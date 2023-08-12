@@ -1,0 +1,208 @@
+name: Build
+on:
+  push:
+
+  workflow_dispatch:
+
+
+
+concurrency: release-${{ github.ref }}
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci --ignore-scripts
+      - name: Build
+        run: npm run build
+      - name: Publish artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "build"
+          path: "dist"
+
+  build-binaries:
+    name: Build binaries - ${{ matrix.config.name }}
+    needs:
+      - build
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Windows MSVC"
+            os: windows-2022
+            cc: "cl"
+            cxx: "cl"
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+            generators: "Visual Studio 17 2022"
+            artifact: "win"
+          - name: "Ubuntu GCC"
+            os: ubuntu-22.04
+            cc: "gcc"
+            cxx: "g++"
+            generators: "Ninja"
+            artifact: "linux"
+          - name: "macOS Clang"
+            os: macos-12
+            cc: "clang"
+            cxx: "clang++"
+            generators: "Xcode"
+            artifact: "mac"
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: dist
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies on windows
+        if: startsWith(matrix.config.os, 'windows')
+        run: |
+          choco install ninja cmake
+
+      - name: Install dependencies on ubuntu
+        if: startsWith(matrix.config.name, 'Ubuntu Latest GCC')
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build cmake libtbb-dev
+
+      - name: Install dependencies on macos
+        if: startsWith(matrix.config.os, 'macos')
+        run: |
+          brew install cmake ninja
+          alias make=cmake
+
+      - name: Setup & Build
+        id: build
+        shell: bash
+        timeout-minutes: 40
+        env:
+          ARTIFACT_NAME: ${{ matrix.config.artifact }}
+        run: |
+          npm ci --ignore-scripts
+          
+          npx zx -y <<'EOF'
+          
+          async function getLatestNodeVersions(maxDate) {
+            const res = await fetch("https://nodejs.org/dist/index.json");
+            const data = await res.json();
+            const versions = new Map();
+            let latestVersion = null;
+            
+            for (const version of data) {
+              const majorVersion = Number(version.version.split(".")[0].slice("v".length));
+              const versionDate = new Date(version.date);
+              
+              if (maxDate != null && versionDate.getTime() > maxDate)
+                continue;
+              
+              if (!versions.has(majorVersion)) {
+                versions.set(majorVersion, version.version);
+              }
+              
+              if (latestVersion === null || majorVersion > latestVersion) {
+                latestVersion = majorVersion;
+              }
+            }
+            
+            return {versions, latestVersion};
+          }
+          
+          function getArches() {
+            switch (process.env.ARTIFACT_NAME) {
+              case "win":
+                return ["x64"];
+              case "linux":
+                return ["x64", "arm64", "armv7l", "ppc64le"];
+              case "mac":
+                return ["x64", "arm64"];
+            }
+            
+            return ["x64"];
+          }
+          
+          const {versions: latestNodeVersions, latestVersion: latestNodeVersion} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
+          
+          const minNodeVersion = latestNodeVersion - 4;
+          
+          const nodeVersions = [...latestNodeVersions].reduce((acc, [majorVersion, version]) => {
+            if (majorVersion >= minNodeVersion)
+              acc.push(version);
+            
+            return acc;
+          }, []);
+          const arches = getArches();
+          
+          console.log("Building for node versions", nodeVersions, "and archs", arches);
+          
+          await $`mkdir -p llamaBins`;
+          
+          for (const nodeVersion of nodeVersions) {
+            for (const arch of arches) {
+              console.log(`Building ${arch} for node ${nodeVersion}`);
+              
+              const majorNodeVersion = parseInt(nodeVersion.slice("v".length))
+              
+              const binName = `${process.env.ARTIFACT_NAME}-${arch}-${majorNodeVersion}.node`; 
+              await $`node ./dist/cli/cli.js download --arch ${arch} --nodeTarget ${nodeVersion}`;
+              await $`mv ./llama/build/Release/llama.node ${"./llamaBins/" + binName}`;
+            }
+          }
+          
+          await $`echo "Built binaries:"`;
+          await $`ls llamaBins`;
+          
+          EOF
+
+      - name: Publish artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "bins-${{ matrix.config.artifact }}"
+          path: "llamaBins/*"
+
+  release:
+    name: Release
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - build-binaries
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      - name: Move artifacts
+        run: |
+          mkdir -p llamaBins
+          mv artifacts/bins-*/* llamaBins/
+          mv artifacts/build dist/
+          
+          echo "Built binaries:"
+          ls llamaBins
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
+

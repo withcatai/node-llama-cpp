@@ -1,0 +1,16 @@
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Install modules
+        run: npm ci --ignore-scripts
+      - name: ESLint
+        run: npx eslint --ext .js --ext .ts .
+      - name: TypeScript validity
+        run: npm run test:typescript

@@ -1,0 +1,17 @@
+/.idea
+/.vscode
+node_modules
+.DS_Store
+
+/dist
+
+/.env
+/.eslintcache
+
+/llama/compile_commands.json
+/llama/llama.cpp
+/llama/.temp
+/llama/build
+/llama/Release
+/llama/Debug
+/llamaBins

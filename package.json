@@ -1,0 +1,120 @@
+{
+  "name": "node-llama-cpp",
+  "version": "0.1.0",
+  "description": "node.js bindings for llama.cpp",
+  "main": "dist/index.js",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "node-llama-cpp": "./dist/cli/cli.js"
+  },
+  "files": [
+    "dist/",
+    "llama/",
+    "llamaBins/",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "import": "./dist/index.js",
+      "node": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./commands": {
+      "default": "./dist/commands.js",
+      "import": "./dist/commands.js",
+      "node": "./dist/commands.js",
+      "types": "./dist/commands.d.ts"
+    },
+    "./commands.js": {
+      "default": "./dist/commands.js",
+      "import": "./dist/commands.js",
+      "node": "./dist/commands.js",
+      "types": "./dist/commands.d.ts"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "postinstall": "node ./dist/cli/cli.js postinstall",
+    "prepare": "[ $CI = true ] || [ -d '.husky/_' ] || husky install",
+    "prebuild": "rm -rf ./dist ./tsconfig.tsbuildinfo",
+    "build": "tsc --build tsconfig.json --force",
+    "prewatch": "rm -rf ./dist ./tsconfig.tsbuildinfo",
+    "watch": "tsc --build tsconfig.json --watch --force",
+    "node-gyp-llama": "cd llama && node-gyp",
+    "node-gyp-llama-build": "cd llama && cross-env CXXFLAGS=\"-fexceptions\" CFLAGS=\"-fexceptions\" node-gyp build -j max",
+    "test": "npm run test:typescript && npm run lint:eslint",
+    "test:typescript": "tsc --build tsconfig.json --dry --force",
+    "lint": "npm run lint:eslint",
+    "lint:eslint": "eslint --ext .js --ext .ts .",
+    "format": "npm run lint:eslint -- --fix",
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/withcatai/node-llama-cpp.git"
+  },
+  "keywords": [
+    "llama",
+    "llama-cpp",
+    "bindings",
+    "ai",
+    "node-gyp",
+    "prebuilt-binaries",
+    "llm",
+    "ggml",
+    "ggmlv3",
+    "raspberry-pi",
+    "self-hosted",
+    "local",
+    "catai"
+  ],
+  "author": "Gilad S.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/withcatai/node-llama-cpp/issues"
+  },
+  "homepage": "https://github.com/withcatai/node-llama-cpp#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^17.7.1",
+    "@commitlint/config-conventional": "^17.7.0",
+    "@types/bytes": "^3.1.1",
+    "@types/cli-progress": "^3.11.0",
+    "@types/fs-extra": "^11.0.1",
+    "@types/node": "^20.4.9",
+    "@types/uuid": "^9.0.2",
+    "@types/yargs": "^17.0.24",
+    "@typescript-eslint/eslint-plugin": "^6.3.0",
+    "@typescript-eslint/parser": "^6.3.0",
+    "eslint": "^8.46.0",
+    "eslint-plugin-import": "^2.28.0",
+    "eslint-plugin-node": "github:giladgd/eslint-plugin-node#dev/giladgd/fixImportExtentionFixingInTypeScript",
+    "husky": "^8.0.3",
+    "semantic-release": "^21.0.7",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.6.1",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "bytes": "^3.1.2",
+    "chalk": "^5.3.0",
+    "cli-progress": "^3.12.0",
+    "cross-env": "^7.0.3",
+    "env-var": "^7.3.1",
+    "fs-extra": "^11.1.1",
+    "node-addon-api": "^7.0.0",
+    "node-downloader-helper": "^2.1.9",
+    "node-gyp": "^9.4.0",
+    "node-stream-zip": "^1.15.0",
+    "octokit": "^3.1.0",
+    "ora": "^7.0.1",
+    "uuid": "^9.0.0",
+    "yargs": "^17.7.2",
+    "zx": "^7.2.3"
+  }
+}
