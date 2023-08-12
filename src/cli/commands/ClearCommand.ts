@@ -46,5 +46,5 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
         });
     }
 
-    await setUsedBinFlag("prebuildBinaries");
+    await setUsedBinFlag("prebuiltBinaries");
 }

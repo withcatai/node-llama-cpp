@@ -46,7 +46,7 @@ export async function compileLlamaCpp({arch = process.arch, nodeTarget = process
         }
     } catch (err) {
         if (setUsedBingFlag)
-            await setUsedBinFlag("prebuildBinaries");
+            await setUsedBinFlag("prebuiltBinaries");
 
         throw err;
     }

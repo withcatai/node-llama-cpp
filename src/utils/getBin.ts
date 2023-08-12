@@ -42,7 +42,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
             case "darwin":
                 return resolvePath("mac", process.arch, supportedVersions);
         }
-        
+
         return null;
     }
 
@@ -52,7 +52,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
 export async function loadBin(): Promise<LlamaCppNodeModule> {
     const usedBingFlag = await getUsedBinFlag();
 
-    if (usedBingFlag === "prebuildBinaries") {
+    if (usedBingFlag === "prebuiltBinaries") {
         const prebuildBinPath = await getPrebuildBinPath();
 
         if (prebuildBinPath == null) {
