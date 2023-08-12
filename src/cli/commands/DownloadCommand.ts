@@ -16,7 +16,8 @@ type DownloadCommandArgs = {
     repo: string,
     release: "latest" | string,
     arch?: string,
-    nodeTarget?: string
+    nodeTarget?: string,
+    skipBuild?: boolean
 };
 
 export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
@@ -41,12 +42,17 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             .option("nodeTarget", {
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
+            })
+            .option("skipBuild", {
+                type: "boolean",
+                default: false,
+                description: "Skip building llama.cpp after downloading it"
             });
     },
     handler: DownloadLlamaCppCommand
 };
 
-export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget}: DownloadCommandArgs) {
+export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, skipBuild}: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
 
@@ -124,13 +130,6 @@ export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget}:
         await unzipLlamaReleaseZipFile(path.join(tempDownloadDirectory, "llama.cpp.zip"), llamaCppDirectory);
     });
 
-    console.log(chalk.blue("Compiling llama.cpp"));
-    await compileLlamaCpp({
-        arch: arch ? arch : undefined,
-        nodeTarget: nodeTarget ? nodeTarget : undefined,
-        setUsedBingFlag: true
-    });
-
     await withOra({
         loading: chalk.blue("Removing temporary files"),
         success: chalk.blue("Removed temporary files"),
@@ -138,6 +137,15 @@ export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget}:
     }, async () => {
         await clearTempFolder();
     });
+
+    if (!skipBuild) {
+        console.log(chalk.blue("Compiling llama.cpp"));
+        await compileLlamaCpp({
+            arch: arch ? arch : undefined,
+            nodeTarget: nodeTarget ? nodeTarget : undefined,
+            setUsedBingFlag: true
+        });
+    }
 
     console.log();
     console.log();

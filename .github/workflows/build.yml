@@ -4,9 +4,6 @@ on:
 
   workflow_dispatch:
 
-
-
-concurrency: release-${{ github.ref }}
 jobs:
   build:
     name: Build
@@ -20,11 +17,18 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Build
         run: npm run build
-      - name: Publish artifact
+      - name: Download latest llama.cpp release
+        run: node ./dist/cli/cli.js download --release latest --skipBuild
+      - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
           name: "build"
           path: "dist"
+      - name: Upload llama.cpp artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "llama.cpp"
+          path: "llama/llama.cpp"
 
   build-binaries:
     name: Build binaries - ${{ matrix.config.name }}
@@ -61,10 +65,17 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: actions/download-artifact@v3
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
         with:
           name: build
           path: dist
+
+      - name: Download llama.cpp artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: llama.cpp
+          path: llama/llama.cpp
 
       - uses: actions/setup-python@v4
         with:
@@ -159,7 +170,7 @@ jobs:
               const majorNodeVersion = parseInt(nodeVersion.slice("v".length))
               
               const binName = `${process.env.ARTIFACT_NAME}-${arch}-${majorNodeVersion}.node`; 
-              await $`node ./dist/cli/cli.js download --arch ${arch} --nodeTarget ${nodeVersion}`;
+              await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${nodeVersion}`;
               await $`mv ./llama/build/Release/llama.node ${"./llamaBins/" + binName}`;
             }
           }
