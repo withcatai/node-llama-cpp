@@ -1,4 +1,4 @@
-import {spawn} from "child_process";
+import spawn from "cross-spawn";
 
 export function spawnCommand(command: string, args: string[], cwd: string) {
     function getCommandString() {
