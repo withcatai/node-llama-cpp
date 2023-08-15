@@ -52,7 +52,7 @@ export class LlamaChatSession {
         });
     }
 
-    public async prompt(prompt: string, onToken?: (token: number) => void, {signal}: {signal?: AbortSignal} = {}) {
+    public async prompt(prompt: string, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
         if (!this.initialized)
             await this.init();
 
@@ -64,11 +64,14 @@ export class LlamaChatSession {
         });
     }
 
-    private async _evalTokens(tokens: Uint32Array, onToken?: (token: number) => void, {signal}: {signal?: AbortSignal} = {}) {
+    private async _evalTokens(tokens: Uint32Array, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
         const stopStrings = this._promptWrapper.getStopStrings();
         const stopStringIndexes = Array(stopStrings.length).fill(0);
         const skippedChunksQueue: number[] = [];
-        let res = "";
+        const res: number[] = [];
+
+        let skipNextTokensEmoji = 0;
+        const decodeRes = () => this._model.decode(Uint32Array.from(res));
 
         for await (const chunk of this._model.evaluate(tokens)) {
             if (signal?.aborted)
@@ -93,27 +96,43 @@ export class LlamaChatSession {
                 }
 
                 if (stopStringIndexes[stopStringIndex] === stopString.length) {
-                    return res;
+                    return decodeRes();
                 }
 
                 skipTokenEvent ||= localShouldSkipTokenEvent;
             }
 
-            if (skipTokenEvent) {
+            skipNextTokensEmoji += LlamaChatSession._calculateEmojiNextLength(chunk);
+            if (skipTokenEvent || skipNextTokensEmoji > 0) {
+                skipNextTokensEmoji--;
                 skippedChunksQueue.push(chunk);
                 continue;
             }
 
             while (skippedChunksQueue.length > 0) {
-                const token = skippedChunksQueue.shift()!;
-                res += this._model.decode(Uint32Array.from([token]));
-                onToken?.(token);
+                res.push(...skippedChunksQueue);
+                onToken?.(skippedChunksQueue);
+                skippedChunksQueue.length = 0;
             }
 
-            res += tokenStr;
-            onToken?.(chunk);
+            res.push(chunk);
+            onToken?.([chunk]);
         }
 
-        return res;
+        return decodeRes();
+    }
+
+    private static _calculateEmojiNextLength(firstByte: number) {
+        const byteText = firstByte.toString(2);
+
+        if (byteText.startsWith("11110")) {
+            return 3;
+        } else if (byteText.startsWith("1110")) {
+            return 2;
+        } else if (byteText.startsWith("110")) {
+            return 1;
+        }
+
+        return 0;
     }
 }
