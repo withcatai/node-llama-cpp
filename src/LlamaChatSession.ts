@@ -80,7 +80,7 @@ export class LlamaChatSession {
 
             const tokenStr = decodeTokens([chunk]);
             const {shouldReturn, skipTokenEvent} = this._checkStopString(tokenStr, stopStringIndexes);
-            
+
             if (shouldReturn)
                 return decodeTokens(res);
 
