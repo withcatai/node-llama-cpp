@@ -90,7 +90,7 @@ export class LlamaChatSession {
                 continue;
             }
 
-            while (skippedChunksQueue.length > 0) {
+            if (skippedChunksQueue.length > 0) {
                 res.push(...skippedChunksQueue);
                 onToken?.(skippedChunksQueue);
                 skippedChunksQueue.length = 0;
