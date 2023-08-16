@@ -1,14 +1,25 @@
-import {LLAMAContext, llamaCppNode} from "./LlamaBins.js";
+import {loadBin, type LLAMAModel, type LLAMAContext} from "./utils/getBin.js";
 
-type LlamaContextConstructorParameters = {prependBos: boolean, ctx: LLAMAContext};
-export class LlamaContext {
+const llamaCppNode = await loadBin();
+const {LLAMAModel, LLAMAContext} = llamaCppNode;
+
+export class LlamaModel {
+    private readonly _model: LLAMAModel;
     private readonly _ctx: LLAMAContext;
     private _prependBos: boolean;
 
-    /** @internal */
-    public constructor( {ctx, prependBos}: LlamaContextConstructorParameters ) {
-        this._ctx = ctx;
+    public constructor({
+        modelPath, prependBos = true
+    }: {
+        modelPath: string, prependBos?: boolean
+    }) {
+        this._model = new LLAMAModel(modelPath);
+        this._ctx = new LLAMAContext(this._model);
         this._prependBos = prependBos;
+    }
+
+    public get systemInfo() {
+        return llamaCppNode.systemInfo();
     }
 
     public encode(text: string): Uint32Array {
@@ -23,10 +34,10 @@ export class LlamaContext {
         let evalTokens = tokens;
 
         if (this._prependBos) {
-            const tokenArray = Array.from(tokens);
-            tokenArray.unshift(llamaCppNode.tokenBos());
+            const tokensArray = Array.from(tokens);
+            tokensArray.unshift(llamaCppNode.tokenBos());
 
-            evalTokens = Uint32Array.from(tokenArray);
+            evalTokens = Uint32Array.from(tokensArray);
             this._prependBos = false;
         }
 
@@ -45,5 +56,4 @@ export class LlamaContext {
             evalTokens = Uint32Array.from([nextToken]);
         }
     }
-
 }

@@ -1,32 +1,31 @@
-import {defaultChatSystemPrompt} from "../config.js";
-import {withLock} from "../utils/withLock.js";
-import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
-import {AbortError} from "../AbortError.js";
-import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper.js";
-import {LlamaContext} from "./LlamaContext.js";
+import {defaultChatSystemPrompt} from "./config.js";
+import {withLock} from "./utils/withLock.js";
 import {LlamaModel} from "./LlamaModel.js";
+import {ChatPromptWrapper} from "./ChatPromptWrapper.js";
+import {AbortError} from "./AbortError.js";
+import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.js";
 
 
 export class LlamaChatSession {
+    private readonly _model: LlamaModel;
     private readonly _systemPrompt: string;
     private readonly _printLLamaSystemInfo: boolean;
     private readonly _promptWrapper: ChatPromptWrapper;
     private _promptIndex: number = 0;
     private _initialized: boolean = false;
-    private readonly _ctx: LlamaContext;
 
     public constructor({
-        context,
+        model,
         printLLamaSystemInfo = false,
         promptWrapper = new GeneralChatPromptWrapper(),
         systemPrompt = defaultChatSystemPrompt
     }: {
-        context: LlamaContext,
+        model: LlamaModel,
         printLLamaSystemInfo?: boolean,
         promptWrapper?: ChatPromptWrapper,
         systemPrompt?: string,
     }) {
-        this._ctx = context;
+        this._model = model;
         this._printLLamaSystemInfo = printLLamaSystemInfo;
         this._promptWrapper = promptWrapper;
 
@@ -37,8 +36,8 @@ export class LlamaChatSession {
         return this._initialized;
     }
 
-    public get context() {
-        return this._ctx;
+    public get model() {
+        return this._model;
     }
 
     public async init() {
@@ -47,7 +46,7 @@ export class LlamaChatSession {
                 return;
 
             if (this._printLLamaSystemInfo)
-                console.log("Llama system info", LlamaModel.systemInfo);
+                console.log("Llama system info", this._model.systemInfo);
 
             this._initialized = true;
         });
@@ -61,7 +60,7 @@ export class LlamaChatSession {
             const promptText = this._promptWrapper.wrapPrompt(prompt, {systemPrompt: this._systemPrompt, promptIndex: this._promptIndex});
             this._promptIndex++;
 
-            return await this._evalTokens(this._ctx.encode(promptText), onToken, {signal});
+            return await this._evalTokens(this._model.encode(promptText), onToken, {signal});
         });
     }
 
@@ -72,13 +71,13 @@ export class LlamaChatSession {
         const res: number[] = [];
 
         let skipNextTokensEmoji = 0;
-        const decodeRes = () => this._ctx.decode(Uint32Array.from(res));
+        const decodeRes = () => this._model.decode(Uint32Array.from(res));
 
-        for await (const chunk of this._ctx.evaluate(tokens)) {
+        for await (const chunk of this._model.evaluate(tokens)) {
             if (signal?.aborted)
                 throw new AbortError();
 
-            const tokenStr = this._ctx.decode(Uint32Array.from([chunk]));
+            const tokenStr = this._model.decode(Uint32Array.from([chunk]));
             let skipTokenEvent = false;
 
             for (let stopStringIndex = 0; stopStringIndex < stopStrings.length; stopStringIndex++) {
