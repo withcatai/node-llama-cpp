@@ -195,7 +195,7 @@ jobs:
 
   release:
     name: Release
-    if: github.ref == 'refs/heads/master'
+#    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -229,14 +229,16 @@ jobs:
           
           echo "Built binaries:"
           ls llamaBins
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+#      - name: Release
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+#        run: npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url
-        run: echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .npmPackage.version.txt)" >> $GITHUB_OUTPUT
+        run: |
+          echo "0.1.0" > .npmPackage.version.txt
+          echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .npmPackage.version.txt)" >> $GITHUB_OUTPUT
       - name: Upload docs to GitHub Pages
         uses: actions/upload-pages-artifact@v2
         with:
