@@ -129,7 +129,7 @@ console.log("AI: " + a1);
 ```
 
 ### CLI
-```txt
+```
 Usage: node-llama-cpp <command> [options]
 
 Commands:
@@ -140,11 +140,11 @@ Commands:
 
 Options:
   -h, --help     Show help                                                                 [boolean]
-  -v, --version  Show version number                                                       [boolean]                                                [boolean]
+  -v, --version  Show version number                                                       [boolean]
 ```
 
 #### `download` command
-```txt
+```
 node-llama-cpp download
 
 Download a release of llama.cpp and compile it
@@ -162,7 +162,7 @@ Options:
 ```
 
 #### `build` command
-```txt
+```
 node-llama-cpp build
 
 Compile the currently downloaded llama.cpp
@@ -175,7 +175,7 @@ Options:
 ```
 
 #### `clear` command
-```txt
+```
 node-llama-cpp clear [type]
 
 Clear files created by llama-cli
@@ -187,7 +187,7 @@ Options:
 ```
 
 #### `chat` command
-```txt
+```
 node-llama-cpp chat
 
 Chat with a LLama model

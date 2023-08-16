@@ -44,6 +44,7 @@
     "prepare": "[ $CI = true ] || [ -d '.husky/_' ] || husky install",
     "prebuild": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force",
+    "generate-docs": "typedoc",
     "prewatch": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
     "node-gyp-llama": "cd llama && node-gyp",
@@ -83,6 +84,7 @@
   "devDependencies": {
     "@commitlint/cli": "^17.7.1",
     "@commitlint/config-conventional": "^17.7.0",
+    "@semantic-release/exec": "^6.0.3",
     "@types/bytes": "^3.1.1",
     "@types/cli-progress": "^3.11.0",
     "@types/cross-spawn": "^6.0.2",
@@ -99,6 +101,7 @@
     "semantic-release": "^21.0.7",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.1",
+    "typedoc": "^0.24.8",
     "typescript": "^5.1.6",
     "zx": "^7.2.3"
   },

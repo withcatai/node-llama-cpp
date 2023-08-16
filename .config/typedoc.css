@@ -1,0 +1,7 @@
+.tsd-typography h4,
+.tsd-typography .tsd-index-panel h3,
+.tsd-index-panel .tsd-typography h3,
+.tsd-typography h5,
+.tsd-typography h6 {
+    margin: 1.2em 0 0.4em 0;
+}
