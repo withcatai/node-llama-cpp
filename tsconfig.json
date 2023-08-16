@@ -23,7 +23,8 @@
         "strict": true,
         "sourceMap": true,
         "composite": false,
-        "declaration": true
+        "declaration": true,
+        "stripInternal": true
     },
     "files": [
         "./src/index.ts"
