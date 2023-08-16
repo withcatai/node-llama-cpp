@@ -18,6 +18,8 @@ If binaries are not available for your platform, it'll fallback to download the 
 To disable this behavior set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
 
 ## Documentation
+### [API reference](https://withcatai.github.io/node-llama-cpp/modules.html)
+
 ### Usage
 #### As a chatbot
 ```typescript
