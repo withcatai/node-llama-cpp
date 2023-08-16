@@ -60,14 +60,14 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper}: ChatCommand) {
-    const {LlamaChatSession} = await import("../../LlamaChatSession.js");
-    const {LlamaModel} = await import("../../LlamaModel.js");
+    const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
+    const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
 
     const model = new LlamaModel({
         modelPath: modelArg
     });
     const session = new LlamaChatSession({
-        model,
+        context: model.createContext(),
         printLLamaSystemInfo: systemInfo,
         systemPrompt,
         promptWrapper: createChatWrapper(wrapper)
@@ -102,7 +102,7 @@ async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper}: Cha
 
         process.stdout.write(startColor);
         await session.prompt(input, (chunk) => {
-            process.stdout.write(model.decode(Uint32Array.from(chunk)));
+            process.stdout.write(session.context.decode(Uint32Array.from(chunk)));
         });
         process.stdout.write(endColor);
         console.log();
