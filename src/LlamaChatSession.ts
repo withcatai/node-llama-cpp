@@ -2,8 +2,8 @@ import {defaultChatSystemPrompt} from "./config.js";
 import {withLock} from "./utils/withLock.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {ChatPromptWrapper} from "./ChatPromptWrapper.js";
-import {LlamaChatPromptWrapper} from "./chatWrappers/LlamaChatPromptWrapper.js";
 import {AbortError} from "./AbortError.js";
+import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.js";
 
 const UNKNOWN_UNICODE_CHAR = "�";
 
@@ -18,7 +18,7 @@ export class LlamaChatSession {
     public constructor({
         model,
         printLLamaSystemInfo = false,
-        promptWrapper = new LlamaChatPromptWrapper(),
+        promptWrapper = new GeneralChatPromptWrapper(),
         systemPrompt = defaultChatSystemPrompt
     }: {
         model: LlamaModel,
@@ -80,7 +80,7 @@ export class LlamaChatSession {
 
             const tokenStr = decodeTokens([chunk]);
             const {shouldReturn, skipTokenEvent} = this._checkStopString(tokenStr, stopStringIndexes);
-            
+
             if (shouldReturn)
                 return decodeTokens(res);
 
