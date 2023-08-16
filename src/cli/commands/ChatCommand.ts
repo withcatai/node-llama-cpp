@@ -93,7 +93,7 @@ async function RunChat({model: modelArg, systemInfo, systemPrompt}: ChatCommand)
 
         process.stdout.write(startColor);
         await session.prompt(input, (chunk) => {
-            process.stdout.write(model.decode(Uint32Array.from([chunk])));
+            process.stdout.write(model.decode(Uint32Array.from(chunk)));
         });
         process.stdout.write(endColor);
         console.log();

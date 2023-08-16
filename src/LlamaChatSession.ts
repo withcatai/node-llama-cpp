@@ -5,6 +5,7 @@ import {ChatPromptWrapper} from "./ChatPromptWrapper.js";
 import {LlamaChatPromptWrapper} from "./chatWrappers/LlamaChatPromptWrapper.js";
 import {AbortError} from "./AbortError.js";
 
+const UNKNOWN_UNICODE_CHAR = "�";
 
 export class LlamaChatSession {
     private readonly _model: LlamaModel;
@@ -52,7 +53,7 @@ export class LlamaChatSession {
         });
     }
 
-    public async prompt(prompt: string, onToken?: (token: number) => void, {signal}: {signal?: AbortSignal} = {}) {
+    public async prompt(prompt: string, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
         if (!this.initialized)
             await this.init();
 
@@ -64,56 +65,70 @@ export class LlamaChatSession {
         });
     }
 
-    private async _evalTokens(tokens: Uint32Array, onToken?: (token: number) => void, {signal}: {signal?: AbortSignal} = {}) {
+    private async _evalTokens(tokens: Uint32Array, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
+        const decodeTokens = (tokens: number[]) => this._model.decode(Uint32Array.from(tokens));
+
         const stopStrings = this._promptWrapper.getStopStrings();
         const stopStringIndexes = Array(stopStrings.length).fill(0);
         const skippedChunksQueue: number[] = [];
-        let res = "";
+        const res: number[] = [];
+
 
         for await (const chunk of this._model.evaluate(tokens)) {
             if (signal?.aborted)
                 throw new AbortError();
 
-            const tokenStr = this._model.decode(Uint32Array.from([chunk]));
-            let skipTokenEvent = false;
+            const tokenStr = decodeTokens([chunk]);
+            const {shouldReturn, skipTokenEvent} = this._checkStopString(tokenStr, stopStringIndexes);
+            
+            if (shouldReturn)
+                return decodeTokens(res);
 
-            for (let stopStringIndex = 0; stopStringIndex < stopStrings.length; stopStringIndex++) {
-                const stopString = stopStrings[stopStringIndex];
-
-                let localShouldSkipTokenEvent = false;
-                for (let i = 0; i < tokenStr.length && stopStringIndexes[stopStringIndex] !== stopString.length; i++) {
-                    if (tokenStr[i] === stopString[stopStringIndexes[stopStringIndex]]) {
-                        stopStringIndexes[stopStringIndex]++;
-                        localShouldSkipTokenEvent = true;
-                    } else {
-                        stopStringIndexes[stopStringIndex] = 0;
-                        localShouldSkipTokenEvent = false;
-                        break;
-                    }
-                }
-
-                if (stopStringIndexes[stopStringIndex] === stopString.length) {
-                    return res;
-                }
-
-                skipTokenEvent ||= localShouldSkipTokenEvent;
-            }
-
-            if (skipTokenEvent) {
+            // if the token is unknown, it means it's not complete character
+            if (tokenStr === UNKNOWN_UNICODE_CHAR || skipTokenEvent) {
                 skippedChunksQueue.push(chunk);
                 continue;
             }
 
-            while (skippedChunksQueue.length > 0) {
-                const token = skippedChunksQueue.shift()!;
-                res += this._model.decode(Uint32Array.from([token]));
-                onToken?.(token);
+            if (skippedChunksQueue.length > 0) {
+                res.push(...skippedChunksQueue);
+                onToken?.(skippedChunksQueue);
+                skippedChunksQueue.length = 0;
             }
 
-            res += tokenStr;
-            onToken?.(chunk);
+            res.push(chunk);
+            onToken?.([chunk]);
         }
 
-        return res;
+        return decodeTokens(res);
+    }
+
+    private _checkStopString(tokenStr: string, stopStringIndexes: number[]){
+        const stopStrings = this._promptWrapper.getStopStrings();
+        let skipTokenEvent = false;
+
+        for (let stopStringIndex = 0; stopStringIndex < stopStrings.length; stopStringIndex++) {
+            const stopString = stopStrings[stopStringIndex];
+
+            let localShouldSkipTokenEvent = false;
+            for (let i = 0; i < tokenStr.length && stopStringIndexes[stopStringIndex] !== stopString.length; i++) {
+                if (tokenStr[i] === stopString[stopStringIndexes[stopStringIndex]]) {
+                    stopStringIndexes[stopStringIndex]++;
+                    localShouldSkipTokenEvent = true;
+                } else {
+                    stopStringIndexes[stopStringIndex] = 0;
+                    localShouldSkipTokenEvent = false;
+                    break;
+                }
+            }
+
+            if (stopStringIndexes[stopStringIndex] === stopString.length) {
+                return {shouldReturn: true};
+            }
+
+            skipTokenEvent ||= localShouldSkipTokenEvent;
+        }
+
+        return {skipTokenEvent};
     }
 }
