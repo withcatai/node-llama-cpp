@@ -8,21 +8,80 @@
 
 class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
   public:
-  llama_context_params params;
-  llama_model* model;
-  LLAMAModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAModel>(info) {
-    params = llama_context_default_params();
-    params.seed = -1;
-    params.n_ctx = 4096;
-    model = llama_load_model_from_file(info[0].As<Napi::String>().Utf8Value().c_str(), params);
+    llama_context_params params;
+    llama_model* model;
 
-    if (model == NULL) {
-      Napi::Error::New(info.Env(), "Failed to load model").ThrowAsJavaScriptException();
-      return;
+    LLAMAModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAModel>(info) {
+        params = llama_context_default_params();
+        params.seed = -1;
+        params.n_ctx = 4096;
+
+        // Get the model path
+        std::string modelPath = info[0].As<Napi::String>().Utf8Value();
+
+        if (info.Length() > 1 && info[1].IsObject()) {
+            Napi::Object options = info[1].As<Napi::Object>();
+
+            if (options.Has("seed")) {
+                params.seed = options.Get("seed").As<Napi::Number>().Int32Value();
+            }
+
+            if (options.Has("contextSize")) {
+                params.n_ctx = options.Get("contextSize").As<Napi::Number>().Int32Value();
+            }
+
+            if (options.Has("batchSize")) {
+                params.n_batch = options.Get("batchSize").As<Napi::Number>().Int32Value();
+            }
+
+            if (options.Has("gpuCores")) {
+                params.n_gpu_layers = options.Get("gpuCores").As<Napi::Number>().Int32Value();
+            }
+
+            if (options.Has("lowVram")) {
+                params.low_vram = options.Get("lowVram").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("f16Kv")) {
+                params.f16_kv = options.Get("f16Kv").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("logitsAll")) {
+                params.logits_all = options.Get("logitsAll").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("vocabOnly")) {
+                params.vocab_only = options.Get("vocabOnly").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("useMmap")) {
+                params.use_mmap = options.Get("useMmap").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("useMlock")) {
+                params.use_mlock = options.Get("useMlock").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("embedding")) {
+                params.embedding = options.Get("embedding").As<Napi::Boolean>().Value();
+            }
+        }
+
+        model = llama_load_model_from_file(modelPath.c_str(), params);
+
+        if (model == NULL) {
+            Napi::Error::New(info.Env(), "Failed to load model").ThrowAsJavaScriptException();
+            return;
+        }
     }
-  }
-  ~LLAMAModel() { llama_free_model(model); }
-  static void init(Napi::Object exports) { exports.Set("LLAMAModel", DefineClass(exports.Env(), "LLAMAModel", {})); }
+
+    ~LLAMAModel() {
+        llama_free_model(model);
+    }
+
+    static void init(Napi::Object exports) {
+        exports.Set("LLAMAModel", DefineClass(exports.Env(), "LLAMAModel", {}));
+    }
 };
 
 class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {

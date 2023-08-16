@@ -95,7 +95,19 @@ export type LlamaCppNodeModule = {
 };
 
 export type LLAMAModel = {
-    new (modelPath: string): LLAMAModel
+    new (modelPath: string, params: {
+        seed?: number,
+        contextSize?: number,
+        batchSize?: number,
+        gpuCores?: number,
+        lowVram?: boolean,
+        f16Kv?: boolean,
+        logitsAll?: boolean,
+        vocabOnly?: boolean,
+        useMmap?: boolean,
+        useMlock?: boolean,
+        embedding?: boolean
+    }): LLAMAModel
 };
 
 export type LLAMAContext = {

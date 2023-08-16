@@ -30,7 +30,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
 });
-const session = new LlamaChatSession({context: model.createContext()});
+const context = new LlamaContext({model});
+const session = new LlamaChatSession({context});
 
 
 const q1 = "Hi there, how are you?";
@@ -73,7 +74,8 @@ const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin"),
     promptWrapper: new MyCustomChatPromptWrapper() // by default, LlamaChatPromptWrapper is used
 })
-const session = new LlamaChatSession({context: model.createContext()});
+const context = new LlamaContext({model});
+const session = new LlamaChatSession({context});
 
 
 const q1 = "Hi there, how are you?";
@@ -102,7 +104,7 @@ const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
 });
 
-const context = model.createContext();
+const context = new LlamaContext({model});
 
 const q1 = "Hi there, how are you?";
 console.log("AI: " + q1);
