@@ -6,7 +6,6 @@ import withOra from "../../utils/withOra.js";
 import {defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
-import {LlamaContext} from "../../llamaEvaluator/LlamaContext.js";
 
 type ChatCommand = {
     model: string,
@@ -70,6 +69,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper, contextSize}: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
+    const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext.js");
 
     const model = new LlamaModel({
         modelPath: modelArg,
