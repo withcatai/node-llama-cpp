@@ -5,11 +5,13 @@ import chalk from "chalk";
 import withOra from "../../utils/withOra.js";
 import {defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
+import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
 
 type ChatCommand = {
     model: string,
     systemInfo: boolean,
-    systemPrompt: string
+    systemPrompt: string,
+    wrapper: string
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
@@ -37,11 +39,18 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                     "System prompt to use against the model. " +
                     "[default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]",
                 group: "Optional:"
+            })
+            .option("wrapper", {
+                type: "string",
+                default: "general",
+                choices: ["general", "llama"],
+                description: "Chat wrapper to use",
+                group: "Optional:"
             });
     },
-    async handler({model, systemInfo, systemPrompt}) {
+    async handler({model, systemInfo, systemPrompt, wrapper}) {
         try {
-            await RunChat({model, systemInfo, systemPrompt});
+            await RunChat({model, systemInfo, systemPrompt, wrapper});
         } catch (err) {
             console.error(err);
             process.exit(1);
@@ -50,7 +59,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 };
 
 
-async function RunChat({model: modelArg, systemInfo, systemPrompt}: ChatCommand) {
+async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper}: ChatCommand) {
     const {LlamaChatSession} = await import("../../LlamaChatSession.js");
     const {LlamaModel} = await import("../../LlamaModel.js");
 
@@ -61,7 +70,7 @@ async function RunChat({model: modelArg, systemInfo, systemPrompt}: ChatCommand)
         model,
         printLLamaSystemInfo: systemInfo,
         systemPrompt,
-        promptWrapper: new LlamaChatPromptWrapper()
+        promptWrapper: createChatWrapper(wrapper)
     });
 
     await withOra({
@@ -98,4 +107,14 @@ async function RunChat({model: modelArg, systemInfo, systemPrompt}: ChatCommand)
         process.stdout.write(endColor);
         console.log();
     }
+}
+
+function createChatWrapper(wrapper: string) {
+    switch (wrapper) {
+        case "general":
+            return new GeneralChatPromptWrapper();
+        case "llama":
+            return new LlamaChatPromptWrapper();
+    }
+    throw new Error("Unknown wrapper: " + wrapper);
 }
