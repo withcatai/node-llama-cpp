@@ -8,7 +8,7 @@ export class LlamaModel {
     /**
      * options source:
      * https://github.com/ggerganov/llama.cpp/blob/b5ffb2849d23afe73647f68eec7b68187af09be6/llama.h#L102 (struct llama_context_params)
-     * @param {string} options
+     * @param {object} options
      * @param {string} options.modelPath - path to the model on the filesystem
      * @param {number | null} [options.seed] - If null, a random seed will be used
      * @param {number} [options.contextSize] - text context size
