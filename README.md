@@ -29,8 +29,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
-})
-const session = new LlamaChatSession({model});
+});
+const session = new LlamaChatSession({context: model.createContext()});
 
 
 const q1 = "Hi there, how are you?";
@@ -73,7 +73,7 @@ const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin"),
     promptWrapper: new MyCustomChatPromptWrapper() // by default, LlamaChatPromptWrapper is used
 })
-const session = new LlamaChatSession({model});
+const session = new LlamaChatSession({context: model.createContext()});
 
 
 const q1 = "Hi there, how are you?";
@@ -98,29 +98,31 @@ import {LlamaModel, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaChatSession({
+const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
 });
+
+const context = model.createContext();
 
 const q1 = "Hi there, how are you?";
 console.log("AI: " + q1);
 
-const tokens = model.encode(q1);
+const tokens = context.encode(q1);
 const res: number[] = [];
-for await (const chunk of model.evaluate(tokens)) {
+for await (const chunk of context.evaluate(tokens)) {
     res.push(chunk);
     
     // it's important to not concatinate the results as strings,
     // as doing so will break some characters (like some emojis) that are made of multiple tokens.
     // by using an array of tokens, we can decode them correctly together.
-    const resString: string = model.decode(Uint32Array.from(res));
+    const resString: string = context.decode(Uint32Array.from(res));
     
     const lastPart = resString.split("ASSISTANT:").reverse()[0];
     if (lastPart.includes("USER:"))
         break;
 }
 
-const a1 = model.decode(Uint32Array.from(res)).split("USER:")[0];
+const a1 = context.decode(Uint32Array.from(res)).split("USER:")[0];
 console.log("AI: " + a1);
 ```
 
