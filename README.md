@@ -25,7 +25,7 @@ To disable this behavior set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNL
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaChatSession} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,7 +54,7 @@ console.log("AI: " + a2);
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaChatSession, ChatPromptWrapper} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession, ChatPromptWrapper} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -98,7 +98,7 @@ console.log("AI: " + a2);
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaChatSession} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
