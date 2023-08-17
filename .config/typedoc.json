@@ -10,5 +10,6 @@
     "excludePrivate": true,
     "githubPages": true,
     "hideGenerator": true,
-    "jsDocCompatibility": true
+    "jsDocCompatibility": true,
+    "htmlLang": "en"
 }
