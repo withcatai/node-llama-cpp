@@ -13,7 +13,7 @@ export class LlamaModel {
      * @param {number | null} [options.seed] - If null, a random seed will be used
      * @param {number} [options.contextSize] - text context size
      * @param {number} [options.batchSize] - prompt processing batch size
-     * @param {number} [options.gpuCores] - number of layers to store in VRAM
+     * @param {number} [options.gpuLayers] - number of layers to store in VRAM
      * @param {boolean} [options.lowVram] - if true, reduce VRAM usage at the cost of performance
      * @param {boolean} [options.f16Kv] - use fp16 for KV cache
      * @param {boolean} [options.logitsAll] - the llama_eval() call computes all logits, not just the last one
@@ -23,18 +23,50 @@ export class LlamaModel {
      * @param {boolean} [options.embedding] - embedding mode only
      */
     public constructor({
-        modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuCores,
+        modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
         lowVram, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: {
-        modelPath: string, seed?: number | null, contextSize?: number, batchSize?: number, gpuCores?: number,
-        lowVram?: boolean, f16Kv?: boolean, logitsAll?: boolean, vocabOnly?: boolean, useMmap?: boolean, useMlock?: boolean,
+        /** path to the model on the filesystem */
+        modelPath: string,
+
+        /** If null, a random seed will be used */
+        seed?: number | null,
+
+        /** text context size */
+        contextSize?: number,
+
+        /** prompt processing batch size */
+        batchSize?: number,
+
+        /** number of layers to store in VRAM */
+        gpuLayers?: number,
+
+        /** if true, reduce VRAM usage at the cost of performance */
+        lowVram?: boolean,
+
+        /** use fp16 for KV cache */
+        f16Kv?: boolean,
+
+        /** the llama_eval() call computes all logits, not just the last one */
+        logitsAll?: boolean,
+
+        /** only load the vocabulary, no weights */
+        vocabOnly?: boolean,
+
+        /** use mmap if possible */
+        useMmap?: boolean,
+
+        /** force system to keep model in RAM */
+        useMlock?: boolean,
+
+        /** embedding mode only */
         embedding?: boolean
     }) {
         this._model = new LLAMAModel(modelPath, removeNullFields({
             seed: seed != null ? Math.max(-1, seed) : undefined,
             contextSize,
             batchSize,
-            gpuCores,
+            gpuLayers,
             lowVram,
             f16Kv,
             logitsAll,

@@ -34,8 +34,8 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
                 params.n_batch = options.Get("batchSize").As<Napi::Number>().Int32Value();
             }
 
-            if (options.Has("gpuCores")) {
-                params.n_gpu_layers = options.Get("gpuCores").As<Napi::Number>().Int32Value();
+            if (options.Has("gpuLayers")) {
+                params.n_gpu_layers = options.Get("gpuLayers").As<Napi::Number>().Int32Value();
             }
 
             if (options.Has("lowVram")) {
