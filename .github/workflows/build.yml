@@ -17,6 +17,8 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Build
         run: npm run build
+      - name: Generate docs
+        run: npm run generate-docs
       - name: Download latest llama.cpp release
         run: node ./dist/cli/cli.js download --release latest --skipBuild
       - name: Upload build artifact
@@ -24,6 +26,11 @@ jobs:
         with:
           name: "build"
           path: "dist"
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "docs"
+          path: "docs"
       - name: Upload llama.cpp artifact
         uses: actions/upload-artifact@v3
         with:
@@ -191,7 +198,12 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
+    environment:
+      name: npm
+      url: ${{ steps.set-npm-url.outputs.npm-url }}
     permissions:
+      pages: write
+      id-token: write
       contents: write
       issues: write
       pull-requests: write
@@ -213,6 +225,7 @@ jobs:
           mkdir -p llamaBins
           mv artifacts/bins-*/* llamaBins/
           mv artifacts/build dist/
+          mv artifacts/docs docs/
           
           echo "Built binaries:"
           ls llamaBins
@@ -221,4 +234,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
-
+      - name: Set npm package url to GITHUB_OUTPUT
+        id: set-npm-url
+        run: |
+          if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
+            echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
+          fi
+      - name: Upload docs to GitHub Pages
+        if: steps.set-npm-url.outputs.npm-url != ''
+        uses: actions/upload-pages-artifact@v2
+        with:
+          name: pages-docs
+          path: docs
+      - name: Deploy docs to GitHub Pages
+        if: steps.set-npm-url.outputs.npm-url != ''
+        uses: actions/deploy-pages@v2
+        with:
+          artifact_name: pages-docs
