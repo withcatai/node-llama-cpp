@@ -236,13 +236,18 @@ jobs:
         run: npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url
-        run: echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .npmPackage.version.txt)" >> $GITHUB_OUTPUT
+        run: |
+          if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
+            echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
+          fi
       - name: Upload docs to GitHub Pages
+        if: steps.set-npm-url.outputs.npm-url != ''
         uses: actions/upload-pages-artifact@v2
         with:
           name: pages-docs
           path: docs
       - name: Deploy docs to GitHub Pages
+        if: steps.set-npm-url.outputs.npm-url != ''
         uses: actions/deploy-pages@v2
         with:
           artifact_name: pages-docs
