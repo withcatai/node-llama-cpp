@@ -21,9 +21,20 @@ pre {
 .tsd-page-toolbar {
     border-bottom: none;
     background: color-mix(in srgb, var(--color-background-secondary), transparent 20%);
-    backdrop-filter: blur(6px);
-    padding: 8px 0px;
     box-shadow: 0px -148px 86px 86px #000000;
+}
+
+.tsd-page-toolbar .tsd-toolbar-contents {
+    padding: 8px 2rem;
+}
+
+.tsd-page-toolbar:before {
+    width: 100%;
+    position: absolute;
+    content: "";
+    height: 100%;
+    z-index: -1;
+    backdrop-filter: blur(6px);
 }
 
 @media (min-width: 1200px) {
@@ -48,7 +59,7 @@ pre {
 .tsd-navigation a:hover,
 .tsd-navigation summary > span:hover,
 .tsd-page-navigation a:hover {
-    opacity: 0.8;
+    /*opacity: 0.8;*/
     text-decoration: none;
     background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
@@ -60,7 +71,7 @@ pre {
 .tsd-navigation a.current:hover,
 .tsd-page-navigation a.current:hover {
     border-radius: 4px;
-    background-color: color-mix(in srgb, var(--color-active-menu-item), transparent 6%);
+    background-color: color-mix(in srgb, var(--color-active-menu-item), transparent 16%);
 }
 
 pre {
@@ -118,4 +129,84 @@ code.tsd-tag {
 
 h1 code.tsd-tag:first-of-type {
     margin-left: 0.55em;
+}
+
+.tsd-page-toolbar a.title:hover {
+    text-decoration: none;
+    background-color: color-mix(in srgb, currentColor 12%, transparent);
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: 4px;
+}
+
+a.tsd-index-link {
+    padding: 4px !important;
+}
+
+a.tsd-index-link:hover {
+    text-decoration: none;
+    background-color: color-mix(in srgb, currentColor 12%, transparent);
+    border-radius: 8px;
+}
+
+h1:not(.tsd-anchor-link, .tsd-returns-title) > a:hover,
+h2:not(.tsd-anchor-link, .tsd-returns-title) > a:hover,
+h3:not(.tsd-anchor-link, .tsd-returns-title) > a:hover,
+h4:not(.tsd-anchor-link, .tsd-returns-title) > a:hover,
+h5:not(.tsd-anchor-link, .tsd-returns-title) > a:hover,
+h6:not(.tsd-anchor-link, .tsd-returns-title) > a:hover {
+    text-decoration: none;
+    color: var(--color-text);
+}
+
+h1:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before,
+h2:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before,
+h3:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before,
+h4:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before,
+h5:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before,
+h6:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before {
+    content: "";
+    position: absolute;
+    height: calc(1ex + (1lh - 1ex)/2);
+    margin-top: calc(0.2 * 1ex);
+    margin-left: -8px;
+    width: 3px;
+    background-color: currentColor;
+    border-radius: 9999px;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+#tsd-search.has-focus {
+    background-color: color-mix(in srgb, var(--color-accent), transparent 60%);
+}
+
+#tsd-search .field input {
+    padding: 12px 16px;
+}
+
+#tsd-search .results li {
+    padding: 0px 16px;
+}
+
+#tsd-search .results li {
+    padding: 0px 16px;
+    background-color: color-mix(in srgb, var(--color-background), transparent 20%);
+}
+
+#tsd-search .results li:nth-child(even) {
+    background-color: color-mix(in srgb, var(--color-background), transparent 20%);
+}
+
+#tsd-search .results li.current,
+#tsd-search .results li:hover {
+    background-color: color-mix(in srgb, var(--color-accent), transparent 20%);
+}
+
+#tsd-search.has-focus .results {
+    backdrop-filter: blur(6px);
+}
+
+.container-main {
+    margin-top: 16px;
 }
