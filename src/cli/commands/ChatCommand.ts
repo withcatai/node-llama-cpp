@@ -11,7 +11,8 @@ type ChatCommand = {
     model: string,
     systemInfo: boolean,
     systemPrompt: string,
-    wrapper: string
+    wrapper: string,
+    contextSize: number
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
@@ -46,11 +47,17 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 choices: ["general", "llama"],
                 description: "Chat wrapper to use",
                 group: "Optional:"
+            })
+            .option("contextSize", {
+                type: "number",
+                default: 1024 * 4,
+                description: "Context size to use for the model",
+                group: "Optional:"
             });
     },
-    async handler({model, systemInfo, systemPrompt, wrapper}) {
+    async handler({model, systemInfo, systemPrompt, wrapper, contextSize}) {
         try {
-            await RunChat({model, systemInfo, systemPrompt, wrapper});
+            await RunChat({model, systemInfo, systemPrompt, wrapper, contextSize});
         } catch (err) {
             console.error(err);
             process.exit(1);
@@ -59,15 +66,18 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 };
 
 
-async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper}: ChatCommand) {
+async function RunChat({model: modelArg, systemInfo, systemPrompt, wrapper, contextSize}: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
+    const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext.js");
 
     const model = new LlamaModel({
-        modelPath: modelArg
+        modelPath: modelArg,
+        contextSize
     });
+    const context = new LlamaContext({model});
     const session = new LlamaChatSession({
-        context: model.createContext(),
+        context,
         printLLamaSystemInfo: systemInfo,
         systemPrompt,
         promptWrapper: createChatWrapper(wrapper)

@@ -6,7 +6,7 @@ import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaContext} from "./LlamaContext.js";
 
-const UNKNOWN_UNICODE_CHAR = "�";
+const UNKNOWN_UNICODE_CHAR = "\ufffd";
 
 export class LlamaChatSession {
     private readonly _systemPrompt: string;

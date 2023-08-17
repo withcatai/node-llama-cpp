@@ -1,13 +1,12 @@
 import {LLAMAContext, llamaCppNode} from "./LlamaBins.js";
+import {LlamaModel} from "./LlamaModel.js";
 
-type LlamaContextConstructorParameters = {prependBos: boolean, ctx: LLAMAContext};
 export class LlamaContext {
     private readonly _ctx: LLAMAContext;
     private _prependBos: boolean;
 
-    /** @internal */
-    public constructor( {ctx, prependBos}: LlamaContextConstructorParameters ) {
-        this._ctx = ctx;
+    public constructor({model, prependBos = true}: {model: LlamaModel, prependBos?: boolean}) {
+        this._ctx = new LLAMAContext(model._model);
         this._prependBos = prependBos;
     }
 
