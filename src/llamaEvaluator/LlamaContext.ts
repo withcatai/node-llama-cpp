@@ -1,4 +1,4 @@
-import {LLAMAContext, llamaCppNode} from "./LlamaBins.js";
+import {LLAMAContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
 
 export class LlamaContext {
@@ -23,7 +23,7 @@ export class LlamaContext {
 
         if (this._prependBos) {
             const tokenArray = Array.from(tokens);
-            tokenArray.unshift(llamaCppNode.tokenBos());
+            tokenArray.unshift(this._ctx.tokenBos());
 
             evalTokens = Uint32Array.from(tokenArray);
             this._prependBos = false;
@@ -35,7 +35,7 @@ export class LlamaContext {
             const nextToken = await this._ctx.eval(evalTokens, getRestrictions?.());
 
             // the assistant finished answering
-            if (nextToken === llamaCppNode.tokenEos())
+            if (nextToken === this._ctx.tokenEos())
                 break;
 
             yield nextToken;

@@ -89,9 +89,7 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
 export type LlamaCppNodeModule = {
     LLAMAModel: LLAMAModel,
     LLAMAContext: LLAMAContext,
-    tokenBos(): number,
-    systemInfo(): string,
-    tokenEos(): number,
+    systemInfo(): string
 };
 
 export type LLAMAModel = {
@@ -116,5 +114,7 @@ export type LLAMAContext = {
     // restrictions used to guide the model towards a specific topic,
     // to only allow the given tokens to be returned, or at least to be more likely to be returned
     eval(tokens: Uint32Array, restrictions?: Uint32Array): Promise<number>,
-    decode(tokens: Uint32Array): string
+    decode(tokens: Uint32Array): string,
+    tokenBos(): number,
+    tokenEos(): number
 };
