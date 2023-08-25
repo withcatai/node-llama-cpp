@@ -67,6 +67,7 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
             }
         }
 
+        llama_backend_init(false);
         model = llama_load_model_from_file(modelPath.c_str(), params);
 
         if (model == NULL) {
@@ -124,7 +125,18 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 
     // Decode each token and accumulate the result.
     for (size_t i = 0; i < tokens.ElementLength(); i++) {
-      const char* str = llama_token_to_str(ctx, (llama_token)tokens[i]);
+      // source: https://github.com/ggerganov/llama.cpp/blob/232caf3c1581a6cb023571780ff41dc2d66d1ca0/llama.cpp#L799-L811
+      std::vector<char> result(8, 0);
+      const int n_tokens = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
+      if (n_tokens < 0) {
+          result.resize(-n_tokens);
+          int check = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
+          GGML_ASSERT(check == -n_tokens);
+      } else {
+          result.resize(n_tokens);
+      }
+
+      const char* str = result.data();
       if (str == nullptr) {
         Napi::Error::New(info.Env(), "Invalid token").ThrowAsJavaScriptException();
         return info.Env().Undefined();
@@ -134,6 +146,15 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 
     return Napi::String::New(info.Env(), ss.str());
   }
+  Napi::Value TokenBos(const Napi::CallbackInfo& info) {
+    return Napi::Number::From(info.Env(), llama_token_bos(ctx));
+  }
+  Napi::Value TokenEos(const Napi::CallbackInfo& info) {
+    return Napi::Number::From(info.Env(), llama_token_eos(ctx));
+  }
+  Napi::Value GetMaxContextSize(const Napi::CallbackInfo& info) {
+    return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
+  }
   Napi::Value Eval(const Napi::CallbackInfo& info);
   static void init(Napi::Object exports) {
     exports.Set("LLAMAContext",
@@ -142,6 +163,9 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
             {
                 InstanceMethod("encode", &LLAMAContext::Encode),
                 InstanceMethod("decode", &LLAMAContext::Decode),
+                InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
+                InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
+                InstanceMethod("getMaxContextSize", &LLAMAContext::GetMaxContextSize),
                 InstanceMethod("eval", &LLAMAContext::Eval),
             }));
   }
@@ -151,7 +175,6 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
   LLAMAContext* ctx;
   std::vector<llama_token> tokens;
-  std::vector<llama_token> restriction;
   llama_token result;
 
   public:
@@ -160,13 +183,6 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
     Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
     this->tokens.reserve(tokens.ElementLength());
     for (size_t i = 0; i < tokens.ElementLength(); i++) { this->tokens.push_back(static_cast<llama_token>(tokens[i])); }
-
-    if (info.Length() > 1 && info[1].IsTypedArray()) {
-      Napi::Uint32Array restriction = info[1].As<Napi::Uint32Array>();
-      this->restriction.reserve(restriction.ElementLength());
-      for (size_t i = 0; i < restriction.ElementLength(); i++) { this->restriction.push_back(static_cast<llama_token>(restriction[i])); }
-      std::sort(this->restriction.begin(), this->restriction.end());
-    }
   }
   ~LLAMAContextEvalWorker() { ctx->Unref(); }
   using Napi::AsyncWorker::Queue;
@@ -175,39 +191,30 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
   protected:
   void Execute() {
     // Perform the evaluation using llama_eval.
-    int r = llama_eval(ctx->ctx, tokens.data(), tokens.size(), llama_get_kv_cache_token_count(ctx->ctx), 6);
+    int r = llama_eval(ctx->ctx, tokens.data(), int(tokens.size()), llama_get_kv_cache_token_count(ctx->ctx), 6);
     if (r != 0) {
       SetError("Eval has failed");
       return;
     }
 
+    llama_token new_token_id = 0;
+
     // Select the best prediction.
-    float* logits = llama_get_logits(ctx->ctx);
-    int n_vocab = llama_n_vocab(ctx->ctx);
-    llama_token re;
-    if (restriction.empty()) {
-      float max = logits[0];
-      re = 0;
-      for (llama_token id = 1; id < n_vocab; id++) {
-        float logit = logits[id];
-        if (logit > max) {
-          max = logit;
-          re = id;
-        }
-      }
-    } else {
-      float max = logits[restriction[0]];
-      re = 0;
-      for (size_t i = 1; i < restriction.size(); i++) {
-        llama_token id = restriction[i];
-        float logit = logits[id];
-        if (logit > max) {
-          max = logit;
-          re = id;
-        }
-      }
+    auto logits = llama_get_logits(ctx->ctx);
+    auto n_vocab = llama_n_vocab(ctx->ctx);
+
+    std::vector<llama_token_data> candidates;
+    candidates.reserve(n_vocab);
+
+    for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+      candidates.emplace_back(llama_token_data{ token_id, logits[token_id], 0.0f });
     }
-    result = re;
+
+    llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
+
+    new_token_id = llama_sample_token_greedy(ctx->ctx , &candidates_p);
+
+    result = new_token_id;
   }
   void OnOK() {
     Napi::Env env = Napi::AsyncWorker::Env();
@@ -223,15 +230,11 @@ Napi::Value LLAMAContext::Eval(const Napi::CallbackInfo& info) {
   return worker->Promise();
 }
 
-Napi::Value tokenBos(const Napi::CallbackInfo& info) { return Napi::Number::From(info.Env(), llama_token_bos()); }
-Napi::Value tokenEos(const Napi::CallbackInfo& info) { return Napi::Number::From(info.Env(), llama_token_eos()); }
 Napi::Value systemInfo(const Napi::CallbackInfo& info) { return Napi::String::From(info.Env(), llama_print_system_info()); }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
   llama_backend_init(false);
   exports.DefineProperties({
-      Napi::PropertyDescriptor::Function("tokenBos", tokenBos),
-      Napi::PropertyDescriptor::Function("tokenEos", tokenEos),
       Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
   });
   LLAMAModel::init(exports);

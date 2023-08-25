@@ -1,4 +1,4 @@
-import {LLAMAContext, llamaCppNode} from "./LlamaBins.js";
+import {LLAMAContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
 
 export class LlamaContext {
@@ -18,12 +18,12 @@ export class LlamaContext {
         return this._ctx.decode(tokens);
     }
 
-    public async *evaluate(tokens: Uint32Array, getRestrictions?: () => Uint32Array) {
+    public async *evaluate(tokens: Uint32Array) {
         let evalTokens = tokens;
 
         if (this._prependBos) {
             const tokenArray = Array.from(tokens);
-            tokenArray.unshift(llamaCppNode.tokenBos());
+            tokenArray.unshift(this._ctx.tokenBos());
 
             evalTokens = Uint32Array.from(tokenArray);
             this._prependBos = false;
@@ -32,10 +32,10 @@ export class LlamaContext {
         // eslint-disable-next-line no-constant-condition
         while (true) {
             // Evaluate to get the next token.
-            const nextToken = await this._ctx.eval(evalTokens, getRestrictions?.());
+            const nextToken = await this._ctx.eval(evalTokens);
 
             // the assistant finished answering
-            if (nextToken === llamaCppNode.tokenEos())
+            if (nextToken === this._ctx.tokenEos())
                 break;
 
             yield nextToken;
