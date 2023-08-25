@@ -3,6 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import envVar from "env-var";
 import * as uuid from "uuid";
+import {getBinariesGithubRelease} from "./utils/binariesGithubRelease.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,12 +15,13 @@ export const llamaBinsDirectory = path.join(__dirname, "..", "llamaBins");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
 export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
+export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
 
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default("ggerganov/llama.cpp")
     .asString();
 export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
-    .default("latest")
+    .default(await getBinariesGithubRelease())
     .asString();
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")

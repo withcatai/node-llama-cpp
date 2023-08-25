@@ -11,13 +11,15 @@ import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, llamaCppDirectory, te
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
+import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
 
 type DownloadCommandArgs = {
     repo: string,
     release: "latest" | string,
     arch?: string,
     nodeTarget?: string,
-    skipBuild?: boolean
+    skipBuild?: boolean,
+    updateBinariesReleaseMetadata?: boolean
 };
 
 export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
@@ -33,7 +35,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             .option("release", {
                 type: "string",
                 default: defaultLlamaCppRelease,
-                description: "The tag of the llama.cpp release to download. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
+                description: "The tag of the llama.cpp release to download. Set to \"latest\" to download the latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
             })
             .option("arch", {
                 type: "string",
@@ -47,12 +49,18 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 type: "boolean",
                 default: false,
                 description: "Skip building llama.cpp after downloading it"
+            })
+            .option("updateBinariesReleaseMetadata", {
+                type: "boolean",
+                hidden: true, // this for the CI to use
+                default: false,
+                description: "Update the binariesGithubRelease.json file with the release of llama.cpp that was downloaded"
             });
     },
     handler: DownloadLlamaCppCommand
 };
 
-export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, skipBuild}: DownloadCommandArgs) {
+export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, skipBuild, updateBinariesReleaseMetadata}: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
 
@@ -145,6 +153,10 @@ export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, 
             nodeTarget: nodeTarget ? nodeTarget : undefined,
             setUsedBingFlag: true
         });
+    }
+
+    if (updateBinariesReleaseMetadata) {
+        await setBinariesGithubRelease(githubRelease!.data.tag_name);
     }
 
     console.log();

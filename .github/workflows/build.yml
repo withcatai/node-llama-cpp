@@ -20,12 +20,17 @@ jobs:
       - name: Generate docs
         run: npm run generate-docs
       - name: Download latest llama.cpp release
-        run: node ./dist/cli/cli.js download --release latest --skipBuild
+        run: node ./dist/cli/cli.js download --release latest --skipBuild --updateBinariesReleaseMetadata
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
           name: "build"
           path: "dist"
+      - name: Upload binariesGithubRelease.json artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "binariesGithubRelease"
+          path: "llama/binariesGithubRelease.json"
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
@@ -226,6 +231,9 @@ jobs:
           mv artifacts/bins-*/* llamaBins/
           mv artifacts/build dist/
           mv artifacts/docs docs/
+          
+          rm -f ./llama/binariesGithubRelease
+          mv artifacts/binariesGithubRelease ./llama/binariesGithubRelease.json
           
           echo "Built binaries:"
           ls llamaBins
