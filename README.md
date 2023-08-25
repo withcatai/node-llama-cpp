@@ -30,7 +30,7 @@ import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
 });
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({context});
@@ -73,7 +73,7 @@ export class MyCustomChatPromptWrapper extends ChatPromptWrapper {
 }
 
 const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin"),
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf"),
     promptWrapper: new MyCustomChatPromptWrapper() // by default, LlamaChatPromptWrapper is used
 })
 const context = new LlamaContext({model});
@@ -103,7 +103,7 @@ import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "vicuna-13b-v1.5-16k.ggmlv3.q5_1.bin")
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
 });
 
 const context = new LlamaContext({model});
