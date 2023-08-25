@@ -76,7 +76,7 @@
     "catai"
   ],
   "author": "Gilad S.",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/withcatai/node-llama-cpp/issues"
   },
