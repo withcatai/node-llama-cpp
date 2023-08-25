@@ -18,7 +18,7 @@ export class LlamaContext {
         return this._ctx.decode(tokens);
     }
 
-    public async *evaluate(tokens: Uint32Array, getRestrictions?: () => Uint32Array) {
+    public async *evaluate(tokens: Uint32Array) {
         let evalTokens = tokens;
 
         if (this._prependBos) {
@@ -32,7 +32,7 @@ export class LlamaContext {
         // eslint-disable-next-line no-constant-condition
         while (true) {
             // Evaluate to get the next token.
-            const nextToken = await this._ctx.eval(evalTokens, getRestrictions?.());
+            const nextToken = await this._ctx.eval(evalTokens);
 
             // the assistant finished answering
             if (nextToken === this._ctx.tokenEos())

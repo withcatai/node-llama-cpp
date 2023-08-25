@@ -111,10 +111,9 @@ export type LLAMAModel = {
 export type LLAMAContext = {
     new (model: LLAMAModel): LLAMAContext,
     encode(text: string): Uint32Array,
-    // restrictions used to guide the model towards a specific topic,
-    // to only allow the given tokens to be returned, or at least to be more likely to be returned
-    eval(tokens: Uint32Array, restrictions?: Uint32Array): Promise<number>,
+    eval(tokens: Uint32Array): Promise<number>,
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
-    tokenEos(): number
+    tokenEos(): number,
+    getMaxContextSize(): number
 };
