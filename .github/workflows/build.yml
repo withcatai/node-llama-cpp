@@ -232,8 +232,8 @@ jobs:
           mv artifacts/build dist/
           mv artifacts/docs docs/
           
-          rm -f ./llama/binariesGithubRelease
-          mv artifacts/binariesGithubRelease ./llama/binariesGithubRelease.json
+          rm -f ./llama/binariesGithubRelease.json
+          mv artifacts/binariesGithubRelease/binariesGithubRelease.json ./llama/binariesGithubRelease.json
           
           echo "Built binaries:"
           ls llamaBins
