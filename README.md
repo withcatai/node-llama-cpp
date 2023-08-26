@@ -130,6 +130,43 @@ const a1 = context.decode(Uint32Array.from(res)).split("USER:")[0];
 console.log("AI: " + a1);
 ```
 
+#### With grammar
+Use this to direct the model to generate a specific type of text, like JSON for example.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {LlamaModel, LlamaGrammar, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const model = new LlamaModel({
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+})
+const grammar = await LlamaGrammar.for("json");
+const context = new LlamaContext({
+    model,
+    grammar
+});
+const session = new LlamaChatSession({context});
+
+
+const q1 = 'Create a JSON that contains a message saying "hi there"';
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+console.log(JSON.parse(a1));
+
+
+const q2 = 'Add another field to the JSON with the key being "author" and the value being "LLama"';
+console.log("User: " + q2);
+
+const a2 = await session.prompt(q2);
+console.log("AI: " + a2);
+console.log(JSON.parse(a2));
+```
+
 ### CLI
 ```
 Usage: node-llama-cpp <command> [options]
@@ -156,10 +193,12 @@ Options:
       --repo        The GitHub repository to download a release of llama.cpp from. Can also be set v
                     ia the NODE_LLAMA_CPP_REPO environment variable
                                                            [string] [default: "ggerganov/llama.cpp"]
-      --release     The tag of the llama.cpp release to download. Can also be set via the NODE_LLAMA
-                    _CPP_REPO_RELEASE environment variable              [string] [default: "latest"]
+      --release     The tag of the llama.cpp release to download. Set to "latest" to download the la
+                    test release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment va
+                    riable                                              [string] [default: "latest"]
       --arch        The architecture to compile llama.cpp for                               [string]
       --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
+      --skipBuild   Skip building llama.cpp after downloading it          [boolean] [default: false]
   -v, --version     Show version number                                                    [boolean]
 ```
 
@@ -209,6 +248,28 @@ Optional:
                 If a question does not make any sense, or is not factually coherent, explain why ins
    tead of answering something not correct. If you don't know the answer to a question, please don't
                                                                           share false information."]
+      --wrapper       Chat wrapper to use
+                               [string] [choices: "general", "llama", "chatML"] [default: "general"]
+      --contextSize   Context size to use for the model                     [number] [default: 4096]
+      --grammar       Restrict the model response to a specific grammar, like JSON for example
+     [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]
+      --temperature   Temperature is a hyperparameter that controls the randomness of the generated
+                      text. It affects the probability distribution of the model's output tokens. A
+                      higher temperature (e.g., 1.5) makes the output more random and creative, whil
+                      e a lower temperature (e.g., 0.5) makes the output more focused, deterministic
+                      , and conservative. The suggested temperature is 0.8, which provides a balance
+                       between randomness and determinism. At the extreme, a temperature of 0 will a
+                      lways pick the most likely next token, leading to identical outputs in each ru
+                      n. Set to `0` to disable.                                [number] [default: 0]
+      --topK          Limits the model to consider only the K most likely next tokens for sampling a
+                      t each step of sequence generation. An integer number between `1` and the size
+                       of the vocabulary. Set to `0` to disable (which uses the full vocabulary). On
+                      ly relevant when `temperature` is set to a value greater than 0.
+                                                                              [number] [default: 40]
+      --topP          Dynamically selects the smallest set of tokens whose cumulative probability ex
+                      ceeds the threshold P, and samples the next token only from this set. A float
+                      number between `0` and `1`. Set to `1` to disable. Only relevant when `tempera
+                      ture` is set to a value greater than `0`.             [number] [default: 0.95]
 
 Options:
   -h, --help     Show help                                                                 [boolean]
