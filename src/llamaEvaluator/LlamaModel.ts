@@ -1,3 +1,4 @@
+import {removeNullFields} from "../utils/removeNullFields.js";
 import {llamaCppNode, LLAMAModel} from "./LlamaBins.js";
 
 
@@ -15,6 +16,26 @@ export class LlamaModel {
      * @param {number} [options.batchSize] - prompt processing batch size
      * @param {number} [options.gpuLayers] - number of layers to store in VRAM
      * @param {boolean} [options.lowVram] - if true, reduce VRAM usage at the cost of performance
+     * @param {number} [options.temperature] - Temperature is a hyperparameter that controls the randomness of the generated text.
+     * It affects the probability distribution of the model's output tokens.
+     * A higher temperature (e.g., 1.5) makes the output more random and creative,
+     * while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative.
+     * The suggested temperature is 0.8, which provides a balance between randomness and determinism.
+     * At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run.
+     *
+     * Set to `0` to disable.
+     * @param {number} [options.topK] - Limits the model to consider only the K most likely next tokens for sampling at each step of
+     * sequence generation.
+     * An integer number between `1` and the size of the vocabulary.
+     * Set to `0` to disable (which uses the full vocabulary).
+     *
+     * Only relevant when `temperature` is set to a value greater than 0.
+     * @param {number} [options.topP] - Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P,
+     * and samples the next token only from this set.
+     * A float number between `0` and `1`.
+     * Set to `1` to disable.
+     *
+     * Only relevant when `temperature` is set to a value greater than `0`.
      * @param {boolean} [options.f16Kv] - use fp16 for KV cache
      * @param {boolean} [options.logitsAll] - the llama_eval() call computes all logits, not just the last one
      * @param {boolean} [options.vocabOnly] - only load the vocabulary, no weights
@@ -24,7 +45,7 @@ export class LlamaModel {
      */
     public constructor({
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
-        lowVram, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
+        lowVram, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: {
         /** path to the model on the filesystem */
         modelPath: string,
@@ -43,6 +64,37 @@ export class LlamaModel {
 
         /** if true, reduce VRAM usage at the cost of performance */
         lowVram?: boolean,
+
+        /**
+         * Temperature is a hyperparameter that controls the randomness of the generated text.
+         * It affects the probability distribution of the model's output tokens.
+         * A higher temperature (e.g., 1.5) makes the output more random and creative,
+         * while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative.
+         * The suggested temperature is 0.8, which provides a balance between randomness and determinism.
+         * At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run.
+         *
+         * Set to `0` to disable.
+         */
+        temperature?: number,
+
+        /**
+         * Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation.
+         * An integer number between `1` and the size of the vocabulary.
+         * Set to `0` to disable (which uses the full vocabulary).
+         *
+         * Only relevant when `temperature` is set to a value greater than 0.
+         * */
+        topK?: number,
+
+        /**
+         * Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P,
+         * and samples the next token only from this set.
+         * A float number between `0` and `1`.
+         * Set to `1` to disable.
+         *
+         * Only relevant when `temperature` is set to a value greater than `0`.
+         * */
+        topP?: number,
 
         /** use fp16 for KV cache */
         f16Kv?: boolean,
@@ -68,6 +120,9 @@ export class LlamaModel {
             batchSize,
             gpuLayers,
             lowVram,
+            temperature,
+            topK,
+            topP,
             f16Kv,
             logitsAll,
             vocabOnly,
@@ -80,15 +135,4 @@ export class LlamaModel {
     public static get systemInfo() {
         return llamaCppNode.systemInfo();
     }
-}
-
-function removeNullFields<T extends object>(obj: T): T {
-    const newObj: T = Object.assign({}, obj);
-
-    for (const key in obj) {
-        if (newObj[key] == null)
-            delete newObj[key];
-    }
-
-    return newObj;
 }

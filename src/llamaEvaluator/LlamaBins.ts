@@ -1,6 +1,6 @@
-import {loadBin, type LLAMAModel, type LLAMAContext} from "../utils/getBin.js";
+import {loadBin, type LLAMAModel, type LLAMAContext, type LLAMAGrammar} from "../utils/getBin.js";
 
 export const llamaCppNode = await loadBin();
-const {LLAMAModel, LLAMAContext} = llamaCppNode;
+const {LLAMAModel, LLAMAContext, LLAMAGrammar} = llamaCppNode;
 
-export {LLAMAModel, LLAMAContext};
+export {LLAMAModel, LLAMAContext, LLAMAGrammar};

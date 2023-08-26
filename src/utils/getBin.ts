@@ -89,6 +89,7 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
 export type LlamaCppNodeModule = {
     LLAMAModel: LLAMAModel,
     LLAMAContext: LLAMAContext,
+    LLAMAGrammar: LLAMAGrammar,
     systemInfo(): string
 };
 
@@ -104,16 +105,27 @@ export type LLAMAModel = {
         vocabOnly?: boolean,
         useMmap?: boolean,
         useMlock?: boolean,
-        embedding?: boolean
+        embedding?: boolean,
+        temperature?: number,
+        topK?: number,
+        topP?: number
     }): LLAMAModel
 };
 
 export type LLAMAContext = {
-    new (model: LLAMAModel): LLAMAContext,
+    new (model: LLAMAModel, params?: {
+        grammar?: LLAMAGrammar
+    }): LLAMAContext,
     encode(text: string): Uint32Array,
     eval(tokens: Uint32Array): Promise<number>,
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
     tokenEos(): number,
     getMaxContextSize(): number
+};
+
+export type LLAMAGrammar = {
+    new (grammarPath: string, params?: {
+        printGrammar?: boolean,
+    }): LLAMAGrammar
 };

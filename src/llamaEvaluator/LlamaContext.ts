@@ -1,12 +1,16 @@
+import {removeNullFields} from "../utils/removeNullFields.js";
 import {LLAMAContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
+import {LlamaGrammar} from "./LlamaGrammar.js";
 
 export class LlamaContext {
     private readonly _ctx: LLAMAContext;
     private _prependBos: boolean;
 
-    public constructor({model, prependBos = true}: {model: LlamaModel, prependBos?: boolean}) {
-        this._ctx = new LLAMAContext(model._model);
+    public constructor({model, grammar, prependBos = true}: {model: LlamaModel, grammar?: LlamaGrammar, prependBos?: boolean}) {
+        this._ctx = new LLAMAContext(model._model, removeNullFields({
+            grammar: grammar?._grammar
+        }));
         this._prependBos = prependBos;
     }
 
