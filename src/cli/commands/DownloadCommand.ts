@@ -60,7 +60,9 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     handler: DownloadLlamaCppCommand
 };
 
-export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, skipBuild, updateBinariesReleaseMetadata}: DownloadCommandArgs) {
+export async function DownloadLlamaCppCommand({
+    repo, release, arch, nodeTarget, skipBuild, updateBinariesReleaseMetadata
+}: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
 
