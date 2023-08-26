@@ -136,7 +136,7 @@ console.log("AI: " + a1);
 ```
 
 #### With grammar
-Use this to direct the model to generate a specific type of text, like JSON for example.
+Use this to direct the model to generate a specific format of text, like `JSON` for example.
 
 ```typescript
 import {fileURLToPath} from "url";
