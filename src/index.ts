@@ -6,7 +6,7 @@ import {EmptyChatPromptWrapper} from "./chatWrappers/EmptyChatPromptWrapper.js";
 import {LlamaChatPromptWrapper} from "./chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.js";
 import {LlamaContext} from "./llamaEvaluator/LlamaContext.js";
-
+import {ChatMLPromptWrapper} from "./chatWrappers/ChatMLPromptWrapper.js";
 
 export {
     LlamaModel,
@@ -16,5 +16,6 @@ export {
     ChatPromptWrapper,
     EmptyChatPromptWrapper,
     LlamaChatPromptWrapper,
-    GeneralChatPromptWrapper
+    GeneralChatPromptWrapper,
+    ChatMLPromptWrapper
 };
