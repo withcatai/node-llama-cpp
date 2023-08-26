@@ -7,7 +7,7 @@ import {defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
 import {ChatMLPromptWrapper} from "../../chatWrappers/ChatMLPromptWrapper.js";
-import {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
+import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 
 type ChatCommand = {
     model: string,
@@ -106,6 +106,7 @@ async function RunChat({
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
     const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext.js");
+    const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
 
     const model = new LlamaModel({
         modelPath: modelArg,
