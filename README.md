@@ -1,11 +1,16 @@
+<div align="center">
+
 # Node Llama.cpp
 Node.js bindings for llama.cpp.
 
-Pre-built bindings are provided with a fallback to building from source with `node-gyp`.
+<sub>Pre-built bindings are provided with a fallback to building from source with `node-gyp`.<sub>
 
 [![Build](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml/badge.svg)](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml)
+[![License](https://badgen.net/badge/color/MIT/green?label=license)](https://www.npmjs.com/package/node-llama-cpp)
+[![License](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/node-llama-cpp)
 [![Version](https://badgen.net/npm/v/node-llama-cpp)](https://www.npmjs.com/package/node-llama-cpp)
 
+</div>
 
 ## Installation
 ```bash
