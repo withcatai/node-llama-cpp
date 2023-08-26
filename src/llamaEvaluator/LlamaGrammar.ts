@@ -21,7 +21,7 @@ export class LlamaGrammar {
         });
     }
 
-    public static async for(type: "json" | "list" | "arithmetic" | "japanese" | "chess") {
+    public static async getFor(type: "json" | "list" | "arithmetic" | "japanese" | "chess") {
         const grammarsFolder = await getGrammarsFolder();
 
         const grammarFile = path.join(grammarsFolder, type + ".gbnf");

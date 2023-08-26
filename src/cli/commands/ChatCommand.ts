@@ -15,7 +15,7 @@ type ChatCommand = {
     systemPrompt: string,
     wrapper: "general" | "llama" | "chatML",
     contextSize: number,
-    grammar: "text" | Parameters<typeof LlamaGrammar.for>[0],
+    grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
     temperature: number,
     topK: number,
     topP: number
@@ -117,7 +117,7 @@ async function RunChat({
     const context = new LlamaContext({
         model,
         grammar: grammarArg !== "text"
-            ? await LlamaGrammar.for(grammarArg)
+            ? await LlamaGrammar.getFor(grammarArg)
             : undefined
     });
     const session = new LlamaChatSession({

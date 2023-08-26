@@ -143,7 +143,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
 })
-const grammar = await LlamaGrammar.for("json");
+const grammar = await LlamaGrammar.getFor("json");
 const context = new LlamaContext({
     model,
     grammar
