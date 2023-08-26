@@ -17,7 +17,7 @@ export const ClearCommand: CommandModule<object, ClearCommand> = {
         return yargs
             .option("type", {
                 type: "string",
-                choices: ["source", "build", "all"] as ClearCommand["type"][],
+                choices: ["source", "build", "all"] satisfies ClearCommand["type"][],
                 default: "all" as ClearCommand["type"],
                 description: "Files to clear"
             });
