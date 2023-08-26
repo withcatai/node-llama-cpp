@@ -1,13 +1,45 @@
 import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
+import {getTextCompletion} from "../utils/getTextCompletion.js";
 
 export class GeneralChatPromptWrapper extends ChatPromptWrapper {
-    public override wrapPrompt(prompt: string, {systemPrompt, promptIndex}: { systemPrompt: string, promptIndex: number }) {
-        const conversationPrompt = "\n\n### Human:\n\n" + prompt + "\n\n### Assistant:\n\n";
+    private readonly _instructionName: string;
+    private readonly _responseName: string;
 
-        return promptIndex === 0 ? systemPrompt + conversationPrompt : conversationPrompt;
+    public constructor({instructionName = "Human", responseName = "Assistant"}: {instructionName?: string, responseName?: string} = {}) {
+        super();
+
+        this._instructionName = instructionName;
+        this._responseName = responseName;
+    }
+
+    public override wrapPrompt(prompt: string, {systemPrompt, promptIndex, lastStopString, lastStopStringSuffix}: {
+        systemPrompt: string, promptIndex: number, lastStopString: string | null, lastStopStringSuffix: string | null
+    }) {
+        if (promptIndex === 0)
+            return systemPrompt + `\n\n### ${this._instructionName}:\n\n` + prompt + `\n\n### ${this._responseName}:\n\n`;
+
+        return this._getPromptPrefix(lastStopString, lastStopStringSuffix) + prompt + `\n\n### ${this._responseName}:\n\n`;
     }
 
     public override getStopStrings(): string[] {
-        return ["### Human:", "Human:", "### Assistant:", "Assistant:", "<end>"];
+        return [
+            `\n\n### ${this._instructionName}`,
+            `### ${this._instructionName}`,
+            `\n\n### ${this._responseName}`,
+            `### ${this._responseName}`,
+            "<end>"
+        ];
+    }
+
+    private _getPromptPrefix(lastStopString: string | null, lastStopStringSuffix: string | null) {
+        return getTextCompletion(
+            lastStopString === "<end>"
+                ? lastStopStringSuffix
+                : (lastStopString + (lastStopStringSuffix ?? "")),
+            [
+                `\n\n### ${this._instructionName}:\n\n`,
+                `### ${this._instructionName}:\n\n`
+            ]
+        ) ?? `\n\n### ${this._instructionName}:\n\n`;
     }
 }
