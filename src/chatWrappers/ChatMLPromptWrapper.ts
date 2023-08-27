@@ -6,10 +6,13 @@ export class ChatMLPromptWrapper extends ChatPromptWrapper {
     public override wrapPrompt(prompt: string, {systemPrompt, promptIndex, lastStopString, lastStopStringSuffix}: {
         systemPrompt: string, promptIndex: number, lastStopString: string | null, lastStopStringSuffix: string | null
     }) {
+        const previousCompletionEnd = (lastStopString ?? "") + (lastStopStringSuffix ?? "");
+
         if (promptIndex === 0 && systemPrompt != "")
-            return "<|im_start|>system\n" + systemPrompt + "<|im_end|>\n<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n";
+            return (getTextCompletion(previousCompletionEnd, "<|im_start|>system\n") ?? "<|im_start|>system\n") +
+                systemPrompt + "<|im_end|>\n<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n";
         else
-            return getTextCompletion(lastStopString + (lastStopStringSuffix ?? ""), "<|im_end|>\n<|im_start|>user\n") +
+            return (getTextCompletion(previousCompletionEnd, "<|im_end|>\n<|im_start|>user\n") ?? "<|im_end|>\n<|im_start|>user\n") +
                 prompt + "<|im_end|>\n<|im_start|>assistant\n";
     }
 
