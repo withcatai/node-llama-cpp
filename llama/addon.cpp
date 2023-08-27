@@ -235,7 +235,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   Napi::Value TokenEos(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_token_eos(ctx));
   }
-  Napi::Value GetMaxContextSize(const Napi::CallbackInfo& info) {
+  Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
   }
   Napi::Value Eval(const Napi::CallbackInfo& info);
@@ -248,7 +248,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
                 InstanceMethod("decode", &LLAMAContext::Decode),
                 InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
                 InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
-                InstanceMethod("getMaxContextSize", &LLAMAContext::GetMaxContextSize),
+                InstanceMethod("getContextSize", &LLAMAContext::GetContextSize),
                 InstanceMethod("eval", &LLAMAContext::Eval),
             }));
   }

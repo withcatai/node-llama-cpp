@@ -121,7 +121,7 @@ export type LLAMAContext = {
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
     tokenEos(): number,
-    getMaxContextSize(): number
+    getContextSize(): number
 };
 
 export type LLAMAGrammar = {

@@ -30,6 +30,10 @@ export class LlamaContext {
         return this._ctx.decode(Uint32Array.from([this._ctx.tokenBos()]));
     }
 
+    public getContextSize() {
+        return this._ctx.getContextSize();
+    }
+
     public async *evaluate(tokens: Uint32Array) {
         let evalTokens = tokens;
 
