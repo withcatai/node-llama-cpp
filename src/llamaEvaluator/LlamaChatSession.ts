@@ -22,7 +22,7 @@ export class LlamaChatSession {
     public constructor({
         context,
         printLLamaSystemInfo = false,
-        promptWrapper = "auto",
+        promptWrapper = new GeneralChatPromptWrapper(),
         systemPrompt = defaultChatSystemPrompt
     }: {
         context: LlamaContext,

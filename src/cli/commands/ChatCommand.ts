@@ -56,7 +56,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("wrapper", {
                 alias: "w",
                 type: "string",
-                default: "auto" as ChatCommand["wrapper"],
+                default: "general" as ChatCommand["wrapper"],
                 choices: ["auto", "general", "llamaChat", "chatML"] satisfies ChatCommand["wrapper"][],
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
