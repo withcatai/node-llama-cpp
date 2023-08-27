@@ -122,6 +122,7 @@ export type LLAMAContext = {
     tokenBos(): number,
     tokenEos(): number,
     getContextSize(): number
+    getTokenString(token: number): string
 };
 
 export type LLAMAGrammar = {

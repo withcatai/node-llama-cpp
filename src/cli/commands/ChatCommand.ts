@@ -7,13 +7,15 @@ import {defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
 import {ChatMLPromptWrapper} from "../../chatWrappers/ChatMLPromptWrapper.js";
+import {getChatWrapperByBos} from "../../chatWrappers/createChatWrapperByBos.js";
+import {ChatPromptWrapper} from "../../ChatPromptWrapper.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 
 type ChatCommand = {
     model: string,
     systemInfo: boolean,
     systemPrompt: string,
-    wrapper: "general" | "llama" | "chatML",
+    wrapper: "auto" | "general" | "llamaChat" | "chatML",
     contextSize: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
     temperature: number,
@@ -54,9 +56,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("wrapper", {
                 alias: "w",
                 type: "string",
-                default: "general" as ChatCommand["wrapper"],
-                choices: ["general", "llama", "chatML"] satisfies ChatCommand["wrapper"][],
-                description: "Chat wrapper to use",
+                default: "auto" as ChatCommand["wrapper"],
+                choices: ["auto", "general", "llamaChat", "chatML"] satisfies ChatCommand["wrapper"][],
+                description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
             })
             .option("contextSize", {
@@ -138,12 +140,19 @@ async function RunChat({
             ? await LlamaGrammar.getFor(grammarArg)
             : undefined
     });
+    const bos = context.getBos(); // bos = beginning of sequence
+    const eos = context.getEos(); // eos = end of sequence
+    const promptWrapper = getChatWrapper(wrapper, bos);
     const session = new LlamaChatSession({
         context,
         printLLamaSystemInfo: systemInfo,
         systemPrompt,
-        promptWrapper: createChatWrapper(wrapper)
+        promptWrapper
     });
+
+    console.info(`${chalk.yellow("BOS:")} ${bos}`);
+    console.info(`${chalk.yellow("EOS:")} ${eos}`);
+    console.info(`${chalk.yellow("Chat wrapper:")} ${promptWrapper.wrapperName}`);
 
     await withOra({
         loading: chalk.blue("Loading model"),
@@ -188,15 +197,24 @@ async function RunChat({
     }
 }
 
-function createChatWrapper(wrapper: ChatCommand["wrapper"]) {
+function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string): ChatPromptWrapper {
     switch (wrapper) {
         case "general":
             return new GeneralChatPromptWrapper();
-        case "llama":
+        case "llamaChat":
             return new LlamaChatPromptWrapper();
         case "chatML":
             return new ChatMLPromptWrapper();
         default:
+    }
+
+    if (wrapper === "auto") {
+        const chatWrapper = getChatWrapperByBos(bos);
+
+        if (chatWrapper != null)
+            return new chatWrapper();
+
+        return new GeneralChatPromptWrapper();
     }
 
     void (wrapper satisfies never);

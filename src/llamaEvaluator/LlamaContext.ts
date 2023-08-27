@@ -26,8 +26,18 @@ export class LlamaContext {
         return this._prependBos;
     }
 
-    public getBos() {
-        return this._ctx.decode(Uint32Array.from([this._ctx.tokenBos()]));
+    /**
+     * @returns {string} The BOS (Beginning Of Sequence) token as a string.
+     */
+    public getBos(): string {
+        return this._ctx.getTokenString(this._ctx.tokenBos());
+    }
+
+    /**
+     * @returns {string} The EOS (End Of Sequence) token as a string.
+     */
+    public getEos(): string {
+        return this._ctx.getTokenString(this._ctx.tokenEos());
     }
 
     public getContextSize() {

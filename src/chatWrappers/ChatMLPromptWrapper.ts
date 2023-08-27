@@ -3,6 +3,8 @@ import {getTextCompletion} from "../utils/getTextCompletion.js";
 
 // source: https://github.com/openai/openai-python/blob/120d225b91a8453e15240a49fb1c6794d8119326/chatml.md
 export class ChatMLPromptWrapper extends ChatPromptWrapper {
+    public readonly wrapperName: string = "ChatML";
+
     public override wrapPrompt(prompt: string, {systemPrompt, promptIndex, lastStopString, lastStopStringSuffix}: {
         systemPrompt: string, promptIndex: number, lastStopString: string | null, lastStopStringSuffix: string | null
     }) {

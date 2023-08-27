@@ -3,6 +3,8 @@ import {getTextCompletion} from "../utils/getTextCompletion.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 export class LlamaChatPromptWrapper extends ChatPromptWrapper {
+    public readonly wrapperName: string = "LlamaChat";
+
     public override wrapPrompt(prompt: string, {systemPrompt, promptIndex, lastStopString, lastStopStringSuffix}: {
         systemPrompt: string, promptIndex: number, lastStopString: string | null, lastStopStringSuffix: string | null
     }) {

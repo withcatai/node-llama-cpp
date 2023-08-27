@@ -118,8 +118,8 @@ console.log("AI: " + q1);
 
 const tokens = context.encode(q1);
 const res: number[] = [];
-for await (const resToken of context.evaluate(tokens)) {
-    res.push(resToken);
+for await (const modelToken of context.evaluate(tokens)) {
+    res.push(modelToken);
     
     // it's important to not concatinate the results as strings,
     // as doing so will break some characters (like some emojis) that are made of multiple tokens.
@@ -256,8 +256,9 @@ Optional:
                 If a question does not make any sense, or is not factually coherent, explain why ins
    tead of answering something not correct. If you don't know the answer to a question, please don't
                                                                           share false information."]
-  -w, --wrapper          Chat wrapper to use
-                               [string] [choices: "general", "llama", "chatML"] [default: "general"]
+  -w, --wrapper          Chat wrapper to use. Use `auto` to automatically select a wrapper based on
+                         the model's BOS token
+                      [string] [choices: "auto", "general", "llamaChat", "chatML"] [default: "auto"]
   -c, --contextSize      Context size to use for the model                  [number] [default: 4096]
   -g, --grammar          Restrict the model response to a specific grammar, like JSON for example
      [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]

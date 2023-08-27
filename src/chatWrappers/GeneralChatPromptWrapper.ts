@@ -2,6 +2,7 @@ import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
 import {getTextCompletion} from "../utils/getTextCompletion.js";
 
 export class GeneralChatPromptWrapper extends ChatPromptWrapper {
+    public readonly wrapperName: string = "General";
     private readonly _instructionName: string;
     private readonly _responseName: string;
 

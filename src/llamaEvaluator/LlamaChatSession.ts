@@ -3,6 +3,7 @@ import {withLock} from "../utils/withLock.js";
 import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
 import {AbortError} from "../AbortError.js";
 import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper.js";
+import {getChatWrapperByBos} from "../chatWrappers/createChatWrapperByBos.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaContext} from "./LlamaContext.js";
 
@@ -21,19 +22,27 @@ export class LlamaChatSession {
     public constructor({
         context,
         printLLamaSystemInfo = false,
-        promptWrapper = new GeneralChatPromptWrapper(),
+        promptWrapper = "auto",
         systemPrompt = defaultChatSystemPrompt
     }: {
         context: LlamaContext,
         printLLamaSystemInfo?: boolean,
-        promptWrapper?: ChatPromptWrapper,
+        promptWrapper?: ChatPromptWrapper | "auto",
         systemPrompt?: string,
     }) {
         this._ctx = context;
         this._printLLamaSystemInfo = printLLamaSystemInfo;
-        this._promptWrapper = promptWrapper;
-
         this._systemPrompt = systemPrompt;
+
+        if (promptWrapper === "auto") {
+            const chatWrapper = getChatWrapperByBos(context.getBos());
+
+            if (chatWrapper != null)
+                this._promptWrapper = new chatWrapper();
+            else
+                this._promptWrapper = new GeneralChatPromptWrapper();
+        } else
+            this._promptWrapper = promptWrapper;
     }
 
     public get initialized() {

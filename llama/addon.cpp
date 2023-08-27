@@ -238,6 +238,19 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
   }
+  Napi::Value GetTokenString(const Napi::CallbackInfo& info) {
+    int token = info[0].As<Napi::Number>().Int32Value();
+    std::stringstream ss;
+
+    const char* str = llama_token_get_text(ctx, token);
+    if (str == nullptr) {
+      return info.Env().Undefined();
+    }
+
+    ss << str;
+
+    return Napi::String::New(info.Env(), ss.str());
+  }
   Napi::Value Eval(const Napi::CallbackInfo& info);
   static void init(Napi::Object exports) {
     exports.Set("LLAMAContext",
@@ -249,6 +262,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
                 InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
                 InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
                 InstanceMethod("getContextSize", &LLAMAContext::GetContextSize),
+                InstanceMethod("getTokenString", &LLAMAContext::GetTokenString),
                 InstanceMethod("eval", &LLAMAContext::Eval),
             }));
   }
