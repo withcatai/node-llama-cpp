@@ -118,8 +118,8 @@ console.log("AI: " + q1);
 
 const tokens = context.encode(q1);
 const res: number[] = [];
-for await (const chunk of context.evaluate(tokens)) {
-    res.push(chunk);
+for await (const resToken of context.evaluate(tokens)) {
+    res.push(resToken);
     
     // it's important to not concatinate the results as strings,
     // as doing so will break some characters (like some emojis) that are made of multiple tokens.
@@ -137,6 +137,9 @@ console.log("AI: " + a1);
 
 #### With grammar
 Use this to direct the model to generate a specific format of text, like `JSON` for example.
+
+> **Note:** there's an issue with some grammars where the model won't stop generating output,
+> so it's advised to use it together with `maxTokens` set to the context size of the model
 
 ```typescript
 import {fileURLToPath} from "url";
@@ -159,7 +162,7 @@ const session = new LlamaChatSession({context});
 const q1 = 'Create a JSON that contains a message saying "hi there"';
 console.log("User: " + q1);
 
-const a1 = await session.prompt(q1);
+const a1 = await session.prompt(q1, {maxTokens: context.getContextSize()});
 console.log("AI: " + a1);
 console.log(JSON.parse(a1));
 
@@ -167,7 +170,7 @@ console.log(JSON.parse(a1));
 const q2 = 'Add another field to the JSON with the key being "author" and the value being "LLama"';
 console.log("User: " + q2);
 
-const a2 = await session.prompt(q2);
+const a2 = await session.prompt(q2, {maxTokens: context.getContextSize()});
 console.log("AI: " + a2);
 console.log(JSON.parse(a2));
 ```
@@ -177,10 +180,10 @@ console.log(JSON.parse(a2));
 Usage: node-llama-cpp <command> [options]
 
 Commands:
-  node-llama-cpp download           Download a release of llama.cpp and compile it
-  node-llama-cpp build              Compile the currently downloaded llama.cpp
-  node-llama-cpp clear [type]       Clear files created by llama-cli
-  node-llama-cpp chat               Chat with a LLama model
+  cli.js download      Download a release of llama.cpp and compile it
+  cli.js build         Compile the currently downloaded llama.cpp
+  cli.js clear [type]  Clear files created by node-llama-cpp
+  cli.js chat          Chat with a LLama model
 
 Options:
   -h, --help     Show help                                                                 [boolean]
@@ -194,17 +197,17 @@ node-llama-cpp download
 Download a release of llama.cpp and compile it
 
 Options:
-  -h, --help        Show help                                                              [boolean]
-      --repo        The GitHub repository to download a release of llama.cpp from. Can also be set v
-                    ia the NODE_LLAMA_CPP_REPO environment variable
+  -h, --help             Show help                                                         [boolean]
+      --repo, --gr       The GitHub repository to download a release of llama.cpp from. Can also be
+                         set via the NODE_LLAMA_CPP_REPO environment variable
                                                            [string] [default: "ggerganov/llama.cpp"]
-      --release     The tag of the llama.cpp release to download. Set to "latest" to download the la
-                    test release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment va
-                    riable                                              [string] [default: "latest"]
-      --arch        The architecture to compile llama.cpp for                               [string]
-      --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
-      --skipBuild   Skip building llama.cpp after downloading it          [boolean] [default: false]
-  -v, --version     Show version number                                                    [boolean]
+      --release, --gr    The tag of the llama.cpp release to download. Set to "latest" to download t
+                         he latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE envi
+                         ronment variable                               [string] [default: "latest"]
+  -a, --arch             The architecture to compile llama.cpp for                          [string]
+  -t, --nodeTarget       The Node.js version to compile llama.cpp for. Example: v18.0.0     [string]
+      --skipBuild, --sb  Skip building llama.cpp after downloading it     [boolean] [default: false]
+  -v, --version          Show version number                                               [boolean]
 ```
 
 #### `build` command
@@ -215,8 +218,8 @@ Compile the currently downloaded llama.cpp
 
 Options:
   -h, --help        Show help                                                              [boolean]
-      --arch        The architecture to compile llama.cpp for                               [string]
-      --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
+  -a, --arch        The architecture to compile llama.cpp for                               [string]
+  -t, --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
   -v, --version     Show version number                                                    [boolean]
 ```
 
@@ -224,7 +227,7 @@ Options:
 ```
 node-llama-cpp clear [type]
 
-Clear files created by llama-cli
+Clear files created by node-llama-cpp
 
 Options:
   -h, --help     Show help                                                                 [boolean]
@@ -239,42 +242,44 @@ node-llama-cpp chat
 Chat with a LLama model
 
 Required:
-      --model  LLama model file to use for the chat                              [string] [required]
+  -m, --model  LLama model file to use for the chat                              [string] [required]
 
 Optional:
-      --systemInfo    Print llama.cpp system info                         [boolean] [default: false]
-      --systemPrompt  System prompt to use against the model. [default value: You are a helpful, res
-                      pectful and honest assistant. Always answer as helpfully as possible. If a que
-                      stion does not make any sense, or is not factually coherent, explain why inste
-                      ad of answering something not correct. If you don't know the answer to a quest
-                      ion, please don't share false information.]
+  -i, --systemInfo       Print llama.cpp system info                      [boolean] [default: false]
+  -s, --systemPrompt     System prompt to use against the model. [default value: You are a helpful,
+                         respectful and honest assistant. Always answer as helpfully as possible. If
+                          a question does not make any sense, or is not factually coherent, explain
+                         why instead of answering something not correct. If you don't know the answe
+                         r to a question, please don't share false information.]
   [string] [default: "You are a helpful, respectful and honest assistant. Always answer as helpfully
                                                                                         as possible.
                 If a question does not make any sense, or is not factually coherent, explain why ins
    tead of answering something not correct. If you don't know the answer to a question, please don't
                                                                           share false information."]
-      --wrapper       Chat wrapper to use
+  -w, --wrapper          Chat wrapper to use
                                [string] [choices: "general", "llama", "chatML"] [default: "general"]
-      --contextSize   Context size to use for the model                     [number] [default: 4096]
-      --grammar       Restrict the model response to a specific grammar, like JSON for example
+  -c, --contextSize      Context size to use for the model                  [number] [default: 4096]
+  -g, --grammar          Restrict the model response to a specific grammar, like JSON for example
      [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]
-      --temperature   Temperature is a hyperparameter that controls the randomness of the generated
-                      text. It affects the probability distribution of the model's output tokens. A
-                      higher temperature (e.g., 1.5) makes the output more random and creative, whil
-                      e a lower temperature (e.g., 0.5) makes the output more focused, deterministic
-                      , and conservative. The suggested temperature is 0.8, which provides a balance
-                       between randomness and determinism. At the extreme, a temperature of 0 will a
-                      lways pick the most likely next token, leading to identical outputs in each ru
-                      n. Set to `0` to disable.                                [number] [default: 0]
-      --topK          Limits the model to consider only the K most likely next tokens for sampling a
-                      t each step of sequence generation. An integer number between `1` and the size
-                       of the vocabulary. Set to `0` to disable (which uses the full vocabulary). On
-                      ly relevant when `temperature` is set to a value greater than 0.
+  -t, --temperature      Temperature is a hyperparameter that controls the randomness of the generat
+                         ed text. It affects the probability distribution of the model's output toke
+                         ns. A higher temperature (e.g., 1.5) makes the output more random and creat
+                         ive, while a lower temperature (e.g., 0.5) makes the output more focused, d
+                         eterministic, and conservative. The suggested temperature is 0.8, which pro
+                         vides a balance between randomness and determinism. At the extreme, a tempe
+                         rature of 0 will always pick the most likely next token, leading to identic
+                         al outputs in each run. Set to `0` to disable.        [number] [default: 0]
+  -k, --topK             Limits the model to consider only the K most likely next tokens for samplin
+                         g at each step of sequence generation. An integer number between `1` and th
+                         e size of the vocabulary. Set to `0` to disable (which uses the full vocabu
+                         lary). Only relevant when `temperature` is set to a value greater than 0.
                                                                               [number] [default: 40]
-      --topP          Dynamically selects the smallest set of tokens whose cumulative probability ex
-                      ceeds the threshold P, and samples the next token only from this set. A float
-                      number between `0` and `1`. Set to `1` to disable. Only relevant when `tempera
-                      ture` is set to a value greater than `0`.             [number] [default: 0.95]
+  -p, --topP             Dynamically selects the smallest set of tokens whose cumulative probability
+                          exceeds the threshold P, and samples the next token only from this set. A
+                         float number between `0` and `1`. Set to `1` to disable. Only relevant when
+                          `temperature` is set to a value greater than `0`. [number] [default: 0.95]
+      --maxTokens, --mt  Maximum number of tokens to generate in responses. Set to `0` to disable. S
+                         et to `-1` to set to the context size                 [number] [default: 0]
 
 Options:
   -h, --help     Show help                                                                 [boolean]
