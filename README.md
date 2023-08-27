@@ -198,10 +198,10 @@ Download a release of llama.cpp and compile it
 
 Options:
   -h, --help             Show help                                                         [boolean]
-      --repo, --gr       The GitHub repository to download a release of llama.cpp from. Can also be
+      --repo             The GitHub repository to download a release of llama.cpp from. Can also be
                          set via the NODE_LLAMA_CPP_REPO environment variable
                                                            [string] [default: "ggerganov/llama.cpp"]
-      --release, --gr    The tag of the llama.cpp release to download. Set to "latest" to download t
+      --release          The tag of the llama.cpp release to download. Set to "latest" to download t
                          he latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE envi
                          ronment variable                               [string] [default: "latest"]
   -a, --arch             The architecture to compile llama.cpp for                          [string]

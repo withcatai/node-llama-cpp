@@ -28,13 +28,11 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     builder(yargs) {
         return yargs
             .option("repo", {
-                alias: "gr",
                 type: "string",
                 default: defaultLlamaCppGitHubRepo,
                 description: "The GitHub repository to download a release of llama.cpp from. Can also be set via the NODE_LLAMA_CPP_REPO environment variable"
             })
             .option("release", {
-                alias: "gr",
                 type: "string",
                 default: defaultLlamaCppRelease,
                 description: "The tag of the llama.cpp release to download. Set to \"latest\" to download the latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
