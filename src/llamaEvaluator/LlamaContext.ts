@@ -22,6 +22,14 @@ export class LlamaContext {
         return this._ctx.decode(tokens);
     }
 
+    public get prependBos() {
+        return this._prependBos;
+    }
+
+    public getBos() {
+        return this._ctx.decode(Uint32Array.from([this._ctx.tokenBos()]));
+    }
+
     public async *evaluate(tokens: Uint32Array) {
         let evalTokens = tokens;
 

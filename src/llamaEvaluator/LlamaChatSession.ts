@@ -56,7 +56,9 @@ export class LlamaChatSession {
         });
     }
 
-    public async prompt(prompt: string, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
+    public async prompt(prompt: string, {
+        onToken, signal, maxTokens
+    }: { onToken?(tokens: number[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
         if (!this.initialized)
             await this.init();
 
@@ -65,11 +67,20 @@ export class LlamaChatSession {
                 systemPrompt: this._systemPrompt,
                 promptIndex: this._promptIndex,
                 lastStopString: this._lastStopString,
-                lastStopStringSuffix: this._lastStopStringSuffix
+                lastStopStringSuffix: this._promptIndex == 0
+                    ? (
+                        this._ctx.prependBos
+                            ? this._ctx.getBos()
+                            : null
+                    )
+                    : this._lastStopStringSuffix
             });
             this._promptIndex++;
+            this._lastStopString = null;
+            this._lastStopStringSuffix = null;
 
-            const {text, stopString, stopStringSuffix} = await this._evalTokens(this._ctx.encode(promptText), onToken, {signal});
+            const {text, stopString, stopStringSuffix} =
+                await this._evalTokens(this._ctx.encode(promptText), {onToken, signal, maxTokens});
             this._lastStopString = stopString;
             this._lastStopStringSuffix = stopStringSuffix;
 
@@ -77,7 +88,9 @@ export class LlamaChatSession {
         });
     }
 
-    private async _evalTokens(tokens: Uint32Array, onToken?: (tokens: number[]) => void, {signal}: { signal?: AbortSignal } = {}) {
+    private async _evalTokens(tokens: Uint32Array, {
+        onToken, signal, maxTokens
+    }: { onToken?(tokens: number[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
         const stopStrings = this._promptWrapper.getStopStrings();
         const stopStringIndexes = Array(stopStrings.length).fill(0);
         const skippedChunksQueue: number[] = [];
@@ -111,6 +124,9 @@ export class LlamaChatSession {
 
             res.push(chunk);
             onToken?.([chunk]);
+
+            if (maxTokens != null && maxTokens > 0 && res.length >= maxTokens)
+                break;
         }
 
         return {
