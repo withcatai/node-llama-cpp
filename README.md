@@ -180,10 +180,10 @@ console.log(JSON.parse(a2));
 Usage: node-llama-cpp <command> [options]
 
 Commands:
-  cli.js download      Download a release of llama.cpp and compile it
-  cli.js build         Compile the currently downloaded llama.cpp
-  cli.js clear [type]  Clear files created by node-llama-cpp
-  cli.js chat          Chat with a LLama model
+  node-llama-cpp download      Download a release of llama.cpp and compile it
+  node-llama-cpp build         Compile the currently downloaded llama.cpp
+  node-llama-cpp clear [type]  Clear files created by node-llama-cpp
+  node-llama-cpp chat          Chat with a LLama model
 
 Options:
   -h, --help     Show help                                                                 [boolean]
@@ -258,7 +258,7 @@ Optional:
                                                                           share false information."]
   -w, --wrapper          Chat wrapper to use. Use `auto` to automatically select a wrapper based on
                          the model's BOS token
-                      [string] [choices: "auto", "general", "llamaChat", "chatML"] [default: "auto"]
+                   [string] [choices: "auto", "general", "llamaChat", "chatML"] [default: "general"]
   -c, --contextSize      Context size to use for the model                  [number] [default: 4096]
   -g, --grammar          Restrict the model response to a specific grammar, like JSON for example
      [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]
