@@ -58,6 +58,18 @@ export class LlamaContext {
     }
 
     /**
+     * @returns {Token | null} The NL (New Line) token.
+     */
+    public getNlToken(): Token | null {
+        const nlToken = this._ctx.tokenNl();
+
+        if (nlToken === -1)
+            return null;
+
+        return nlToken;
+    }
+
+    /**
      * @returns {string | null} The BOS (Beginning Of Sequence) token as a string.
      */
     public getBosString(): string | null {
@@ -79,6 +91,18 @@ export class LlamaContext {
             return null;
 
         return this._ctx.getTokenString(eosToken);
+    }
+
+    /**
+     * @returns {string | null} The NL (New Line) token as a string.
+     */
+    public getNlString(): string | null {
+        const nlToken = this.getNlToken();
+
+        if (nlToken == null)
+            return null;
+
+        return this._ctx.getTokenString(nlToken);
     }
 
     public getContextSize() {

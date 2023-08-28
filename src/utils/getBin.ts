@@ -121,6 +121,7 @@ export type LLAMAContext = {
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
     tokenEos(): number,
+    tokenNl(): number,
     getContextSize(): number
     getTokenString(token: number): string
 };
