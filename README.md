@@ -206,6 +206,10 @@ Options:
                          ronment variable                               [string] [default: "latest"]
   -a, --arch             The architecture to compile llama.cpp for                          [string]
   -t, --nodeTarget       The Node.js version to compile llama.cpp for. Example: v18.0.0     [string]
+      --metal            Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CP
+                         P_METAL environment variable                     [boolean] [default: false]
+      --cuda             Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP
+                         _CUDA environment variable                       [boolean] [default: false]
       --skipBuild, --sb  Skip building llama.cpp after downloading it     [boolean] [default: false]
   -v, --version          Show version number                                               [boolean]
 ```
@@ -220,6 +224,10 @@ Options:
   -h, --help        Show help                                                              [boolean]
   -a, --arch        The architecture to compile llama.cpp for                               [string]
   -t, --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
+      --metal       Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CPP_MET
+                    AL environment variable                               [boolean] [default: false]
+      --cuda        Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA
+                     environment variable                                 [boolean] [default: false]
   -v, --version     Show version number                                                    [boolean]
 ```
 
