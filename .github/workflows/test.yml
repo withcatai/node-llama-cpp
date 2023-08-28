@@ -9,7 +9,7 @@ jobs:
         with:
           node-version: "18"
       - name: Install modules
-        run: npm ci --ignore-scripts
+        run: npm ci
       - name: ESLint
         run: npx eslint --ext .js --ext .ts .
       - name: TypeScript validity
