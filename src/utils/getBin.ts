@@ -3,7 +3,10 @@ import * as console from "console";
 import path from "path";
 import process from "process";
 import fs from "fs-extra";
-import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, defaultSkipDownload, llamaBinsDirectory} from "../config.js";
+import {
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultSkipDownload,
+    llamaBinsDirectory
+} from "../config.js";
 import {DownloadLlamaCppCommand} from "../cli/commands/DownloadCommand.js";
 import {getUsedBinFlag} from "./usedBinFlag.js";
 import {getCompiledLlamaCppBinaryPath} from "./compileLLamaCpp.js";
@@ -70,7 +73,9 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
         } else {
             await DownloadLlamaCppCommand({
                 repo: defaultLlamaCppGitHubRepo,
-                release: defaultLlamaCppRelease
+                release: defaultLlamaCppRelease,
+                metal: defaultLlamaCppMetalSupport,
+                cuda: defaultLlamaCppCudaSupport
             });
 
             const modulePath = await getCompiledLlamaCppBinaryPath();

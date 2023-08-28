@@ -25,6 +25,12 @@ export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
 export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .default(await getBinariesGithubRelease())
     .asString();
+export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
+    .default("false")
+    .asBool();
+export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
+    .default("false")
+    .asBool();
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();

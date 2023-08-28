@@ -1,5 +1,7 @@
 import {CommandModule} from "yargs";
-import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, defaultSkipDownload} from "../../config.js";
+import {
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultSkipDownload
+} from "../../config.js";
 import {getPrebuildBinPath} from "../../utils/getBin.js";
 import {DownloadLlamaCppCommand} from "./DownloadCommand.js";
 
@@ -18,7 +20,9 @@ export const OnPostInstallCommand: CommandModule<object, OnPostInstallCommand> =
         try {
             await DownloadLlamaCppCommand({
                 repo: defaultLlamaCppGitHubRepo,
-                release: defaultLlamaCppRelease
+                release: defaultLlamaCppRelease,
+                metal: defaultLlamaCppMetalSupport,
+                cuda: defaultLlamaCppCudaSupport
             });
         } catch (err) {
             console.error(err);

@@ -1,12 +1,16 @@
+import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
+import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport} from "../../config.js";
 
 type BuildCommand = {
     arch?: string,
-    nodeTarget?: string
+    nodeTarget?: string,
+    metal: boolean,
+    cuda: boolean
 };
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
@@ -23,12 +27,30 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 alias: "t",
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
+            })
+            .option("metal", {
+                type: "boolean",
+                default: defaultLlamaCppMetalSupport,
+                description: "Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
+            })
+            .option("cuda", {
+                type: "boolean",
+                default: defaultLlamaCppCudaSupport,
+                description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
             });
     },
     handler: BuildLlamaCppCommand
 };
 
-export async function BuildLlamaCppCommand({arch, nodeTarget}: BuildCommand) {
+export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: BuildCommand) {
+    if (metal && process.platform === "darwin") {
+        console.log(`${chalk.yellow("Metal:")} enabled`);
+    }
+
+    if (cuda) {
+        console.log(`${chalk.yellow("CUDA:")} enabled`);
+    }
+
     await withOra({
         loading: chalk.blue("Compiling llama.cpp"),
         success: chalk.blue("Compiled llama.cpp"),
@@ -37,7 +59,9 @@ export async function BuildLlamaCppCommand({arch, nodeTarget}: BuildCommand) {
         await compileLlamaCpp({
             arch: arch ? arch : undefined,
             nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBingFlag: true
+            setUsedBingFlag: true,
+            metal,
+            cuda
         });
     });
 
