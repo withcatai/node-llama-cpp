@@ -177,7 +177,7 @@ console.log(JSON.parse(a2));
 
 ### Metal and CUDA support
 To load a version of `llama.cpp` that was compiled to use Metal or CUDA,
-you have to rebuild it from source with the `--metal` or `--cuda` flag before running your code that imports `node-llama-cpp`.
+you have to build it from source with the `--metal` or `--cuda` flag before running your code that imports `node-llama-cpp`.
 
 To do this, run this command inside of your project directory:
 ```bash
