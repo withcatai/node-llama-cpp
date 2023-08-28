@@ -4,6 +4,7 @@ import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
 import {AbortError} from "../AbortError.js";
 import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper.js";
 import {getChatWrapperByBos} from "../chatWrappers/createChatWrapperByBos.js";
+import {Token} from "../types.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaContext} from "./LlamaContext.js";
 
@@ -35,7 +36,7 @@ export class LlamaChatSession {
         this._systemPrompt = systemPrompt;
 
         if (promptWrapper === "auto") {
-            const chatWrapper = getChatWrapperByBos(context.getBos());
+            const chatWrapper = getChatWrapperByBos(context.getBosString());
 
             if (chatWrapper != null)
                 this._promptWrapper = new chatWrapper();
@@ -67,7 +68,7 @@ export class LlamaChatSession {
 
     public async prompt(prompt: string, {
         onToken, signal, maxTokens
-    }: { onToken?(tokens: number[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
+    }: { onToken?(tokens: Token[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
         if (!this.initialized)
             await this.init();
 
@@ -79,7 +80,7 @@ export class LlamaChatSession {
                 lastStopStringSuffix: this._promptIndex == 0
                     ? (
                         this._ctx.prependBos
-                            ? this._ctx.getBos()
+                            ? this._ctx.getBosString()
                             : null
                     )
                     : this._lastStopStringSuffix
@@ -99,11 +100,11 @@ export class LlamaChatSession {
 
     private async _evalTokens(tokens: Uint32Array, {
         onToken, signal, maxTokens
-    }: { onToken?(tokens: number[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
+    }: { onToken?(tokens: Token[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
         const stopStrings = this._promptWrapper.getStopStrings();
         const stopStringIndexes = Array(stopStrings.length).fill(0);
-        const skippedChunksQueue: number[] = [];
-        const res: number[] = [];
+        const skippedChunksQueue: Token[] = [];
+        const res: Token[] = [];
 
         for await (const chunk of this._ctx.evaluate(tokens)) {
             if (signal?.aborted)

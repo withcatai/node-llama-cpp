@@ -140,8 +140,8 @@ async function RunChat({
             ? await LlamaGrammar.getFor(grammarArg)
             : undefined
     });
-    const bos = context.getBos(); // bos = beginning of sequence
-    const eos = context.getEos(); // eos = end of sequence
+    const bos = context.getBosString(); // bos = beginning of sequence
+    const eos = context.getEosString(); // eos = end of sequence
     const promptWrapper = getChatWrapper(wrapper, bos);
     const session = new LlamaChatSession({
         context,
@@ -197,7 +197,7 @@ async function RunChat({
     }
 }
 
-function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string): ChatPromptWrapper {
+function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string | null): ChatPromptWrapper {
     switch (wrapper) {
         case "general":
             return new GeneralChatPromptWrapper();

@@ -10,6 +10,9 @@ import {LlamaContext} from "./llamaEvaluator/LlamaContext.js";
 import {ChatMLPromptWrapper} from "./chatWrappers/ChatMLPromptWrapper.js";
 import {getChatWrapperByBos} from "./chatWrappers/createChatWrapperByBos.js";
 
+import {type Token} from "./types.js";
+
+
 export {
     LlamaModel,
     LlamaGrammar,
@@ -21,5 +24,6 @@ export {
     LlamaChatPromptWrapper,
     GeneralChatPromptWrapper,
     ChatMLPromptWrapper,
-    getChatWrapperByBos
+    getChatWrapperByBos,
+    type Token
 };
