@@ -38,14 +38,17 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 description: "The tag of the llama.cpp release to download. Set to \"latest\" to download the latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
             })
             .option("arch", {
+                alias: "a",
                 type: "string",
                 description: "The architecture to compile llama.cpp for"
             })
             .option("nodeTarget", {
+                alias: "t",
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
             })
             .option("skipBuild", {
+                alias: "sb",
                 type: "boolean",
                 default: false,
                 description: "Skip building llama.cpp after downloading it"
@@ -60,7 +63,9 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     handler: DownloadLlamaCppCommand
 };
 
-export async function DownloadLlamaCppCommand({repo, release, arch, nodeTarget, skipBuild, updateBinariesReleaseMetadata}: DownloadCommandArgs) {
+export async function DownloadLlamaCppCommand({
+    repo, release, arch, nodeTarget, skipBuild, updateBinariesReleaseMetadata
+}: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
 

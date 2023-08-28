@@ -15,10 +15,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
     builder(yargs) {
         return yargs
             .option("arch", {
+                alias: "a",
                 type: "string",
                 description: "The architecture to compile llama.cpp for"
             })
             .option("nodeTarget", {
+                alias: "t",
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
             });

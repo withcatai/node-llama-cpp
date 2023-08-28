@@ -232,6 +232,8 @@ jobs:
           mv artifacts/build dist/
           mv artifacts/docs docs/
           
+          cp -r artifacts/llama.cpp/grammars llama/grammars
+          
           rm -f ./llama/binariesGithubRelease.json
           mv artifacts/binariesGithubRelease/binariesGithubRelease.json ./llama/binariesGithubRelease.json
           

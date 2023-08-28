@@ -3,18 +3,26 @@
 #include <sstream>
 #include <vector>
 
+#include "common.h"
 #include "llama.h"
+#include "common/grammar-parser.h"
 #include "napi.h"
 
 class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
   public:
     llama_context_params params;
     llama_model* model;
+    float temperature;
+    int32_t top_k;
+    float top_p;
 
     LLAMAModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAModel>(info) {
         params = llama_context_default_params();
         params.seed = -1;
         params.n_ctx = 4096;
+        temperature = 0.0f;
+        top_k = 40;
+        top_p = 0.95f;
 
         // Get the model path
         std::string modelPath = info[0].As<Napi::String>().Utf8Value();
@@ -65,6 +73,18 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
             if (options.Has("embedding")) {
                 params.embedding = options.Get("embedding").As<Napi::Boolean>().Value();
             }
+
+            if (options.Has("temperature")) {
+                temperature = options.Get("temperature").As<Napi::Number>().FloatValue();
+            }
+
+            if (options.Has("topK")) {
+                top_k = options.Get("topK").As<Napi::Number>().Int32Value();
+            }
+
+            if (options.Has("topP")) {
+                top_p = options.Get("topP").As<Napi::Number>().FloatValue();
+            }
         }
 
         llama_backend_init(false);
@@ -85,20 +105,84 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
     }
 };
 
+class LLAMAGrammar : public Napi::ObjectWrap<LLAMAGrammar> {
+  public:
+    grammar_parser::parse_state parsed_grammar;
+    llama_grammar *grammar = nullptr;
+
+    LLAMAGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAGrammar>(info) {
+        // Get the model path
+        std::string grammarCode = info[0].As<Napi::String>().Utf8Value();
+        bool should_print_grammar = false;
+
+        if (info.Length() > 1 && info[1].IsObject()) {
+            Napi::Object options = info[1].As<Napi::Object>();
+
+            if (options.Has("printGrammar")) {
+                should_print_grammar = options.Get("printGrammar").As<Napi::Boolean>().Value();
+            }
+        }
+
+        parsed_grammar = grammar_parser::parse(grammarCode.c_str());
+        // will be empty (default) if there are parse errors
+        if (parsed_grammar.rules.empty()) {
+            Napi::Error::New(info.Env(), "Failed to parse grammar").ThrowAsJavaScriptException();
+            return;
+        }
+
+        if (should_print_grammar) {
+            grammar_parser::print_grammar(stderr, parsed_grammar);
+        }
+
+        std::vector<const llama_grammar_element *> grammar_rules(parsed_grammar.c_rules());
+        grammar = llama_grammar_init(
+            grammar_rules.data(), grammar_rules.size(), parsed_grammar.symbol_ids.at("root"));
+    }
+
+    ~LLAMAGrammar() {
+        if (grammar != nullptr) {
+            llama_grammar_free(grammar);
+            grammar = nullptr;
+        }
+    }
+
+    static void init(Napi::Object exports) {
+        exports.Set("LLAMAGrammar", DefineClass(exports.Env(), "LLAMAGrammar", {}));
+    }
+};
+
 class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   public:
   LLAMAModel* model;
   llama_context* ctx;
+  LLAMAGrammar* grammar;
+  bool use_grammar = false;
+
   LLAMAContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAContext>(info) {
     model = Napi::ObjectWrap<LLAMAModel>::Unwrap(info[0].As<Napi::Object>());
     model->Ref();
     ctx = llama_new_context_with_model(model->model, model->params);
     Napi::MemoryManagement::AdjustExternalMemory(Env(), llama_get_state_size(ctx));
+
+    if (info.Length() > 1 && info[1].IsObject()) {
+        Napi::Object options = info[1].As<Napi::Object>();
+
+        if (options.Has("grammar")) {
+            grammar = Napi::ObjectWrap<LLAMAGrammar>::Unwrap(options.Get("grammar").As<Napi::Object>());
+            grammar->Ref();
+            use_grammar = true;
+        }
+    }
   }
   ~LLAMAContext() {
     Napi::MemoryManagement::AdjustExternalMemory(Env(), -(int64_t)llama_get_state_size(ctx));
     llama_free(ctx);
     model->Unref();
+
+    if (use_grammar) {
+        grammar->Unref();
+        use_grammar = false;
+    }
   }
   Napi::Value Encode(const Napi::CallbackInfo& info) {
     std::string text = info[0].As<Napi::String>().Utf8Value();
@@ -125,23 +209,13 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 
     // Decode each token and accumulate the result.
     for (size_t i = 0; i < tokens.ElementLength(); i++) {
-      // source: https://github.com/ggerganov/llama.cpp/blob/232caf3c1581a6cb023571780ff41dc2d66d1ca0/llama.cpp#L799-L811
-      std::vector<char> result(8, 0);
-      const int n_tokens = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
-      if (n_tokens < 0) {
-          result.resize(-n_tokens);
-          int check = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
-          GGML_ASSERT(check == -n_tokens);
-      } else {
-          result.resize(n_tokens);
-      }
+        const std::string piece = llama_token_to_piece(ctx, (llama_token)tokens[i]);
 
-      const char* str = result.data();
-      if (str == nullptr) {
-        Napi::Error::New(info.Env(), "Invalid token").ThrowAsJavaScriptException();
-        return info.Env().Undefined();
-      }
-      ss << str;
+        if (piece.empty()) {
+            continue;
+        }
+
+        ss << piece;
     }
 
     return Napi::String::New(info.Env(), ss.str());
@@ -152,8 +226,24 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   Napi::Value TokenEos(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_token_eos(ctx));
   }
-  Napi::Value GetMaxContextSize(const Napi::CallbackInfo& info) {
+  Napi::Value TokenNl(const Napi::CallbackInfo& info) {
+    return Napi::Number::From(info.Env(), llama_token_nl(ctx));
+  }
+  Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
+  }
+  Napi::Value GetTokenString(const Napi::CallbackInfo& info) {
+    int token = info[0].As<Napi::Number>().Int32Value();
+    std::stringstream ss;
+
+    const char* str = llama_token_get_text(ctx, token);
+    if (str == nullptr) {
+      return info.Env().Undefined();
+    }
+
+    ss << str;
+
+    return Napi::String::New(info.Env(), ss.str());
   }
   Napi::Value Eval(const Napi::CallbackInfo& info);
   static void init(Napi::Object exports) {
@@ -165,7 +255,9 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
                 InstanceMethod("decode", &LLAMAContext::Decode),
                 InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
                 InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
-                InstanceMethod("getMaxContextSize", &LLAMAContext::GetMaxContextSize),
+                InstanceMethod("tokenNl", &LLAMAContext::TokenNl),
+                InstanceMethod("getContextSize", &LLAMAContext::GetContextSize),
+                InstanceMethod("getTokenString", &LLAMAContext::GetTokenString),
                 InstanceMethod("eval", &LLAMAContext::Eval),
             }));
   }
@@ -212,7 +304,49 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
 
     llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
 
-    new_token_id = llama_sample_token_greedy(ctx->ctx , &candidates_p);
+    float originalEosLogit = 0;
+    auto eos_token = llama_token_eos(ctx->ctx);
+
+    for (auto& candidate : candidates) {
+      if (candidate.id == eos_token) {
+        originalEosLogit = candidate.logit;
+        break;
+      }
+    }
+
+    if (ctx->use_grammar) {
+        llama_sample_grammar(ctx->ctx, &candidates_p, (ctx->grammar)->grammar);
+    }
+
+    for (auto& candidate : candidates) {
+      if (candidate.id == eos_token) {
+        candidate.logit = originalEosLogit;
+        break;
+      }
+    }
+
+    if ((ctx->model)->temperature <= 0) {
+        new_token_id = llama_sample_token_greedy(ctx->ctx , &candidates_p);
+    } else {
+        const int32_t top_k = (ctx->model)->top_k <= 0 ? llama_n_vocab(ctx->ctx) : (ctx->model)->top_k;
+        const int32_t n_probs = 0; // Number of probabilities to keep - 0 = disabled
+        const float tfs_z = 1.00f; // Tail free sampling - 1.0 = disabled
+        const float typical_p = 1.00f; // Typical probability - 1.0 = disabled
+        const float top_p = (ctx->model)->top_p; // Top p sampling - 1.0 = disabled
+
+        // Temperature sampling
+        size_t min_keep = std::max(1, n_probs);
+        llama_sample_top_k(ctx->ctx, &candidates_p, top_k, min_keep);
+        llama_sample_tail_free(ctx->ctx, &candidates_p, tfs_z, min_keep);
+        llama_sample_typical(ctx->ctx, &candidates_p, typical_p, min_keep);
+        llama_sample_top_p(ctx->ctx, &candidates_p, top_p, min_keep);
+        llama_sample_temperature(ctx->ctx, &candidates_p, (ctx->model)->temperature);;
+        new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
+    }
+
+    if (new_token_id != eos_token && ctx->use_grammar) {
+        llama_grammar_accept_token(ctx->ctx, (ctx->grammar)->grammar, new_token_id);
+    }
 
     result = new_token_id;
   }
@@ -238,6 +372,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
       Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
   });
   LLAMAModel::init(exports);
+  LLAMAGrammar::init(exports);
   LLAMAContext::init(exports);
   return exports;
 }

@@ -12,7 +12,9 @@ const env = envVar.from(process.env);
 
 export const llamaDirectory = path.join(__dirname, "..", "llama");
 export const llamaBinsDirectory = path.join(__dirname, "..", "llamaBins");
+export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
+export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
 export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");

@@ -12,12 +12,12 @@ type ClearCommand = {
 
 export const ClearCommand: CommandModule<object, ClearCommand> = {
     command: "clear [type]",
-    describe: "Clear files created by llama-cli",
+    describe: "Clear files created by node-llama-cpp",
     builder(yargs) {
         return yargs
             .option("type", {
                 type: "string",
-                choices: ["source", "build", "all"] as ClearCommand["type"][],
+                choices: ["source", "build", "all"] satisfies ClearCommand["type"][],
                 default: "all" as ClearCommand["type"],
                 description: "Files to clear"
             });
