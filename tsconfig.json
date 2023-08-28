@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "baseUrl": "./src",
         "lib": ["es2022"],
         "module": "es2022",
         "target": "es2022",

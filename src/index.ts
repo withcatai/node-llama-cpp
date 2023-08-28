@@ -1,4 +1,4 @@
-import {LlamaGrammar} from "llamaEvaluator/LlamaGrammar.js";
+import {LlamaGrammar} from "./llamaEvaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "./llamaEvaluator/LlamaChatSession.js";
 import {LlamaModel} from "./llamaEvaluator/LlamaModel.js";
 import {AbortError} from "./AbortError.js";
