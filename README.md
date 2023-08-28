@@ -175,6 +175,23 @@ console.log("AI: " + a2);
 console.log(JSON.parse(a2));
 ```
 
+### Metal and CUDA support
+To load a version of `llama.cpp` that was compiled to use Metal or CUDA,
+you have to build it from source with the `--metal` or `--cuda` flag before running your code that imports `node-llama-cpp`.
+
+To do this, run this command inside of your project directory:
+```bash
+# For Metal support on macOS
+npx node-llama-cpp download --metal
+
+# For CUDA support
+npx node-llama-cpp download --cuda
+```
+
+> In order for `node-llama-cpp` to be able to build `llama.cpp` from source, make sure you have the required dependencies of `node-gyp` installed.
+> 
+> More info is available [here](https://github.com/nodejs/node-gyp#on-unix) (you don't have to install `node-gyp` itself, just the dependencies).
+
 ### CLI
 ```
 Usage: node-llama-cpp <command> [options]
