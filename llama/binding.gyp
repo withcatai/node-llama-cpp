@@ -8,6 +8,7 @@
         "llama.cpp/ggml-alloc.c",
         "llama.cpp/k_quants.c",
         "llama.cpp/llama.cpp",
+        "llama.cpp/common/common.cpp",
         "llama.cpp/common/grammar-parser.cpp"
       ],
       "include_dirs": [

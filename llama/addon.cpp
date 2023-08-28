@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 
+#include "common.h"
 #include "llama.h"
 #include "common/grammar-parser.h"
 #include "napi.h"
@@ -208,23 +209,13 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 
     // Decode each token and accumulate the result.
     for (size_t i = 0; i < tokens.ElementLength(); i++) {
-      // source: https://github.com/ggerganov/llama.cpp/blob/232caf3c1581a6cb023571780ff41dc2d66d1ca0/llama.cpp#L799-L811
-      std::vector<char> result(8, 0);
-      const int n_tokens = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
-      if (n_tokens < 0) {
-          result.resize(-n_tokens);
-          int check = llama_token_to_str(ctx, (llama_token)tokens[i], result.data(), result.size());
-          GGML_ASSERT(check == -n_tokens);
-      } else {
-          result.resize(n_tokens);
-      }
+        const std::string piece = llama_token_to_piece(ctx, (llama_token)tokens[i]);
 
-      const char* str = result.data();
-      if (str == nullptr) {
-        Napi::Error::New(info.Env(), "Invalid token").ThrowAsJavaScriptException();
-        return info.Env().Undefined();
-      }
-      ss << str;
+        if (piece.empty()) {
+            continue;
+        }
+
+        ss << piece;
     }
 
     return Napi::String::New(info.Env(), ss.str());
