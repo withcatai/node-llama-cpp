@@ -1,6 +1,6 @@
 import spawn from "cross-spawn";
 
-export function spawnCommand(command: string, args: string[], cwd: string) {
+export function spawnCommand(command: string, args: string[], cwd: string, env = process.env) {
     function getCommandString() {
         let res = command;
 
@@ -19,7 +19,7 @@ export function spawnCommand(command: string, args: string[], cwd: string) {
         const child = spawn(command, args, {
             stdio: "inherit",
             cwd,
-            env: process.env,
+            env,
             detached: false,
             windowsHide: true
         });

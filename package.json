@@ -40,10 +40,10 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "postinstall": "node ./dist/cli/cli.js postinstall",
     "prepare": "[ $CI = true ] || [ -d '.husky/_' ] || husky install",
     "prebuild": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force",
+    "addPostinstallScript": "npm pkg set scripts.postinstall=\"node ./dist/cli/cli.js postinstall\"",
     "generate-docs": "typedoc",
     "prewatch": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
@@ -123,6 +123,7 @@
     "node-stream-zip": "^1.15.0",
     "octokit": "^3.1.0",
     "ora": "^7.0.1",
+    "simple-git": "^3.19.1",
     "uuid": "^9.0.0",
     "yargs": "^17.7.2"
   }

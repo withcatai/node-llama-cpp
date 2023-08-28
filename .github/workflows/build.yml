@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install modules
-        run: npm ci --ignore-scripts
+        run: npm ci
       - name: Build
         run: npm run build
       - name: Generate docs
@@ -117,7 +117,7 @@ jobs:
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
-          npm ci --ignore-scripts
+          npm ci
           
           npx zx -y <<'EOF'
           
@@ -221,7 +221,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install modules
-        run: npm ci --ignore-scripts
+        run: npm ci
       - uses: actions/download-artifact@v3
         with:
           path: artifacts
@@ -239,6 +239,8 @@ jobs:
           
           echo "Built binaries:"
           ls llamaBins
+      - name: Add "postinstall" script to package.json
+        run: npm run addPostinstallScript
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

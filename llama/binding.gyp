@@ -18,7 +18,7 @@
       ],
       "cflags": ["-fexceptions"],
       "cflags_cc": ["-fexceptions"],
-      "defines": [ "GGML_USE_K_QUANTS", "NAPI_CPP_EXCEPTIONS" ],
+      "defines": ["GGML_USE_K_QUANTS", "NAPI_CPP_EXCEPTIONS"],
       "msvs_settings": {
         "VCCLCompilerTool": { "AdditionalOptions": [ '/arch:AVX2', '/EHsc' ] }
       }
