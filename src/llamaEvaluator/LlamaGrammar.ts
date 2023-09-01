@@ -26,7 +26,7 @@ export class LlamaGrammar {
 
         const grammarFile = path.join(grammarsFolder, type + ".gbnf");
 
-        if (await fs.exists(grammarFile)) {
+        if (await fs.pathExists(grammarFile)) {
             const grammar = await fs.readFile(grammarFile, "utf8");
             return new LlamaGrammar({grammar});
         }

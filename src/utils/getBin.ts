@@ -25,7 +25,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
         for (const nodeVersion of nodeVersions) {
             const binPath = createPath(platform, arch, nodeVersion);
 
-            if (await fs.exists(binPath))
+            if (await fs.pathExists(binPath))
                 return binPath;
         }
 
@@ -53,9 +53,9 @@ export async function getPrebuildBinPath(): Promise<string | null> {
 }
 
 export async function loadBin(): Promise<LlamaCppNodeModule> {
-    const usedBingFlag = await getUsedBinFlag();
+    const usedBinFlag = await getUsedBinFlag();
 
-    if (usedBingFlag === "prebuiltBinaries") {
+    if (usedBinFlag === "prebuiltBinaries") {
         const prebuildBinPath = await getPrebuildBinPath();
 
         if (prebuildBinPath == null) {

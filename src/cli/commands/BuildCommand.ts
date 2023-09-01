@@ -1,10 +1,11 @@
 import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
+import fs from "fs-extra";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport} from "../../config.js";
+import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, llamaCppDirectory} from "../../config.js";
 
 type BuildCommand = {
     arch?: string,
@@ -43,6 +44,11 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
 };
 
 export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: BuildCommand) {
+    if (!(await fs.pathExists(llamaCppDirectory))) {
+        console.log(chalk.red('llama.cpp is not downloaded. Please run "node-llama-cpp download" first'));
+        process.exit(1);
+    }
+
     if (metal && process.platform === "darwin") {
         console.log(`${chalk.yellow("Metal:")} enabled`);
     }
@@ -59,7 +65,7 @@ export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: Buil
         await compileLlamaCpp({
             arch: arch ? arch : undefined,
             nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBingFlag: true,
+            setUsedBinFlag: true,
             metal,
             cuda
         });
