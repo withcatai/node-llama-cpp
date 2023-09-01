@@ -1,0 +1,58 @@
+name: 📝 Documentation Issue
+description: Documentation is unclear or otherwise insufficient.
+labels:
+  - requires triage
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Have a question? This is the `node-llama-cpp` issue tracker – and is not the right place for general support or questions.
+        Instead, use [`node-llama-cpp` GitHub Discussions](https://github.com/withcatai/node-llama-cpp/discussions) to get support or ask questions.
+  - type: textarea
+    id: details
+    attributes:
+      label: What was unclear or otherwise insufficient?
+      description: >-
+        If relevant, please be clear about the documentation URL, as well as the location within the page.
+        Add a link to the relevant documentation you're referring to.
+      placeholder: >-
+        If the page or section does not exist, please be clear why a new documentation page or section is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommended Fix
+      description: How should this documentation issue be fixed?
+      placeholder: Should there be more examples, the language be clarified, or the section be dropped entirely?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the documentation issue here.
+  - type: dropdown
+    id: pr
+    attributes:
+      label: Are you willing to resolve this issue by submitting a Pull Request?
+      options:
+        - Yes, I have the time, and I know how to start.
+        - >-
+          Yes, I have the time, but I don't know how to start. I would need
+          guidance.
+        - >-
+          No, I don’t have the time, but I can support (using donations)
+          development.
+        - >-
+          No, I don’t have the time and I’m okay to wait for the community /
+          maintainers to resolve this issue.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |-
+        First-time contributors are always welcome! 🙌
+
+        👋 Have a great day and thank you for the documentation issue!
