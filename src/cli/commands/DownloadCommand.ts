@@ -165,7 +165,7 @@ export async function DownloadLlamaCppCommand({
         await compileLlamaCpp({
             arch: arch ? arch : undefined,
             nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBingFlag: true,
+            setUsedBinFlag: true,
             metal,
             cuda
         });

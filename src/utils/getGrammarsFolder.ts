@@ -3,13 +3,15 @@ import {llamaBinsGrammarsDirectory, llamaCppGrammarsDirectory} from "../config.j
 import {getUsedBinFlag} from "./usedBinFlag.js";
 
 export async function getGrammarsFolder() {
-    const usedBingFlag = await getUsedBinFlag();
+    const usedBinFlag = await getUsedBinFlag();
 
     if (usedBingFlag === "localBuildFromSource") {
         if (await fs.exists(llamaCppGrammarsDirectory))
+    if (usedBinFlag === "localBuildFromSource") {
             return llamaCppGrammarsDirectory;
     } else if (usedBingFlag === "prebuiltBinaries") {
         if (await fs.exists(llamaBinsGrammarsDirectory))
+    } else if (usedBinFlag === "prebuiltBinaries") {
             return llamaBinsGrammarsDirectory;
         else if (await fs.exists(llamaCppGrammarsDirectory))
             return llamaCppGrammarsDirectory;

@@ -65,7 +65,7 @@ export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: Buil
         await compileLlamaCpp({
             arch: arch ? arch : undefined,
             nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBingFlag: true,
+            setUsedBinFlag: true,
             metal,
             cuda
         });

@@ -53,9 +53,9 @@ export async function getPrebuildBinPath(): Promise<string | null> {
 }
 
 export async function loadBin(): Promise<LlamaCppNodeModule> {
-    const usedBingFlag = await getUsedBinFlag();
+    const usedBinFlag = await getUsedBinFlag();
 
-    if (usedBingFlag === "prebuiltBinaries") {
+    if (usedBinFlag === "prebuiltBinaries") {
         const prebuildBinPath = await getPrebuildBinPath();
 
         if (prebuildBinPath == null) {
