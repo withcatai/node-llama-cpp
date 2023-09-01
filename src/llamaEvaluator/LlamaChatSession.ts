@@ -10,6 +10,14 @@ import {LlamaContext} from "./LlamaContext.js";
 
 const UNKNOWN_UNICODE_CHAR = "\ufffd";
 
+
+export type LlamaChatSessionOptions = {
+    context: LlamaContext,
+    printLLamaSystemInfo?: boolean,
+    promptWrapper?: ChatPromptWrapper | "auto",
+    systemPrompt?: string
+};
+
 export class LlamaChatSession {
     private readonly _systemPrompt: string;
     private readonly _printLLamaSystemInfo: boolean;
@@ -25,12 +33,7 @@ export class LlamaChatSession {
         printLLamaSystemInfo = false,
         promptWrapper = new GeneralChatPromptWrapper(),
         systemPrompt = defaultChatSystemPrompt
-    }: {
-        context: LlamaContext,
-        printLLamaSystemInfo?: boolean,
-        promptWrapper?: ChatPromptWrapper | "auto",
-        systemPrompt?: string,
-    }) {
+    }: LlamaChatSessionOptions) {
         this._ctx = context;
         this._printLLamaSystemInfo = printLLamaSystemInfo;
         this._systemPrompt = systemPrompt;
