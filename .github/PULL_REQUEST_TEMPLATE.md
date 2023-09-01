@@ -29,4 +29,4 @@
 - [ ] This pull request links relevant issues as `Fixes #0000`
 - [ ] There are new or updated unit tests validating the change
 - [ ] Documentation has been updated to reflect this change
-- [ ] The new commits follow conventions explained in [CONTRIBUTING.md](https://github.com/withcatai/node-llama-cpp/blob/master/CONTRIBUTING.md)
+- [ ] The new commits and pull request title follow conventions explained in [CONTRIBUTING.md](https://github.com/withcatai/node-llama-cpp/blob/master/CONTRIBUTING.md) (PRs that do not follow this convention will not be merged)
