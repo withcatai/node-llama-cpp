@@ -15,7 +15,7 @@ export async function compileLlamaCpp({
     arch?: string, nodeTarget?: string, setUsedBinFlag?: boolean, metal?: boolean, cuda?: boolean
 }) {
     try {
-        if (!(await fs.exists(llamaCppDirectory))) {
+        if (!(await fs.pathExists(llamaCppDirectory))) {
             throw new Error(`"${llamaCppDirectory}" directory does not exist`);
         }
 
@@ -46,12 +46,12 @@ export async function compileLlamaCpp({
 
         await spawnCommand("npm", ["run", "-s", "node-gyp-llama", "--", "configure", "--arch=" + arch, "--target=" + nodeTarget, "--", "-f", "compile_commands_json"], __dirname, nodeGypEnv);
 
-        if (await fs.exists(path.join(llamaDirectory, "Release", "compile_commands.json"))) {
+        if (await fs.pathExists(path.join(llamaDirectory, "Release", "compile_commands.json"))) {
             await fs.move(
                 path.join(llamaDirectory, "Release", "compile_commands.json"),
                 path.join(llamaDirectory, "compile_commands.json")
             );
-        } else if (await fs.exists(path.join(llamaDirectory, "Debug", "compile_commands.json"))) {
+        } else if (await fs.pathExists(path.join(llamaDirectory, "Debug", "compile_commands.json"))) {
             await fs.move(
                 path.join(llamaDirectory, "Debug", "compile_commands.json"),
                 path.join(llamaDirectory, "compile_commands.json")
@@ -78,7 +78,7 @@ export async function compileLlamaCpp({
 export async function getCompiledLlamaCppBinaryPath() {
     const modulePath = path.join(__dirname, "..", "..", "llama", "build", "Release", "llama.node");
 
-    if (await fs.exists(modulePath))
+    if (await fs.pathExists(modulePath))
         return modulePath;
 
     return null;

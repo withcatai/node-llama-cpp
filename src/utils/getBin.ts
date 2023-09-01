@@ -25,7 +25,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
         for (const nodeVersion of nodeVersions) {
             const binPath = createPath(platform, arch, nodeVersion);
 
-            if (await fs.exists(binPath))
+            if (await fs.pathExists(binPath))
                 return binPath;
         }
 
