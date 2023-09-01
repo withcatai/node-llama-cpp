@@ -4,11 +4,18 @@ import {LLAMAContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
+
+export type LlamaContextOptions = {
+    model: LlamaModel,
+    grammar?: LlamaGrammar,
+    prependBos?: boolean
+};
+
 export class LlamaContext {
     private readonly _ctx: LLAMAContext;
     private _prependBos: boolean;
 
-    public constructor({model, grammar, prependBos = true}: {model: LlamaModel, grammar?: LlamaGrammar, prependBos?: boolean}) {
+    public constructor({model, grammar, prependBos = true}: LlamaContextOptions) {
         this._ctx = new LLAMAContext(model._model, removeNullFields({
             grammar: grammar?._grammar
         }));

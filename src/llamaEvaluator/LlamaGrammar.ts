@@ -4,6 +4,14 @@ import {getGrammarsFolder} from "../utils/getGrammarsFolder.js";
 import {LLAMAGrammar} from "./LlamaBins.js";
 
 
+export type LlamaGrammarOptions = {
+    /** GBNF grammar */
+    grammar: string,
+
+    /** print the grammar to stdout */
+    printGrammar?: boolean
+};
+
 export class LlamaGrammar {
     /** @internal */
     public readonly _grammar: LLAMAGrammar;
@@ -15,7 +23,7 @@ export class LlamaGrammar {
      * @param {string} options.grammar - GBNF grammar
      * @param {boolean} [options.printGrammar] - print the grammar to stdout
      */
-    public constructor({grammar, printGrammar = false}: {grammar: string, printGrammar?: boolean}) {
+    public constructor({grammar, printGrammar = false}: LlamaGrammarOptions) {
         this._grammar = new LLAMAGrammar(grammar, {
             printGrammar
         });
