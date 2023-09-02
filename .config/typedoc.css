@@ -214,21 +214,21 @@ h6:not(.tsd-anchor-link, .tsd-returns-title) > a:hover:before {
     margin-top: 16px;
 }
 
-img[src="assets/logo.roundEdges.png"],
-img[src="assets/logo.png"] {
+img[src$="assets/logo.roundEdges.png"],
+img[src$="assets/logo.png"] {
     box-shadow: 0px 4px 12px 0px rgb(0 0 0 / 16%), 0px 8px 64px 0px rgb(0 0 0 / 24%);
     border-radius: 14px;
 }
 
-div[align="center"] > img[alt="Star please"][src="assets/star.please.roundEdges.png"] ~ p[align="right"],
-div[align="center"] > img[alt="Star please"][src="assets/star.please.png"] ~ p[align="right"] {
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"],
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"] {
     max-width: 360px;
 }
-div[align="center"] > img[alt="Star please"][src="assets/star.please.roundEdges.png"] ~ p[align="right"]>*,
-div[align="center"] > img[alt="Star please"][src="assets/star.please.png"] ~ p[align="right"]>* {
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"]>*,
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"]>* {
     display: none;
 }
-div[align="center"] > img[alt="Star please"][src="assets/star.please.roundEdges.png"] ~ p[align="right"]>:first-of-type,
-div[align="center"] > img[alt="Star please"][src="assets/star.please.png"] ~ p[align="right"]>:first-of-type {
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"]>:first-of-type,
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"]>:first-of-type {
     display: block;
 }

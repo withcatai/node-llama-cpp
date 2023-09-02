@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="node-llama-cpp Logo" src="assets/logo.roundEdges.png" width="360px" />
+    <img alt="node-llama-cpp Logo" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" width="360px" />
     <h1>Node Llama.cpp</h1>
     <p>Node.js bindings for llama.cpp</p>
     <sub>Pre-built bindings are provided with a fallback to building from source with node-gyp</sub>
@@ -323,7 +323,7 @@ Options:
 <br />
 
 <div align="center" width="360">
-    <img alt="Star please" src="assets/star.please.roundEdges.png" width="360px" margin="auto" />
+    <img alt="Star please" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/star.please.roundEdges.png" width="360px" margin="auto" />
     <br/>
     <p align="right">
         <i>If you like this repo, star it ✨</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;

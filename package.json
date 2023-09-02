@@ -44,7 +44,7 @@
     "prebuild": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force",
     "addPostinstallScript": "npm pkg set scripts.postinstall=\"node ./dist/cli/cli.js postinstall\"",
-    "generate-docs": "typedoc && cp -r ./assets/*.png ./docs/assets/",
+    "generate-docs": "typedoc",
     "prewatch": "rm -rf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
     "node-gyp-llama": "cd llama && node-gyp",
