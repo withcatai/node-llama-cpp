@@ -13,6 +13,7 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
     llama_context_params params;
     llama_model* model;
     float temperature;
+    int threads;
     int32_t top_k;
     float top_p;
 
@@ -21,6 +22,7 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
         params.seed = -1;
         params.n_ctx = 4096;
         temperature = 0.0f;
+        threads = 6;
         top_k = 40;
         top_p = 0.95f;
 
@@ -72,6 +74,10 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
 
             if (options.Has("embedding")) {
                 params.embedding = options.Get("embedding").As<Napi::Boolean>().Value();
+            }
+
+            if (options.Has("threads")) {
+                threads = options.Get("threads").As<Napi::Number>().Int32Value();
             }
 
             if (options.Has("temperature")) {
@@ -283,7 +289,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
   protected:
   void Execute() {
     // Perform the evaluation using llama_eval.
-    int r = llama_eval(ctx->ctx, tokens.data(), int(tokens.size()), llama_get_kv_cache_token_count(ctx->ctx), 6);
+    int r = llama_eval(ctx->ctx, tokens.data(), int(tokens.size()), llama_get_kv_cache_token_count(ctx->ctx), (ctx->model)->threads);
     if (r != 0) {
       SetError("Eval has failed");
       return;

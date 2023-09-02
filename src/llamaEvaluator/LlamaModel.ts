@@ -21,6 +21,9 @@ export type LlamaModelOptions = {
     /** if true, reduce VRAM usage at the cost of performance */
     lowVram?: boolean,
 
+    /** number of threads to use to evaluate tokens */
+    threads?: number,
+
     /**
      * Temperature is a hyperparameter that controls the randomness of the generated text.
      * It affects the probability distribution of the model's output tokens.
@@ -85,6 +88,7 @@ export class LlamaModel {
      * @param {number} [options.batchSize] - prompt processing batch size
      * @param {number} [options.gpuLayers] - number of layers to store in VRAM
      * @param {boolean} [options.lowVram] - if true, reduce VRAM usage at the cost of performance
+     * @param {number} [options.threads] - number of threads to use to evaluate tokens
      * @param {number} [options.temperature] - Temperature is a hyperparameter that controls the randomness of the generated text.
      * It affects the probability distribution of the model's output tokens.
      * A higher temperature (e.g., 1.5) makes the output more random and creative,
@@ -114,7 +118,7 @@ export class LlamaModel {
      */
     public constructor({
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
-        lowVram, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
+        lowVram, threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: LlamaModelOptions) {
         this._model = new LLAMAModel(modelPath, removeNullFields({
             seed: seed != null ? Math.max(-1, seed) : undefined,
@@ -122,6 +126,7 @@ export class LlamaModel {
             batchSize,
             gpuLayers,
             lowVram,
+            threads,
             temperature,
             topK,
             topP,
