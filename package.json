@@ -18,22 +18,22 @@
   ],
   "exports": {
     ".": {
-      "default": "./dist/index.js",
       "import": "./dist/index.js",
       "node": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./commands": {
-      "default": "./dist/commands.js",
       "import": "./dist/commands.js",
       "node": "./dist/commands.js",
-      "types": "./dist/commands.d.ts"
+      "types": "./dist/commands.d.ts",
+      "default": "./dist/commands.js"
     },
     "./commands.js": {
-      "default": "./dist/commands.js",
       "import": "./dist/commands.js",
       "node": "./dist/commands.js",
-      "types": "./dist/commands.d.ts"
+      "types": "./dist/commands.d.ts",
+      "default": "./dist/commands.js"
     }
   },
   "engines": {
