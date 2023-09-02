@@ -105,7 +105,7 @@ export class LlamaChatSession {
         onToken, signal, maxTokens
     }: { onToken?(tokens: Token[]): void, signal?: AbortSignal, maxTokens?: number } = {}) {
         const stopStrings = this._promptWrapper.getStopStrings();
-        const stopStringIndexes = Array(stopStrings.length).fill(0);
+        const stopStringIndexes: number[] = Array(stopStrings.length).fill(0);
         const skippedChunksQueue: Token[] = [];
         const res: Token[] = [];
 
@@ -114,14 +114,32 @@ export class LlamaChatSession {
                 throw new AbortError();
 
             const tokenStr = this._ctx.decode(Uint32Array.from([chunk]));
-            const {shouldReturn, skipTokenEvent, stopString, stopStringSuffix} = this._checkStopString(tokenStr, stopStringIndexes);
+            const {
+                shouldReturn, skipTokenEvent, stopString, stopStringSuffix
+            } = this._checkStopString(tokenStr, stopStrings, stopStringIndexes);
 
-            if (shouldReturn)
+            if (shouldReturn) {
+                skippedChunksQueue.push(chunk);
+                const skippedChunksText = skippedChunksQueue.length > 0
+                    ? this._ctx.decode(Uint32Array.from(skippedChunksQueue))
+                    : "";
+
+                const [queuedTextBeforeStopString] = skippedChunksText.split(stopString);
+
+                if (queuedTextBeforeStopString.length > 0) {
+                    const beforeStopStringTokens: Token[] = Array.from(this._ctx.encode(queuedTextBeforeStopString));
+
+                    res.push(...beforeStopStringTokens);
+                    onToken?.(beforeStopStringTokens);
+                    skippedChunksQueue.length = 0;
+                }
+
                 return {
                     text: this._ctx.decode(Uint32Array.from(res)),
                     stopString,
                     stopStringSuffix
                 };
+            }
 
             // if the token is unknown, it means it's not complete character
             if (tokenStr === UNKNOWN_UNICODE_CHAR || skipTokenEvent) {
@@ -149,15 +167,15 @@ export class LlamaChatSession {
         };
     }
 
-    private _checkStopString(tokenStr: string, stopStringIndexes: number[]){
-        const stopStrings = this._promptWrapper.getStopStrings();
+    private _checkStopString(tokenStr: string, stopStrings: string[], stopStringIndexes: number[]){
         let skipTokenEvent = false;
 
         for (let stopStringIndex = 0; stopStringIndex < stopStrings.length; stopStringIndex++) {
             const stopString = stopStrings[stopStringIndex];
 
             let localShouldSkipTokenEvent = false;
-            for (let i = 0; i < tokenStr.length && stopStringIndexes[stopStringIndex] !== stopString.length; i++) {
+            let i = 0;
+            for (; i < tokenStr.length && stopStringIndexes[stopStringIndex] !== stopString.length; i++) {
                 if (tokenStr[i] === stopString[stopStringIndexes[stopStringIndex]]) {
                     stopStringIndexes[stopStringIndex]++;
                     localShouldSkipTokenEvent = true;
@@ -171,9 +189,9 @@ export class LlamaChatSession {
                 return {
                     shouldReturn: true,
                     stopString,
-                    stopStringSuffix: tokenStr.length === stopString.length
+                    stopStringSuffix: tokenStr.length === i
                         ? null
-                        : tokenStr.slice(stopString.length)
+                        : tokenStr.slice(i)
                 };
             }
 
