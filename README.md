@@ -1,8 +1,9 @@
 <div align="center">
     <img alt="node-llama-cpp Logo" src="assets/logo.roundEdges.png" width="360px" />
     <h1>Node Llama.cpp</h1>
-    <p>Node.js bindings for llama.cpp.</p>
-    <sub>Pre-built bindings are provided with a fallback to building from source with `node-gyp`.</sub>
+    <p>Node.js bindings for llama.cpp</p>
+    <sub>Pre-built bindings are provided with a fallback to building from source with node-gyp</sub>
+    <p></p>
 </div>
 
 <div align="center">
