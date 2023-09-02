@@ -29,11 +29,14 @@ export class LlamaContext {
         return this._ctx.encode(text);
     }
 
-    public decode(tokens: Uint32Array): string {
+    public decode(tokens: Uint32Array | Token[]): string {
         if (tokens.length === 0)
             return "";
 
-        return this._ctx.decode(tokens);
+        if (tokens instanceof Uint32Array)
+            return this._ctx.decode(tokens);
+
+        return this._ctx.decode(Uint32Array.from(tokens));
     }
 
     public get prependBos() {
