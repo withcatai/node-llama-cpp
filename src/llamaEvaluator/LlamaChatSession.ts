@@ -164,7 +164,6 @@ export class LlamaChatSession {
                 } else {
                     stopStringIndexes[stopStringIndex] = 0;
                     localShouldSkipTokenEvent = false;
-                    break;
                 }
             }
 
