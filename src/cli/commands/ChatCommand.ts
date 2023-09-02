@@ -18,6 +18,7 @@ type ChatCommand = {
     wrapper: "auto" | "general" | "llamaChat" | "chatML",
     contextSize: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
+    threads: number,
     temperature: number,
     topK: number,
     topP: number,
@@ -76,6 +77,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Restrict the model response to a specific grammar, like JSON for example",
                 group: "Optional:"
             })
+            .option("threads", {
+                type: "number",
+                default: 6,
+                description: "Number of threads to use for the evaluation of tokens",
+                group: "Optional:"
+            })
             .option("temperature", {
                 alias: "t",
                 type: "number",
@@ -107,10 +114,10 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         model, systemInfo, systemPrompt, wrapper, contextSize, grammar,
-        temperature, topK, topP, maxTokens
+        threads, temperature, topK, topP, maxTokens
     }) {
         try {
-            await RunChat({model, systemInfo, systemPrompt, wrapper, contextSize, grammar, temperature, topK, topP, maxTokens});
+            await RunChat({model, systemInfo, systemPrompt, wrapper, contextSize, grammar, threads, temperature, topK, topP, maxTokens});
         } catch (err) {
             console.error(err);
             process.exit(1);
@@ -120,7 +127,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, wrapper, contextSize, grammar: grammarArg, temperature, topK, topP, maxTokens
+    model: modelArg, systemInfo, systemPrompt, wrapper, contextSize, grammar: grammarArg, threads, temperature, topK, topP, maxTokens
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -130,6 +137,7 @@ async function RunChat({
     const model = new LlamaModel({
         modelPath: modelArg,
         contextSize,
+        threads,
         temperature,
         topK,
         topP

@@ -111,6 +111,7 @@ export type LLAMAModel = {
         useMmap?: boolean,
         useMlock?: boolean,
         embedding?: boolean,
+        threads?: number,
         temperature?: number,
         topK?: number,
         topP?: number

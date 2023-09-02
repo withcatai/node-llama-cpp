@@ -287,6 +287,7 @@ Optional:
   -c, --contextSize      Context size to use for the model                  [number] [default: 4096]
   -g, --grammar          Restrict the model response to a specific grammar, like JSON for example
      [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]
+      --threads          Number of threads to use for the evaluation of tokens [number] [default: 6]
   -t, --temperature      Temperature is a hyperparameter that controls the randomness of the generat
                          ed text. It affects the probability distribution of the model's output toke
                          ns. A higher temperature (e.g., 1.5) makes the output more random and creat
