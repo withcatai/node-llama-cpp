@@ -10,7 +10,7 @@ endif()
 
 add_definitions(-DNAPI_VERSION=7)
 
-execute_process(COMMAND node -p "JSON.parse(require('node-addon-api').include)"
+execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                 OUTPUT_VARIABLE NODE_ADDON_API_DIR
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
