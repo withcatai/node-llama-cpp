@@ -18,7 +18,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
     const supportedVersions = [majorNodeVersion, majorNodeVersion - 1];
 
     function createPath(platform: string, arch: string, nodeVersion: number) {
-        return path.join(llamaBinsDirectory, `${platform}-${arch}-${nodeVersion}.node`);
+        return path.join(llamaBinsDirectory, `${platform}-${arch}-${nodeVersion}/llama-addon.node`);
     }
 
     async function resolvePath(platform: string, arch: string, nodeVersions: number[]) {

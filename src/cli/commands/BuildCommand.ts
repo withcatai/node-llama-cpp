@@ -6,6 +6,8 @@ import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, llamaCppDirectory} from "../../config.js";
+import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
+import withStatusLogs from "../../utils/withStatusLogs.js";
 
 type BuildCommand = {
     arch?: string,
@@ -32,7 +34,7 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
             .option("metal", {
                 type: "boolean",
                 default: defaultLlamaCppMetalSupport,
-                description: "Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
+                description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
             })
             .option("cuda", {
                 type: "boolean",
@@ -57,7 +59,9 @@ export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: Buil
         console.log(`${chalk.yellow("CUDA:")} enabled`);
     }
 
-    await withOra({
+    await downloadCmakeIfNeeded(true);
+
+    await withStatusLogs({
         loading: chalk.blue("Compiling llama.cpp"),
         success: chalk.blue("Compiled llama.cpp"),
         fail: chalk.blue("Failed to compile llama.cpp")

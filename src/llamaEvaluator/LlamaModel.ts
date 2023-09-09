@@ -1,3 +1,5 @@
+import process from "process";
+import path from "path";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {llamaCppNode, LLAMAModel} from "./LlamaBins.js";
 
@@ -120,7 +122,7 @@ export class LlamaModel {
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
         lowVram, threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: LlamaModelOptions) {
-        this._model = new LLAMAModel(modelPath, removeNullFields({
+        this._model = new LLAMAModel(path.resolve(process.cwd(), modelPath), removeNullFields({
             seed: seed != null ? Math.max(-1, seed) : undefined,
             contextSize,
             batchSize,

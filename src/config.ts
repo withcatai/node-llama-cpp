@@ -1,6 +1,7 @@
 import {fileURLToPath} from "url";
 import * as path from "path";
 import * as os from "os";
+import process from "process";
 import envVar from "env-var";
 import * as uuid from "uuid";
 import {getBinariesGithubRelease} from "./utils/binariesGithubRelease.js";
@@ -18,6 +19,10 @@ export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", 
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
 export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
+export const xpackDirectory = path.join(llamaDirectory, "xpack");
+export const localXpacksStoreDirectory = path.join(xpackDirectory, "store");
+export const localXpacksCacheDirectory = path.join(xpackDirectory, "cache");
+export const xpmVersion = "^0.16.3";
 
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default("ggerganov/llama.cpp")
@@ -26,7 +31,7 @@ export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .default(await getBinariesGithubRelease())
     .asString();
 export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
-    .default("false")
+    .default(process.platform === "darwin" ? "true" : "false")
     .asBool();
 export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
     .default("false")
@@ -34,6 +39,13 @@ export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();
+export const defaultXpacksStoreDirectory = env.get("NODE_LLAMA_CPP_XPACKS_STORE_FOLDER")
+    .default(localXpacksStoreDirectory)
+    .asString();
+export const defaultXpacksCacheDirectory = env.get("NODE_LLAMA_CPP_XPACKS_CACHE_FOLDER")
+    .default(localXpacksCacheDirectory)
+    .asString();
+export const customCmakeOptionsEnvVarPrefix = "NODE_LLAMA_CPP_CMAKE_OPTION_";
 export const defaultChatSystemPrompt = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.\n" +
     "If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. " +
     "If you don't know the answer to a question, please don't share false information.";
