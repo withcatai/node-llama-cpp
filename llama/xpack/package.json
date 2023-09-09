@@ -1,0 +1,10 @@
+{
+  "xpack": {
+    "minimumXpmRequired": "0.16.3",
+    "dependencies": {},
+    "devDependencies": {},
+    "properties": {},
+    "actions": {},
+    "buildConfigurations": {}
+  }
+}

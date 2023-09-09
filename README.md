@@ -2,7 +2,7 @@
     <img alt="node-llama-cpp Logo" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" width="360px" />
     <h1>Node Llama.cpp</h1>
     <p>Node.js bindings for llama.cpp</p>
-    <sub>Pre-built bindings are provided with a fallback to building from source with node-gyp</sub>
+    <sub>Pre-built bindings are provided with a fallback to building from source with cmake</sub>
     <p></p>
 </div>
 
@@ -22,7 +22,7 @@ npm install --save node-llama-cpp
 
 This package comes with pre-built binaries for macOS, Linux and Windows.
 
-If binaries are not available for your platform, it'll fallback to download the latest version of `llama.cpp` and build it from source with `node-gyp`.
+If binaries are not available for your platform, it'll fallback to download the latest version of `llama.cpp` and build it from source with `cmake`.
 To disable this behavior set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
 
 ## Documentation
@@ -81,11 +81,13 @@ export class MyCustomChatPromptWrapper extends ChatPromptWrapper {
 }
 
 const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf"),
-    promptWrapper: new MyCustomChatPromptWrapper() // by default, LlamaChatPromptWrapper is used
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
 })
 const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const session = new LlamaChatSession({
+    context,
+    promptWrapper: new MyCustomChatPromptWrapper() // by default, GeneralChatPromptWrapper is used
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -170,7 +172,7 @@ console.log("AI: " + a1);
 console.log(JSON.parse(a1));
 
 
-const q2 = 'Add another field to the JSON with the key being "author" and the value being "LLama"';
+const q2 = 'Add another field to the JSON with the key being "author" and the value being "Llama"';
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2, {maxTokens: context.getContextSize()});
@@ -179,21 +181,19 @@ console.log(JSON.parse(a2));
 ```
 
 ### Metal and CUDA support
-To load a version of `llama.cpp` that was compiled to use Metal or CUDA,
-you have to build it from source with the `--metal` or `--cuda` flag before running your code that imports `node-llama-cpp`.
+**Metal:** `llama.cpp` is built with Metal support by default on macOS.
+
+**CUDA:** To load a version of `llama.cpp` that was compiled to use CUDA,
+you have to build it from source with the `--cuda` flag before running your code that imports `node-llama-cpp`.
 
 To do this, run this command inside of your project directory:
 ```bash
-# For Metal support on macOS
-npx node-llama-cpp download --metal
-
-# For CUDA support
 npx node-llama-cpp download --cuda
 ```
 
-> In order for `node-llama-cpp` to be able to build `llama.cpp` from source, make sure you have the required dependencies of `node-gyp` installed.
+> If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
 > 
-> More info is available [here](https://github.com/nodejs/node-gyp#on-unix) (you don't have to install `node-gyp` itself, just the dependencies).
+> If the build fails, make sure you have the required dependencies of `cmake` installed on your machine. More info is available [here](https://github.com/cmake-js/cmake-js#installation:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) (you don't have to install `cmake` or `cmake-js`, just the dependencies).
 
 ### CLI
 ```
@@ -202,8 +202,8 @@ Usage: node-llama-cpp <command> [options]
 Commands:
   node-llama-cpp download      Download a release of llama.cpp and compile it
   node-llama-cpp build         Compile the currently downloaded llama.cpp
-  node-llama-cpp clear [type]  Clear files created by node-llama-cpp
-  node-llama-cpp chat          Chat with a LLama model
+  node-llama-cpp clear [type]  Clear files created by node-llama-cpp                [aliases: clean]
+  node-llama-cpp chat          Chat with a Llama model
 
 Options:
   -h, --help     Show help                                                                 [boolean]
@@ -226,8 +226,9 @@ Options:
                          ronment variable                               [string] [default: "latest"]
   -a, --arch             The architecture to compile llama.cpp for                          [string]
   -t, --nodeTarget       The Node.js version to compile llama.cpp for. Example: v18.0.0     [string]
-      --metal            Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CP
-                         P_METAL environment variable                     [boolean] [default: false]
+      --metal            Compile llama.cpp with Metal support. Enabled by default on macOS. Can be d
+                         isabled with "--no-metal". Can also be set via the NODE_LLAMA_CPP_METAL env
+                         ironment variable                                 [boolean] [default: true]
       --cuda             Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP
                          _CUDA environment variable                       [boolean] [default: false]
       --skipBuild, --sb  Skip building llama.cpp after downloading it     [boolean] [default: false]
@@ -244,12 +245,16 @@ Options:
   -h, --help        Show help                                                              [boolean]
   -a, --arch        The architecture to compile llama.cpp for                               [string]
   -t, --nodeTarget  The Node.js version to compile llama.cpp for. Example: v18.0.0          [string]
-      --metal       Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CPP_MET
-                    AL environment variable                               [boolean] [default: false]
+      --metal       Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabl
+                    ed with "--no-metal". Can also be set via the NODE_LLAMA_CPP_METAL environment v
+                    ariable                                                [boolean] [default: true]
       --cuda        Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA
                      environment variable                                 [boolean] [default: false]
   -v, --version     Show version number                                                    [boolean]
 ```
+
+> To set custom cmake options that are supported by `llama.cpp`'s cmake build,
+> set an environment variable of the option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_`.
 
 #### `clear` command
 ```
@@ -259,7 +264,8 @@ Clear files created by node-llama-cpp
 
 Options:
   -h, --help     Show help                                                                 [boolean]
-      --type     Files to clear        [string] [choices: "source", "build", "all"] [default: "all"]
+      --type     Files to clear
+                              [string] [choices: "source", "build", "cmake", "all"] [default: "all"]
   -v, --version  Show version number                                                       [boolean]
 ```
 
@@ -267,10 +273,10 @@ Options:
 ```
 node-llama-cpp chat
 
-Chat with a LLama model
+Chat with a Llama model
 
 Required:
-  -m, --model  LLama model file to use for the chat                              [string] [required]
+  -m, --model  Llama model file to use for the chat                              [string] [required]
 
 Optional:
   -i, --systemInfo       Print llama.cpp system info                      [boolean] [default: false]

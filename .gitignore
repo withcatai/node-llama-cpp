@@ -15,4 +15,7 @@ node_modules
 /llama/build
 /llama/Release
 /llama/Debug
+/llama/xpack/cache
+/llama/xpack/store
+/llama/xpack/xpacks
 /llamaBins

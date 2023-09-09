@@ -1,5 +1,4 @@
 import process from "process";
-import path from "path";
 import {CommandModule} from "yargs";
 import {Octokit} from "octokit";
 import fs from "fs-extra";
@@ -13,6 +12,8 @@ import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
+import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
+import withStatusLogs from "../../utils/withStatusLogs.js";
 
 type DownloadCommandArgs = {
     repo: string,
@@ -54,7 +55,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 type: "boolean",
                 default: defaultLlamaCppMetalSupport,
                 hidden: process.platform !== "darwin",
-                description: "Compile llama.cpp with Metal support. Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
+                description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
             })
             .option("cuda", {
                 type: "boolean",
@@ -144,30 +145,21 @@ export async function DownloadLlamaCppCommand({
     console.log(chalk.blue("Cloning llama.cpp"));
     await cloneTag(githubOwner, githubRepo, githubRelease!.data.tag_name, llamaCppDirectory);
 
-    await withOra({
-        loading: chalk.blue("Generating required files"),
-        success: chalk.blue("Generated required files"),
-        fail: chalk.blue("Failed to generate required files")
-    }, async () => {
-        const buildInfoTemplateFilePath = path.join(llamaCppDirectory, "scripts", "build-info.h.in");
-        const buildInfoResultFilePath = path.join(llamaCppDirectory, "build-info.h");
-        const buildInfoTemplateFile = await fs.readFile(buildInfoTemplateFilePath, "utf8");
-
-        const finalFile = buildInfoTemplateFile
-            .replaceAll("@BUILD_NUMBER@", "1")
-            .replaceAll("@BUILD_COMMIT@", githubRelease!.data.tag_name);
-
-        await fs.writeFile(buildInfoResultFilePath, finalFile, "utf8");
-    });
-
     if (!skipBuild) {
-        console.log(chalk.blue("Compiling llama.cpp"));
-        await compileLlamaCpp({
-            arch: arch ? arch : undefined,
-            nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBinFlag: true,
-            metal,
-            cuda
+        await downloadCmakeIfNeeded(true);
+
+        await withStatusLogs({
+            loading: chalk.blue("Compiling llama.cpp"),
+            success: chalk.blue("Compiled llama.cpp"),
+            fail: chalk.blue("Failed to compile llama.cpp")
+        }, async () => {
+            await compileLlamaCpp({
+                arch: arch ? arch : undefined,
+                nodeTarget: nodeTarget ? nodeTarget : undefined,
+                setUsedBinFlag: true,
+                metal,
+                cuda
+            });
         });
     }
 

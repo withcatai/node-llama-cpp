@@ -27,14 +27,14 @@ type ChatCommand = {
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
     command: "chat",
-    describe: "Chat with a LLama model",
+    describe: "Chat with a Llama model",
     builder(yargs) {
         return yargs
             .option("model", {
                 alias: "m",
                 type: "string",
                 demandOption: true,
-                description: "LLama model file to use for the chat",
+                description: "Llama model file to use for the chat",
                 group: "Required:"
             })
             .option("systemInfo", {

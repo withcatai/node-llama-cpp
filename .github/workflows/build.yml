@@ -181,9 +181,9 @@ jobs:
               
               const majorNodeVersion = parseInt(nodeVersion.slice("v".length))
               
-              const binName = `${process.env.ARTIFACT_NAME}-${arch}-${majorNodeVersion}.node`; 
+              const binName = `${process.env.ARTIFACT_NAME}-${arch}-${majorNodeVersion}`; 
               await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${nodeVersion}`;
-              await $`mv ./llama/build/Release/llama.node ${"./llamaBins/" + binName}`;
+              await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
             }
           }
           
