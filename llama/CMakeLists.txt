@@ -19,7 +19,9 @@ include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
 include_directories("llama.cpp")
+set_target_properties("llama" PROPERTIES POSITION_INDEPENDENT_CODE ON)
 include_directories("./llama.cpp/common")
+set_target_properties("common" PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 file(GLOB SOURCE_FILES "addon.cpp")
 
