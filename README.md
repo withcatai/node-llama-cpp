@@ -322,6 +322,9 @@ Options:
   -v, --version  Show version number                                                       [boolean]
 ```
 
+## Contributing
+To contribute to `node-llama-cpp` read [CONTRIBUTING.md](https://github.com/withcatai/node-llama-cpp/blob/master/DEVELOPMENT.md).
+
 ## Acknowledgements
 * llama.cpp: [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
 

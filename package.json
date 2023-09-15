@@ -53,6 +53,8 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts .",
     "format": "npm run lint:eslint -- --fix",
+    "dev:setup": "npm run build && node ./dist/cli/cli.js download",
+    "dev:build": "npm run build && node ./dist/cli/cli.js build",
     "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
   },
   "repository": {
