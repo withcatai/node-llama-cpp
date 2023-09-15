@@ -41,11 +41,11 @@
   },
   "scripts": {
     "prepare": "[ \"$CI\" = true ] || [ -d '.husky/_' ] || husky install",
-    "prebuild": "rm -rf ./dist ./tsconfig.tsbuildinfo",
+    "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force",
     "addPostinstallScript": "npm pkg set scripts.postinstall=\"node ./dist/cli/cli.js postinstall\"",
-    "generate-docs": "typedoc",
-    "prewatch": "rm -rf ./dist ./tsconfig.tsbuildinfo",
+    "generate-docs": "typedoc --plugin typedoc-plugin-mdn-links",
+    "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
     "cmake-js-llama": "cd llama && cmake-js",
     "test": "npm run test:typescript && npm run lint:eslint",
@@ -53,6 +53,8 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts .",
     "format": "npm run lint:eslint -- --fix",
+    "dev:setup": "npm run build && node ./dist/cli/cli.js download",
+    "dev:build": "npm run build && node ./dist/cli/cli.js build",
     "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
   },
   "repository": {
@@ -105,10 +107,12 @@
     "eslint-plugin-import": "^2.28.0",
     "eslint-plugin-node": "github:giladgd/eslint-plugin-node#dev/giladgd/fixImportExtentionFixingInTypeScript",
     "husky": "^8.0.3",
+    "rimraf": "^5.0.1",
     "semantic-release": "^21.0.7",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.1",
     "typedoc": "^0.24.8",
+    "typedoc-plugin-mdn-links": "^3.1.0",
     "typescript": "^5.1.6",
     "zx": "^7.2.3"
   },

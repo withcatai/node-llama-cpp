@@ -1,3 +1,6 @@
+## Development
+To set up your development environment, read [DEVELOPMENT.md](https://github.com/withcatai/node-llama-cpp/blob/master/DEVELOPMENT.md).
+
 ## <a name="commit"></a> Commit Message Guidelines
 
 This repository has very precise rules over how git commit messages can be formatted.
