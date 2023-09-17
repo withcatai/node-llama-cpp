@@ -50,11 +50,11 @@ export async function compileLlamaCpp({
 
         await clearLlamaBuild();
 
-        await spawnCommand("npm", ["run", "-s", "cmake-js-llama", "--", "clean", "--log-level", "warn", ...cmakePathArgs], __dirname);
+        await spawnCommand("npm", ["run", "-s", "cmake-js-llama", "clean", "--log-level", "warn", ...cmakePathArgs], __dirname);
 
         await spawnCommand(
             "npm",
-            ["run", "-s", "cmake-js-llama", "--", "compile", "--log-level", "warn", "--arch=" + arch, "--runtime-version=" + runtimeVersion, ...cmakePathArgs]
+            ["run", "-s", "cmake-js-llama", "compile", "--log-level", "warn", "--arch=" + arch, "--runtime-version=" + runtimeVersion, ...cmakePathArgs]
                 .concat(cmakeCustomOptions.map(option => "--CD" + option)),
             __dirname
         );
