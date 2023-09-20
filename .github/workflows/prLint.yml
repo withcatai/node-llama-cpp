@@ -11,5 +11,7 @@ jobs:
     steps:
       - uses: amannn/action-semantic-pull-request@v5
         env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          HEAD_REF: ${{ github.head_ref }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: echo "${{github.ref}}"
