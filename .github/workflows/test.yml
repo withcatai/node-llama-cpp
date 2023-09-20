@@ -1,5 +1,17 @@
 name: Test
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  pull_request_target:
+    branches-ignore:
+      - master
+    types:
+      - synchronize
+      - opened
+      - reopened
+  workflow_dispatch:
+
 jobs:
   test:
     name: Test

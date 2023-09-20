@@ -1,7 +1,15 @@
 name: Build
 on:
   push:
-
+    branches:
+      - master
+  pull_request_target:
+    branches-ignore:
+      - master
+    types:
+      - synchronize
+      - opened
+      - reopened
   workflow_dispatch:
 
 jobs:
@@ -200,7 +208,7 @@ jobs:
 
   release:
     name: Release
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
