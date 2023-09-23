@@ -4,7 +4,8 @@ import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
 import {AbortError} from "../AbortError.js";
 import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper.js";
 import {getChatWrapperByBos} from "../chatWrappers/createChatWrapperByBos.js";
-import {Token} from "../types.js";
+import {ConversationInteraction, Token} from "../types.js";
+import {generateContextTextFromConversationHistory} from "../chatWrappers/generateContextTextFromConversationHistory.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaContext} from "./LlamaContext.js";
 
@@ -15,7 +16,10 @@ export type LlamaChatSessionOptions = {
     context: LlamaContext,
     printLLamaSystemInfo?: boolean,
     promptWrapper?: ChatPromptWrapper | "auto",
-    systemPrompt?: string
+    systemPrompt?: string,
+
+    /** Conversation history to load into the context to continue an existing conversation */
+    conversationHistory?: readonly ConversationInteraction[]
 };
 
 export class LlamaChatSession {
@@ -26,17 +30,22 @@ export class LlamaChatSession {
     private _initialized: boolean = false;
     private _lastStopString: string | null = null;
     private _lastStopStringSuffix: string | null = null;
+    private _conversationHistoryToLoad: readonly ConversationInteraction[] | null = null;
     private readonly _ctx: LlamaContext;
 
     public constructor({
         context,
         printLLamaSystemInfo = false,
         promptWrapper = new GeneralChatPromptWrapper(),
-        systemPrompt = defaultChatSystemPrompt
+        systemPrompt = defaultChatSystemPrompt,
+        conversationHistory
     }: LlamaChatSessionOptions) {
         this._ctx = context;
         this._printLLamaSystemInfo = printLLamaSystemInfo;
         this._systemPrompt = systemPrompt;
+        this._conversationHistoryToLoad = (conversationHistory != null && conversationHistory.length > 0)
+            ? conversationHistory
+            : null;
 
         if (promptWrapper === "auto") {
             const chatWrapper = getChatWrapperByBos(context.getBosString());
@@ -76,7 +85,32 @@ export class LlamaChatSession {
             await this.init();
 
         return await withLock(this, "prompt", async () => {
-            const promptText = this._promptWrapper.wrapPrompt(prompt, {
+            let promptText = "";
+
+            if (this._promptIndex == 0 && this._conversationHistoryToLoad != null) {
+                const {text, stopString, stopStringSuffix} =
+                    generateContextTextFromConversationHistory(this._promptWrapper, this._conversationHistoryToLoad, {
+                        systemPrompt: this._systemPrompt,
+                        currentPromptIndex: this._promptIndex,
+                        lastStopString: this._lastStopString,
+                        lastStopStringSuffix: this._promptIndex == 0
+                            ? (
+                                this._ctx.prependBos
+                                    ? this._ctx.getBosString()
+                                    : null
+                            )
+                            : this._lastStopStringSuffix
+                    });
+
+                promptText += text;
+                this._lastStopString = stopString;
+                this._lastStopStringSuffix = stopStringSuffix;
+                this._promptIndex += this._conversationHistoryToLoad.length;
+
+                this._conversationHistoryToLoad = null;
+            }
+
+            promptText += this._promptWrapper.wrapPrompt(prompt, {
                 systemPrompt: this._systemPrompt,
                 promptIndex: this._promptIndex,
                 lastStopString: this._lastStopString,

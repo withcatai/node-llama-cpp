@@ -13,13 +13,19 @@ export type LlamaContextOptions = {
 
 export class LlamaContext {
     private readonly _ctx: LLAMAContext;
-    private _prependBos: boolean;
+    private readonly _prependBos: boolean;
+    private _prependTokens: Token[];
 
     public constructor({model, grammar, prependBos = true}: LlamaContextOptions) {
         this._ctx = new LLAMAContext(model._model, removeNullFields({
             grammar: grammar?._grammar
         }));
         this._prependBos = prependBos;
+        this._prependTokens = [];
+
+        if (prependBos) {
+            this._prependTokens.unshift(this._ctx.tokenBos());
+        }
     }
 
     public encode(text: string): Uint32Array {
@@ -115,19 +121,18 @@ export class LlamaContext {
         return this._ctx.getTokenString(nlToken);
     }
 
-    public getContextSize() {
+    public getContextSize(): number {
         return this._ctx.getContextSize();
     }
 
     public async *evaluate(tokens: Uint32Array): AsyncGenerator<Token, void> {
         let evalTokens = tokens;
 
-        if (this._prependBos) {
-            const tokenArray: Token[] = Array.from(tokens);
-            tokenArray.unshift(this._ctx.tokenBos());
+        if (this._prependTokens.length > 0) {
+            const tokenArray: Token[] = this._prependTokens.concat(Array.from(tokens));
 
             evalTokens = Uint32Array.from(tokenArray);
-            this._prependBos = false;
+            this._prependTokens = [];
         }
 
         // eslint-disable-next-line no-constant-condition
@@ -145,5 +150,4 @@ export class LlamaContext {
             evalTokens = Uint32Array.from([nextToken]);
         }
     }
-
 }

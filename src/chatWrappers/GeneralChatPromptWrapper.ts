@@ -32,11 +32,15 @@ export class GeneralChatPromptWrapper extends ChatPromptWrapper {
         ];
     }
 
+    public override getDefaultStopString(): string {
+        return `\n\n### ${this._instructionName}`;
+    }
+
     private _getPromptPrefix(lastStopString: string | null, lastStopStringSuffix: string | null) {
         return getTextCompletion(
             lastStopString === "<end>"
                 ? lastStopStringSuffix
-                : (lastStopString + (lastStopStringSuffix ?? "")),
+                : ((lastStopString ?? "") + (lastStopStringSuffix ?? "")),
             [
                 `\n\n### ${this._instructionName}:\n\n`,
                 `### ${this._instructionName}:\n\n`

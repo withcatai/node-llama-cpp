@@ -104,6 +104,34 @@ const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
 
+##### Load existing conversation history
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const model = new LlamaModel({
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+})
+const context = new LlamaContext({model});
+const session = new LlamaChatSession({
+    context,
+    conversationHistory: [{
+        prompt: `Remember the number 6 as "The number"`,
+        response: "OK. I'll remember it"
+    }]
+});
+
+
+const q2 = 'What is "The number"?';
+console.log("User: " + q2);
+
+const a2 = await session.prompt(q2);
+console.log("AI: " + a2);
+```
+
 #### Raw
 ```typescript
 import {fileURLToPath} from "url";
