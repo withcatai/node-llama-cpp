@@ -21,4 +21,8 @@ export class ChatMLPromptWrapper extends ChatPromptWrapper {
     public override getStopStrings(): string[] {
         return ["<|im_end|>"];
     }
+
+    public override getDefaultStopString(): string {
+        return "<|im_end|>";
+    }
 }

@@ -10,7 +10,7 @@ import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.
 import {ChatMLPromptWrapper} from "./chatWrappers/ChatMLPromptWrapper.js";
 import {getChatWrapperByBos} from "./chatWrappers/createChatWrapperByBos.js";
 
-import {type Token} from "./types.js";
+import {type ConversationInteraction, type Token} from "./types.js";
 
 
 export {
@@ -22,6 +22,7 @@ export {
     type LlamaContextOptions,
     LlamaChatSession,
     type LlamaChatSessionOptions,
+    type ConversationInteraction,
     AbortError,
     ChatPromptWrapper,
     EmptyChatPromptWrapper,

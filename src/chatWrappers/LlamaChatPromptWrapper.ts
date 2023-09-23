@@ -21,4 +21,8 @@ export class LlamaChatPromptWrapper extends ChatPromptWrapper {
     public override getStopStrings(): string[] {
         return ["</s>"];
     }
+
+    public override getDefaultStopString(): string {
+        return "</s>";
+    }
 }
