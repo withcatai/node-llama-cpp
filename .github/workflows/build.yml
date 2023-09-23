@@ -126,7 +126,7 @@ jobs:
             const data = await res.json();
             const versions = new Map();
             let latestVersion = null;
-          
+            
             for (const version of data) {
               const majorVersion = Number(version.version.split(".")[0].slice("v".length));
               const versionDate = new Date(version.date);
