@@ -193,16 +193,9 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   Napi::Value Encode(const Napi::CallbackInfo& info) {
     std::string text = info[0].As<Napi::String>().Utf8Value();
 
-    std::vector<llama_token> tokens(text.size());
-    int n = llama_tokenize(ctx, text.data(), tokens.data(), text.size(), false);
+    std::vector<llama_token> tokens = llama_tokenize(ctx, text, false);
 
-    if (n < 0) {
-      Napi::Error::New(info.Env(), "String expected").ThrowAsJavaScriptException();
-      return info.Env().Undefined();
-    }
-    tokens.resize(n);
-
-    Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), n);
+    Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
     for (size_t i = 0; i < tokens.size(); ++i) { result[i] = static_cast<uint32_t>(tokens[i]); }
 
     return result;
