@@ -149,7 +149,7 @@ jobs:
           function getArches() {
             switch (process.env.ARTIFACT_NAME) {
               case "win":
-                return ["x64"];
+                return ["x64" /*, "arm64" */ ]; // disabled arm64 for now as compilation doesn't work
               case "linux":
                 return ["x64", "arm64", "armv7l", "ppc64le"];
               case "mac":
@@ -159,32 +159,32 @@ jobs:
             return ["x64"];
           }
           
-          const {versions: latestNodeVersions, latestVersion: latestNodeVersion} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
+          const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
           
-          const minNodeVersion = latestNodeVersion - 4;
-          
-          const nodeVersions = [...latestNodeVersions].reduce((acc, [majorVersion, version]) => {
-            if (majorVersion >= minNodeVersion)
-              acc.push(version);
-            
-            return acc;
-          }, []);
+          const nodeVersion = latestNodeVersions.get(18);
+          const windowsOnArmNodeVersion = latestNodeVersions.get(20);
           const arches = getArches();
           
-          console.log("Building for node versions", nodeVersions, "and archs", arches);
+          if (nodeVersion == null || windowsOnArmNodeVersion == null) {
+            throw new Error("Could not find node versions");
+          }
+          
+          console.log("Building for node version", nodeVersion, "and archs", arches);
           
           await $`mkdir -p llamaBins`;
           
-          for (const nodeVersion of nodeVersions) {
-            for (const arch of arches) {
-              console.log(`Building ${arch} for node ${nodeVersion}`);
-              
-              const majorNodeVersion = parseInt(nodeVersion.slice("v".length))
-              
-              const binName = `${process.env.ARTIFACT_NAME}-${arch}-${majorNodeVersion}`; 
-              await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${nodeVersion}`;
-              await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
+          for (const arch of arches) {
+            let buildNodeVersion = nodeVersion;
+            
+            if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
+              buildNodeVersion = windowsOnArmNodeVersion;
             }
+            
+            console.log(`Building ${arch} for node ${buildNodeVersion}`);
+            
+            const binName = `${process.env.ARTIFACT_NAME}-${arch}`; 
+            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion}`;
+            await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
           }
           
           await $`echo "Built binaries:"`;

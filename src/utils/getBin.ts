@@ -14,20 +14,15 @@ import {getCompiledLlamaCppBinaryPath} from "./compileLLamaCpp.js";
 const require = createRequire(import.meta.url);
 
 export async function getPrebuildBinPath(): Promise<string | null> {
-    const majorNodeVersion = parseInt(process.version.slice("v".length));
-    const supportedVersions = [majorNodeVersion, majorNodeVersion - 1];
-
-    function createPath(platform: string, arch: string, nodeVersion: number) {
-        return path.join(llamaBinsDirectory, `${platform}-${arch}-${nodeVersion}/llama-addon.node`);
+    function createPath(platform: string, arch: string) {
+        return path.join(llamaBinsDirectory, `${platform}-${arch}/llama-addon.node`);
     }
 
-    async function resolvePath(platform: string, arch: string, nodeVersions: number[]) {
-        for (const nodeVersion of nodeVersions) {
-            const binPath = createPath(platform, arch, nodeVersion);
+    async function resolvePath(platform: string, arch: string) {
+        const binPath = createPath(platform, arch);
 
-            if (await fs.pathExists(binPath))
-                return binPath;
-        }
+        if (await fs.pathExists(binPath))
+            return binPath;
 
         return null;
     }
@@ -36,14 +31,14 @@ export async function getPrebuildBinPath(): Promise<string | null> {
         switch (process.platform) {
             case "win32":
             case "cygwin":
-                return resolvePath("win", process.arch, supportedVersions);
+                return resolvePath("win", process.arch);
 
             case "linux":
             case "android":
-                return resolvePath("linux", process.arch, supportedVersions);
+                return resolvePath("linux", process.arch);
 
             case "darwin":
-                return resolvePath("mac", process.arch, supportedVersions);
+                return resolvePath("mac", process.arch);
         }
 
         return null;
