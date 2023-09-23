@@ -320,7 +320,7 @@ Optional:
                                                                           share false information."]
   -w, --wrapper          Chat wrapper to use. Use `auto` to automatically select a wrapper based on
                          the model's BOS token
-                   [string] [choices: "auto", "general", "llamaChat", "chatML"] [default: "general"]
+     [string] [choices: "auto", "general", "llamaChat", "chatML", "falconChat"] [default: "general"]
   -c, --contextSize      Context size to use for the model                  [number] [default: 4096]
   -g, --grammar          Restrict the model response to a specific grammar, like JSON for example
      [string] [choices: "text", "json", "list", "arithmetic", "japanese", "chess"] [default: "text"]

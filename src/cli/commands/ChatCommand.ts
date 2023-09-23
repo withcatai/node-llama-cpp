@@ -9,13 +9,14 @@ import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrap
 import {ChatMLPromptWrapper} from "../../chatWrappers/ChatMLPromptWrapper.js";
 import {getChatWrapperByBos} from "../../chatWrappers/createChatWrapperByBos.js";
 import {ChatPromptWrapper} from "../../ChatPromptWrapper.js";
+import {FalconChatPromptWrapper} from "../../chatWrappers/FalconChatPromptWrapper.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 
 type ChatCommand = {
     model: string,
     systemInfo: boolean,
     systemPrompt: string,
-    wrapper: "auto" | "general" | "llamaChat" | "chatML",
+    wrapper: "auto" | "general" | "llamaChat" | "chatML" | "falconChat",
     contextSize: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
     threads: number,
@@ -58,7 +59,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "w",
                 type: "string",
                 default: "general" as ChatCommand["wrapper"],
-                choices: ["auto", "general", "llamaChat", "chatML"] satisfies ChatCommand["wrapper"][],
+                choices: ["auto", "general", "llamaChat", "chatML", "falconChat"] satisfies ChatCommand["wrapper"][],
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
             })
@@ -213,6 +214,8 @@ function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string | null): Ch
             return new LlamaChatPromptWrapper();
         case "chatML":
             return new ChatMLPromptWrapper();
+        case "falconChat":
+            return new FalconChatPromptWrapper();
         default:
     }
 
