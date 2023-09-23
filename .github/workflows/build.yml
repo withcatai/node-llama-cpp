@@ -121,6 +121,31 @@ jobs:
           
           npx zx -y <<'EOF'
           
+          async function getLatestNodeVersions(maxDate) {
+            const res = await fetch("https://nodejs.org/dist/index.json");
+            const data = await res.json();
+            const versions = new Map();
+            let latestVersion = null;
+          
+            for (const version of data) {
+              const majorVersion = Number(version.version.split(".")[0].slice("v".length));
+              const versionDate = new Date(version.date);
+          
+              if (maxDate != null && versionDate.getTime() > maxDate)
+                continue;
+          
+              if (!versions.has(majorVersion)) {
+                versions.set(majorVersion, version.version);
+              }
+          
+              if (latestVersion === null || majorVersion > latestVersion) {
+                latestVersion = majorVersion;
+              }
+            }
+          
+            return {versions, latestVersion};
+          }
+          
           function getArches() {
             switch (process.env.ARTIFACT_NAME) {
               case "win":
@@ -134,8 +159,10 @@ jobs:
             return ["x64"];
           }
           
-          const nodeVersion = 18;
-          const windowsOnArmNodeVersion = 20;
+          const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
+          
+          const nodeVersion = latestNodeVersions.get(18);
+          const windowsOnArmNodeVersion = latestNodeVersions.get(20);
           const arches = getArches();
           
           console.log("Building for node version", nodeVersion, "and archs", arches);
