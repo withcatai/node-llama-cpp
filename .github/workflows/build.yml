@@ -130,19 +130,19 @@ jobs:
             for (const version of data) {
               const majorVersion = Number(version.version.split(".")[0].slice("v".length));
               const versionDate = new Date(version.date);
-          
+              
               if (maxDate != null && versionDate.getTime() > maxDate)
                 continue;
-          
+              
               if (!versions.has(majorVersion)) {
                 versions.set(majorVersion, version.version);
               }
-          
+              
               if (latestVersion === null || majorVersion > latestVersion) {
                 latestVersion = majorVersion;
               }
             }
-          
+            
             return {versions, latestVersion};
           }
           
