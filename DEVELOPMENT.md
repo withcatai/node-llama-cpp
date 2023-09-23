@@ -36,7 +36,7 @@ npx ipull <model-file-ul>
 ### Validate your setup by chatting with a model
 To validate that your setup works, run the following command to chat with the model you downloaded:
 ```bash
-npx run dev:build; node ./dist/cli/cli.js chat --model <path-to-model-file-on-your-computer>
+npm run dev:build; node ./dist/cli/cli.js chat --model <path-to-model-file-on-your-computer>
 ```
 
 Try telling the model `Hi there` and see how it reacts. Any response from the model means that your setup works.
@@ -44,7 +44,7 @@ If the response looks weird or doesn't make sense, try using a different model.
 
 If the model doesn't stop generating output, try using a different chat wrapper. For example:
 ```bash
-npx run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path-to-model-file-on-your-computer>
+npm run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path-to-model-file-on-your-computer>
 ```
 
 > **Important:** Make sure you always run `npm run dev:build` before running the CLI to make sure that your code changes are reflected in the CLI.
