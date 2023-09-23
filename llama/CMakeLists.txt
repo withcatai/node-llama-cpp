@@ -4,15 +4,6 @@ project ("llama-addon")
 
 if (MSVC)
   add_compile_options(/EHsc)
-  string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" ADDON_CMAKE_GENERATOR_PLATFORM_LWR)
-
-  if (("${ADDON_CMAKE_GENERATOR_PLATFORM_LWR}" MATCHES "arm64"))
-    add_compile_definitions(__ARM_NEON)
-    add_compile_definitions(__ARM_FEATURE_FMA)
-    add_compile_definitions(__ARM_FEATURE_DOTPROD)
-    # add_compile_definitions(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) # MSVC doesn't support vdupq_n_f16, vld1q_f16, vst1q_f16
-    add_compile_definitions(__aarch64__) # MSVC defines _M_ARM64 instead
-  endif()
 else()
   add_compile_options(-fexceptions)
 endif()

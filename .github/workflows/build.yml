@@ -149,7 +149,7 @@ jobs:
           function getArches() {
             switch (process.env.ARTIFACT_NAME) {
               case "win":
-                return ["x64", "arm64"];
+                return ["x64" /*, "arm64" */ ]; // disabled arm64 for now as compilation doesn't work
               case "linux":
                 return ["x64", "arm64", "armv7l", "ppc64le"];
               case "mac":
