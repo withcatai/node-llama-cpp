@@ -165,6 +165,10 @@ jobs:
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
           const arches = getArches();
           
+          if (nodeVersion == null || windowsOnArmNodeVersion == null) {
+            throw new Error("Could not find node versions");
+          }
+          
           console.log("Building for node version", nodeVersion, "and archs", arches);
           
           await $`mkdir -p llamaBins`;
