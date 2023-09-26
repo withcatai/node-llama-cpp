@@ -56,7 +56,16 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
         if (prebuildBinPath == null) {
             console.warn("Prebuild binaries not found, falling back to to locally built binaries");
         } else {
-            return require(prebuildBinPath);
+            try {
+                return require(prebuildBinPath);
+            } catch (err) {
+                console.error(`Failed to load prebuilt binary for platform "${process.platform}" "${process.arch}". Error:`, err);
+                console.info("Falling back to locally built binaries");
+
+                try {
+                    delete require.cache[require.resolve(prebuildBinPath)];
+                } catch (err) {}
+            }
         }
     }
 
