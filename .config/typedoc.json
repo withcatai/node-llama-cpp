@@ -1,7 +1,7 @@
 {
     "$schema": "https://typedoc.org/schema.json",
     "entryPoints": ["../src/index.ts"],
-    "out": "../docs",
+    "out": "../docs-site",
     "tsconfig": "../tsconfig.json",
     "customCss": "./typedoc.css",
     "readme": "../README.md",

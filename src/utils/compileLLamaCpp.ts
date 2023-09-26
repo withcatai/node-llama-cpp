@@ -37,6 +37,7 @@ export async function compileLlamaCpp({
         if (process.env.LLAMA_CUDA_MMV_Y != null) cmakeCustomOptions.push("LLAMA_CUDA_MMV_Y=" + process.env.LLAMA_CUDA_MMV_Y);
         if (process.env.LLAMA_CUDA_F16 != null) cmakeCustomOptions.push("LLAMA_CUDA_F16=" + process.env.LLAMA_CUDA_F16);
         if (process.env.LLAMA_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.push("LLAMA_CUDA_KQUANTS_ITER=" + process.env.LLAMA_CUDA_KQUANTS_ITER);
+        if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.push("LLAMA_CUDA_PEER_MAX_BATCH_SIZE=" + process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
         if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.push("LLAMA_HIPBLAS=1");
         if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.push("LLAMA_CLBLAST=1");
 
