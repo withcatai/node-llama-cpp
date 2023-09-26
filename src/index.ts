@@ -8,6 +8,7 @@ import {EmptyChatPromptWrapper} from "./chatWrappers/EmptyChatPromptWrapper.js";
 import {LlamaChatPromptWrapper} from "./chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.js";
 import {ChatMLPromptWrapper} from "./chatWrappers/ChatMLPromptWrapper.js";
+import {FalconChatPromptWrapper} from "./chatWrappers/FalconChatPromptWrapper.js";
 import {getChatWrapperByBos} from "./chatWrappers/createChatWrapperByBos.js";
 
 import {type ConversationInteraction, type Token} from "./types.js";
@@ -29,6 +30,7 @@ export {
     LlamaChatPromptWrapper,
     GeneralChatPromptWrapper,
     ChatMLPromptWrapper,
+    FalconChatPromptWrapper,
     getChatWrapperByBos,
     type Token
 };
