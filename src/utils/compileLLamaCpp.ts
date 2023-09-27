@@ -26,7 +26,7 @@ export async function compileLlamaCpp({
         const cmakeCustomOptions = [];
 
         if ((metal && process.platform === "darwin") || process.env.LLAMA_METAL === "1") cmakeCustomOptions.push("LLAMA_METAL=1");
-        else cmakeCustomOptions.push("LLAMA_METAL=0");
+        else cmakeCustomOptions.push("LLAMA_METAL=OFF");
 
         if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.push("LLAMA_CUBLAS=1");
         if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.push("LLAMA_MPI=1");
