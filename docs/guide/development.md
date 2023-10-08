@@ -17,7 +17,7 @@ This document describes how to set up your development environment to contribute
     ```bash
     npm run dev:setup
     ```
-   > If the build fails on cpp errors, this may be due to breaking interface changes on the `llama.cpp` side, which happens pretty often recently.
+   > If the build fails on c++ errors, this may be due to breaking interface changes on the `llama.cpp` side, which happens pretty often recently.
    > 
    > You're encouraged to make changes to the usage of `llama.cpp` functions in the `llama/addon.cpp` file to resolve these errors and then open a pull request for these changes separately from your main changes PR.
    >

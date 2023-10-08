@@ -38,11 +38,11 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, cliNam
 
 
 async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Promise<OptionsGroup[]> {
-    const yargsLike = getYargsStub();
+    const yargsStub = getYargsStub();
     function getYargsStub() {
         function option(name: string, option: Options) {
             if (option.hidden)
-                return yargsLike;
+                return yargsStub;
 
             const group = option.group ?? "default";
 
@@ -54,7 +54,7 @@ async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Pro
             if (!groups.includes(group))
                 groups.push(group);
 
-            return yargsLike;
+            return yargsStub;
         }
 
         return {option};
@@ -64,20 +64,20 @@ async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Pro
     const groups: string[] = [];
 
     if (command.builder instanceof Function)
-        await command.builder?.(yargsLike as any as Argv);
+        await command.builder?.(yargsStub as any as Argv);
     else if (command.builder != null) {
         for (const [name, option] of Object.entries(command.builder)) {
-            yargsLike.option(name, option);
+            yargsStub.option(name, option);
         }
     }
 
     const hasGroups = groups.length > 1;
-    yargsLike.option("help", {
+    yargsStub.option("help", {
         description: "Show help",
         alias: "h",
         group: hasGroups ? "Other" : undefined
     });
-    yargsLike.option("version", {
+    yargsStub.option("version", {
         description: "Show version number",
         alias: "v",
         group: hasGroups ? "Other" : undefined
