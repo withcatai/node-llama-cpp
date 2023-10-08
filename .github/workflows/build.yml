@@ -109,9 +109,6 @@ jobs:
           
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
-          
-          which powerpc64le-linux-gnu-gcc
-          which powerpc64le-linux-gnu-g++
 
       - name: Install dependencies on macos
         if: startsWith(matrix.config.os, 'macos')
