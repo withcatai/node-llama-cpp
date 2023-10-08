@@ -102,7 +102,7 @@ jobs:
         if: startsWith(matrix.config.name, 'Ubuntu Latest GCC')
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build cmake libtbb-dev
+          sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf g++-powerpc64le-linux-gnu gcc-powerpc64le-linux-gnu
 
       - name: Install dependencies on macos
         if: startsWith(matrix.config.os, 'macos')
