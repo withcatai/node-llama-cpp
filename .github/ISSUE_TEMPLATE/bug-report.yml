@@ -52,12 +52,13 @@ body:
         Please add any other relevant dependencies to this table at the end.
         For example: Electron, Bun, Webpack.
       value: |
-        | Dependency               | Version  |
-        | ---                      | ---      |
-        | Operating System         |          |
-        | Node.js version          | x.y.zzz  |
-        | Typescript version       | x.y.zzz  |
-        | `node-llama-cpp` version | x.y.zzz  |
+        | Dependency               | Version             |
+        | ---                      | ---                 |
+        | Operating System         |                     |
+        | CPU                      | Intel i9 / Apple M1 |
+        | Node.js version          | x.y.zzz             |
+        | Typescript version       | x.y.zzz             |
+        | `node-llama-cpp` version | x.y.zzz             |
     validations:
       required: true
   - type: textarea
