@@ -45,7 +45,7 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
     if (gitBundleForTag != null) {
         try {
             await withGitCloneProgress("local bundle", async (gitWithCloneProgress) => {
-                gitWithCloneProgress.clone(gitBundleForTag, llamaCppDirectory, {
+                await gitWithCloneProgress.clone(gitBundleForTag, llamaCppDirectory, {
                     "--quiet": null
                 });
 
@@ -62,7 +62,7 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
     }
 
     await withGitCloneProgress("GitHub", async (gitWithCloneProgress) => {
-        gitWithCloneProgress.clone(remoteGitUrl, llamaCppDirectory, {
+        await gitWithCloneProgress.clone(remoteGitUrl, llamaCppDirectory, {
             "--depth": 1,
             "--branch": tag,
             "--quiet": null
