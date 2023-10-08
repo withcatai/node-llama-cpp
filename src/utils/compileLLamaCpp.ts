@@ -2,7 +2,7 @@ import path from "path";
 import {fileURLToPath} from "url";
 import process from "process";
 import fs from "fs-extra";
-import {customCmakeOptionsEnvVarPrefix, llamaCppDirectory, llamaDirectory} from "../config.js";
+import {customCmakeOptionsEnvVarPrefix, llamaCppDirectory, llamaDirectory, llamaToolchainsDirectory} from "../config.js";
 import {clearLlamaBuild} from "./clearLlamaBuild.js";
 import {setUsedBinFlag} from "./usedBinFlag.js";
 import {spawnCommand} from "./spawnCommand.js";
@@ -22,6 +22,7 @@ export async function compileLlamaCpp({
         }
 
         const cmakePathArgs = await getCmakePathArgs();
+        const toolchainFile = await getToolchainFileForArch(arch);
         const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
         const cmakeCustomOptions = [];
 
@@ -40,6 +41,9 @@ export async function compileLlamaCpp({
         if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.push("LLAMA_CUDA_PEER_MAX_BATCH_SIZE=" + process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
         if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.push("LLAMA_HIPBLAS=1");
         if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.push("LLAMA_CLBLAST=1");
+
+        if (toolchainFile != null)
+            cmakeCustomOptions.push("CMAKE_TOOLCHAIN_FILE=" + toolchainFile);
 
         for (const key in process.env) {
             if (key.startsWith(customCmakeOptionsEnvVarPrefix)) {
@@ -61,7 +65,7 @@ export async function compileLlamaCpp({
         );
 
         const binFilesDirPath = path.join(llamaDirectory, "build", "llama.cpp", "bin");
-        const compiledResultDirPath = await getCompiledResultDir();
+        const compiledResultDirPath = await getCompiledResultDir(true);
 
         if (await fs.pathExists(binFilesDirPath)) {
             const files = await fs.readdir(binFilesDirPath);
@@ -89,7 +93,11 @@ export async function compileLlamaCpp({
 }
 
 export async function getCompiledLlamaCppBinaryPath() {
-    const compiledResultDirPath = await getCompiledResultDir();
+    const compiledResultDirPath = await getCompiledResultDir(false);
+
+    if (compiledResultDirPath == null)
+        return null;
+
     const modulePath = path.join(compiledResultDirPath, "llama-addon.node");
 
     if (await fs.pathExists(modulePath))
@@ -98,14 +106,19 @@ export async function getCompiledLlamaCppBinaryPath() {
     return null;
 }
 
-async function getCompiledResultDir() {
+async function getCompiledResultDir(failIfNotFound?: false): Promise<string | null>;
+async function getCompiledResultDir(failIfNotFound: true): Promise<string>;
+async function getCompiledResultDir(failIfNotFound: boolean = false) {
     if (await fs.pathExists(path.join(llamaDirectory, "build", "Release"))) {
         return path.join(llamaDirectory, "build", "Release");
     } else if (await fs.pathExists(path.join(llamaDirectory, "build", "Debug"))) {
         return path.join(llamaDirectory, "build", "Debug");
     }
 
-    throw new Error("Could not find Release or Debug directory");
+    if (failIfNotFound)
+        throw new Error("Could not find Release or Debug directory");
+
+    return null;
 }
 
 async function getCmakePathArgs() {
@@ -118,4 +131,21 @@ async function getCmakePathArgs() {
         return [];
 
     return ["--cmake-path", cmakePath];
+}
+
+async function getToolchainFileForArch(targetArch: string) {
+    if (process.arch === targetArch)
+        return null;
+
+    const platform = process.platform;
+    const hostArch = process.arch;
+
+    const toolchainFilename = `${platform}.host-${hostArch}.target-${targetArch}.cmake`;
+
+    const filePath = path.join(llamaToolchainsDirectory, toolchainFilename);
+
+    if (await fs.pathExists(filePath))
+        return filePath;
+
+    return null;
 }
