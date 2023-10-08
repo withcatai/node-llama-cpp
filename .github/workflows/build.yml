@@ -20,7 +20,9 @@ jobs:
       - name: Generate docs
         run: npm run generate-docs
       - name: Download latest llama.cpp release
-        run: node ./dist/cli/cli.js download --release latest --skipBuild --updateBinariesReleaseMetadata
+        env:
+          CI: true
+        run: node ./dist/cli/cli.js download --release latest --skipBuild --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
@@ -41,6 +43,11 @@ jobs:
         with:
           name: "llama.cpp"
           path: "llama/llama.cpp"
+      - name: Upload gitRelease.bundle artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "gitReleaseBundle"
+          path: "llama/gitRelease.bundle"
 
   build-binaries:
     name: Build binaries - ${{ matrix.config.name }}
@@ -242,6 +249,9 @@ jobs:
           
           rm -f ./llama/binariesGithubRelease.json
           mv artifacts/binariesGithubRelease/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          
+          rm -f ./llama/gitRelease.bundle
+          mv artifacts/gitReleaseBundle/gitRelease.bundle ./llama/gitRelease.bundle
           
           echo "Built binaries:"
           ls llamaBins

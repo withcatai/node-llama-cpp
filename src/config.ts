@@ -20,11 +20,15 @@ export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", 
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
 export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
+export const currentReleaseGitBundlePath = path.join(llamaDirectory, "gitRelease.bundle");
 export const xpackDirectory = path.join(llamaDirectory, "xpack");
 export const localXpacksStoreDirectory = path.join(xpackDirectory, "store");
 export const localXpacksCacheDirectory = path.join(xpackDirectory, "cache");
 export const xpmVersion = "^0.16.3";
 
+export const isCI = env.get("CI")
+    .default("false")
+    .asBool();
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default("ggerganov/llama.cpp")
     .asString();
