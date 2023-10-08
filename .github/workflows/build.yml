@@ -17,8 +17,6 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Generate docs
-        run: npm run generate-docs
       - name: Download latest llama.cpp release
         env:
           CI: true
@@ -33,11 +31,6 @@ jobs:
         with:
           name: "binariesGithubRelease"
           path: "llama/binariesGithubRelease.json"
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: "docs-site"
-          path: "docs-site"
       - name: Upload llama.cpp artifact
         uses: actions/upload-artifact@v3
         with:
@@ -243,7 +236,6 @@ jobs:
           mkdir -p llamaBins
           mv artifacts/bins-*/* llamaBins/
           mv artifacts/build dist/
-          mv artifacts/docs-site docs-site/
           
           cp -r artifacts/llama.cpp/grammars llama/grammars
           
@@ -268,6 +260,13 @@ jobs:
           if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
             echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
           fi
+      - name: Generate docs
+        if: steps.set-npm-url.outputs.npm-url != ''
+        env:
+          DOCS_URL_BASE: "/node-llama-cpp/"
+        run: |
+          export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
+          npm run docs:build
       - name: Upload docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != ''
         uses: actions/upload-pages-artifact@v2

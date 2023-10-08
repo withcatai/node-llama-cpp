@@ -1,5 +1,5 @@
 import {LlamaChatPromptWrapper} from "./LlamaChatPromptWrapper.js";
-import {ChatMLPromptWrapper} from "./ChatMLPromptWrapper.js";
+import {ChatMLChatPromptWrapper} from "./ChatMLChatPromptWrapper.js";
 
 export function getChatWrapperByBos(bos: string | undefined | null) {
     if (bos === "" || bos == null)
@@ -8,7 +8,7 @@ export function getChatWrapperByBos(bos: string | undefined | null) {
     if ("<s>[INST] <<SYS>>\n".startsWith(bos)) {
         return LlamaChatPromptWrapper;
     } else if ("<|im_start|>system\n".startsWith(bos)) {
-        return ChatMLPromptWrapper;
+        return ChatMLChatPromptWrapper;
     }
 
     return null;

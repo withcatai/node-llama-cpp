@@ -5,9 +5,11 @@ node_modules
 
 /dist
 /docs-site
+/docs/api
 
 /.env
 /.eslintcache
+/.vitepress/.cache
 
 /llama/compile_commands.json
 /llama/llama.cpp

@@ -1,0 +1,70 @@
+:root {
+    --vp-c-brand-1: #b26134;
+    --vp-c-brand-2: #cc6e3a;
+    --vp-c-brand-3: #cd8156;
+    --vp-c-brand-soft: rgb(255 156 100 / 14%);
+}
+
+.dark {
+    --vp-c-brand-1: #ffc7a8;
+    --vp-c-brand-2: #e78e5c;
+    --vp-c-brand-3: #dd773e;
+    --vp-c-brand-soft: rgb(255 156 100 / 16%);
+}
+
+:root {
+    --vp-home-hero-name-color: transparent;
+    --vp-home-hero-name-background: -webkit-linear-gradient(
+        108deg,
+        #bd44c5 16%,
+        #faad5e
+    );
+
+    --vp-home-hero-image-background-image: linear-gradient(
+        108deg,
+        #faad5e 50%,
+        #bd44c5 50%
+    );
+    --vp-home-hero-image-filter: blur(40px);
+}
+
+@media (min-width: 640px) {
+    :root {
+        --vp-home-hero-image-filter: blur(56px);
+    }
+}
+
+@media (min-width: 960px) {
+    :root {
+        --vp-home-hero-image-filter: blur(72px) opacity(0.8);
+    }
+}
+
+.main-badges>p {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+img[src$="assets/logo.roundEdges.png"],
+img[src$="assets/logo.png"] {
+    box-shadow: 0px 4px 12px 0px rgb(0 0 0 / 16%), 0px 8px 64px 0px rgb(0 0 0 / 24%);
+    border-radius: 14px;
+    margin-bottom: 12px;
+}
+
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"],
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"] {
+    max-width: 360px;
+    margin-top: -12px;
+}
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"]>*,
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"]>* {
+    display: none;
+}
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.roundEdges.png"] ~ p[align="right"]>:first-of-type,
+div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[align="right"]>:first-of-type {
+    display: block;
+}

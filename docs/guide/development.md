@@ -1,4 +1,4 @@
-# How to contribute to `node-llama-cpp`
+# Developing `node-llama-cpp`
 This document describes how to set up your development environment to contribute to `node-llama-cpp`.
 
 ## Prerequisites
@@ -17,6 +17,11 @@ This document describes how to set up your development environment to contribute
     ```bash
     npm run dev:setup
     ```
+   > If the build fails on cpp errors, this may be due to breaking interface changes on the `llama.cpp` side, which happens pretty often recently.
+   > 
+   > You're encouraged to make changes to the usage of `llama.cpp` functions in the `llama/addon.cpp` file to resolve these errors and then open a pull request for these changes separately from your main changes PR.
+   >
+   > We continually maintain the `llama/addon.cpp` file to keep it up to date with the latest changes of `llama.cpp`, so any help with this is greatly appreciated.
 
 ## Development
 Whenever you add a new functionality to `node-llama-cpp`, consider improving the CLI to reflect this change.
@@ -36,7 +41,7 @@ npx ipull <model-file-ul>
 ### Validate your setup by chatting with a model
 To validate that your setup works, run the following command to chat with the model you downloaded:
 ```bash
-npm run dev:build; node ./dist/cli/cli.js chat --model <path-to-model-file-on-your-computer>
+npm run dev:build; node ./dist/cli/cli.js chat --model <path-to-a-model-file-on-your-computer>
 ```
 
 Try telling the model `Hi there` and see how it reacts. Any response from the model means that your setup works.
@@ -44,7 +49,7 @@ If the response looks weird or doesn't make sense, try using a different model.
 
 If the model doesn't stop generating output, try using a different chat wrapper. For example:
 ```bash
-npm run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path-to-model-file-on-your-computer>
+npm run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path-to-a-model-file-on-your-computer>
 ```
 
 > **Important:** Make sure you always run `npm run dev:build` before running the CLI to make sure that your code changes are reflected in the CLI.
@@ -52,8 +57,8 @@ npm run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path
 ### Debugging
 To run a chat session with a debugger, configure your IDE to run the following command with a debugger:
 ```bash
-node --loader ts-node/esm ./src/cli/cli.ts chat --model <path-to-model-file-on-your-computer>
+node --loader ts-node/esm ./src/cli/cli.ts chat --model <path-to-a-model-file-on-your-computer>
 ```
 
 ## Opening a pull request
-To open a pull request, read the [CONTRIBUTING.md](https://github.com/withcatai/node-llama-cpp/blob/master/CONTRIBUTING.md) guidelines.
+To open a pull request, read the [pull request guidelines](./contributing.md).

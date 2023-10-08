@@ -1,4 +1,4 @@
-# `node-llama-cpp` CUDA support
+# Enabling CUDA support
 ## Prerequisites
 * [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.0 or higher
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
