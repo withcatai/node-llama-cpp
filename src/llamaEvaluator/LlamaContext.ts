@@ -2,26 +2,107 @@ import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
 import {LLAMAContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
+import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
 
 export type LlamaContextOptions = {
     model: LlamaModel,
+    prependBos?: boolean,
+
+    /**
+     * @deprecated use the `grammar` option on `LlamaChatSession`'s `prompt` function
+     * or the `grammarEvaluationState` option on `LlamaContext`'s `evaluate` function instead
+     * @hidden
+     */
     grammar?: LlamaGrammar,
-    prependBos?: boolean
+
+    /** If null, a random seed will be used */
+    seed?: number | null,
+
+    /** text context size */
+    contextSize?: number,
+
+    /** prompt processing batch size */
+    batchSize?: number,
+
+    /** use fp16 for KV cache */
+    f16Kv?: boolean,
+
+    /** the llama_eval() call computes all logits, not just the last one */
+    logitsAll?: boolean,
+
+    /** embedding mode only */
+    embedding?: boolean
+
+    /** number of threads to use to evaluate tokens */
+    threads?: number,
+};
+
+export type LlamaContextRepeatPenalty = {
+    /** Tokens to lower the predication probability of to be the next predicted token */
+    punishTokens: Uint32Array | (() => Uint32Array),
+
+    /**
+     * The relative amount to lower the probability of the tokens in `punishTokens` by
+     * Defaults to `1.1`.
+     * Set to `1` to disable.
+     */
+    penalty?: number,
+
+    /**
+     * For n time a token is in the `punishTokens` array, lower its probability by `n * frequencyPenalty`
+     * Disabled by default (`0`).
+     * Set to a value between `0` and `1` to enable.
+     */
+    frequencyPenalty?: number,
+
+    /**
+     * Lower the probability of all the tokens in the `punishTokens` array by `presencePenalty`
+     * Disabled by default (`0`).
+     * Set to a value between `0` and `1` to enable.
+     */
+    presencePenalty?: number
 };
 
 export class LlamaContext {
+    private readonly _model: LlamaModel;
     private readonly _ctx: LLAMAContext;
     private readonly _prependBos: boolean;
     private _prependTokens: Token[];
 
-    public constructor({model, grammar, prependBos = true}: LlamaContextOptions) {
+    /** @internal */
+    public readonly _chatGrammar?: LlamaGrammar;
+
+
+    /**
+     * @param {LlamaContextOptions} options
+     */
+    public constructor({
+        model,
+        prependBos = true,
+        grammar,
+        seed = model._contextOptions.seed,
+        contextSize = model._contextOptions.contextSize,
+        batchSize = model._contextOptions.batchSize,
+        f16Kv = model._contextOptions.f16Kv,
+        logitsAll = model._contextOptions.logitsAll,
+        embedding = model._contextOptions.embedding,
+        threads = model._contextOptions.threads
+    }: LlamaContextOptions) {
+        this._model = model;
         this._ctx = new LLAMAContext(model._model, removeNullFields({
-            grammar: grammar?._grammar
+            seed: seed != null ? Math.max(-1, seed) : undefined,
+            contextSize,
+            batchSize,
+            f16Kv,
+            logitsAll,
+            embedding,
+            threads
         }));
         this._prependBos = prependBos;
         this._prependTokens = [];
+        this._chatGrammar = grammar;
 
         if (prependBos) {
             this._prependTokens.unshift(this._ctx.tokenBos());
@@ -125,7 +206,21 @@ export class LlamaContext {
         return this._ctx.getContextSize();
     }
 
-    public async *evaluate(tokens: Uint32Array): AsyncGenerator<Token, void> {
+    /**
+     * @param {Uint32Array} tokens
+     * @param {object} options
+     * @returns {AsyncGenerator<Token, void>}
+     */
+    public async *evaluate(tokens: Uint32Array, {
+        temperature = this._model._evaluationOptions.temperature,
+        topK = this._model._evaluationOptions.topK,
+        topP = this._model._evaluationOptions.topP,
+        grammarEvaluationState,
+        repeatPenalty
+    }: {
+        temperature?: number, topK?: number, topP?: number, grammarEvaluationState?: LlamaGrammarEvaluationState,
+        repeatPenalty?: LlamaContextRepeatPenalty
+    } = {}): AsyncGenerator<Token, void> {
         let evalTokens = tokens;
 
         if (this._prependTokens.length > 0) {
@@ -135,10 +230,24 @@ export class LlamaContext {
             this._prependTokens = [];
         }
 
+        if (evalTokens.length === 0)
+            return;
+
         // eslint-disable-next-line no-constant-condition
         while (true) {
             // Evaluate to get the next token.
-            const nextToken: Token = await this._ctx.eval(evalTokens);
+            const nextToken: Token = await this._ctx.eval(evalTokens, removeNullFields({
+                temperature,
+                topK,
+                topP,
+                repeatPenalty: repeatPenalty?.penalty,
+                repeatPenaltyTokens: repeatPenalty?.punishTokens instanceof Function
+                    ? repeatPenalty.punishTokens()
+                    : repeatPenalty?.punishTokens,
+                repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
+                repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+                grammarEvaluationState: grammarEvaluationState?._state
+            }));
 
             // the assistant finished answering
             if (nextToken === this._ctx.tokenEos())
