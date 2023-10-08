@@ -103,6 +103,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf g++-powerpc64le-linux-gnu gcc-powerpc64le-linux-gnu
+          
+          which aarch64-linux-gnu-gcc
+          which aarch64-linux-gnu-g++
+          
+          which arm-linux-gnueabihf-gcc
+          which arm-linux-gnueabihf-g++
+          
+          which powerpc64le-linux-gnu-gcc
+          which powerpc64le-linux-gnu-g++
 
       - name: Install dependencies on macos
         if: startsWith(matrix.config.os, 'macos')
