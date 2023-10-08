@@ -99,10 +99,16 @@ jobs:
           choco install ninja cmake
 
       - name: Install dependencies on ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu Latest GCC')
+        if: startsWith(matrix.config.name, 'Ubuntu GCC')
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build cmake libtbb-dev
+          sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+          
+          which aarch64-linux-gnu-gcc
+          which aarch64-linux-gnu-g++
+          
+          which arm-linux-gnueabihf-gcc
+          which arm-linux-gnueabihf-g++
 
       - name: Install dependencies on macos
         if: startsWith(matrix.config.os, 'macos')
@@ -151,7 +157,7 @@ jobs:
               case "win":
                 return ["x64" /*, "arm64" */ ]; // disabled arm64 for now as compilation doesn't work
               case "linux":
-                return ["x64", "arm64", "armv7l", "ppc64le"];
+                return ["x64", "arm64", "armv7l"];
               case "mac":
                 return ["x64", "arm64"];
             }

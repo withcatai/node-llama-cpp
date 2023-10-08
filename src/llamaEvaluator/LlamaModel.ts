@@ -8,22 +8,35 @@ export type LlamaModelOptions = {
     /** path to the model on the filesystem */
     modelPath: string,
 
-    /** If null, a random seed will be used */
+    /**
+     * If null, a random seed will be used
+     * @deprecated use the `seed` option on `LlamaContext` instead
+     * @hidden
+     * */
     seed?: number | null,
 
-    /** text context size */
+    /**
+     * text context size
+     * @deprecated use the `contextSize` option on `LlamaContext` instead
+     * @hidden
+     * */
     contextSize?: number,
 
-    /** prompt processing batch size */
+    /**
+     * prompt processing batch size
+     * @deprecated use the `batchSize` option on `LlamaContext` instead
+     * @hidden
+     * */
     batchSize?: number,
 
     /** number of layers to store in VRAM */
     gpuLayers?: number,
 
-    /** if true, reduce VRAM usage at the cost of performance */
-    lowVram?: boolean,
-
-    /** number of threads to use to evaluate tokens */
+    /**
+     * number of threads to use to evaluate tokens
+     * @deprecated use the `threads` option on `LlamaContext` instead
+     * @hidden
+     * */
     threads?: number,
 
     /**
@@ -35,6 +48,8 @@ export type LlamaModelOptions = {
      * At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run.
      *
      * Set to `0` to disable.
+     * @deprecated use the `temperature` option on `LlamaChatSession`'s `prompt` function or `LlamaContext`'s `evaluate` function instead
+     * @hidden
      */
     temperature?: number,
 
@@ -44,6 +59,8 @@ export type LlamaModelOptions = {
      * Set to `0` to disable (which uses the full vocabulary).
      *
      * Only relevant when `temperature` is set to a value greater than 0.
+     * @deprecated use the `topK` option on `LlamaChatSession`'s `prompt` function or `LlamaContext`'s `evaluate` function instead
+     * @hidden
      * */
     topK?: number,
 
@@ -54,13 +71,23 @@ export type LlamaModelOptions = {
      * Set to `1` to disable.
      *
      * Only relevant when `temperature` is set to a value greater than `0`.
-     * */
+     * @deprecated use the `topP` option on `LlamaChatSession`'s `prompt` function or `LlamaContext`'s `evaluate` function instead
+     * @hidden
+     */
     topP?: number,
 
-    /** use fp16 for KV cache */
+    /**
+     * use fp16 for KV cache
+     * @deprecated use the `f16Kv` option on `LlamaContext` instead
+     * @hidden
+     */
     f16Kv?: boolean,
 
-    /** the llama_eval() call computes all logits, not just the last one */
+    /**
+     * the llama_eval() call computes all logits, not just the last one
+     * @deprecated use the `logitsAll` option on `LlamaContext` instead
+     * @hidden
+     */
     logitsAll?: boolean,
 
     /** only load the vocabulary, no weights */
@@ -72,7 +99,11 @@ export type LlamaModelOptions = {
     /** force system to keep model in RAM */
     useMlock?: boolean,
 
-    /** embedding mode only */
+    /**
+     * embedding mode only
+     * @deprecated use the `embedding` option on `LlamaContext` instead
+     * @hidden
+     */
     embedding?: boolean
 };
 
@@ -80,16 +111,34 @@ export class LlamaModel {
     /** @internal */
     public readonly _model: LLAMAModel;
 
+    /** @internal */
+    public readonly _contextOptions: {
+        seed: LlamaModelOptions["seed"],
+        contextSize: LlamaModelOptions["contextSize"],
+        batchSize: LlamaModelOptions["batchSize"],
+        f16Kv: LlamaModelOptions["f16Kv"],
+        logitsAll: LlamaModelOptions["logitsAll"],
+        embedding: LlamaModelOptions["embedding"],
+        threads: LlamaModelOptions["threads"]
+    };
+
+    /** @internal */
+    public readonly _evaluationOptions: {
+        temperature: LlamaModelOptions["temperature"],
+        topK: LlamaModelOptions["topK"],
+        topP: LlamaModelOptions["topP"]
+    };
+
     /**
-     * options source:
-     * https://github.com/ggerganov/llama.cpp/blob/b5ffb2849d23afe73647f68eec7b68187af09be6/llama.h#L102 (struct llama_context_params)
+     * > options source:
+     * > [github:ggerganov/llama.cpp/llama.h](
+     * > https://github.com/ggerganov/llama.cpp/blob/b5ffb2849d23afe73647f68eec7b68187af09be6/llama.h#L102) (`struct llama_context_params`)
      * @param {object} options
      * @param {string} options.modelPath - path to the model on the filesystem
      * @param {number | null} [options.seed] - If null, a random seed will be used
      * @param {number} [options.contextSize] - text context size
      * @param {number} [options.batchSize] - prompt processing batch size
      * @param {number} [options.gpuLayers] - number of layers to store in VRAM
-     * @param {boolean} [options.lowVram] - if true, reduce VRAM usage at the cost of performance
      * @param {number} [options.threads] - number of threads to use to evaluate tokens
      * @param {number} [options.temperature] - Temperature is a hyperparameter that controls the randomness of the generated text.
      * It affects the probability distribution of the model's output tokens.
@@ -120,25 +169,30 @@ export class LlamaModel {
      */
     public constructor({
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
-        lowVram, threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
+        threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: LlamaModelOptions) {
         this._model = new LLAMAModel(path.resolve(process.cwd(), modelPath), removeNullFields({
-            seed: seed != null ? Math.max(-1, seed) : undefined,
-            contextSize,
-            batchSize,
             gpuLayers,
-            lowVram,
-            threads,
-            temperature,
-            topK,
-            topP,
-            f16Kv,
-            logitsAll,
             vocabOnly,
             useMmap,
-            useMlock,
-            embedding
+            useMlock
         }));
+
+        this._contextOptions = {
+            seed,
+            contextSize,
+            batchSize,
+            f16Kv,
+            logitsAll,
+            embedding,
+            threads
+        };
+
+        this._evaluationOptions = {
+            temperature,
+            topK,
+            topP
+        };
     }
 
     public static get systemInfo() {
