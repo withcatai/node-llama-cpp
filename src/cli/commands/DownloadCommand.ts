@@ -3,10 +3,8 @@ import {CommandModule} from "yargs";
 import {Octokit} from "octokit";
 import fs from "fs-extra";
 import chalk from "chalk";
-import cliProgress from "cli-progress";
-import simpleGit from "simple-git";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, llamaCppDirectory
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI, llamaCppDirectory
 } from "../../config.js";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -14,6 +12,8 @@ import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
+import {saveCurrentRepoAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
+import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
 
 type DownloadCommandArgs = {
     repo: string,
@@ -23,7 +23,7 @@ type DownloadCommandArgs = {
     metal: boolean,
     cuda: boolean,
     skipBuild?: boolean,
-    updateBinariesReleaseMetadata?: boolean
+    updateBinariesReleaseMetadataAndSaveGitBundle?: boolean
 };
 
 export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
@@ -68,7 +68,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 default: false,
                 description: "Skip building llama.cpp after downloading it"
             })
-            .option("updateBinariesReleaseMetadata", {
+            .option("updateBinariesReleaseMetadataAndSaveGitBundle", {
                 type: "boolean",
                 hidden: true, // this for the CI to use
                 default: false,
@@ -79,7 +79,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
 };
 
 export async function DownloadLlamaCppCommand({
-    repo, release, arch, nodeTarget, metal, cuda, skipBuild, updateBinariesReleaseMetadata
+    repo, release, arch, nodeTarget, metal, cuda, skipBuild, updateBinariesReleaseMetadataAndSaveGitBundle
 }: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
@@ -143,7 +143,7 @@ export async function DownloadLlamaCppCommand({
     });
 
     console.log(chalk.blue("Cloning llama.cpp"));
-    await cloneTag(githubOwner, githubRepo, githubRelease!.data.tag_name, llamaCppDirectory);
+    await cloneLlamaCppRepo(githubOwner, githubRepo, githubRelease!.data.tag_name);
 
     if (!skipBuild) {
         await downloadCmakeIfNeeded(true);
@@ -163,8 +163,9 @@ export async function DownloadLlamaCppCommand({
         });
     }
 
-    if (updateBinariesReleaseMetadata) {
+    if (isCI && updateBinariesReleaseMetadataAndSaveGitBundle) {
         await setBinariesGithubRelease(githubRelease!.data.tag_name);
+        await saveCurrentRepoAsReleaseBundle();
     }
 
     console.log();
@@ -173,36 +174,4 @@ export async function DownloadLlamaCppCommand({
     console.log(`${chalk.yellow("Release:")} ${release}`);
     console.log();
     console.log(chalk.green("Done"));
-}
-
-
-async function cloneTag(githubOwner: string, githubRepo: string, tag: string, directory: string) {
-    const progressBar = new cliProgress.Bar({
-        clearOnComplete: false,
-        hideCursor: true,
-        autopadding: true,
-        format: `${chalk.bold("Clone {repo}")}  ${chalk.yellow("{percentage}%")} ${chalk.cyan("{bar}")} ${chalk.grey("{eta_formatted}")}`
-    }, cliProgress.Presets.shades_classic);
-
-    progressBar.start(100, 0, {
-        speed: "",
-        repo: `${githubOwner}/${githubRepo}`
-    });
-
-    try {
-        await simpleGit({
-            progress({progress, total, processed}) {
-                const totalProgress = (processed / 100) + (progress / total);
-
-                progressBar.update(Math.floor(totalProgress * 10000) / 100);
-            }
-        }).clone(`https://github.com/${githubOwner}/${githubRepo}.git`, directory, {
-            "--depth": 1,
-            "--branch": tag,
-            "--quiet": null
-        });
-    } finally {
-        progressBar.update(100);
-        progressBar.stop();
-    }
 }

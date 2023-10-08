@@ -11,6 +11,7 @@ node_modules
 
 /llama/compile_commands.json
 /llama/llama.cpp
+/llama/gitRelease.bundle
 /llama/.temp
 /llama/build
 /llama/Release
