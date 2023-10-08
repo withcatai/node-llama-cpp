@@ -11,7 +11,7 @@ export async function saveCurrentRepoAsReleaseBundle() {
     if (await fs.pathExists(currentReleaseGitBundlePath))
         await fs.remove(currentReleaseGitBundlePath);
 
-    await simpleGit(llamaCppDirectory).raw("bundle", ["create", currentReleaseGitBundlePath, "HEAD"]);
+    await simpleGit(llamaCppDirectory).raw(["bundle", "create", currentReleaseGitBundlePath, "HEAD"]);
 }
 
 export async function getGitBundlePathForRelease(githubOwner: string, githubRepo: string, release: string) {
