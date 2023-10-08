@@ -99,35 +99,40 @@ export type LlamaCppNodeModule = {
     LLAMAModel: LLAMAModel,
     LLAMAContext: LLAMAContext,
     LLAMAGrammar: LLAMAGrammar,
+    LLAMAGrammarEvaluationState: LLAMAGrammarEvaluationState,
     systemInfo(): string
 };
 
 export type LLAMAModel = {
     new (modelPath: string, params: {
-        seed?: number,
-        contextSize?: number,
-        batchSize?: number,
-        gpuCores?: number,
-        lowVram?: boolean,
-        f16Kv?: boolean,
-        logitsAll?: boolean,
+        gpuLayers?: number,
         vocabOnly?: boolean,
         useMmap?: boolean,
-        useMlock?: boolean,
-        embedding?: boolean,
-        threads?: number,
-        temperature?: number,
-        topK?: number,
-        topP?: number
+        useMlock?: boolean
     }): LLAMAModel
 };
 
 export type LLAMAContext = {
-    new (model: LLAMAModel, params?: {
-        grammar?: LLAMAGrammar
+    new (model: LLAMAModel, params: {
+        seed?: number,
+        contextSize?: number,
+        batchSize?: number,
+        f16Kv?: boolean,
+        logitsAll?: boolean,
+        embedding?: boolean,
+        threads?: number,
     }): LLAMAContext,
     encode(text: string): Uint32Array,
-    eval(tokens: Uint32Array): Promise<number>,
+    eval(tokens: Uint32Array, options?: {
+        temperature?: number,
+        topK?: number,
+        topP?: number,
+        repeatPenalty?: number,
+        repeatPenaltyTokens?: Uint32Array,
+        repeatPenaltyPresencePenalty?: number, // alpha_presence
+        repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
+        grammarEvaluationState?: LLAMAGrammarEvaluationState
+    }): Promise<number>,
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
     tokenEos(): number,
@@ -140,4 +145,8 @@ export type LLAMAGrammar = {
     new (grammarPath: string, params?: {
         printGrammar?: boolean,
     }): LLAMAGrammar
+};
+
+export type LLAMAGrammarEvaluationState = {
+    new (grammar: LLAMAGrammar): LLAMAGrammarEvaluationState
 };
