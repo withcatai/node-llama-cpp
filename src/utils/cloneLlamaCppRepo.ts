@@ -6,8 +6,8 @@ import {llamaCppDirectory} from "../config.js";
 import {getGitBundlePathForRelease} from "./gitReleaseBundles.js";
 
 
-export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string, tag: string) {
-    const gitBundleForTag = await getGitBundlePathForRelease(githubOwner, githubRepo, tag);
+export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true) {
+    const gitBundleForTag = !useBundles ? null : await getGitBundlePathForRelease(githubOwner, githubRepo, tag);
     const remoteGitUrl = `https://github.com/${githubOwner}/${githubRepo}.git`;
 
     async function withGitCloneProgress<T>(cloneName: string, callback: (gitWithCloneProgress: SimpleGit) => Promise<T>): Promise<T> {
@@ -49,10 +49,7 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
                     "--quiet": null
                 });
 
-                await simpleGit(llamaCppDirectory)
-                    .removeRemote("origin");
-                await simpleGit(llamaCppDirectory)
-                    .addRemote("origin", remoteGitUrl);
+                await simpleGit(llamaCppDirectory).removeRemote("origin");
             });
             return;
         } catch (err) {
