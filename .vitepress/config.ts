@@ -44,7 +44,19 @@ export default defineConfig({
 
     base: urlBase,
     sitemap: {
-        hostname: "https://withcatai.github.io/node-llama-cpp/"
+        hostname: "https://withcatai.github.io/node-llama-cpp/",
+        transformItems(items) {
+            return items.map((item) => {
+                if (item.url.includes("api/") || item.url.includes("guide/cli/")) {
+                    item = {
+                        ...item,
+                        lastmod: undefined,
+                    }
+                }
+
+                return item;
+            });
+        }
     },
     head: [
         ["link", {rel: "icon", type: "image/svg+xml", href: resolveHref("/favicon.svg")}],
