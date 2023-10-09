@@ -28,6 +28,7 @@
 * [Getting started guide](https://withcatai.github.io/node-llama-cpp/guide/)
 * [API reference](https://withcatai.github.io/node-llama-cpp/api/classes/LlamaModel)
 * [CLI help](https://withcatai.github.io/node-llama-cpp/guide/cli/)
+* [Changelog](https://github.com/withcatai/node-llama-cpp/releases)
 
 ## Installation
 ```bash
