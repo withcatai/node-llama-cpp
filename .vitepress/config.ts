@@ -68,7 +68,7 @@ export default defineConfig({
     },
     themeConfig: {
         editLink: {
-            pattern: "https://github.com/withcatai/node-llama-cpp/edit/main/docs/:path"
+            pattern: "https://github.com/withcatai/node-llama-cpp/edit/master/docs/:path"
         },
         nav: [
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},
