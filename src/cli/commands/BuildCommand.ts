@@ -8,6 +8,7 @@ import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, llamaCppDirectory} from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
+import {getIsInDocumentationMode} from "../../state.js";
 
 type BuildCommand = {
     arch?: string,
@@ -20,6 +21,8 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
     command: "build",
     describe: "Compile the currently downloaded llama.cpp",
     builder(yargs) {
+        const isInDocumentationMode = getIsInDocumentationMode();
+
         return yargs
             .option("arch", {
                 alias: "a",
@@ -33,7 +36,7 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
             })
             .option("metal", {
                 type: "boolean",
-                default: defaultLlamaCppMetalSupport,
+                default: defaultLlamaCppMetalSupport || isInDocumentationMode,
                 description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
             })
             .option("cuda", {

@@ -12,6 +12,7 @@ import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
+import {getIsInDocumentationMode} from "../../state.js";
 import {saveCurrentRepoAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
 import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
 
@@ -30,6 +31,8 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     command: "download",
     describe: "Download a release of llama.cpp and compile it",
     builder(yargs) {
+        const isInDocumentationMode = getIsInDocumentationMode();
+
         return yargs
             .option("repo", {
                 type: "string",
@@ -38,7 +41,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             })
             .option("release", {
                 type: "string",
-                default: defaultLlamaCppRelease,
+                default: isInDocumentationMode ? "<current build>" : defaultLlamaCppRelease,
                 description: "The tag of the llama.cpp release to download. Set to \"latest\" to download the latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
             })
             .option("arch", {
@@ -53,8 +56,8 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             })
             .option("metal", {
                 type: "boolean",
-                default: defaultLlamaCppMetalSupport,
-                hidden: process.platform !== "darwin",
+                default: defaultLlamaCppMetalSupport || isInDocumentationMode,
+                hidden: process.platform !== "darwin" && !isInDocumentationMode,
                 description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
             })
             .option("cuda", {

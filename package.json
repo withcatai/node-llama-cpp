@@ -44,7 +44,6 @@
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force",
     "addPostinstallScript": "npm pkg set scripts.postinstall=\"node ./dist/cli/cli.js postinstall\"",
-    "generate-docs": "typedoc --plugin typedoc-plugin-mdn-links",
     "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
     "cmake-js-llama": "cd llama && cmake-js",
@@ -53,9 +52,13 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts .",
     "format": "npm run lint:eslint -- --fix",
-    "dev:setup": "npm run build && node ./dist/cli/cli.js download",
+    "dev:setup": "npm run build && node ./dist/cli/cli.js download && npm run docs:generateTypedoc",
     "dev:build": "npm run build && node ./dist/cli/cli.js build",
-    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo",
+    "docs:generateTypedoc": "typedoc && rimraf ./docs/api/index.md ./docs/api/exports.md",
+    "docs:dev": "npm run docs:generateTypedoc && vitepress dev",
+    "docs:build": "npm run docs:generateTypedoc && vitepress build",
+    "docs:preview": "npm run docs:generateTypedoc && vitepress preview"
   },
   "repository": {
     "type": "git",
@@ -111,9 +114,12 @@
     "semantic-release": "^21.0.7",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.1",
-    "typedoc": "^0.24.8",
+    "typedoc": "^0.25.1",
+    "typedoc-plugin-markdown": "^4.0.0-next.22",
     "typedoc-plugin-mdn-links": "^3.1.0",
+    "typedoc-vitepress-theme": "^1.0.0-next.3",
     "typescript": "^5.1.6",
+    "vitepress": "^1.0.0-rc.20",
     "zx": "^7.2.3"
   },
   "dependencies": {
