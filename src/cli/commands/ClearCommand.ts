@@ -1,5 +1,5 @@
 import {CommandModule} from "yargs";
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import chalk from "chalk";
 import {llamaCppDirectory} from "../../config.js";
 import withOra from "../../utils/withOra.js";

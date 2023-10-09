@@ -1,5 +1,5 @@
 import process from "process";
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import {tempDownloadDirectory} from "../config.js";
 
 export async function clearTempFolder() {
