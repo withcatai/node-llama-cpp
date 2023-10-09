@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)
 project ("llama-addon")
 
 if (MSVC)
-  add_compile_options(/EHsc)
+  # add_compile_options(/EHsc)
 else()
   add_compile_options(-fexceptions)
 endif()

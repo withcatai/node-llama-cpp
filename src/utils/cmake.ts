@@ -1,5 +1,5 @@
 import path from "path";
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import which from "which";
 import chalk from "chalk";
 import {chmodr} from "chmodrp";
@@ -29,9 +29,12 @@ export async function getCmakePath() {
     } catch (err) {}
 
     try {
-        const resolvedPath = await which("cmake", {
+        let resolvedPath = await which("cmake", {
             path: path.join(llamaDirectory, "xpack", "xpacks", ".bin")
         });
+
+        if (resolvedPath.toLowerCase().endsWith(".cmd"))
+            resolvedPath = (await getBinFromWindowCmd(resolvedPath, "cmake.exe")) ?? "";
 
         if (resolvedPath !== "")
             return resolvedPath;
@@ -88,4 +91,27 @@ async function downloadCmake() {
 
     await fs.remove(localXpacksCacheDirectory);
     await fixXpackPermissions();
+}
+
+async function getBinFromWindowCmd(cmdFilePath: string, binName: string) {
+    const fileContent: string = await fs.readFile(cmdFilePath, "utf8");
+    const lowercaseFileContent = fileContent.toLowerCase();
+
+    if (!lowercaseFileContent.includes(binName))
+        return null;
+
+    const lastIndexOfBinName = lowercaseFileContent.lastIndexOf(binName);
+    const characterAfterBinName = fileContent[lastIndexOfBinName + binName.length];
+
+    if (characterAfterBinName !== '"' && characterAfterBinName !== "'")
+        return null;
+
+    const startStringCharacter = fileContent.lastIndexOf(characterAfterBinName, lastIndexOfBinName);
+
+    const binPath = fileContent.slice(startStringCharacter + 1, lastIndexOfBinName + binName.length);
+
+    if (!await fs.pathExists(binPath))
+        return null;
+
+    return binPath;
 }

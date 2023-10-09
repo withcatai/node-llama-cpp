@@ -30,6 +30,9 @@ export async function compileLlamaCpp({
         else cmakeCustomOptions.push("LLAMA_METAL=OFF");
 
         if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.push("LLAMA_CUBLAS=1");
+        if (cuda && process.env.CUDA_PATH != null && await fs.pathExists(process.env.CUDA_PATH))
+            cmakeCustomOptions.push("CMAKE_GENERATOR_TOOLSET=" + process.env.CUDA_PATH);
+
         if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.push("LLAMA_MPI=1");
         if (process.env.LLAMA_OPENBLAS === "1") cmakeCustomOptions.push("LLAMA_OPENBLAS=1");
         if (process.env.LLAMA_BLAS_VENDOR != null) cmakeCustomOptions.push("LLAMA_BLAS_VENDOR=" + process.env.LLAMA_BLAS_VENDOR);
