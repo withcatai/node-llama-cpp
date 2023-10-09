@@ -12,6 +12,7 @@ const env = envVar.from(process.env);
 
 const urlBase = env.get("DOCS_URL_BASE").asString();
 const packageVersion = env.get("DOCS_PACKAGE_VERSION").default(packageJson.version).asString();
+const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
 const chatWrappersOrder = [
     "GeneralChatPromptWrapper",
@@ -43,7 +44,19 @@ export default defineConfig({
 
     base: urlBase,
     sitemap: {
-        hostname: "https://withcatai.github.io/node-llama-cpp/"
+        hostname: "https://withcatai.github.io/node-llama-cpp/",
+        transformItems(items) {
+            return items.map((item) => {
+                if (item.url.includes("api/") || item.url.includes("guide/cli/")) {
+                    item = {
+                        ...item,
+                        lastmod: undefined,
+                    }
+                }
+
+                return item;
+            });
+        }
     },
     head: [
         ["link", {rel: "icon", type: "image/svg+xml", href: resolveHref("/favicon.svg")}],
@@ -54,6 +67,11 @@ export default defineConfig({
         ["meta", {name: "og:locale", content: "en"}],
         ["meta", {name: "og:site_name", content: "node-llama-cpp"}]
     ],
+    transformHead({pageData, head}) {
+        if (pageData.filePath === "index.md") {
+            head.push(["meta", {name: "google-site-verification", content: googleSiteVerificationCode}]);
+        }
+    },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/") || pageData.filePath.startsWith("guide/cli/")) {
             pageData.frontmatter.editLink = false;
@@ -62,7 +80,7 @@ export default defineConfig({
     },
     themeConfig: {
         editLink: {
-            pattern: "https://github.com/withcatai/node-llama-cpp/edit/main/docs/:path"
+            pattern: "https://github.com/withcatai/node-llama-cpp/edit/master/docs/:path"
         },
         nav: [
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},

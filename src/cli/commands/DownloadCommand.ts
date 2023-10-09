@@ -76,7 +76,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 alias: "nb",
                 type: "boolean",
                 default: false,
-                description: "Download a llama.cpp only from GitHub, even if a local git bundle exists for the release"
+                description: "Download a llama.cpp release only from GitHub, even if a local git bundle exists for the release"
             })
             .option("updateBinariesReleaseMetadataAndSaveGitBundle", {
                 type: "boolean",
