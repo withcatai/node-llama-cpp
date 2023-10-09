@@ -13,7 +13,7 @@ import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../state.js";
-import {saveCurrentRepoAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
+import {unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
 import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
 
 type DownloadCommandArgs = {
@@ -24,6 +24,7 @@ type DownloadCommandArgs = {
     metal: boolean,
     cuda: boolean,
     skipBuild?: boolean,
+    noBundle?: boolean,
     updateBinariesReleaseMetadataAndSaveGitBundle?: boolean
 };
 
@@ -71,6 +72,12 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 default: false,
                 description: "Skip building llama.cpp after downloading it"
             })
+            .option("noBundle", {
+                alias: "nb",
+                type: "boolean",
+                default: false,
+                description: "Download a llama.cpp only from GitHub, even if a local git bundle exists for the release"
+            })
             .option("updateBinariesReleaseMetadataAndSaveGitBundle", {
                 type: "boolean",
                 hidden: true, // this for the CI to use
@@ -82,7 +89,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
 };
 
 export async function DownloadLlamaCppCommand({
-    repo, release, arch, nodeTarget, metal, cuda, skipBuild, updateBinariesReleaseMetadataAndSaveGitBundle
+    repo, release, arch, nodeTarget, metal, cuda, skipBuild, noBundle, updateBinariesReleaseMetadataAndSaveGitBundle
 }: DownloadCommandArgs) {
     const octokit = new Octokit();
     const [githubOwner, githubRepo] = repo.split("/");
@@ -146,7 +153,7 @@ export async function DownloadLlamaCppCommand({
     });
 
     console.log(chalk.blue("Cloning llama.cpp"));
-    await cloneLlamaCppRepo(githubOwner, githubRepo, githubRelease!.data.tag_name);
+    await cloneLlamaCppRepo(githubOwner, githubRepo, githubRelease!.data.tag_name, noBundle != true);
 
     if (!skipBuild) {
         await downloadCmakeIfNeeded(true);
@@ -168,7 +175,7 @@ export async function DownloadLlamaCppCommand({
 
     if (isCI && updateBinariesReleaseMetadataAndSaveGitBundle) {
         await setBinariesGithubRelease(githubRelease!.data.tag_name);
-        await saveCurrentRepoAsReleaseBundle();
+        await unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle();
     }
 
     console.log();
