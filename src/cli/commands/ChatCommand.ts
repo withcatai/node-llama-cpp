@@ -3,6 +3,7 @@ import process from "process";
 import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
+import fs from "fs-extra";
 import withOra from "../../utils/withOra.js";
 import {defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
@@ -24,6 +25,7 @@ type ChatCommand = {
     wrapper: (typeof modelWrappers)[number],
     contextSize: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
+    jsonSchemaGrammarFile?: string,
     threads: number,
     temperature: number,
     topK: number,
@@ -94,6 +96,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: "text" as ChatCommand["grammar"],
                 choices: ["text", "json", "list", "arithmetic", "japanese", "chess"] satisfies ChatCommand["grammar"][],
                 description: "Restrict the model response to a specific grammar, like JSON for example",
+                group: "Optional:"
+            })
+            .option("jsonSchemaGrammarFile", {
+                alias: ["jsgf"],
+                type: "string",
+                description: "File path to a JSON schema file, to restrict the model response to only generate output that conforms to the JSON schema",
                 group: "Optional:"
             })
             .option("threads", {
@@ -172,13 +180,15 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
-        grammar, threads, temperature, topK, topP, gpuLayers, repeatPenalty,
-        lastTokensRepeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
+        grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
+        gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
     }) {
         try {
             await RunChat({
-                model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, threads, temperature, topK, topP, gpuLayers,
-                lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
+                model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
+                topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
+                repeatPresencePenalty, maxTokens
             });
         } catch (err) {
             console.error(err);
@@ -189,13 +199,15 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg, threads, temperature, topK, topP,
-    gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
+    model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
+    jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
+    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
     const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext.js");
     const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
+    const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
 
     let initialPrompt = prompt ?? null;
     const model = new LlamaModel({
@@ -207,9 +219,15 @@ async function RunChat({
         contextSize,
         threads
     });
-    const grammar = grammarArg !== "text"
-        ? await LlamaGrammar.getFor(grammarArg)
-        : undefined;
+    const grammar = jsonSchemaGrammarFilePath != null
+        ? new LlamaJsonSchemaGrammar(
+            await fs.readJson(
+                path.resolve(process.cwd(), jsonSchemaGrammarFilePath)
+            )
+        )
+        : grammarArg !== "text"
+            ? await LlamaGrammar.getFor(grammarArg)
+            : undefined;
     const bos = context.getBosString(); // bos = beginning of sequence
     const eos = context.getEosString(); // eos = end of sequence
     const promptWrapper = getChatWrapper(wrapper, bos);
@@ -219,6 +237,9 @@ async function RunChat({
         systemPrompt,
         promptWrapper
     });
+
+    if (grammarArg != "text" && jsonSchemaGrammarFilePath != null)
+        console.warn(chalk.yellow("Both `grammar` and `jsonSchemaGrammarFile` were specified. `jsonSchemaGrammarFile` will be used."));
 
     console.info(`${chalk.yellow("BOS:")} ${bos}`);
     console.info(`${chalk.yellow("EOS:")} ${eos}`);
@@ -233,6 +254,13 @@ async function RunChat({
 
     if (!penalizeRepeatingNewLine)
         console.info(`${chalk.yellow("Penalize repeating new line:")} disabled`);
+
+    if (jsonSchemaGrammarFilePath != null)
+        console.info(`${chalk.yellow("JSON schema grammar file:")} ${
+            path.relative(process.cwd(), path.resolve(process.cwd(), jsonSchemaGrammarFilePath))
+        }`);
+    else if (grammarArg !== "text")
+        console.info(`${chalk.yellow("Grammar:")} ${grammarArg}`);
 
     await withOra({
         loading: chalk.blue("Loading model"),
