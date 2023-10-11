@@ -17,9 +17,9 @@ export class GeneralChatPromptWrapper extends ChatPromptWrapper {
         systemPrompt: string, promptIndex: number, lastStopString: string | null, lastStopStringSuffix: string | null
     }) {
         if (promptIndex === 0)
-            return systemPrompt + `\n\n### ${this._instructionName}:\n\n` + prompt + `\n\n### ${this._responseName}:\n\n`;
+            return systemPrompt + `\n\n### ${this._instructionName}:\n` + prompt + `\n\n### ${this._responseName}:\n`;
 
-        return this._getPromptPrefix(lastStopString, lastStopStringSuffix) + prompt + `\n\n### ${this._responseName}:\n\n`;
+        return this._getPromptPrefix(lastStopString, lastStopStringSuffix) + prompt + `\n\n### ${this._responseName}:\n`;
     }
 
     public override getStopStrings(): string[] {
@@ -42,9 +42,9 @@ export class GeneralChatPromptWrapper extends ChatPromptWrapper {
                 ? lastStopStringSuffix
                 : ((lastStopString ?? "") + (lastStopStringSuffix ?? "")),
             [
-                `\n\n### ${this._instructionName}:\n\n`,
-                `### ${this._instructionName}:\n\n`
+                `\n\n### ${this._instructionName}:\n`,
+                `### ${this._instructionName}:\n`
             ]
-        ) ?? `\n\n### ${this._instructionName}:\n\n`;
+        ) ?? `\n\n### ${this._instructionName}:\n`;
     }
 }
