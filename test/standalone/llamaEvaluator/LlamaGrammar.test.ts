@@ -297,7 +297,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
           rule0 ::= \\"good\\"
           null-rule ::= \\"null\\"
