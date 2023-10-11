@@ -22,7 +22,7 @@
 * Chat with a model using a chat wrapper
 * Use the CLI to chat with a model without writing any code
 * Up-to-date with the latest version of `llama.cpp`. Download and compile the latest release with a single CLI command.
-* Force a model to generate output in a parseable format, like JSON
+* Force a model to generate output in a parseable format, like JSON, or even force it to follow a specific JSON schema
 
 ## [Documentation](https://withcatai.github.io/node-llama-cpp/)
 * [Getting started guide](https://withcatai.github.io/node-llama-cpp/guide/)

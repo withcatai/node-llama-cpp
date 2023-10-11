@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # CLI
 
 <script setup lang="ts">

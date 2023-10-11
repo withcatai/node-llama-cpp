@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # `build` command
 
 <script setup lang="ts">

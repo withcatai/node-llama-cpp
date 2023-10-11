@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "properties": {
+        "responseMessage": {
+            "type": "string"
+        },
+        "requestPositivityScoreFromOneToTen": {
+            "type": "number"
+        }
+    }
+}

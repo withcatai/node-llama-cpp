@@ -5,7 +5,7 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/llama", "/docs"],
+    "ignorePatterns": ["/dist", "/llama", "/docs-site"],
     "extends": [
         "eslint:recommended"
     ],
@@ -39,6 +39,11 @@
             "semi": ["off"],
             "@typescript-eslint/semi": ["warn", "always"],
             "@typescript-eslint/no-inferrable-types": ["off"]
+        }
+    }, {
+        "files": ["test/**/**.ts"],
+        "rules": {
+            "max-len": ["off"]
         }
     }],
     "plugins": [

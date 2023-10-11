@@ -89,10 +89,6 @@ jobs:
           name: llama.cpp
           path: llama/llama.cpp
 
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
       - name: Install dependencies on windows
         if: startsWith(matrix.config.os, 'windows')
         run: |
@@ -203,6 +199,40 @@ jobs:
         with:
           name: "bins-${{ matrix.config.artifact }}"
           path: "llamaBins/*"
+
+  standalone-tests:
+    name: Standalone tests
+    runs-on: ubuntu-22.04
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: dist
+
+      - name: Download llama.cpp artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: llama.cpp
+          path: llama/llama.cpp
+
+      - name: Install dependencies on ubuntu
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build cmake 
+
+      - name: Install modules
+        run: npm ci
+
+      - name: Run standalone tests
+        run: npm run test:standalone
 
   release:
     name: Release

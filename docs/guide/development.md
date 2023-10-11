@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # Developing `node-llama-cpp`
 This document describes how to set up your development environment to contribute to `node-llama-cpp`.
 
