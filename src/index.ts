@@ -4,7 +4,9 @@ import {LlamaJsonSchemaGrammar} from "./llamaEvaluator/LlamaJsonSchemaGrammar.js
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./llamaEvaluator/LlamaGrammarEvaluationState.js";
 import {LlamaContext, type LlamaContextOptions, type LlamaContextRepeatPenalty} from "./llamaEvaluator/LlamaContext.js";
-import {LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionRepeatPenalty} from "./llamaEvaluator/LlamaChatSession.js";
+import {
+    LlamaChatSession, type LlamaChatSessionOptions, type LLamaChatPromptOptions, type LlamaChatSessionRepeatPenalty
+} from "./llamaEvaluator/LlamaChatSession.js";
 import {AbortError} from "./AbortError.js";
 import {ChatPromptWrapper} from "./ChatPromptWrapper.js";
 import {EmptyChatPromptWrapper} from "./chatWrappers/EmptyChatPromptWrapper.js";
@@ -35,6 +37,7 @@ export {
     type LlamaContextRepeatPenalty,
     LlamaChatSession,
     type LlamaChatSessionOptions,
+    type LLamaChatPromptOptions,
     type LlamaChatSessionRepeatPenalty,
     type ConversationInteraction,
     AbortError,
