@@ -10,6 +10,7 @@ node_modules
 /.env
 /.eslintcache
 /.vitepress/.cache
+/coverage
 
 /llama/compile_commands.json
 /llama/llama.cpp

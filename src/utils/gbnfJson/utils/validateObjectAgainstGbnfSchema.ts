@@ -52,13 +52,15 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
                 return true;
         }
 
-        throw new Error(`Expected one of ${schema.type.join(", ")} but got "${typeof object}"`);
+        throw new Error(`Expected one type of [${
+            schema.type.map((type) => JSON.stringify(type)).join(", ")
+        }] but got type "${object === null ? null : typeof object}"`);
     }
 
     if (validateImmutableType(object, schema.type))
         return true;
 
-    throw new Error(`Expected "${schema.type}" but got "${typeof object}"`);
+    throw new Error(`Expected "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
 }
 
 function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
@@ -87,7 +89,7 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
 
     const missingKeys = schemaKeys.filter((key) => !objectKeysSet.has(key));
     if (missingKeys.length > 0)
-        throw new TechnicalValidationError(`Missing keys: ${extraKeys.map((key) => JSON.stringify(key)).join(", ")}`);
+        throw new TechnicalValidationError(`Missing keys: ${missingKeys.map((key) => JSON.stringify(key)).join(", ")}`);
 
     let res = true;
     for (const key of schemaKeys)
@@ -117,9 +119,9 @@ function validateEnum<T extends GbnfJsonEnumSchema>(object: any, schema: T): obj
             return true;
     }
 
-    throw new TechnicalValidationError(`Expected one of ${
+    throw new TechnicalValidationError(`Expected one of [${
         schema.enum.map((item) => JSON.stringify(item)).join(", ")
-    } but got ${JSON.stringify(object)}`);
+    }] but got ${JSON.stringify(object)}`);
 }
 
 function validateConst<T extends GbnfJsonConstSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
