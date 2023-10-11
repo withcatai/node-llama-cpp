@@ -110,6 +110,7 @@
     "@types/yargs": "^17.0.24",
     "@typescript-eslint/eslint-plugin": "^6.3.0",
     "@typescript-eslint/parser": "^6.3.0",
+    "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.46.0",
     "eslint-plugin-import": "^2.28.0",
     "eslint-plugin-node": "github:giladgd/eslint-plugin-node#dev/giladgd/fixImportExtentionFixingInTypeScript",

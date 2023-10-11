@@ -46,6 +46,14 @@ describe("grammar for JSON schema", () => {
             "feelingOverall": "good",
             "verbsInMessage": ["Hello", "world"]
         };
+        const exampleValidValue2 = {
+            "message": null,
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": false,
+            "feelingOverall": "bad",
+            "verbsInMessage": ["Hello", "world"]
+        };
         const exampleInvalidValue = {
             "message": "Hello, world!",
             "numberOfWordsInMessage": 3,
@@ -53,6 +61,46 @@ describe("grammar for JSON schema", () => {
             "feelingGood": true,
             "feelingOverall": "good",
             "verbsInMessage": ["Hello", 10]
+        };
+        const exampleInvalidValue2 = {
+            "message": "Hello, world!",
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": true,
+            "feelingOverall": "average",
+            "verbsInMessage": ["Hello", "world"]
+        };
+        const exampleInvalidValue3 = {
+            "message": "Hello, world!",
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": true,
+            "feelingOverall": "good",
+            "verbsInMessage": ["Hello", "world", true]
+        };
+        const exampleInvalidValue4 = {
+            "message": "Hello, world!",
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": true,
+            "feelingOverall": "good",
+            "verbsInMessage": ["Hello", "world", {}]
+        };
+        const exampleInvalidValue5 = {
+            "message": "Hello, world!",
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": true,
+            "feelingOverall": "good",
+            "verbsInMessage": ["Hello", "world", null]
+        };
+        const exampleInvalidValue6 = {
+            "message": false,
+            "numberOfWordsInMessage": 3,
+            "feelingGoodPercentage": 0.5,
+            "feelingGood": true,
+            "feelingOverall": "good",
+            "verbsInMessage": ["Hello", "world"]
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
@@ -79,11 +127,51 @@ describe("grammar for JSON schema", () => {
         expectTypeOf(parsedValue).toMatchTypeOf<schemaType>();
         expect(parsedValue).toEqual(exampleValidValue);
 
+        const parsedValue2 = grammar.parse(JSON.stringify(exampleValidValue2));
+
+        expectTypeOf(parsedValue2).toMatchTypeOf<schemaType>();
+        expect(parsedValue2).toEqual(exampleValidValue2);
+
         try {
             grammar.parse(JSON.stringify(exampleInvalidValue));
             expect.unreachable("Parsing should have failed");
         } catch (err) {
             expect(err).toMatchInlineSnapshot('[Error: Expected "string" but got "number"]');
+        }
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue2));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Expected one of ["good", "bad"] but got "average"]');
+        }
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue3));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Expected "string" but got "boolean"]');
+        }
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue4));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Expected "string" but got "object"]');
+        }
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue5));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Expected "string" but got "null"]');
+        }
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue6));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Expected one type of ["string", "null"] but got type "boolean"]');
         }
     });
 
@@ -160,6 +248,9 @@ describe("grammar for JSON schema", () => {
                 "onlyPositiveText": {
                     const: true
                 },
+                "onlyNegativeText": {
+                    const: false
+                },
                 "onlyVibe": {
                     const: "good"
                 },
@@ -179,6 +270,7 @@ describe("grammar for JSON schema", () => {
         } as const);
         type schemaType = {
             "onlyPositiveText": true,
+            "onlyNegativeText": false,
             "onlyVibe": "good",
             "onlyNumber": 10,
             "worstThing": null,
@@ -187,6 +279,7 @@ describe("grammar for JSON schema", () => {
         };
         const exampleValidValue = {
             "onlyPositiveText": true,
+            "onlyNegativeText": false,
             "onlyVibe": "good",
             "onlyNumber": 10,
             "worstThing": null,
@@ -195,6 +288,7 @@ describe("grammar for JSON schema", () => {
         };
         const exampleInvalidValue = {
             "onlyPositiveText": true,
+            "onlyNegativeText": false,
             "onlyVibe": "good",
             "onlyNumber": 10.1,
             "worstThing": null,
@@ -221,6 +315,161 @@ describe("grammar for JSON schema", () => {
             expect.unreachable("Parsing should have failed");
         } catch (err) {
             expect(err).toMatchInlineSnapshot("[Error: Expected 10 but got 10.1]");
+        }
+    });
+
+    test("missing keys", () => {
+        const grammar = new LlamaJsonSchemaGrammar({
+            type: "object",
+            properties: {
+                "onlyPositiveText": {
+                    const: true
+                },
+                "onlyNegativeText": {
+                    const: false
+                },
+                "onlyVibe": {
+                    const: "good"
+                },
+                "onlyNumber": {
+                    const: 10
+                },
+                "worstThing": {
+                    const: null
+                },
+                "withNewLine": {
+                    const: "Hooray!\nYes!\t/\\"
+                },
+                "withQuotes": {
+                    const: 'The message is "Hi!".'
+                }
+            }
+        } as const);
+        type schemaType = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            "onlyVibe": "good",
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+        const exampleValidValue = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            "onlyVibe": "good",
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+        const exampleInvalidValue = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            // "onlyVibe": "good",
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+
+        expect(grammar.grammar).toMatchInlineSnapshot(`
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
+          rule0 ::= \\"good\\"
+          null-rule ::= \\"null\\"
+          rule1 ::= \\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\"
+          rule2 ::= \\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\""
+        `);
+
+        const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
+
+        expectTypeOf(parsedValue).toMatchTypeOf<schemaType>();
+        expect(parsedValue).toEqual(exampleValidValue);
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Missing keys: "onlyVibe"]');
+        }
+    });
+
+    test("unexpected keys", () => {
+        const grammar = new LlamaJsonSchemaGrammar({
+            type: "object",
+            properties: {
+                "onlyPositiveText": {
+                    const: true
+                },
+                "onlyNegativeText": {
+                    const: false
+                },
+                "onlyVibe": {
+                    const: "good"
+                },
+                "onlyNumber": {
+                    const: 10
+                },
+                "worstThing": {
+                    const: null
+                },
+                "withNewLine": {
+                    const: "Hooray!\nYes!\t/\\"
+                },
+                "withQuotes": {
+                    const: 'The message is "Hi!".'
+                }
+            }
+        } as const);
+        type schemaType = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            "onlyVibe": "good",
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+        const exampleValidValue = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            "onlyVibe": "good",
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+        const exampleInvalidValue = {
+            "onlyPositiveText": true,
+            "onlyNegativeText": false,
+            "onlyVibe": "good",
+            "onlyFeeling": "good", // unexpected key
+            "onlyNumber": 10,
+            "worstThing": null,
+            "withNewLine": "Hooray!\nYes!\t/\\",
+            "withQuotes": 'The message is "Hi!".'
+        };
+
+        expect(grammar.grammar).toMatchInlineSnapshot(`
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
+          rule0 ::= \\"good\\"
+          null-rule ::= \\"null\\"
+          rule1 ::= \\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\"
+          rule2 ::= \\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\""
+        `);
+
+        const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
+
+        expectTypeOf(parsedValue).toMatchTypeOf<schemaType>();
+        expect(parsedValue).toEqual(exampleValidValue);
+
+        try {
+            grammar.parse(JSON.stringify(exampleInvalidValue));
+            expect.unreachable("Parsing should have failed");
+        } catch (err) {
+            expect(err).toMatchInlineSnapshot('[Error: Unexpected keys: "onlyFeeling"]');
         }
     });
 });
