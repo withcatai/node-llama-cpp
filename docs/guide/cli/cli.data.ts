@@ -1,9 +1,9 @@
+import {CommandModule} from "yargs";
 import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
 import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
 import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
 import {DownloadCommand} from "../../../src/cli/commands/DownloadCommand.js";
 import {ClearCommand} from "../../../src/cli/commands/ClearCommand.js";
-import {CommandModule} from "yargs";
 import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
 import {cliBinName, npxRunPrefix} from "../../../src/config.js";
 import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
@@ -28,7 +28,7 @@ export default {
             clear: await getCommandHtmlDoc(ClearCommand)
         };
     }
-}
+};
 
 function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
     let res = "";

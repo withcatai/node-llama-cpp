@@ -5,7 +5,7 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/llama", "/docs"],
+    "ignorePatterns": ["/dist", "/llama", "/docs-site"],
     "extends": [
         "eslint:recommended"
     ],
