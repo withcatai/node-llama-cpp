@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # `download` command
 
 <script setup lang="ts">

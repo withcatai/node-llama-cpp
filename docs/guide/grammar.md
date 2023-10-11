@@ -58,16 +58,18 @@ console.log(JSON.parse(a2));
 ```
 
 ## Using a JSON schema grammar
-The [`LlamaGrammar.getForJsonSchema(<schema>)`](/api/classes/LlamaGrammar#getforjsonschema) creates a GBNF grammar based on the [JSON schema](https://json-schema.org/learn/getting-started-step-by-step) you provide, and then returns a [`LlamaGrammar`](/api/classes/LlamaGrammar).
+The [`LlamaJsonSchemaGrammar`](/api/classes/LlamaJsonSchemaGrammar) class uses a GBNF grammar that's generated based on the [JSON schema](https://json-schema.org/learn/getting-started-step-by-step) you provide.
 
-It only supports a small subset of the JSON schema spec, but it's enough to generate useful JSON objects using a text generation model.
+It only supports [a small subset of the JSON schema spec](/api/type-aliases/GbnfJsonSchema), but it's enough to generate useful JSON objects using a text generation model.
 
 To see what subset of the JSON schema spec is supported, see the [`GbnfJsonSchema` type](/api/type-aliases/GbnfJsonSchema).
 
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaJsonSchemaGrammar, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {
+    LlamaModel, LlamaJsonSchemaGrammar, LlamaContext, LlamaChatSession
+} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,20 +87,24 @@ const grammar = new LlamaJsonSchemaGrammar({
         }
     }
 } as const);
-const context = new LlamaContext({
-    model
-});
+const context = new LlamaContext({model});
 const session = new LlamaChatSession({context});
 
 
 const q1 = 'How are you doing?';
 console.log("User: " + q1);
 
-const a1 = await session.prompt(q1, {grammar, maxTokens: context.getContextSize()});
+const a1 = await session.prompt(q1, {
+    grammar,
+    maxTokens: context.getContextSize()
+});
 console.log("AI: " + a1);
 
 const parsedA1 = grammar.parse(a1);
-console.log(parsedA1.responseMessage, parsedA1.requestPositivityScoreFromOneToTen);
+console.log(
+    parsedA1.responseMessage,
+    parsedA1.requestPositivityScoreFromOneToTen
+);
 ```
 
 ## Creating your own grammar

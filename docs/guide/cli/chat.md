@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # `chat` command
 
 <script setup lang="ts">

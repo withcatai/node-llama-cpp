@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # Getting started 
 
 ## Installation
@@ -41,7 +44,7 @@ npx --no node-llama-cpp chat --wrapper llamaChat --model <path-to-a-model-file-o
 ```
 
 ## Usage
-### As a chatbot
+### Chatbot
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
@@ -71,6 +74,64 @@ console.log("AI: " + a2);
 ```
 
 > To use a custom chat prompt wrapper, see the [chat prompt wrapper guide](./chat-prompt-wrapper.md).
+
+
+### Chatbot with JSON schema
+To force the model to generate output according to a JSON schema, use the [`LlamaJsonSchemaGrammar`](/api/classes/LlamaJsonSchemaGrammar) class.
+
+It'll force the model to generate output according to the JSON schema you provide, and it'll do it on the text generation level.
+
+It only supports [a small subset of the JSON schema spec](/api/type-aliases/GbnfJsonSchema), but it's enough to generate useful JSON objects using a text generation model.
+
+::: tip NOTE
+
+To learn more on how to use grammars correctly, read the [grammar guide](./grammar.md).
+
+:::
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {
+    LlamaModel, LlamaJsonSchemaGrammar, LlamaContext, LlamaChatSession
+} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const model = new LlamaModel({
+    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+})
+const grammar = new LlamaJsonSchemaGrammar({
+    "type": "object",
+    "properties": {
+        "responseMessage": {
+            "type": "string"
+        },
+        "requestPositivityScoreFromOneToTen": {
+            "type": "number"
+        }
+    }
+} as const);
+const context = new LlamaContext({model});
+const session = new LlamaChatSession({context});
+
+
+const q1 = 'How are you doing?';
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1, {
+    grammar,
+    maxTokens: context.getContextSize()
+});
+console.log("AI: " + a1);
+
+const parsedA1 = grammar.parse(a1);
+console.log(
+    parsedA1.responseMessage,
+    parsedA1.requestPositivityScoreFromOneToTen
+);
+```
+
 
 ### Raw
 ```typescript

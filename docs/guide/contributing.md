@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # Opening a PR on `node-llama-cpp`
 This document describes the guidelines of how to open a PR on the `node-llama-cpp` project.
 

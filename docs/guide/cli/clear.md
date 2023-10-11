@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # `clear` command
 
 <script setup lang="ts">

@@ -73,7 +73,14 @@ export default defineConfig({
         }
     },
     transformPageData(pageData) {
-        if (pageData.filePath.startsWith("api/") || pageData.filePath.startsWith("guide/cli/")) {
+        if (pageData.filePath.startsWith("api/")) {
+            pageData.frontmatter.editLink = false;
+            pageData.frontmatter.lastUpdated = false;
+            pageData.frontmatter ||= {}
+            pageData.frontmatter.outline = [2, 3];
+        }
+
+        if (pageData.filePath.startsWith("guide/cli/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
         }
