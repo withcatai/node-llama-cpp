@@ -23,6 +23,7 @@ export class LlamaGrammar {
     public readonly _grammar: LLAMAGrammar;
     private readonly _stopStrings: readonly string[];
     private readonly _trimWhitespaceSuffix: boolean;
+    private readonly _grammarText: string;
 
     /**
      * > GBNF files are supported.
@@ -44,6 +45,11 @@ export class LlamaGrammar {
         });
         this._stopStrings = stopStrings ?? [];
         this._trimWhitespaceSuffix = trimWhitespaceSuffix;
+        this._grammarText = grammar;
+    }
+
+    public get grammar(): string {
+        return this._grammarText;
     }
 
     public get stopStrings() {
