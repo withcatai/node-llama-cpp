@@ -40,6 +40,11 @@
             "@typescript-eslint/semi": ["warn", "always"],
             "@typescript-eslint/no-inferrable-types": ["off"]
         }
+    }, {
+        "files": ["test/**/**.ts"],
+        "rules": {
+            "max-len": ["off"]
+        }
     }],
     "plugins": [
         "@typescript-eslint",

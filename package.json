@@ -47,7 +47,9 @@
     "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
     "cmake-js-llama": "cd llama && cmake-js",
-    "test": "npm run test:typescript && npm run lint:eslint",
+    "test": "npm run test:typescript && npm run lint:eslint && npm run test:standalone",
+    "test:standalone": "vitest run ./test",
+    "test:standalone:interactive": "vitest watch ./test",
     "test:typescript": "tsc --build tsconfig.json --dry --force",
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts .",
@@ -100,7 +102,7 @@
     "@types/cli-progress": "^3.11.0",
     "@types/cross-spawn": "^6.0.2",
     "@types/fs-extra": "^11.0.1",
-    "@types/node": "^20.4.9",
+    "@types/node": "^20.8.4",
     "@types/uuid": "^9.0.2",
     "@types/which": "^3.0.0",
     "@types/yargs": "^17.0.24",
@@ -120,6 +122,7 @@
     "typedoc-vitepress-theme": "^1.0.0-next.3",
     "typescript": "^5.1.6",
     "vitepress": "^1.0.0-rc.20",
+    "vitest": "^0.34.6",
     "zx": "^7.2.3"
   },
   "dependencies": {
