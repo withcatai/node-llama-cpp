@@ -181,13 +181,20 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 }
 
 function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
+    orderClasses(sidebar);
+    orderTypes(sidebar);
+
+    return sidebar;
+}
+
+function orderClasses(sidebar: typeof typedocSidebar) {
     const baseChatPromptWrapper = "ChatPromptWrapper";
     const chatPromptWrapperItems: DefaultTheme.SidebarItem[] = [];
 
     const classes = sidebar.find((item) => item.text === "Classes");
 
     if (classes == null || !(classes.items instanceof Array))
-        return sidebar;
+        return;
 
     (classes.items as DefaultTheme.SidebarItem[]).unshift({
         text: "Chat wrappers",
@@ -222,7 +229,54 @@ function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedo
 
         return aIndex - bIndex;
     });
-
-    return sidebar;
 }
 
+function orderTypes(sidebar: typeof typedocSidebar) {
+    const types = sidebar.find((item) => item.text === "Types");
+
+    if (types == null || !(types.items instanceof Array))
+        return;
+
+    function groupGbnfJsonSchema() {
+        if (types == null || !(types.items instanceof Array))
+            return;
+
+        const gbnfJsonSchemaItemTitle = "GbnfJsonSchema";
+        const gbnfItemsPrefix = "GbnfJson";
+        const gbnfJsonSchemaItems: DefaultTheme.SidebarItem[] = [];
+
+        const gbnfJsonSchemaItem = types.items
+            .find((item) => item.text === gbnfJsonSchemaItemTitle) as DefaultTheme.SidebarItem | null;
+
+        if (gbnfJsonSchemaItem == null)
+            return;
+
+        gbnfJsonSchemaItem.collapsed = true;
+        gbnfJsonSchemaItem.items = gbnfJsonSchemaItems;
+
+        for (const item of types.items.slice()) {
+            if (item.text === gbnfJsonSchemaItemTitle || !item.text.startsWith(gbnfItemsPrefix))
+                continue;
+
+            types.items.splice(types.items.indexOf(item), 1);
+            gbnfJsonSchemaItems.push(item);
+        }
+    }
+
+    function moveCollapseItemsToTheEnd() {
+        if (types == null || !(types.items instanceof Array))
+            return;
+
+        types.items.sort((a, b) => {
+            if (a.collapsed && !b.collapsed)
+                return 1;
+            if (!a.collapsed && b.collapsed)
+                return -1;
+
+            return 0;
+        });
+    }
+
+    groupGbnfJsonSchema();
+    moveCollapseItemsToTheEnd();
+}
