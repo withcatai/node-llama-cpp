@@ -18,6 +18,7 @@ export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "g
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
+export const chatCommandHistoryFilePath = path.join(os.homedir(), ".node-llama-cpp.chat_repl_history");
 export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
 export const currentReleaseGitBundlePath = path.join(llamaDirectory, "gitRelease.bundle");

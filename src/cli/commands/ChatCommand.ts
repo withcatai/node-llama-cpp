@@ -5,7 +5,7 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import withOra from "../../utils/withOra.js";
-import {defaultChatSystemPrompt} from "../../config.js";
+import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
 import {ChatMLChatPromptWrapper} from "../../chatWrappers/ChatMLChatPromptWrapper.js";
@@ -13,6 +13,7 @@ import {getChatWrapperByBos} from "../../chatWrappers/createChatWrapperByBos.js"
 import {ChatPromptWrapper} from "../../ChatPromptWrapper.js";
 import {FalconChatPromptWrapper} from "../../chatWrappers/FalconChatPromptWrapper.js";
 import {getIsInDocumentationMode} from "../../state.js";
+import {ReplHistory} from "../../utils/ReplHistory.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 
 const modelWrappers = ["auto", "general", "llamaChat", "chatML", "falconChat"] as const;
@@ -36,7 +37,8 @@ type ChatCommand = {
     penalizeRepeatingNewLine: boolean,
     repeatFrequencyPenalty?: number,
     repeatPresencePenalty?: number,
-    maxTokens: number
+    maxTokens: number,
+    noHistory: boolean
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
@@ -176,19 +178,26 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: 0,
                 description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size",
                 group: "Optional:"
+            })
+            .option("noHistory", {
+                alias: "nh",
+                type: "boolean",
+                default: false,
+                description: "Don't load or save chat history",
+                group: "Optional:"
             });
     },
     async handler({
         model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
-        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
                 topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens
+                repeatPresencePenalty, maxTokens, noHistory
             });
         } catch (err) {
             console.error(err);
@@ -201,7 +210,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
-    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens
+    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -273,21 +282,32 @@ async function RunChat({
     // this is for ora to not interfere with readline
     await new Promise(resolve => setTimeout(resolve, 1));
 
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
+    const replHistory = await ReplHistory.load(chatCommandHistoryFilePath, !noHistory);
+
+    async function getPrompt() {
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            history: replHistory.history.slice()
+        });
+
+        const res: string = await new Promise((accept) => rl.question(chalk.yellow("> "), accept));
+        rl.close();
+
+        return res;
+    }
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        const input: string = initialPrompt != null
+        const input = initialPrompt != null
             ? initialPrompt
-            : await new Promise((accept) => rl.question(chalk.yellow("> "), accept));
+            : await getPrompt();
 
         if (initialPrompt != null) {
             console.log(chalk.green("> ") + initialPrompt);
             initialPrompt = null;
-        }
+        } else
+            await replHistory.add(input);
 
         if (input === ".exit")
             break;
