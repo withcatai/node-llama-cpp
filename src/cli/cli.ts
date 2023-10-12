@@ -6,6 +6,7 @@ import yargs from "yargs";
 // eslint-disable-next-line node/file-extension-in-import
 import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
+import {cliBinName} from "../config.js";
 import {DownloadCommand} from "./commands/DownloadCommand.js";
 import {BuildCommand} from "./commands/BuildCommand.js";
 import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
@@ -19,6 +20,7 @@ const packageJson = fs.readJSONSync(path.join(__dirname, "..", "..", "package.js
 const yarg = yargs(hideBin(process.argv));
 
 yarg
+    .scriptName(cliBinName)
     .usage("Usage: $0 <command> [options]")
     .command(DownloadCommand)
     .command(BuildCommand)

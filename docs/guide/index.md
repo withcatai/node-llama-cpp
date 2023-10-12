@@ -11,7 +11,7 @@ npm install --save node-llama-cpp
 
 > `node-llama-cpp` comes with pre-built binaries for macOS, Linux and Windows.
 >
-> If binaries are not available for your platform, it'll fallback to download the latest version of `llama.cpp` and build it from source with `cmake`.
+> If binaries are not available for your platform, it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 > To disable this behavior, set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
 
 ## CUDA and Metal support
