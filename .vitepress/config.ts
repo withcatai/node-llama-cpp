@@ -65,7 +65,10 @@ export default defineConfig({
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
         ["meta", {name: "og:type", content: "website"}],
         ["meta", {name: "og:locale", content: "en"}],
-        ["meta", {name: "og:site_name", content: "node-llama-cpp"}]
+        ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
+        ["meta", {name: "og:image", content: resolveHref("/social.poster.jpg")}],
+        ["meta", {name: "og:image:width", content: "4096"}],
+        ["meta", {name: "og:image:height", content: "2048"}]
     ],
     transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
