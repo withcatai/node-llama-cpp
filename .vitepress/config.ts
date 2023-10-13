@@ -14,6 +14,8 @@ const urlBase = env.get("DOCS_URL_BASE").asString();
 const packageVersion = env.get("DOCS_PACKAGE_VERSION").default(packageJson.version).asString();
 const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
+const hostname = "https://withcatai.github.io/node-llama-cpp/";
+
 const chatWrappersOrder = [
     "GeneralChatPromptWrapper",
     "LlamaChatPromptWrapper",
@@ -44,7 +46,7 @@ export default defineConfig({
 
     base: urlBase,
     sitemap: {
-        hostname: "https://withcatai.github.io/node-llama-cpp/",
+        hostname,
         transformItems(items) {
             return items.map((item) => {
                 if (item.url.includes("api/") || item.url.includes("guide/cli/")) {
@@ -66,9 +68,15 @@ export default defineConfig({
         ["meta", {name: "og:type", content: "website"}],
         ["meta", {name: "og:locale", content: "en"}],
         ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
-        ["meta", {name: "og:image", content: resolveHref("/social.poster.jpg")}],
+        ["meta", {name: "og:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
+        ["meta", {name: "og:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}],
+        ["meta", {name: "og:image", content: hostname + "social.poster.jpg"}],
         ["meta", {name: "og:image:width", content: "4096"}],
-        ["meta", {name: "og:image:height", content: "2048"}]
+        ["meta", {name: "og:image:height", content: "2048"}],
+        ["meta", {name: "twitter:image:src", content: hostname + "social.poster.jpg"}],
+        ["meta", {name: "twitter:card", content: "summary_large_image"}],
+        ["meta", {name: "twitter:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
+        ["meta", {name: "twitter:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}]
     ],
     transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
