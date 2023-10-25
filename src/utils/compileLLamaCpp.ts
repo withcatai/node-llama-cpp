@@ -24,35 +24,33 @@ export async function compileLlamaCpp({
         const cmakePathArgs = await getCmakePathArgs();
         const toolchainFile = await getToolchainFileForArch(arch);
         const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
-        const cmakeCustomOptions = [];
+        const cmakeCustomOptions = new Map<string, string>();
 
-        if ((metal && process.platform === "darwin") || process.env.LLAMA_METAL === "1") cmakeCustomOptions.push("LLAMA_METAL=1");
-        else cmakeCustomOptions.push("LLAMA_METAL=OFF");
+        if ((metal && process.platform === "darwin") || process.env.LLAMA_METAL === "1") cmakeCustomOptions.set("LLAMA_METAL", "1");
+        else cmakeCustomOptions.set("LLAMA_METAL", "OFF");
 
-        if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.push("LLAMA_CUBLAS=1");
-        if (cuda && process.env.CUDA_PATH != null && await fs.pathExists(process.env.CUDA_PATH))
-            cmakeCustomOptions.push("CMAKE_GENERATOR_TOOLSET=" + process.env.CUDA_PATH);
+        if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
 
-        if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.push("LLAMA_MPI=1");
-        if (process.env.LLAMA_OPENBLAS === "1") cmakeCustomOptions.push("LLAMA_OPENBLAS=1");
-        if (process.env.LLAMA_BLAS_VENDOR != null) cmakeCustomOptions.push("LLAMA_BLAS_VENDOR=" + process.env.LLAMA_BLAS_VENDOR);
-        if (process.env.LLAMA_CUDA_FORCE_DMMV != null) cmakeCustomOptions.push("LLAMA_CUDA_FORCE_DMMV=" + process.env.LLAMA_CUDA_FORCE_DMMV);
-        if (process.env.LLAMA_CUDA_DMMV_X != null) cmakeCustomOptions.push("LLAMA_CUDA_DMMV_X=" + process.env.LLAMA_CUDA_DMMV_X);
-        if (process.env.LLAMA_CUDA_MMV_Y != null) cmakeCustomOptions.push("LLAMA_CUDA_MMV_Y=" + process.env.LLAMA_CUDA_MMV_Y);
-        if (process.env.LLAMA_CUDA_F16 != null) cmakeCustomOptions.push("LLAMA_CUDA_F16=" + process.env.LLAMA_CUDA_F16);
-        if (process.env.LLAMA_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.push("LLAMA_CUDA_KQUANTS_ITER=" + process.env.LLAMA_CUDA_KQUANTS_ITER);
-        if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.push("LLAMA_CUDA_PEER_MAX_BATCH_SIZE=" + process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
-        if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.push("LLAMA_HIPBLAS=1");
-        if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.push("LLAMA_CLBLAST=1");
+        if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.set("LLAMA_MPI", "1");
+        if (process.env.LLAMA_OPENBLAS === "1") cmakeCustomOptions.set("LLAMA_OPENBLAS", "1");
+        if (process.env.LLAMA_BLAS_VENDOR != null) cmakeCustomOptions.set("LLAMA_BLAS_VENDOR", process.env.LLAMA_BLAS_VENDOR);
+        if (process.env.LLAMA_CUDA_FORCE_DMMV != null) cmakeCustomOptions.set("LLAMA_CUDA_FORCE_DMMV", process.env.LLAMA_CUDA_FORCE_DMMV);
+        if (process.env.LLAMA_CUDA_DMMV_X != null) cmakeCustomOptions.set("LLAMA_CUDA_DMMV_X", process.env.LLAMA_CUDA_DMMV_X);
+        if (process.env.LLAMA_CUDA_MMV_Y != null) cmakeCustomOptions.set("LLAMA_CUDA_MMV_Y", process.env.LLAMA_CUDA_MMV_Y);
+        if (process.env.LLAMA_CUDA_F16 != null) cmakeCustomOptions.set("LLAMA_CUDA_F16", process.env.LLAMA_CUDA_F16);
+        if (process.env.LLAMA_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.set("LLAMA_CUDA_KQUANTS_ITER", process.env.LLAMA_CUDA_KQUANTS_ITER);
+        if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.set("LLAMA_CUDA_PEER_MAX_BATCH_SIZE", process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
+        if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.set("LLAMA_HIPBLAS", "1");
+        if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.set("LLAMA_CLBLAST", "1");
 
         if (toolchainFile != null)
-            cmakeCustomOptions.push("CMAKE_TOOLCHAIN_FILE=" + toolchainFile);
+            cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
         for (const key in process.env) {
             if (key.startsWith(customCmakeOptionsEnvVarPrefix)) {
                 const option = key.slice(customCmakeOptionsEnvVarPrefix.length);
                 const value = process.env[key];
-                cmakeCustomOptions.push(`${option}=${value}`);
+                cmakeCustomOptions.set(option, value!);
             }
         }
 
@@ -63,7 +61,7 @@ export async function compileLlamaCpp({
         await spawnCommand(
             "npm",
             ["run", "-s", "cmake-js-llama", "--", "compile", "--log-level", "warn", "--arch=" + arch, "--runtime-version=" + runtimeVersion, ...cmakePathArgs]
-                .concat(cmakeCustomOptions.map(option => "--CD" + option)),
+                .concat([...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)),
             __dirname
         );
 
