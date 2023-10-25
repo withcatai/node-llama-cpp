@@ -23,20 +23,38 @@ To build `node-llama-cpp` with any of these options, set an environment variable
 ### Fix the `Failed to detect a default CUDA architecture` build error
 To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler.
 
-For example, if you installed CUDA Toolkit 12.2 on Windows, you have to run the following command:
-```bash
-set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\bin\nvcc.exe
-```
-
-On Linux, it would be something like this:
-```bash
+For example, if you have installed CUDA Toolkit 12.2, you have to run a command like this:
+::: code-group
+```bash [Linux]
 export CUDACXX=/usr/local/cuda-12.2/bin/nvcc
 ```
+
+```bash [Windows]
+set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\bin\nvcc.exe
+```
+:::
 
 Then run the build command again to check whether setting the `CUDACXX` environment variable fixed the issue.
 
 ### Fix the `The CUDA compiler identification is unknown` build error
 The solution to this error is the same as [the solution to the `Failed to detect a default CUDA architecture` error](#fix-the-failed-to-detect-a-default-cuda-architecture-build-error).
+
+### Fix the `A single input file is required for a non-link phase when an outputfile is specified` build error
+To fix this issue you have to set the `CMAKE_GENERATOR_TOOLSET` cmake option to the CUDA home directory, usually already set as the `CUDA_PATH` environment variable.
+
+To do this, set the `NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET` environment variable to the path of your CUDA home directory:
+
+::: code-group
+```bash [Linux]
+export NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$CUDA_PATH
+```
+
+```bash [Windows]
+set NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=%CUDA_PATH%
+```
+:::
+
+Then run the build command again to check whether setting the `CMAKE_GENERATOR_TOOLSET` cmake option fixed the issue.
 
 ## Using `node-llama-cpp` with CUDA
 After you build `node-llama-cpp` with CUDA support, you can use it normally.
