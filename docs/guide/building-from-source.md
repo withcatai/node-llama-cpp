@@ -27,6 +27,8 @@ If `cmake` is not installed on your machine, `node-llama-cpp` will automatically
 
 If the build fails, make sure you have the required dependencies of `cmake` installed on your machine. More info is available [here](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) (you don't have to install `cmake` or `cmake-js`, just the dependencies).
 
+If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.
+
 :::
 
 ## `download` and `build` commands
