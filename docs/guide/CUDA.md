@@ -35,6 +35,9 @@ export CUDACXX=/usr/local/cuda-12.2/bin/nvcc
 
 Then run the build command again to check whether setting the `CUDACXX` environment variable fixed the issue.
 
+### Fix the `The CUDA compiler identification is unknown` build error
+The solution to this error is the same as [the solution to the `Failed to detect a default CUDA architecture` error](#fix-the-failed-to-detect-a-default-cuda-architecture-build-error).
+
 ## Using `node-llama-cpp` with CUDA
 After you build `node-llama-cpp` with CUDA support, you can use it normally.
 
