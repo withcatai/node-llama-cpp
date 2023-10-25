@@ -57,3 +57,8 @@ export const defaultChatSystemPrompt = "You are a helpful, respectful and honest
     "If you don't know the answer to a question, please don't share false information.";
 export const cliBinName = "node-llama-cpp";
 export const npxRunPrefix = "npx --no ";
+
+const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
+export const documentationPageUrls = {
+    CUDA: documentationUrl + "/guide/CUDA"
+} as const;

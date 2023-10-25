@@ -2,7 +2,10 @@ import path from "path";
 import {fileURLToPath} from "url";
 import process from "process";
 import fs from "fs-extra";
-import {customCmakeOptionsEnvVarPrefix, llamaCppDirectory, llamaDirectory, llamaToolchainsDirectory} from "../config.js";
+import chalk from "chalk";
+import {
+    customCmakeOptionsEnvVarPrefix, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaToolchainsDirectory
+} from "../config.js";
 import {clearLlamaBuild} from "./clearLlamaBuild.js";
 import {setUsedBinFlag} from "./usedBinFlag.js";
 import {spawnCommand} from "./spawnCommand.js";
@@ -86,6 +89,13 @@ export async function compileLlamaCpp({
     } catch (err) {
         if (setUsedBinFlagArg)
             await setUsedBinFlag("prebuiltBinaries");
+
+        if (cuda)
+            console.info("\n" +
+                chalk.grey("[node-llama-cpp] ") +
+                chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
+                documentationPageUrls.CUDA
+            );
 
         throw err;
     } finally {
