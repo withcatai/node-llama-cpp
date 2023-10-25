@@ -336,18 +336,14 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
 
   protected:
   void Execute() {
-    llama_batch batch = llama_batch_init(tokens.size(), 0);
+    llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
 
-    batch.n_tokens = tokens.size();
-
-    for (int32_t i = 0; i < batch.n_tokens; i++) {
-        batch.token[i]  = tokens[i];
-        batch.pos[i]    = ctx->n_cur;
-        batch.seq_id[i] = 0;
-        batch.logits[i] = false;
+    for (size_t i = 0; i < tokens.size(); i++) {
+        llama_batch_add(batch, tokens[i], ctx->n_cur, { 0 }, false);
 
         ctx->n_cur++;
     }
+    GGML_ASSERT(batch.n_tokens == (int) tokens.size());
 
     batch.logits[batch.n_tokens - 1] = true;
 
@@ -384,11 +380,8 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
     auto eos_token = llama_token_eos(ctx->ctx);
 
     if (use_repeat_penalty && !repeat_penalty_tokens.empty()) {
-      llama_sample_repetition_penalty(
-        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(), repeat_penalty
-      );
-      llama_sample_frequency_and_presence_penalties(
-        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(),
+      llama_sample_repetition_penalties(
+        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(), repeat_penalty,
         repeat_penalty_frequency_penalty, repeat_penalty_presence_penalty
       );
     }
