@@ -35,6 +35,12 @@ export async function getCmakePath() {
 
         if (resolvedPath.toLowerCase().endsWith(".cmd"))
             resolvedPath = (await getBinFromWindowCmd(resolvedPath, "cmake.exe")) ?? "";
+        else if (resolvedPath.toLowerCase().endsWith(".ps1")) {
+            const cmdFilePath = resolvedPath.slice(0, -".ps1".length) + ".cmd";
+
+            if (await fs.pathExists(cmdFilePath))
+                resolvedPath = (await getBinFromWindowCmd(cmdFilePath, "cmake.exe")) ?? "";
+        }
 
         if (resolvedPath !== "")
             return resolvedPath;
