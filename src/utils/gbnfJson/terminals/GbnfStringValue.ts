@@ -11,14 +11,16 @@ export class GbnfStringValue extends GbnfTerminal {
 
     override getGrammar(): string {
         return [
-            "\"",
+            '"',
+            '\\"',
             this.value
                 .replaceAll("\\", "\\\\")
                 .replaceAll("\t", "\\t")
                 .replaceAll("\r", "\\r")
                 .replaceAll("\n", "\\n")
                 .replaceAll('"', "\\\\" + '\\"'),
-            "\""
+            '\\"',
+            '"'
         ].join("");
     }
 }

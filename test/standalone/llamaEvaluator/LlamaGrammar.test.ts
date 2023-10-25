@@ -104,7 +104,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= \\"{\\" whitespace-new-lines-rule \\"message\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"numberOfWordsInMessage\\" \\":\\" [ ]? integer-number-rule \\",\\" whitespace-new-lines-rule \\"feelingGoodPercentage\\" \\":\\" [ ]? fractional-number-rule \\",\\" whitespace-new-lines-rule \\"feelingGood\\" \\":\\" [ ]? boolean-rule \\",\\" whitespace-new-lines-rule \\"feelingOverall\\" \\":\\" [ ]? rule5 \\",\\" whitespace-new-lines-rule \\"verbsInMessage\\" \\":\\" [ ]? rule6 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"\\\\\\"message\\\\\\"\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"\\\\\\"numberOfWordsInMessage\\\\\\"\\" \\":\\" [ ]? integer-number-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"feelingGoodPercentage\\\\\\"\\" \\":\\" [ ]? fractional-number-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"feelingGood\\\\\\"\\" \\":\\" [ ]? boolean-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"feelingOverall\\\\\\"\\" \\":\\" [ ]? rule5 \\",\\" whitespace-new-lines-rule \\"\\\\\\"verbsInMessage\\\\\\"\\" \\":\\" [ ]? rule6 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
           string-rule ::= \\"\\\\\\"\\" ( [^\\"\\\\\\\\] | \\"\\\\\\\\\\" ([\\"\\\\\\\\/bfnrt] | \\"u\\" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* \\"\\\\\\"\\"
           null-rule ::= \\"null\\"
@@ -114,8 +114,8 @@ describe("grammar for JSON schema", () => {
           rule1 ::= \\"true\\"
           rule2 ::= \\"false\\"
           boolean-rule ::= ( rule1 | rule2 )
-          rule3 ::= \\"good\\"
-          rule4 ::= \\"bad\\"
+          rule3 ::= \\"\\\\\\"good\\\\\\"\\"
+          rule4 ::= \\"\\\\\\"bad\\\\\\"\\"
           rule5 ::= ( rule3 | rule4 )
           rule7 ::= ( string-rule ) ( \\",\\" whitespace-new-lines-rule string-rule )*
           rule8 ::= ( string-rule )?
@@ -210,7 +210,7 @@ describe("grammar for JSON schema", () => {
           "root ::= \\"[\\" whitespace-new-lines-rule ( rule2 | rule3 ) whitespace-new-lines-rule \\"]\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
           string-rule ::= \\"\\\\\\"\\" ( [^\\"\\\\\\\\] | \\"\\\\\\\\\\" ([\\"\\\\\\\\/bfnrt] | \\"u\\" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* \\"\\\\\\"\\"
-          rule0 ::= \\"{\\" whitespace-new-lines-rule \\"message\\" \\":\\" [ ]? string-rule whitespace-new-lines-rule \\"}\\"
+          rule0 ::= \\"{\\" whitespace-new-lines-rule \\"\\\\\\"message\\\\\\"\\" \\":\\" [ ]? string-rule whitespace-new-lines-rule \\"}\\"
           rule1 ::= ( rule0 | string-rule )
           rule2 ::= ( rule1 ) ( \\",\\" whitespace-new-lines-rule rule1 )*
           rule3 ::= ( rule1 )?"
@@ -297,12 +297,12 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"\\\\\\"onlyPositiveText\\\\\\"\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNegativeText\\\\\\"\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyVibe\\\\\\"\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNumber\\\\\\"\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"worstThing\\\\\\"\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"withNewLine\\\\\\"\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"\\\\\\"withQuotes\\\\\\"\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
-          rule0 ::= \\"good\\"
+          rule0 ::= \\"\\\\\\"good\\\\\\"\\"
           null-rule ::= \\"null\\"
-          rule1 ::= \\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\"
-          rule2 ::= \\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\""
+          rule1 ::= \\"\\\\\\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\\\\\"\\"
+          rule2 ::= \\"\\\\\\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\\\\\"\\""
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
@@ -374,12 +374,12 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"\\\\\\"onlyPositiveText\\\\\\"\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNegativeText\\\\\\"\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyVibe\\\\\\"\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNumber\\\\\\"\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"worstThing\\\\\\"\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"withNewLine\\\\\\"\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"\\\\\\"withQuotes\\\\\\"\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
-          rule0 ::= \\"good\\"
+          rule0 ::= \\"\\\\\\"good\\\\\\"\\"
           null-rule ::= \\"null\\"
-          rule1 ::= \\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\"
-          rule2 ::= \\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\""
+          rule1 ::= \\"\\\\\\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\\\\\"\\"
+          rule2 ::= \\"\\\\\\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\\\\\"\\""
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
@@ -452,12 +452,12 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= \\"{\\" whitespace-new-lines-rule \\"onlyPositiveText\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"onlyNegativeText\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"onlyVibe\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"onlyNumber\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"worstThing\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"withNewLine\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"withQuotes\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
+          "root ::= \\"{\\" whitespace-new-lines-rule \\"\\\\\\"onlyPositiveText\\\\\\"\\" \\":\\" [ ]? \\"true\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNegativeText\\\\\\"\\" \\":\\" [ ]? \\"false\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyVibe\\\\\\"\\" \\":\\" [ ]? rule0 \\",\\" whitespace-new-lines-rule \\"\\\\\\"onlyNumber\\\\\\"\\" \\":\\" [ ]? \\"10\\" \\",\\" whitespace-new-lines-rule \\"\\\\\\"worstThing\\\\\\"\\" \\":\\" [ ]? null-rule \\",\\" whitespace-new-lines-rule \\"\\\\\\"withNewLine\\\\\\"\\" \\":\\" [ ]? rule1 \\",\\" whitespace-new-lines-rule \\"\\\\\\"withQuotes\\\\\\"\\" \\":\\" [ ]? rule2 whitespace-new-lines-rule \\"}\\" [\\\\n] [\\\\n] [\\\\n] [\\\\n] [\\\\n]*
           whitespace-new-lines-rule ::= [\\\\n]? [ \\\\t]* [\\\\n]?
-          rule0 ::= \\"good\\"
+          rule0 ::= \\"\\\\\\"good\\\\\\"\\"
           null-rule ::= \\"null\\"
-          rule1 ::= \\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\"
-          rule2 ::= \\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\""
+          rule1 ::= \\"\\\\\\"Hooray!\\\\nYes!\\\\t/\\\\\\\\\\\\\\"\\"
+          rule2 ::= \\"\\\\\\"The message is \\\\\\\\\\\\\\"Hi!\\\\\\\\\\\\\\".\\\\\\"\\""
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));

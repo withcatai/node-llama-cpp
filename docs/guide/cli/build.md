@@ -10,6 +10,10 @@ const commandDoc = docs.build;
 
 {{commandDoc.description}}
 
+::: info
+If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.
+:::
+
 ## Usage
 ```shell-vue
 {{commandDoc.usage}}

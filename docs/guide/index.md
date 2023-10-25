@@ -14,6 +14,11 @@ npm install --save node-llama-cpp
 > If binaries are not available for your platform, it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 > To disable this behavior, set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
 
+## ESM usage
+`node-llama-cpp` is an [ES module](https://nodejs.org/api/esm.html#modules-ecmascript-modules), so can only use `import` to load it and cannot use `require`.
+
+To make sure you can use it in your project, make sure your `package.json` file has `"type": "module"` in it.
+
 ## CUDA and Metal support
 **Metal:** Metal support is enabled by default on macOS. If you're using a Mac with an Intel chip, [you might want to disable it](./Metal.md).
 

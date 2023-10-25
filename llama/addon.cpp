@@ -208,13 +208,13 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
     return Napi::String::New(info.Env(), ss.str());
   }
   Napi::Value TokenBos(const Napi::CallbackInfo& info) {
-    return Napi::Number::From(info.Env(), llama_token_bos(ctx));
+    return Napi::Number::From(info.Env(), llama_token_bos(model->model)); // TODO: move this to the model
   }
   Napi::Value TokenEos(const Napi::CallbackInfo& info) {
-    return Napi::Number::From(info.Env(), llama_token_eos(ctx));
+    return Napi::Number::From(info.Env(), llama_token_eos(model->model)); // TODO: move this to the model
   }
   Napi::Value TokenNl(const Napi::CallbackInfo& info) {
-    return Napi::Number::From(info.Env(), llama_token_nl(ctx));
+    return Napi::Number::From(info.Env(), llama_token_nl(model->model)); // TODO: move this to the model
   }
   Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
@@ -223,7 +223,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
     int token = info[0].As<Napi::Number>().Int32Value();
     std::stringstream ss;
 
-    const char* str = llama_token_get_text(ctx, token);
+    const char* str = llama_token_get_text(model->model, token); // TODO: move this to the model
     if (str == nullptr) {
       return info.Env().Undefined();
     }
@@ -336,18 +336,14 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
 
   protected:
   void Execute() {
-    llama_batch batch = llama_batch_init(tokens.size(), 0);
+    llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
 
-    batch.n_tokens = tokens.size();
-
-    for (int32_t i = 0; i < batch.n_tokens; i++) {
-        batch.token[i]  = tokens[i];
-        batch.pos[i]    = ctx->n_cur;
-        batch.seq_id[i] = 0;
-        batch.logits[i] = false;
+    for (size_t i = 0; i < tokens.size(); i++) {
+        llama_batch_add(batch, tokens[i], ctx->n_cur, { 0 }, false);
 
         ctx->n_cur++;
     }
+    GGML_ASSERT(batch.n_tokens == (int) tokens.size());
 
     batch.logits[batch.n_tokens - 1] = true;
 
@@ -381,14 +377,11 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
 
     llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
 
-    auto eos_token = llama_token_eos(ctx->ctx);
+    auto eos_token = llama_token_eos(ctx->model->model);
 
     if (use_repeat_penalty && !repeat_penalty_tokens.empty()) {
-      llama_sample_repetition_penalty(
-        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(), repeat_penalty
-      );
-      llama_sample_frequency_and_presence_penalties(
-        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(),
+      llama_sample_repetition_penalties(
+        ctx->ctx, &candidates_p, repeat_penalty_tokens.data(), repeat_penalty_tokens.size(), repeat_penalty,
         repeat_penalty_frequency_penalty, repeat_penalty_presence_penalty
       );
     }
