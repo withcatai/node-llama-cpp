@@ -55,14 +55,35 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
         } catch (err) {
             await fs.remove(llamaCppDirectory);
             console.error("Failed to clone git bundle, cloning from GitHub instead", err);
+
+            printCloneErrorHelp(String(err));
         }
     }
 
-    await withGitCloneProgress("GitHub", async (gitWithCloneProgress) => {
-        await gitWithCloneProgress.clone(remoteGitUrl, llamaCppDirectory, {
-            "--depth": 1,
-            "--branch": tag,
-            "--quiet": null
+    try {
+        await withGitCloneProgress("GitHub", async (gitWithCloneProgress) => {
+            await gitWithCloneProgress.clone(remoteGitUrl, llamaCppDirectory, {
+                "--depth": 1,
+                "--branch": tag,
+                "--quiet": null
+            });
         });
-    });
+    } catch (err) {
+        printCloneErrorHelp(String(err));
+
+        throw err;
+    }
+}
+
+function printCloneErrorHelp(error: string) {
+    // This error happens with some docker images where the current user is different
+    // from the owner of the files due to mounting a volume.
+    // In such cases, print a helpful message to help the user resolve the issue.
+    if (error.toLowerCase().includes("detected dubious ownership in repository"))
+        console.info("\n" +
+            chalk.grey("[node-llama-cpp]") + chalk.yellow(" To fix this issue, try running this command to fix it for the current module directory:") + "\n" +
+            'git config --global --add safe.directory "' + llamaCppDirectory + '"\n\n' +
+            chalk.yellow("Or run this command to fix it everywhere:") + "\n" +
+            'git config --global --add safe.directory "*"'
+        );
 }
