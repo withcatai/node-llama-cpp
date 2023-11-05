@@ -109,6 +109,9 @@ export default defineConfig({
                     text: "Changelog",
                     link: "https://github.com/withcatai/node-llama-cpp/releases"
                 }, {
+                    text: "Roadmap",
+                    link: "https://github.com/orgs/withcatai/projects/1"
+                }, {
                     text: "npm",
                     link: "https://www.npmjs.com/package/node-llama-cpp"
                 }, {

@@ -1,7 +1,7 @@
 <div align="center">
     <img alt="node-llama-cpp Logo" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" width="360px" />
-    <h1>Node Llama.cpp</h1>
-    <p>Node.js bindings for llama.cpp</p>
+    <h1>node-llama-cpp</h1>
+    <p>Run AI models locally on your machine</p>
     <sub>Pre-built bindings are provided with a fallback to building from source with cmake</sub>
     <p></p>
 </div>
@@ -29,6 +29,7 @@
 * [API reference](https://withcatai.github.io/node-llama-cpp/api/classes/LlamaModel)
 * [CLI help](https://withcatai.github.io/node-llama-cpp/guide/cli/)
 * [Changelog](https://github.com/withcatai/node-llama-cpp/releases)
+* [Roadmap](https://github.com/orgs/withcatai/projects/1)
 
 ## Installation
 ```bash
