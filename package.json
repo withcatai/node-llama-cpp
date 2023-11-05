@@ -69,6 +69,7 @@
   "keywords": [
     "llama",
     "llama-cpp",
+    "llama.cpp",
     "bindings",
     "ai",
     "cmake",
