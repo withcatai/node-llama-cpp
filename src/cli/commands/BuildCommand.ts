@@ -13,8 +13,8 @@ import {getIsInDocumentationMode} from "../../state.js";
 type BuildCommand = {
     arch?: string,
     nodeTarget?: string,
-    metal: boolean,
-    cuda: boolean
+    metal?: boolean,
+    cuda?: boolean
 };
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
@@ -48,7 +48,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
     handler: BuildLlamaCppCommand
 };
 
-export async function BuildLlamaCppCommand({arch, nodeTarget, metal, cuda}: BuildCommand) {
+export async function BuildLlamaCppCommand({
+    arch = undefined,
+    nodeTarget = undefined,
+    metal = defaultLlamaCppMetalSupport,
+    cuda = defaultLlamaCppCudaSupport
+}: BuildCommand) {
     if (!(await fs.pathExists(llamaCppDirectory))) {
         console.log(chalk.red('llama.cpp is not downloaded. Please run "node-llama-cpp download" first'));
         process.exit(1);

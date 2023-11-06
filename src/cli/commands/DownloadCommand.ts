@@ -4,7 +4,8 @@ import {Octokit} from "octokit";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI, llamaCppDirectory
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI,
+    llamaCppDirectory, llamaCppDirectoryTagFilePath
 } from "../../config.js";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -20,14 +21,16 @@ import {
 import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
 
 type DownloadCommandArgs = {
-    repo: string,
-    release: "latest" | string,
+    repo?: string,
+    release?: "latest" | string,
     arch?: string,
     nodeTarget?: string,
-    metal: boolean,
-    cuda: boolean,
+    metal?: boolean,
+    cuda?: boolean,
     skipBuild?: boolean,
     noBundle?: boolean,
+
+    /** @internal */
     updateBinariesReleaseMetadataAndSaveGitBundle?: boolean
 };
 
@@ -92,7 +95,15 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
 };
 
 export async function DownloadLlamaCppCommand({
-    repo, release, arch, nodeTarget, metal, cuda, skipBuild, noBundle, updateBinariesReleaseMetadataAndSaveGitBundle
+    repo = defaultLlamaCppGitHubRepo,
+    release = defaultLlamaCppRelease,
+    arch = undefined,
+    nodeTarget = undefined,
+    metal = defaultLlamaCppMetalSupport,
+    cuda = defaultLlamaCppCudaSupport,
+    skipBuild = false,
+    noBundle = false,
+    updateBinariesReleaseMetadataAndSaveGitBundle = false
 }: DownloadCommandArgs) {
     const useBundle = noBundle != true;
     const octokit = new Octokit();
@@ -162,6 +173,7 @@ export async function DownloadLlamaCppCommand({
         fail: chalk.blue("Failed to remove existing llama.cpp directory")
     }, async () => {
         await fs.remove(llamaCppDirectory);
+        await fs.remove(llamaCppDirectoryTagFilePath);
     });
 
     console.log(chalk.blue("Cloning llama.cpp"));

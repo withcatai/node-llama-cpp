@@ -15,6 +15,7 @@ import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.
 import {ChatMLChatPromptWrapper} from "./chatWrappers/ChatMLChatPromptWrapper.js";
 import {FalconChatPromptWrapper} from "./chatWrappers/FalconChatPromptWrapper.js";
 import {getChatWrapperByBos} from "./chatWrappers/createChatWrapperByBos.js";
+import {getReleaseInfo} from "./utils/getReleaseInfo.js";
 
 import {type ConversationInteraction, type Token} from "./types.js";
 import {
@@ -48,6 +49,7 @@ export {
     ChatMLChatPromptWrapper,
     FalconChatPromptWrapper,
     getChatWrapperByBos,
+    getReleaseInfo,
     type Token,
     type GbnfJsonSchema,
     type GbnfJsonSchemaToType,
