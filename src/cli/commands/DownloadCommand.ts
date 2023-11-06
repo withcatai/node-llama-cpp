@@ -20,14 +20,16 @@ import {
 import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
 
 type DownloadCommandArgs = {
-    repo: string,
-    release: "latest" | string,
+    repo?: string,
+    release?: "latest" | string,
     arch?: string,
     nodeTarget?: string,
-    metal: boolean,
-    cuda: boolean,
+    metal?: boolean,
+    cuda?: boolean,
     skipBuild?: boolean,
     noBundle?: boolean,
+
+    /** @internal */
     updateBinariesReleaseMetadataAndSaveGitBundle?: boolean
 };
 
@@ -92,7 +94,15 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
 };
 
 export async function DownloadLlamaCppCommand({
-    repo, release, arch, nodeTarget, metal, cuda, skipBuild, noBundle, updateBinariesReleaseMetadataAndSaveGitBundle
+    repo = defaultLlamaCppGitHubRepo,
+    release = defaultLlamaCppRelease,
+    arch = undefined,
+    nodeTarget = undefined,
+    metal = defaultLlamaCppMetalSupport,
+    cuda = defaultLlamaCppCudaSupport,
+    skipBuild = false,
+    noBundle = false,
+    updateBinariesReleaseMetadataAndSaveGitBundle = false
 }: DownloadCommandArgs) {
     const useBundle = noBundle != true;
     const octokit = new Octokit();
