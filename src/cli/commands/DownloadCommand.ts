@@ -4,7 +4,8 @@ import {Octokit} from "octokit";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI, llamaCppDirectory
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI,
+    llamaCppDirectory, llamaCppDirectoryTagFilePath
 } from "../../config.js";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -172,6 +173,7 @@ export async function DownloadLlamaCppCommand({
         fail: chalk.blue("Failed to remove existing llama.cpp directory")
     }, async () => {
         await fs.remove(llamaCppDirectory);
+        await fs.remove(llamaCppDirectoryTagFilePath);
     });
 
     console.log(chalk.blue("Cloning llama.cpp"));

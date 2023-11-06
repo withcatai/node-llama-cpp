@@ -1,7 +1,7 @@
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {llamaCppDirectory} from "../../config.js";
+import {llamaCppDirectory, llamaCppDirectoryTagFilePath} from "../../config.js";
 import withOra from "../../utils/withOra.js";
 import {clearLlamaBuild} from "../../utils/clearLlamaBuild.js";
 import {setUsedBinFlag} from "../../utils/usedBinFlag.js";
@@ -35,6 +35,7 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
             fail: chalk.blue("Failed to clear source")
         }, async () => {
             await fs.remove(llamaCppDirectory);
+            await fs.remove(llamaCppDirectoryTagFilePath);
         });
     }
 

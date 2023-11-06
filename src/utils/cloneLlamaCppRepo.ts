@@ -2,8 +2,12 @@ import simpleGit, {SimpleGit} from "simple-git";
 import cliProgress from "cli-progress";
 import chalk from "chalk";
 import fs from "fs-extra";
-import {llamaCppDirectory} from "../config.js";
+import {llamaCppDirectory, llamaCppDirectoryTagFilePath} from "../config.js";
 import {getGitBundlePathForRelease} from "./gitReleaseBundles.js";
+
+type ClonedLlamaCppRepoTagFile = {
+    tag: string
+};
 
 
 export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true) {
@@ -54,6 +58,7 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
             return;
         } catch (err) {
             await fs.remove(llamaCppDirectory);
+            await fs.remove(llamaCppDirectoryTagFilePath);
             console.error("Failed to clone git bundle, cloning from GitHub instead", err);
 
             printCloneErrorHelp(String(err));
@@ -73,6 +78,20 @@ export async function cloneLlamaCppRepo(githubOwner: string, githubRepo: string,
 
         throw err;
     }
+
+    try {
+        const clonedLlamaCppRepoTagJson: ClonedLlamaCppRepoTagFile = {
+            tag
+        };
+
+        await fs.writeJson(llamaCppDirectoryTagFilePath, clonedLlamaCppRepoTagJson, {
+            spaces: 4
+        });
+    } catch (err) {
+        console.error("Failed to write llama.cpp tag file", err);
+
+        throw err;
+    }
 }
 
 function printCloneErrorHelp(error: string) {
@@ -86,4 +105,18 @@ function printCloneErrorHelp(error: string) {
             chalk.yellow("Or run this command to fix it everywhere:") + "\n" +
             'git config --global --add safe.directory "*"'
         );
+}
+
+export async function getClonedLlamaCppRepoReleaseTag() {
+    if (!(await fs.pathExists(llamaCppDirectoryTagFilePath)))
+        return null;
+
+    try {
+        const clonedLlamaCppRepoTagJson: ClonedLlamaCppRepoTagFile = await fs.readJson(llamaCppDirectoryTagFilePath);
+
+        return clonedLlamaCppRepoTagJson.tag;
+    } catch (err) {
+        console.error("Failed to read llama.cpp tag file", err);
+        return null;
+    }
 }
