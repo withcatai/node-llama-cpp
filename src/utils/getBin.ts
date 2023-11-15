@@ -109,7 +109,8 @@ export type LLAMAModel = {
         vocabOnly?: boolean,
         useMmap?: boolean,
         useMlock?: boolean
-    }): LLAMAModel
+    }): LLAMAModel,
+    getTrainContextSize(): number
 };
 
 export type LLAMAContext = {

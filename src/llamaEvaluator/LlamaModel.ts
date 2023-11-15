@@ -195,6 +195,14 @@ export class LlamaModel {
         };
     }
 
+    /**
+     * Get the context size the model was trained on
+     * @returns {number}
+     */
+    public getTrainContextSize(): number {
+        return this._model.getTrainContextSize();
+    }
+
     public static get systemInfo() {
         return llamaCppNode.systemInfo();
     }

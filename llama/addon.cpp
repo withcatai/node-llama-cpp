@@ -52,8 +52,20 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
         llama_free_model(model);
     }
 
+    Napi::Value GetTrainContextSize(const Napi::CallbackInfo& info) {
+      return Napi::Number::From(info.Env(), llama_n_ctx_train(model));
+    }
+
     static void init(Napi::Object exports) {
-        exports.Set("LLAMAModel", DefineClass(exports.Env(), "LLAMAModel", {}));
+        exports.Set(
+          "LLAMAModel",
+          DefineClass(exports.Env(),
+          "LLAMAModel",
+          {
+            InstanceMethod("getTrainContextSize", &LLAMAModel::GetTrainContextSize),
+          }
+        )
+    );
     }
 };
 
@@ -405,7 +417,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
         llama_sample_tail_free(ctx->ctx, &candidates_p, tfs_z, min_keep);
         llama_sample_typical(ctx->ctx, &candidates_p, typical_p, min_keep);
         llama_sample_top_p(ctx->ctx, &candidates_p, resolved_top_p, min_keep);
-        llama_sample_temperature(ctx->ctx, &candidates_p, temperature);
+        llama_sample_temp(ctx->ctx, &candidates_p, temperature);
         new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
     }
 
