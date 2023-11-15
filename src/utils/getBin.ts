@@ -47,7 +47,7 @@ export async function getPrebuildBinPath(): Promise<string | null> {
     return await getPath();
 }
 
-export async function loadBin(): Promise<LlamaCppNodeModule> {
+export async function loadBin(): Promise<BindingModule> {
     const usedBinFlag = await getUsedBinFlag();
 
     if (usedBinFlag === "prebuiltBinaries") {
@@ -95,34 +95,42 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
     return require(modulePath);
 }
 
-export type LlamaCppNodeModule = {
-    AddonModel: AddonModel,
-    AddonContext: AddonContext,
-    AddonGrammar: AddonGrammar,
-    AddonGrammarEvaluationState: AddonGrammarEvaluationState,
+export type BindingModule = {
+    AddonModel: {
+        new (modelPath: string, params: {
+            gpuLayers?: number,
+            vocabOnly?: boolean,
+            useMmap?: boolean,
+            useMlock?: boolean
+        }): AddonModel
+    },
+    AddonContext: {
+        new (model: AddonModel, params: {
+            seed?: number,
+            contextSize?: number,
+            batchSize?: number,
+            f16Kv?: boolean,
+            logitsAll?: boolean,
+            embedding?: boolean,
+            threads?: number,
+        }): AddonContext,
+    },
+    AddonGrammar: {
+        new (grammarPath: string, params?: {
+            printGrammar?: boolean,
+        }): AddonGrammar
+    },
+    AddonGrammarEvaluationState: {
+        new (grammar: AddonGrammar): AddonGrammarEvaluationState
+    },
     systemInfo(): string
 };
 
 export type AddonModel = {
-    new (modelPath: string, params: {
-        gpuLayers?: number,
-        vocabOnly?: boolean,
-        useMmap?: boolean,
-        useMlock?: boolean
-    }): AddonModel,
     getTrainContextSize(): number
 };
 
 export type AddonContext = {
-    new (model: AddonModel, params: {
-        seed?: number,
-        contextSize?: number,
-        batchSize?: number,
-        f16Kv?: boolean,
-        logitsAll?: boolean,
-        embedding?: boolean,
-        threads?: number,
-    }): AddonContext,
     encode(text: string): Uint32Array,
     eval(tokens: Uint32Array, options?: {
         temperature?: number,
@@ -142,12 +150,10 @@ export type AddonContext = {
     getTokenString(token: number): string
 };
 
-export type AddonGrammar = {
-    new (grammarPath: string, params?: {
-        printGrammar?: boolean,
-    }): AddonGrammar
+export type AddonGrammar = "AddonGrammar" & {
+    __brand: never
 };
 
-export type AddonGrammarEvaluationState = {
-    new (grammar: AddonGrammar): AddonGrammarEvaluationState
+export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {
+    __brand: never
 };
