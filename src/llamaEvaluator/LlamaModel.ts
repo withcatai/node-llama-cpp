@@ -1,7 +1,7 @@
 import process from "process";
 import path from "path";
 import {removeNullFields} from "../utils/removeNullFields.js";
-import {llamaCppNode, LLAMAModel} from "./LlamaBins.js";
+import {addonBinding, AddonModel} from "./LlamaBins.js";
 
 
 export type LlamaModelOptions = {
@@ -109,7 +109,7 @@ export type LlamaModelOptions = {
 
 export class LlamaModel {
     /** @internal */
-    public readonly _model: LLAMAModel;
+    public readonly _model: AddonModel;
 
     /** @internal */
     public readonly _contextOptions: {
@@ -171,7 +171,7 @@ export class LlamaModel {
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
         threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: LlamaModelOptions) {
-        this._model = new LLAMAModel(path.resolve(process.cwd(), modelPath), removeNullFields({
+        this._model = new AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
             gpuLayers,
             vocabOnly,
             useMmap,
@@ -204,6 +204,6 @@ export class LlamaModel {
     }
 
     public static get systemInfo() {
-        return llamaCppNode.systemInfo();
+        return addonBinding.systemInfo();
     }
 }

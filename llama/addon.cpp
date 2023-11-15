@@ -8,12 +8,12 @@
 #include "common/grammar-parser.h"
 #include "napi.h"
 
-class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
+class AddonModel : public Napi::ObjectWrap<AddonModel> {
   public:
     llama_model_params model_params;
     llama_model* model;
 
-    LLAMAModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAModel>(info) {
+    AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModel>(info) {
         model_params = llama_model_default_params();
 
         // Get the model path
@@ -48,7 +48,7 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
         }
     }
 
-    ~LLAMAModel() {
+    ~AddonModel() {
         llama_free_model(model);
     }
 
@@ -58,22 +58,22 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
 
     static void init(Napi::Object exports) {
         exports.Set(
-          "LLAMAModel",
+          "AddonModel",
           DefineClass(exports.Env(),
-          "LLAMAModel",
+          "AddonModel",
           {
-            InstanceMethod("getTrainContextSize", &LLAMAModel::GetTrainContextSize),
+            InstanceMethod("getTrainContextSize", &AddonModel::GetTrainContextSize),
           }
         )
     );
     }
 };
 
-class LLAMAGrammar : public Napi::ObjectWrap<LLAMAGrammar> {
+class AddonGrammar : public Napi::ObjectWrap<AddonGrammar> {
   public:
     grammar_parser::parse_state parsed_grammar;
 
-    LLAMAGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAGrammar>(info) {
+    AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammar>(info) {
         // Get the model path
         std::string grammarCode = info[0].As<Napi::String>().Utf8Value();
         bool should_print_grammar = false;
@@ -99,17 +99,17 @@ class LLAMAGrammar : public Napi::ObjectWrap<LLAMAGrammar> {
     }
 
     static void init(Napi::Object exports) {
-        exports.Set("LLAMAGrammar", DefineClass(exports.Env(), "LLAMAGrammar", {}));
+        exports.Set("AddonGrammar", DefineClass(exports.Env(), "AddonGrammar", {}));
     }
 };
 
-class LLAMAGrammarEvaluationState : public Napi::ObjectWrap<LLAMAGrammarEvaluationState> {
+class AddonGrammarEvaluationState : public Napi::ObjectWrap<AddonGrammarEvaluationState> {
   public:
-    LLAMAGrammar* grammarDef;
+    AddonGrammar* grammarDef;
     llama_grammar *grammar = nullptr;
 
-    LLAMAGrammarEvaluationState(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAGrammarEvaluationState>(info) {
-        grammarDef = Napi::ObjectWrap<LLAMAGrammar>::Unwrap(info[0].As<Napi::Object>());
+    AddonGrammarEvaluationState(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammarEvaluationState>(info) {
+        grammarDef = Napi::ObjectWrap<AddonGrammar>::Unwrap(info[0].As<Napi::Object>());
         grammarDef->Ref();
 
         std::vector<const llama_grammar_element *> grammar_rules(grammarDef->parsed_grammar.c_rules());
@@ -118,7 +118,7 @@ class LLAMAGrammarEvaluationState : public Napi::ObjectWrap<LLAMAGrammarEvaluati
         );
     }
 
-    ~LLAMAGrammarEvaluationState() {
+    ~AddonGrammarEvaluationState() {
       grammarDef->Unref();
 
         if (grammar != nullptr) {
@@ -128,19 +128,19 @@ class LLAMAGrammarEvaluationState : public Napi::ObjectWrap<LLAMAGrammarEvaluati
     }
 
     static void init(Napi::Object exports) {
-        exports.Set("LLAMAGrammarEvaluationState", DefineClass(exports.Env(), "LLAMAGrammarEvaluationState", {}));
+        exports.Set("AddonGrammarEvaluationState", DefineClass(exports.Env(), "AddonGrammarEvaluationState", {}));
     }
 };
 
-class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
+class AddonContext : public Napi::ObjectWrap<AddonContext> {
   public:
-  LLAMAModel* model;
+  AddonModel* model;
   llama_context_params context_params;
   llama_context* ctx;
   int n_cur = 0;
 
-  LLAMAContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<LLAMAContext>(info) {
-    model = Napi::ObjectWrap<LLAMAModel>::Unwrap(info[0].As<Napi::Object>());
+  AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonContext>(info) {
+    model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
     model->Ref();
 
     context_params = llama_context_default_params();
@@ -185,7 +185,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
     ctx = llama_new_context_with_model(model->model, context_params);
     Napi::MemoryManagement::AdjustExternalMemory(Env(), llama_get_state_size(ctx));
   }
-  ~LLAMAContext() {
+  ~AddonContext() {
     Napi::MemoryManagement::AdjustExternalMemory(Env(), -(int64_t)llama_get_state_size(ctx));
     llama_free(ctx);
     model->Unref();
@@ -246,26 +246,26 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
   }
   Napi::Value Eval(const Napi::CallbackInfo& info);
   static void init(Napi::Object exports) {
-    exports.Set("LLAMAContext",
+    exports.Set("AddonContext",
         DefineClass(exports.Env(),
-            "LLAMAContext",
+            "AddonContext",
             {
-                InstanceMethod("encode", &LLAMAContext::Encode),
-                InstanceMethod("decode", &LLAMAContext::Decode),
-                InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
-                InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
-                InstanceMethod("tokenNl", &LLAMAContext::TokenNl),
-                InstanceMethod("getContextSize", &LLAMAContext::GetContextSize),
-                InstanceMethod("getTokenString", &LLAMAContext::GetTokenString),
-                InstanceMethod("eval", &LLAMAContext::Eval),
+                InstanceMethod("encode", &AddonContext::Encode),
+                InstanceMethod("decode", &AddonContext::Decode),
+                InstanceMethod("tokenBos", &AddonContext::TokenBos),
+                InstanceMethod("tokenEos", &AddonContext::TokenEos),
+                InstanceMethod("tokenNl", &AddonContext::TokenNl),
+                InstanceMethod("getContextSize", &AddonContext::GetContextSize),
+                InstanceMethod("getTokenString", &AddonContext::GetTokenString),
+                InstanceMethod("eval", &AddonContext::Eval),
             }));
   }
 };
 
 
-class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
-  LLAMAContext* ctx;
-  LLAMAGrammarEvaluationState* grammar_evaluation_state;
+class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
+  AddonContext* ctx;
+  AddonGrammarEvaluationState* grammar_evaluation_state;
   bool use_grammar = false;
   std::vector<llama_token> tokens;
   llama_token result;
@@ -279,7 +279,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
   bool use_repeat_penalty = false;
 
   public:
-  LLAMAContextEvalWorker(const Napi::CallbackInfo& info, LLAMAContext* ctx) : Napi::AsyncWorker(info.Env(), "LLAMAContextEvalWorker"), ctx(ctx), Napi::Promise::Deferred(info.Env()) {
+  AddonContextEvalWorker(const Napi::CallbackInfo& info, AddonContext* ctx) : Napi::AsyncWorker(info.Env(), "AddonContextEvalWorker"), ctx(ctx), Napi::Promise::Deferred(info.Env()) {
     ctx->Ref();
     Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
 
@@ -326,7 +326,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
       }
 
       if (options.Has("grammarEvaluationState")) {
-          grammar_evaluation_state = Napi::ObjectWrap<LLAMAGrammarEvaluationState>::Unwrap(options.Get("grammarEvaluationState").As<Napi::Object>());
+          grammar_evaluation_state = Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(options.Get("grammarEvaluationState").As<Napi::Object>());
           grammar_evaluation_state->Ref();
           use_grammar = true;
       }
@@ -335,7 +335,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
     this->tokens.reserve(tokens.ElementLength());
     for (size_t i = 0; i < tokens.ElementLength(); i++) { this->tokens.push_back(static_cast<llama_token>(tokens[i])); }
   }
-  ~LLAMAContextEvalWorker() {
+  ~AddonContextEvalWorker() {
     ctx->Unref();
 
     if (use_grammar) {
@@ -435,8 +435,8 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
   void OnError(const Napi::Error& err) { Napi::Promise::Deferred::Reject(err.Value()); }
 };
 
-Napi::Value LLAMAContext::Eval(const Napi::CallbackInfo& info) {
-  LLAMAContextEvalWorker* worker = new LLAMAContextEvalWorker(info, this);
+Napi::Value AddonContext::Eval(const Napi::CallbackInfo& info) {
+  AddonContextEvalWorker* worker = new AddonContextEvalWorker(info, this);
   worker->Queue();
   return worker->Promise();
 }
@@ -448,10 +448,10 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
   exports.DefineProperties({
       Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
   });
-  LLAMAModel::init(exports);
-  LLAMAGrammar::init(exports);
-  LLAMAGrammarEvaluationState::init(exports);
-  LLAMAContext::init(exports);
+  AddonModel::init(exports);
+  AddonGrammar::init(exports);
+  AddonGrammarEvaluationState::init(exports);
+  AddonContext::init(exports);
   return exports;
 }
 

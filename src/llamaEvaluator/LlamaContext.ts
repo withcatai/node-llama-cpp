@@ -1,6 +1,6 @@
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
-import {LLAMAContext} from "./LlamaBins.js";
+import {AddonContext} from "./LlamaBins.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
@@ -67,7 +67,7 @@ export type LlamaContextRepeatPenalty = {
 
 export class LlamaContext {
     private readonly _model: LlamaModel;
-    private readonly _ctx: LLAMAContext;
+    private readonly _ctx: AddonContext;
     private readonly _prependBos: boolean;
     private _prependTokens: Token[];
 
@@ -91,7 +91,7 @@ export class LlamaContext {
         threads = model._contextOptions.threads
     }: LlamaContextOptions) {
         this._model = model;
-        this._ctx = new LLAMAContext(model._model, removeNullFields({
+        this._ctx = new AddonContext(model._model, removeNullFields({
             seed: seed != null ? Math.max(-1, seed) : undefined,
             contextSize,
             batchSize,

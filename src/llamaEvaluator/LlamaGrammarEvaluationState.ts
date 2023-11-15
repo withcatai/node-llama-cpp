@@ -1,4 +1,4 @@
-import {LLAMAGrammarEvaluationState} from "./LlamaBins.js";
+import {AddonGrammarEvaluationState} from "./LlamaBins.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
 
@@ -8,7 +8,7 @@ export type LlamaGrammarEvaluationStateOptions = {
 
 export class LlamaGrammarEvaluationState {
     /** @internal */
-    public readonly _state: LLAMAGrammarEvaluationState;
+    public readonly _state: AddonGrammarEvaluationState;
 
     /**
      * Grammar evaluation state is used to track the model response to determine the next allowed characters for the model to generate.
@@ -18,6 +18,6 @@ export class LlamaGrammarEvaluationState {
      * @param {LlamaGrammar} options.grammar
      */
     public constructor({grammar}: LlamaGrammarEvaluationStateOptions) {
-        this._state = new LLAMAGrammarEvaluationState(grammar._grammar);
+        this._state = new AddonGrammarEvaluationState(grammar._grammar);
     }
 }

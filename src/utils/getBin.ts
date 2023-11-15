@@ -96,25 +96,25 @@ export async function loadBin(): Promise<LlamaCppNodeModule> {
 }
 
 export type LlamaCppNodeModule = {
-    LLAMAModel: LLAMAModel,
-    LLAMAContext: LLAMAContext,
-    LLAMAGrammar: LLAMAGrammar,
-    LLAMAGrammarEvaluationState: LLAMAGrammarEvaluationState,
+    AddonModel: AddonModel,
+    AddonContext: AddonContext,
+    AddonGrammar: AddonGrammar,
+    AddonGrammarEvaluationState: AddonGrammarEvaluationState,
     systemInfo(): string
 };
 
-export type LLAMAModel = {
+export type AddonModel = {
     new (modelPath: string, params: {
         gpuLayers?: number,
         vocabOnly?: boolean,
         useMmap?: boolean,
         useMlock?: boolean
-    }): LLAMAModel,
+    }): AddonModel,
     getTrainContextSize(): number
 };
 
-export type LLAMAContext = {
-    new (model: LLAMAModel, params: {
+export type AddonContext = {
+    new (model: AddonModel, params: {
         seed?: number,
         contextSize?: number,
         batchSize?: number,
@@ -122,7 +122,7 @@ export type LLAMAContext = {
         logitsAll?: boolean,
         embedding?: boolean,
         threads?: number,
-    }): LLAMAContext,
+    }): AddonContext,
     encode(text: string): Uint32Array,
     eval(tokens: Uint32Array, options?: {
         temperature?: number,
@@ -132,7 +132,7 @@ export type LLAMAContext = {
         repeatPenaltyTokens?: Uint32Array,
         repeatPenaltyPresencePenalty?: number, // alpha_presence
         repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
-        grammarEvaluationState?: LLAMAGrammarEvaluationState
+        grammarEvaluationState?: AddonGrammarEvaluationState
     }): Promise<number>,
     decode(tokens: Uint32Array): string,
     tokenBos(): number,
@@ -142,12 +142,12 @@ export type LLAMAContext = {
     getTokenString(token: number): string
 };
 
-export type LLAMAGrammar = {
+export type AddonGrammar = {
     new (grammarPath: string, params?: {
         printGrammar?: boolean,
-    }): LLAMAGrammar
+    }): AddonGrammar
 };
 
-export type LLAMAGrammarEvaluationState = {
-    new (grammar: LLAMAGrammar): LLAMAGrammarEvaluationState
+export type AddonGrammarEvaluationState = {
+    new (grammar: AddonGrammar): AddonGrammarEvaluationState
 };
