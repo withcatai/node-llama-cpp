@@ -2,7 +2,7 @@
   "name": "node-llama-cpp",
   "version": "0.1.0",
   "description": "Run AI models locally on your machine with node.js bindings for llama.cpp. Force a JSON schema on the model output on the generation level",
-  "main": "dist/index.js",
+  "module": "dist/index.js",
   "type": "module",
   "types": "./dist/index.d.ts",
   "bin": {
