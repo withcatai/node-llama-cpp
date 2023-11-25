@@ -117,7 +117,15 @@ export default defineConfig({
                 }, {
                     text: "Contributing",
                     link: "/guide/contributing"
-                }]
+                },
+                ...(
+                    packageJson?.funding?.url == null
+                        ? []
+                        : [{
+                            text: "Sponsor",
+                            link: packageJson?.funding?.url
+                        }]
+                )]
             }
         ],
         search: {
