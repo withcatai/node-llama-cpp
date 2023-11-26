@@ -32,8 +32,8 @@
         "plugins": [
             "@typescript-eslint",
             "import",
-            "node",
-            "jsdoc"
+            "jsdoc",
+            "n"
         ],
         "rules": {
             "@typescript-eslint/explicit-module-boundary-types": ["off"],
@@ -60,8 +60,8 @@
     "plugins": [
         "@typescript-eslint",
         "import",
-        "node",
-        "jsdoc"
+        "jsdoc",
+        "n"
     ],
     "settings": {
         "import/parsers": {
@@ -108,9 +108,7 @@
             "groups": ["builtin", "external","internal", "parent", "sibling", "index", "type", "object", "unknown"],
             "warnOnUnassignedImports": true
         }],
-        "node/file-extension-in-import": ["error", "always", {
-            "tryExtensions": [".js", ".json"]
-        }],
+        "n/file-extension-in-import": ["error", "always"],
         "newline-per-chained-call": ["error", {
             "ignoreChainWithDepth": 2
         }],

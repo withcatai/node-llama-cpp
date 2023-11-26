@@ -6,6 +6,10 @@ import {GeneralChatPromptWrapper} from "./GeneralChatPromptWrapper.js";
 import {FalconChatPromptWrapper} from "./FalconChatPromptWrapper.js";
 import type {ModelTypeDescription} from "../utils/getBin.js";
 
+
+/**
+ * @param options
+ */
 export function resolveChatWrapperBasedOnModel({
     bosString,
     filename,
@@ -13,6 +17,8 @@ export function resolveChatWrapperBasedOnModel({
 }: {
     bosString?: string | null,
     filename?: string,
+
+    /** @hidden this type alias is too long in the documentation */
     typeDescription?: ModelTypeDescription
 }) {
     if (filename != null) {

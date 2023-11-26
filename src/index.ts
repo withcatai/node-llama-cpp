@@ -1,12 +1,12 @@
 import {DisposedError} from "lifecycle-utils";
-import {LlamaModel, type LlamaModelOptions} from "./llamaEvaluator/LlamaModel.js";
+import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./llamaEvaluator/LlamaModel.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./llamaEvaluator/LlamaGrammar.js";
 import {LlamaJsonSchemaGrammar} from "./llamaEvaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./llamaEvaluator/LlamaGrammarEvaluationState.js";
-import {LlamaContext} from "./llamaEvaluator/LlamaContext/LlamaContext.js";
+import {LlamaContext, LlamaContextSequence} from "./llamaEvaluator/LlamaContext/LlamaContext.js";
 import {
-    type LlamaContextOptions, type BatchingOptions, type LlamaContextRepeatPenalty, type CustomBatchingDispatchSchedule,
+    type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizeStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
     type ContextTokensDeleteRange, type EvaluationPriority, type TokenPriority
 } from "./llamaEvaluator/LlamaContext/types.js";
@@ -32,6 +32,8 @@ import {
 
 export {
     LlamaModel,
+    LlamaModelTokens,
+    LlamaModelInfillTokens,
     type LlamaModelOptions,
     LlamaGrammar,
     type LlamaGrammarOptions,
@@ -40,6 +42,7 @@ export {
     LlamaGrammarEvaluationState,
     type LlamaGrammarEvaluationStateOptions,
     LlamaContext,
+    LlamaContextSequence,
     type LlamaContextOptions,
     type BatchingOptions,
     type CustomBatchingDispatchSchedule,
@@ -50,7 +53,7 @@ export {
     type ContextTokensDeleteRange,
     type EvaluationPriority,
     type TokenPriority,
-    type LlamaContextRepeatPenalty,
+    type LlamaContextSequenceRepeatPenalty,
     LlamaChatSession,
     type LlamaChatSessionOptions,
     type LLamaChatPromptOptions,

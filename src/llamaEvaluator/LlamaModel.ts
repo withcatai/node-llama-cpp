@@ -104,6 +104,7 @@ export class LlamaModel {
         return this._model.detokenize(Uint32Array.from(tokens));
     }
 
+    /** @hidden `ModelTypeDescription` type alias is too long in the documentation */
     public get typeDescription(): ModelTypeDescription {
         this._ensureNotDisposed();
 

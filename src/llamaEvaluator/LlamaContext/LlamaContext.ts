@@ -7,7 +7,7 @@ import {LlamaModel} from "../LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
-    LlamaContextRepeatPenalty, PrioritizedBatchItem, TokenPriority
+    LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, TokenPriority
 } from "./types.js";
 import {resolveBatchItemsPrioritizingStrategy} from "./utils/resolveBatchItemsPrioritizingStrategy.js";
 
@@ -621,7 +621,7 @@ export class LlamaContextSequence {
         tokenPriority = 1
     }: {
         temperature?: number, topK?: number, topP?: number, grammarEvaluationState?: LlamaGrammarEvaluationState,
-        repeatPenalty?: LlamaContextRepeatPenalty,
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
@@ -708,8 +708,8 @@ export class LlamaContextSequence {
         generateNewTokens = true
     }: {
         temperature?: number, topK?: number, topP?: number, grammarEvaluationState?: LlamaGrammarEvaluationState,
-        repeatPenalty?: LlamaContextRepeatPenalty, evaluationPriority?: EvaluationPriority, tokenPriority?: TokenPriority | TokenPriority[],
-        generateNewTokens?: boolean
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, evaluationPriority?: EvaluationPriority,
+        tokenPriority?: TokenPriority | TokenPriority[], generateNewTokens?: boolean
     } = {}): AsyncGenerator<Token, void> {
         this._ensureNotDisposed();
 

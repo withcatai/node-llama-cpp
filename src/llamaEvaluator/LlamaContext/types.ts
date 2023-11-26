@@ -38,7 +38,7 @@ export type LlamaContextOptions = {
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions
 };
-export type LlamaContextRepeatPenalty = {
+export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */
     punishTokens: Uint32Array | (() => Uint32Array),
 
@@ -89,6 +89,7 @@ export type ContextTokensDeleteRange = {
 
 /**
  * 1 - low
+ *
  * 5 - high
  */
 export type EvaluationPriority = 1 | 2 | 3 | 4 | 5;

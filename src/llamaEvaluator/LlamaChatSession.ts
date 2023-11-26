@@ -207,6 +207,14 @@ export class LlamaChatSession {
         return this._sequence;
     }
 
+    public get context() {
+        return this.sequence.context;
+    }
+
+    public get model() {
+        return this.sequence.model;
+    }
+
     public async init() {
         await withLock(this, "init", async () => {
             this._ensureNotDisposed();
