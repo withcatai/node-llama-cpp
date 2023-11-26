@@ -9,12 +9,13 @@ import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.
 import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
 import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
 import {ChatMLChatPromptWrapper} from "../../chatWrappers/ChatMLChatPromptWrapper.js";
-import {getChatWrapperByBos} from "../../chatWrappers/createChatWrapperByBos.js";
+import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
 import {ChatPromptWrapper} from "../../ChatPromptWrapper.js";
 import {FalconChatPromptWrapper} from "../../chatWrappers/FalconChatPromptWrapper.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
+import type {ModelTypeDescription} from "../../utils/getBin.js";
 
 const modelWrappers = ["auto", "general", "llamaChat", "chatML", "falconChat"] as const;
 
@@ -214,7 +215,7 @@ async function RunChat({
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
-    const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext.js");
+    const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext/LlamaContext.js");
     const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
     const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
 
@@ -237,11 +238,15 @@ async function RunChat({
         : grammarArg !== "text"
             ? await LlamaGrammar.getFor(grammarArg)
             : undefined;
-    const bos = context.getBosString(); // bos = beginning of sequence
-    const eos = context.getEosString(); // eos = end of sequence
-    const promptWrapper = getChatWrapper(wrapper, bos);
+    const bos = model.tokens.bosString; // bos = beginning of sequence
+    const eos = model.tokens.bosString; // eos = end of sequence
+    const promptWrapper = getChatWrapper(wrapper, {
+        bosString: bos,
+        filename: model.filename,
+        typeDescription: model.typeDescription
+    });
     const session = new LlamaChatSession({
-        context,
+        contextSequence: context.getSequence(),
         printLLamaSystemInfo: systemInfo,
         systemPrompt,
         promptWrapper
@@ -250,6 +255,8 @@ async function RunChat({
     if (grammarArg != "text" && jsonSchemaGrammarFilePath != null)
         console.warn(chalk.yellow("Both `grammar` and `jsonSchemaGrammarFile` were specified. `jsonSchemaGrammarFile` will be used."));
 
+    console.info(`${chalk.yellow("Context size:")} ${context.contextSize}`);
+    console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
     console.info(`${chalk.yellow("BOS:")} ${bos}`);
     console.info(`${chalk.yellow("EOS:")} ${eos}`);
     console.info(`${chalk.yellow("Chat wrapper:")} ${promptWrapper.wrapperName}`);
@@ -330,12 +337,12 @@ async function RunChat({
                 lastTokens: lastTokensRepeatPenalty
             },
             maxTokens: maxTokens === -1
-                ? context.getContextSize()
+                ? context.contextSize
                 : maxTokens <= 0
                     ? undefined
                     : maxTokens,
             onToken(chunk) {
-                process.stdout.write(session.context.decode(chunk));
+                process.stdout.write(model.detokenize(chunk));
             }
         });
         process.stdout.write(endColor);
@@ -343,7 +350,15 @@ async function RunChat({
     }
 }
 
-function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string | null): ChatPromptWrapper {
+function getChatWrapper(wrapper: ChatCommand["wrapper"], {
+    bosString,
+    filename,
+    typeDescription
+}: {
+    bosString?: string | null,
+    filename?: string,
+    typeDescription?: ModelTypeDescription
+}): ChatPromptWrapper {
     switch (wrapper) {
         case "general":
             return new GeneralChatPromptWrapper();
@@ -357,7 +372,11 @@ function getChatWrapper(wrapper: ChatCommand["wrapper"], bos: string | null): Ch
     }
 
     if (wrapper === "auto") {
-        const chatWrapper = getChatWrapperByBos(bos);
+        const chatWrapper = resolveChatWrapperBasedOnModel({
+            bosString,
+            filename,
+            typeDescription
+        });
 
         if (chatWrapper != null)
             return new chatWrapper();

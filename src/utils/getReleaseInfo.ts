@@ -7,7 +7,13 @@ import {getBinariesGithubRelease} from "./binariesGithubRelease.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function getReleaseInfo() {
+export async function getReleaseInfo(): Promise<{
+    moduleVersion: string,
+    llamaCpp: {
+        binarySource: string,
+        release: string
+    }
+}> {
     const [usedBinFlag, moduleVersion] = await Promise.all([
         getUsedBinFlag(),
         getModuleVersion()

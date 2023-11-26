@@ -239,7 +239,7 @@ jobs:
 
   release:
     name: Release
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -296,20 +296,20 @@ jobs:
             echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
           fi
       - name: Generate docs with updated version
-        if: steps.set-npm-url.outputs.npm-url != ''
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
         env:
           DOCS_URL_BASE: "/node-llama-cpp/"
         run: |
           export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
           npm run docs:build
       - name: Upload docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != ''
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v2
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != ''
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
         uses: actions/deploy-pages@v2
         with:
           artifact_name: pages-docs
