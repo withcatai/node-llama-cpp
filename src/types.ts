@@ -1,4 +1,6 @@
-export type Token = number;
+export type Token = number & {
+    __token: never;
+};
 
 export type ConversationInteraction = {
     prompt: string,

@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import {withLock} from "./withLock.js";
+import {withLock} from "lifecycle-utils";
 
 type ReplyHistoryFile = {
     history: string[]

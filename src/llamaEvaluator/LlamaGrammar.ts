@@ -29,13 +29,13 @@ export class LlamaGrammar {
      * > GBNF files are supported.
      * > More info here: [github:ggerganov/llama.cpp:grammars/README.md](
      * > https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
-     * @param {object} options
-     * @param {string} options.grammar - GBNF grammar
-     * @param {string[]} [options.stopStrings] - Consider any of these texts as EOS for the generated out.
+     * @param options
+     * @param options.grammar - GBNF grammar
+     * @param [options.stopStrings] - Consider any of these texts as EOS for the generated out.
      * Only supported by `LlamaChatSession`
-     * @param {boolean} [options.trimWhitespaceSuffix] - Trim whitespace from the end of the generated text.
+     * @param [options.trimWhitespaceSuffix] - Trim whitespace from the end of the generated text.
      * Only supported by `LlamaChatSession`
-     * @param {boolean} [options.printGrammar] - print the grammar to stdout
+     * @param [options.printGrammar] - print the grammar to stdout
      */
     public constructor({
         grammar, stopStrings = [], trimWhitespaceSuffix = false, printGrammar = false

@@ -9,10 +9,26 @@
 #include "llama.h"
 #include "napi.h"
 
+std::string addon_model_token_to_piece(const struct llama_model * model, llama_token token) {
+    std::vector<char> result(8, 0);
+    const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size());
+    if (n_tokens < 0) {
+        result.resize(-n_tokens);
+        int check = llama_token_to_piece(model, token, result.data(), result.size());
+        GGML_ASSERT(check == -n_tokens);
+    }
+    else {
+        result.resize(n_tokens);
+    }
+
+    return std::string(result.data(), result.size());
+}
+
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
         llama_model_params model_params;
         llama_model* model;
+        bool disposed = false;
 
         AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModel>(info) {
             model_params = llama_model_default_params();
@@ -50,20 +66,209 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         }
 
         ~AddonModel() {
+            dispose();
+        }
+
+        void dispose() {
+            if (disposed) {
+                return;
+            }
+
             llama_free_model(model);
+            disposed = true;
+        }
+
+        Napi::Value Dispose(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                return info.Env().Undefined();
+            }
+
+            dispose();
+
+            return info.Env().Undefined();
+        }
+
+        Napi::Value Tokenize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            std::string text = info[0].As<Napi::String>().Utf8Value();
+
+            std::vector<llama_token> tokens = llama_tokenize(model, text, true, true);
+
+            Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
+            for (size_t i = 0; i < tokens.size(); ++i) {
+                result[i] = static_cast<uint32_t>(tokens[i]);
+            }
+
+            return result;
+        }
+        Napi::Value Detokenize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
+
+            // Create a stringstream for accumulating the decoded string.
+            std::stringstream ss;
+
+            // Decode each token and accumulate the result.
+            for (size_t i = 0; i < tokens.ElementLength(); i++) {
+                const std::string piece = addon_model_token_to_piece(model, (llama_token)tokens[i]);
+
+                if (piece.empty()) {
+                    continue;
+                }
+
+                ss << piece;
+            }
+
+            return Napi::String::New(info.Env(), ss.str());
         }
 
         Napi::Value GetTrainContextSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
             return Napi::Number::From(info.Env(), llama_n_ctx_train(model));
         }
 
+        Napi::Value GetTotalSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_model_size(model));
+        }
+
+        Napi::Value GetTotalParameters(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_model_n_params(model));
+        }
+
+        Napi::Value GetModelDescription(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+            
+            char model_desc[128];
+            int actual_length = llama_model_desc(model, model_desc, sizeof(model_desc));
+
+            return Napi::String::New(info.Env(), model_desc, actual_length);
+        }
+
+        Napi::Value TokenBos(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_bos(model));
+        }
+        Napi::Value TokenEos(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_eos(model));
+        }
+        Napi::Value TokenNl(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_nl(model));
+        }
+        Napi::Value PrefixToken(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_prefix(model));
+        }
+        Napi::Value MiddleToken(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_middle(model));
+        }
+        Napi::Value SuffixToken(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_suffix(model));
+        }
+        Napi::Value EotToken(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_token_eot(model));
+        }
+        Napi::Value GetTokenString(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            int token = info[0].As<Napi::Number>().Int32Value();
+            std::stringstream ss;
+
+            const char* str = llama_token_get_text(model, token);
+            if (str == nullptr) {
+                return info.Env().Undefined();
+            }
+
+            ss << str;
+
+            return Napi::String::New(info.Env(), ss.str());
+        }
+
         static void init(Napi::Object exports) {
-            exports.Set("AddonModel",
-                DefineClass(exports.Env(),
+            exports.Set(
+                "AddonModel",
+                DefineClass(
+                    exports.Env(),
                     "AddonModel",
                     {
+                        InstanceMethod("tokenize", &AddonModel::Tokenize),
+                        InstanceMethod("detokenize", &AddonModel::Detokenize),
                         InstanceMethod("getTrainContextSize", &AddonModel::GetTrainContextSize),
-                    }));
+                        InstanceMethod("getTotalSize", &AddonModel::GetTotalSize),
+                        InstanceMethod("getTotalParameters", &AddonModel::GetTotalParameters),
+                        InstanceMethod("getModelDescription", &AddonModel::GetModelDescription),
+                        InstanceMethod("tokenBos", &AddonModel::TokenBos),
+                        InstanceMethod("tokenEos", &AddonModel::TokenEos),
+                        InstanceMethod("tokenNl", &AddonModel::TokenNl),
+                        InstanceMethod("prefixToken", &AddonModel::PrefixToken),
+                        InstanceMethod("middleToken", &AddonModel::MiddleToken),
+                        InstanceMethod("suffixToken", &AddonModel::SuffixToken),
+                        InstanceMethod("eotToken", &AddonModel::EotToken),
+                        InstanceMethod("getTokenString", &AddonModel::GetTokenString),
+                        InstanceMethod("dispose", &AddonModel::Dispose)
+                    }
+                )
+            );
         }
 };
 
@@ -133,7 +338,11 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         AddonModel* model;
         llama_context_params context_params;
         llama_context* ctx;
+        llama_batch batch;
+        bool has_batch = false;
+        int32_t batch_n_tokens = 0;
         int n_cur = 0;
+        bool disposed = false;
 
         AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonContext>(info) {
             model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
@@ -182,111 +391,240 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             Napi::MemoryManagement::AdjustExternalMemory(Env(), llama_get_state_size(ctx));
         }
         ~AddonContext() {
+            dispose();
+        }
+
+        void dispose() {
+            if (disposed) {
+                return;
+            }
+
             Napi::MemoryManagement::AdjustExternalMemory(Env(), -(int64_t)llama_get_state_size(ctx));
             llama_free(ctx);
             model->Unref();
+
+            disposeBatch();
+
+            disposed = true;
         }
-        Napi::Value Encode(const Napi::CallbackInfo& info) {
-            std::string text = info[0].As<Napi::String>().Utf8Value();
-
-            std::vector<llama_token> tokens = llama_tokenize(ctx, text, false);
-
-            Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
-            for (size_t i = 0; i < tokens.size(); ++i) {
-                result[i] = static_cast<uint32_t>(tokens[i]);
+        void disposeBatch() {
+            if (!has_batch) {
+                return;
             }
 
-            return result;
+            llama_batch_free(batch);
+            has_batch = false;
+            batch_n_tokens = 0;
         }
-        Napi::Value Decode(const Napi::CallbackInfo& info) {
-            Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
-
-            // Create a stringstream for accumulating the decoded string.
-            std::stringstream ss;
-
-            // Decode each token and accumulate the result.
-            for (size_t i = 0; i < tokens.ElementLength(); i++) {
-                const std::string piece = llama_token_to_piece(ctx, (llama_token)tokens[i]);
-
-                if (piece.empty()) {
-                    continue;
-                }
-
-                ss << piece;
-            }
-
-            return Napi::String::New(info.Env(), ss.str());
-        }
-        Napi::Value TokenBos(const Napi::CallbackInfo& info) {
-            return Napi::Number::From(info.Env(), llama_token_bos(model->model));  // TODO: move this to the model
-        }
-        Napi::Value TokenEos(const Napi::CallbackInfo& info) {
-            return Napi::Number::From(info.Env(), llama_token_eos(model->model));  // TODO: move this to the model
-        }
-        Napi::Value TokenNl(const Napi::CallbackInfo& info) {
-            return Napi::Number::From(info.Env(), llama_token_nl(model->model));  // TODO: move this to the model
-        }
-        Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
-            return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
-        }
-        Napi::Value GetTokenString(const Napi::CallbackInfo& info) {
-            int token = info[0].As<Napi::Number>().Int32Value();
-            std::stringstream ss;
-
-            const char* str = llama_token_get_text(model->model, token);  // TODO: move this to the model
-            if (str == nullptr) {
+        Napi::Value Dispose(const Napi::CallbackInfo& info) {
+            if (disposed) {
                 return info.Env().Undefined();
             }
 
-            ss << str;
+            dispose();
 
-            return Napi::String::New(info.Env(), ss.str());
+            return info.Env().Undefined();
         }
-        Napi::Value Eval(const Napi::CallbackInfo& info);
+        Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_n_ctx(ctx));
+        }
+        Napi::Value InitBatch(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            if (has_batch) {
+                llama_batch_free(batch);
+            }
+
+            int32_t n_tokens = info[0].As<Napi::Number>().Int32Value();
+
+            batch = llama_batch_init(n_tokens, 0, 1);
+            has_batch = true;
+            batch_n_tokens = n_tokens;
+
+            return info.Env().Undefined();
+        }
+        Napi::Value DisposeBatch(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            disposeBatch();
+
+            return info.Env().Undefined();
+        }
+        Napi::Value AddToBatch(const Napi::CallbackInfo& info) {
+            if (!has_batch) {
+                Napi::Error::New(info.Env(), "No batch is initialized").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+            int32_t firstTokenContextIndex = info[1].As<Napi::Number>().Int32Value();
+            Napi::Uint32Array tokens = info[2].As<Napi::Uint32Array>();
+            bool generateLogitAtTheEnd = info[3].As<Napi::Boolean>().Value();
+
+            auto tokensLength = tokens.ElementLength();
+            GGML_ASSERT(batch.n_tokens + tokensLength <= batch_n_tokens);
+
+            for (size_t i = 0; i < tokensLength; i++) {
+                llama_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
+            }
+
+            if (generateLogitAtTheEnd) {
+                batch.logits[batch.n_tokens - 1] = true;
+
+                auto logit_index = batch.n_tokens - 1;
+
+                return Napi::Number::From(info.Env(), logit_index);
+            }
+
+            return info.Env().Undefined();
+        }
+        Napi::Value DisposeSequence(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+
+            llama_kv_cache_seq_rm(ctx, sequenceId, -1, -1);
+
+            return info.Env().Undefined();
+        }
+        Napi::Value RemoveTokenCellsFromSequence(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+            int32_t startPos = info[1].As<Napi::Number>().Int32Value();
+            int32_t endPos = info[2].As<Napi::Number>().Int32Value();
+
+            llama_kv_cache_seq_rm(ctx, sequenceId, startPos, endPos);
+
+            return info.Env().Undefined();
+        }
+        Napi::Value ShiftSequenceTokenCells(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+            int32_t startPos = info[1].As<Napi::Number>().Int32Value();
+            int32_t endPos = info[2].As<Napi::Number>().Int32Value();
+            int32_t shiftDelta = info[3].As<Napi::Number>().Int32Value();
+
+            llama_kv_cache_seq_shift(ctx, sequenceId, startPos, endPos, shiftDelta);
+
+            return info.Env().Undefined();
+        }
+        Napi::Value DecodeBatch(const Napi::CallbackInfo& info);
+        Napi::Value SampleToken(const Napi::CallbackInfo& info);
+
         static void init(Napi::Object exports) {
-            exports.Set("AddonContext",
-                DefineClass(exports.Env(),
+            exports.Set(
+                "AddonContext",
+                DefineClass(
+                    exports.Env(),
                     "AddonContext",
                     {
-                        InstanceMethod("encode", &AddonContext::Encode),
-                        InstanceMethod("decode", &AddonContext::Decode),
-                        InstanceMethod("tokenBos", &AddonContext::TokenBos),
-                        InstanceMethod("tokenEos", &AddonContext::TokenEos),
-                        InstanceMethod("tokenNl", &AddonContext::TokenNl),
                         InstanceMethod("getContextSize", &AddonContext::GetContextSize),
-                        InstanceMethod("getTokenString", &AddonContext::GetTokenString),
-                        InstanceMethod("eval", &AddonContext::Eval),
-                    }));
+                        InstanceMethod("initBatch", &AddonContext::InitBatch),
+                        InstanceMethod("addToBatch", &AddonContext::AddToBatch),
+                        InstanceMethod("disposeSequence", &AddonContext::DisposeSequence),
+                        InstanceMethod("removeTokenCellsFromSequence", &AddonContext::RemoveTokenCellsFromSequence),
+                        InstanceMethod("shiftSequenceTokenCells", &AddonContext::ShiftSequenceTokenCells),
+                        InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
+                        InstanceMethod("sampleToken", &AddonContext::SampleToken),
+                        InstanceMethod("dispose", &AddonContext::Dispose)
+                    }
+                )
+            );
         }
 };
 
 
-class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
+class AddonContextDecodeBatchWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
+    public:
+        AddonContext* ctx;
+
+        AddonContextDecodeBatchWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
+            : Napi::AsyncWorker(info.Env(), "AddonContextDecodeBatchWorker"),
+              ctx(ctx),
+              Napi::Promise::Deferred(info.Env()) {
+            ctx->Ref();
+        }
+        ~AddonContextDecodeBatchWorker() {
+            ctx->Unref();
+        }
+        using Napi::AsyncWorker::Queue;
+        using Napi::Promise::Deferred::Promise;
+
+    protected:
+        void Execute() {
+            // Perform the evaluation using llama_decode.
+            int r = llama_decode(ctx->ctx, ctx->batch);
+
+            if (r != 0) {
+                if (r == 1) {
+                    SetError("could not find a KV slot for the batch (try reducing the size of the batch or increase the context)");
+                } else {
+                    SetError("Eval has failed");
+                }
+
+                return;
+            }
+        }
+        void OnOK() {
+            Napi::Env env = Napi::AsyncWorker::Env();
+            Napi::Promise::Deferred::Resolve(env.Undefined());
+        }
+        void OnError(const Napi::Error& err) {
+            Napi::Promise::Deferred::Reject(err.Value());
+        }
+};
+
+Napi::Value AddonContext::DecodeBatch(const Napi::CallbackInfo& info) {
+    AddonContextDecodeBatchWorker* worker = new AddonContextDecodeBatchWorker(info, this);
+    worker->Queue();
+    return worker->Promise();
+}
+
+class AddonContextSampleTokenWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
+    public:
         AddonContext* ctx;
         AddonGrammarEvaluationState* grammar_evaluation_state;
+        int32_t batchLogitIndex;
         bool use_grammar = false;
-        std::vector<llama_token> tokens;
         llama_token result;
-        float temperature;
-        int32_t top_k;
-        float top_p;
+        float temperature = 0.0f;
+        int32_t top_k = 40;
+        float top_p = 0.95f;
         float repeat_penalty = 1.10f;  // 1.0 = disabled
         float repeat_penalty_presence_penalty = 0.00f;  // 0.0 = disabled
         float repeat_penalty_frequency_penalty = 0.00f;  // 0.0 = disabled
         std::vector<llama_token> repeat_penalty_tokens;
         bool use_repeat_penalty = false;
 
-    public:
-        AddonContextEvalWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
-            : Napi::AsyncWorker(info.Env(), "AddonContextEvalWorker"),
+        AddonContextSampleTokenWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
+            : Napi::AsyncWorker(info.Env(), "AddonContextSampleTokenWorker"),
               ctx(ctx),
               Napi::Promise::Deferred(info.Env()) {
             ctx->Ref();
-            Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
 
-            temperature = 0.0f;
-            top_k = 40;
-            top_p = 0.95f;
+            batchLogitIndex = info[0].As<Napi::Number>().Int32Value();
 
             if (info.Length() > 1 && info[1].IsObject()) {
                 Napi::Object options = info[1].As<Napi::Object>();
@@ -333,13 +671,8 @@ class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
                     use_grammar = true;
                 }
             }
-
-            this->tokens.reserve(tokens.ElementLength());
-            for (size_t i = 0; i < tokens.ElementLength(); i++) {
-                this->tokens.push_back(static_cast<llama_token>(tokens[i]));
-            }
         }
-        ~AddonContextEvalWorker() {
+        ~AddonContextSampleTokenWorker() {
             ctx->Unref();
 
             if (use_grammar) {
@@ -352,36 +685,10 @@ class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
 
     protected:
         void Execute() {
-            llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
-
-            for (size_t i = 0; i < tokens.size(); i++) {
-                llama_batch_add(batch, tokens[i], ctx->n_cur, { 0 }, false);
-
-                ctx->n_cur++;
-            }
-            GGML_ASSERT(batch.n_tokens == (int)tokens.size());
-
-            batch.logits[batch.n_tokens - 1] = true;
-
-            // Perform the evaluation using llama_decode.
-            int r = llama_decode(ctx->ctx, batch);
-
-            llama_batch_free(batch);
-
-            if (r != 0) {
-                if (r == 1) {
-                    SetError("could not find a KV slot for the batch (try reducing the size of the batch or increase the context)");
-                } else {
-                    SetError("Eval has failed");
-                }
-
-                return;
-            }
-
             llama_token new_token_id = 0;
 
             // Select the best prediction.
-            auto logits = llama_get_logits_ith(ctx->ctx, batch.n_tokens - 1);
+            auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
             auto n_vocab = llama_n_vocab(ctx->model->model);
 
             std::vector<llama_token_data> candidates;
@@ -396,13 +703,15 @@ class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
             auto eos_token = llama_token_eos(ctx->model->model);
 
             if (use_repeat_penalty && !repeat_penalty_tokens.empty()) {
-                llama_sample_repetition_penalties(ctx->ctx,
+                llama_sample_repetition_penalties(
+                    ctx->ctx,
                     &candidates_p,
                     repeat_penalty_tokens.data(),
                     repeat_penalty_tokens.size(),
                     repeat_penalty,
                     repeat_penalty_frequency_penalty,
-                    repeat_penalty_presence_penalty);
+                    repeat_penalty_presence_penalty
+                );
             }
 
             if (use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
@@ -445,8 +754,8 @@ class AddonContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
         }
 };
 
-Napi::Value AddonContext::Eval(const Napi::CallbackInfo& info) {
-    AddonContextEvalWorker* worker = new AddonContextEvalWorker(info, this);
+Napi::Value AddonContext::SampleToken(const Napi::CallbackInfo& info) {
+    AddonContextSampleTokenWorker* worker = new AddonContextSampleTokenWorker(info, this);
     worker->Queue();
     return worker->Promise();
 }
