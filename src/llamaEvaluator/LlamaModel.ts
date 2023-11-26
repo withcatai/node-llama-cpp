@@ -67,6 +67,7 @@ export class LlamaModel {
         this._disposedState.disposed = true;
     }
 
+    /** @hidden */
     public [Symbol.dispose]() {
         this.dispose();
     }

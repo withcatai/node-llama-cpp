@@ -187,6 +187,7 @@ export class LlamaChatSession {
         this._disposeAggregator.dispose();
     }
 
+    /** @hidden */
     public [Symbol.dispose]() {
         return this.dispose();
     }

@@ -68,7 +68,10 @@
             "@typescript-eslint/parser": [".ts"]
         },
         "jsdoc": {
-            "exemptDestructuredRootsFromChecks": true
+            "exemptDestructuredRootsFromChecks": true,
+            "tagNamePreference": {
+                "hidden": "hidden"
+            }
         }
     },
     "rules": {

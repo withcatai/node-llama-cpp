@@ -97,6 +97,7 @@ export class LlamaContext {
         this._disposeAggregator.dispose();
     }
 
+    /** @hidden */
     public [Symbol.dispose]() {
         return this.dispose();
     }
@@ -488,6 +489,7 @@ export class LlamaContextSequence {
         this._disposed = true;
     }
 
+    /** @hidden */
     public [Symbol.dispose]() {
         return this.dispose();
     }
