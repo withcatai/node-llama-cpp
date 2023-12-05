@@ -18,3 +18,17 @@ npx --no node-llama-cpp download --no-metal
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
+
+You can optionally disable `metal` by setting `NODE_LLAMA_CPP_METAL` in your script before importing or executing `node-llama-cpp`.
+```bash
+NODE_LLAMA_CPP_METAL=false node your-script.js
+```
+```javascript
+// Set dynamically during execution via dynamic import.
+// Will build at runtime.
+process.env.NODE_LLAMA_CPP_METAL = false;
+const LlamaModel = (...args) => import("node-llama-cpp").then(({ LlamaModel }) => new LlamaModel(...args));
+const model = await LlamaModel({
+  modelPath: path.join(__dirname, "downloaded-model.gguf"),
+});
+```
