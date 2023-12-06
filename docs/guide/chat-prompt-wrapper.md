@@ -57,7 +57,7 @@ const model = new LlamaModel({
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({
     context,
-    promptWrapper: new LlamaChatPromptWrapper() // by default, GeneralChatPromptWrapper is used
+    promptWrapper: new LlamaChatPromptWrapper() // by default, "auto" is used
 });
 
 

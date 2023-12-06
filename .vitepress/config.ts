@@ -115,9 +115,17 @@ export default defineConfig({
                     text: "npm",
                     link: "https://www.npmjs.com/package/node-llama-cpp"
                 }, {
-                    text: "Contributing",
+                    text: "Contribute",
                     link: "/guide/contributing"
-                }]
+                },
+                ...(
+                    packageJson?.funding?.url == null
+                        ? []
+                        : [{
+                            text: "Sponsor",
+                            link: packageJson?.funding?.url
+                        }]
+                )]
             }
         ],
         search: {
@@ -258,29 +266,37 @@ function orderTypes(sidebar: typeof typedocSidebar) {
     if (types == null || !(types.items instanceof Array))
         return;
 
-    function groupGbnfJsonSchema() {
+    function groupItems(
+        findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
+        findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
+        {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
+    ) {
+        const children: DefaultTheme.SidebarItem[] = [];
+
         if (types == null || !(types.items instanceof Array))
             return;
 
-        const gbnfJsonSchemaItemTitle = "GbnfJsonSchema";
-        const gbnfItemsPrefix = "GbnfJson";
-        const gbnfJsonSchemaItems: DefaultTheme.SidebarItem[] = [];
+        const parent = types.items.find(findParent) as DefaultTheme.SidebarItem | null;
 
-        const gbnfJsonSchemaItem = types.items
-            .find((item) => item.text === gbnfJsonSchemaItemTitle) as DefaultTheme.SidebarItem | null;
-
-        if (gbnfJsonSchemaItem == null)
+        if (parent == null)
             return;
 
-        gbnfJsonSchemaItem.collapsed = true;
-        gbnfJsonSchemaItem.items = gbnfJsonSchemaItems;
-
         for (const item of types.items.slice()) {
-            if (item.text === gbnfJsonSchemaItemTitle || !item.text.startsWith(gbnfItemsPrefix))
+            if (item === parent || !findChildren(item))
                 continue;
 
             types.items.splice(types.items.indexOf(item), 1);
-            gbnfJsonSchemaItems.push(item);
+            children.push(item);
+        }
+
+        if (children.length > 0) {
+            parent.collapsed = collapsed;
+            parent.items = children;
+
+            if (moveToEndIfGrouped) {
+                types.items.splice(types.items.indexOf(parent as typeof types.items[number]), 1);
+                types.items.push(parent as typeof types.items[number]);
+            }
         }
     }
 
@@ -298,6 +314,24 @@ function orderTypes(sidebar: typeof typedocSidebar) {
         });
     }
 
-    groupGbnfJsonSchema();
+    groupItems(
+        (item) => item.text === "BatchingOptions",
+        (item) => (
+            item.text === "BatchItem" ||
+            item.text === "CustomBatchingDispatchSchedule" ||
+            item.text === "CustomBatchingPrioritizeStrategy" ||
+            item.text === "PrioritizedBatchItem"
+        ),
+        {collapsed: false}
+    );
+    groupItems(
+        (item) => item.text === "LlamaContextOptions",
+        (item) => item.text === "BatchingOptions"
+    );
+    groupItems(
+        (item) => item.text === "GbnfJsonSchema",
+        (item) => item.text?.startsWith("GbnfJson")
+    );
+    
     moveCollapseItemsToTheEnd();
 }
