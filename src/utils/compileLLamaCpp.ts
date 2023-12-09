@@ -68,19 +68,24 @@ export async function compileLlamaCpp({
             __dirname
         );
 
-        const binFilesDirPath = path.join(llamaDirectory, "build", "bin");
+        const binFilesDirPaths = [
+            path.join(llamaDirectory, "build", "bin"),
+            path.join(llamaDirectory, "build", "llama.cpp", "bin")
+        ];
         const compiledResultDirPath = await getCompiledResultDir(true);
 
-        if (await fs.pathExists(binFilesDirPath)) {
-            const files = await fs.readdir(binFilesDirPath);
+        for (const binFilesDirPath of binFilesDirPaths) {
+            if (await fs.pathExists(binFilesDirPath)) {
+                const files = await fs.readdir(binFilesDirPath);
 
-            await Promise.all(
-                files.map((fileName) => (
-                    fs.copy(path.join(binFilesDirPath, fileName), path.join(compiledResultDirPath, fileName), {
-                        overwrite: false
-                    })
-                ))
-            );
+                await Promise.all(
+                    files.map((fileName) => (
+                        fs.copy(path.join(binFilesDirPath, fileName), path.join(compiledResultDirPath, fileName), {
+                            overwrite: false
+                        })
+                    ))
+                );
+            }
         }
 
         if (setUsedBinFlagArg) {
