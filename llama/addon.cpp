@@ -152,10 +152,6 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
         context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Int32Value();
       }
 
-      if (options.Has("f16Kv")) {
-          context_params.f16_kv = options.Get("f16Kv").As<Napi::Boolean>().Value();
-      }
-
       if (options.Has("logitsAll")) {
           context_params.logits_all = options.Get("logitsAll").As<Napi::Boolean>().Value();
       }
