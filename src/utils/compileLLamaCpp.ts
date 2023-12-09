@@ -68,7 +68,7 @@ export async function compileLlamaCpp({
             __dirname
         );
 
-        const binFilesDirPath = path.join(llamaDirectory, "build", "llama.cpp", "bin");
+        const binFilesDirPath = path.join(llamaDirectory, "build", "bin");
         const compiledResultDirPath = await getCompiledResultDir(true);
 
         if (await fs.pathExists(binFilesDirPath)) {

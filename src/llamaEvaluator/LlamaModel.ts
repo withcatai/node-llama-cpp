@@ -77,13 +77,6 @@ export type LlamaModelOptions = {
     topP?: number,
 
     /**
-     * use fp16 for KV cache
-     * @deprecated use the `f16Kv` option on `LlamaContext` instead
-     * @hidden
-     */
-    f16Kv?: boolean,
-
-    /**
      * the llama_eval() call computes all logits, not just the last one
      * @deprecated use the `logitsAll` option on `LlamaContext` instead
      * @hidden
@@ -116,7 +109,6 @@ export class LlamaModel {
         seed: LlamaModelOptions["seed"],
         contextSize: LlamaModelOptions["contextSize"],
         batchSize: LlamaModelOptions["batchSize"],
-        f16Kv: LlamaModelOptions["f16Kv"],
         logitsAll: LlamaModelOptions["logitsAll"],
         embedding: LlamaModelOptions["embedding"],
         threads: LlamaModelOptions["threads"]
@@ -160,7 +152,6 @@ export class LlamaModel {
      * Set to `1` to disable.
      *
      * Only relevant when `temperature` is set to a value greater than `0`.
-     * @param {boolean} [options.f16Kv] - use fp16 for KV cache
      * @param {boolean} [options.logitsAll] - the llama_eval() call computes all logits, not just the last one
      * @param {boolean} [options.vocabOnly] - only load the vocabulary, no weights
      * @param {boolean} [options.useMmap] - use mmap if possible
@@ -169,7 +160,7 @@ export class LlamaModel {
      */
     public constructor({
         modelPath, seed = null, contextSize = 1024 * 4, batchSize, gpuLayers,
-        threads = 6, temperature = 0, topK = 40, topP = 0.95, f16Kv, logitsAll, vocabOnly, useMmap, useMlock, embedding
+        threads = 6, temperature = 0, topK = 40, topP = 0.95, logitsAll, vocabOnly, useMmap, useMlock, embedding
     }: LlamaModelOptions) {
         this._model = new LLAMAModel(path.resolve(process.cwd(), modelPath), removeNullFields({
             gpuLayers,
@@ -182,7 +173,6 @@ export class LlamaModel {
             seed,
             contextSize,
             batchSize,
-            f16Kv,
             logitsAll,
             embedding,
             threads

@@ -26,9 +26,6 @@ export type LlamaContextOptions = {
     /** prompt processing batch size */
     batchSize?: number,
 
-    /** use fp16 for KV cache */
-    f16Kv?: boolean,
-
     /** the llama_eval() call computes all logits, not just the last one */
     logitsAll?: boolean,
 
@@ -85,7 +82,6 @@ export class LlamaContext {
         seed = model._contextOptions.seed,
         contextSize = model._contextOptions.contextSize,
         batchSize = model._contextOptions.batchSize,
-        f16Kv = model._contextOptions.f16Kv,
         logitsAll = model._contextOptions.logitsAll,
         embedding = model._contextOptions.embedding,
         threads = model._contextOptions.threads
@@ -95,7 +91,6 @@ export class LlamaContext {
             seed: seed != null ? Math.max(-1, seed) : undefined,
             contextSize,
             batchSize,
-            f16Kv,
             logitsAll,
             embedding,
             threads

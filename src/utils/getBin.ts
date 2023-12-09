@@ -117,7 +117,6 @@ export type LLAMAContext = {
         seed?: number,
         contextSize?: number,
         batchSize?: number,
-        f16Kv?: boolean,
         logitsAll?: boolean,
         embedding?: boolean,
         threads?: number,
