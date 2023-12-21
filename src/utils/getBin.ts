@@ -122,6 +122,7 @@ export type LLAMAContext = {
         threads?: number,
     }): LLAMAContext,
     encode(text: string): Uint32Array,
+    embeddings(text: string): Uint32Array,
     eval(tokens: Uint32Array, options?: {
         temperature?: number,
         topK?: number,

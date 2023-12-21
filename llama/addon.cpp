@@ -203,6 +203,84 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
 
     return Napi::String::New(info.Env(), ss.str());
   }
+
+  Napi::Value Embeddings(const Napi::CallbackInfo& info) {
+
+    std::string text = info[0].As<Napi::String>().Utf8Value();
+
+    llama_context_params context_params;
+
+    context_params = llama_context_default_params();
+    context_params.embedding = true;
+
+
+    // llama_backend_init(context_params.numa);
+
+    llama_context * ctx;
+
+    ctx = llama_new_context_with_model(model->model, context_params);
+
+
+    fprintf(stderr, "%s : getting training size\n", __func__);
+
+    const int n_ctx_train = llama_n_ctx_train(model->model);
+    const int n_ctx = llama_n_ctx(ctx);
+
+    fprintf(stderr, "%s : context train %d; context size %d\n", __func__, n_ctx_train, n_ctx);
+
+    if (n_ctx_train < n_ctx) {
+      fprintf(stderr, "%s: warning: model was trained on only %d context tokens (%d specified)\n",
+            __func__, n_ctx_train, n_ctx);
+    }
+
+    fprintf(stderr, "%s : tokenizing\n", __func__);
+
+    std::vector<llama_token> embd_inp = llama_tokenize(ctx, text, true);
+
+    if (embd_inp.size() > (size_t)n_ctx) {
+        fprintf(stderr, "%s: error: prompt is longer than the context window (%zu tokens, n_ctx = %d)\n",
+                __func__, embd_inp.size(), n_ctx);
+        return Napi::Number::New(info.Env(), 1);
+    }
+
+    int n_past = 0;
+
+    while (!embd_inp.empty()) {
+        int n_tokens = std::min((int) context_params.n_batch, static_cast<int>(embd_inp.size()));
+        fprintf(stderr, "%s : processing %d tokens at %d \n", __func__, n_tokens, n_past);
+        if (llama_decode(ctx, llama_batch_get_one(embd_inp.data(), n_tokens, n_past, 0))) {
+            fprintf(stderr, "%s : failed to eval\n", __func__);
+            return Napi::Number::New(info.Env(), 1);
+        }
+        n_past += n_tokens;
+        fprintf(stderr, "%s : removing %d tokens \n", __func__, n_tokens);
+        embd_inp.erase(embd_inp.begin(), embd_inp.begin() + n_tokens);
+    }
+
+    fprintf(stderr, "%s : getting the embeddings \n", __func__);
+
+    const int n_embd = llama_n_embd(model->model);
+
+    fprintf(stderr, "%s : getting %d floats \n", __func__, n_embd);
+    const auto * embeddings = llama_get_embeddings(ctx);
+
+    fprintf(stderr, "%s : converting the embeddings \n", __func__);
+
+    Napi::Float32Array result = Napi::Float32Array::New(info.Env(), n_embd);
+
+    fprintf(stderr, "%s : Allocated %d float \n", __func__, n_embd);
+
+    for (int i = 0; i < n_embd; ++i) {
+      fprintf(stderr, "%s : embedding %f float \n", __func__, embeddings[i]);
+    }
+
+    for (int i = 0; i < n_embd; ++i) { result[i] = embeddings[i]; }
+
+    fprintf(stderr, "%s : returning the embeddings \n", __func__);
+
+    return result;
+  }
+
   Napi::Value TokenBos(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_token_bos(model->model)); // TODO: move this to the model
   }
@@ -237,6 +315,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
                 InstanceMethod("encode", &LLAMAContext::Encode),
                 InstanceMethod("decode", &LLAMAContext::Decode),
                 InstanceMethod("tokenBos", &LLAMAContext::TokenBos),
+                InstanceMethod("embeddings", &LLAMAContext::Embeddings),
                 InstanceMethod("tokenEos", &LLAMAContext::TokenEos),
                 InstanceMethod("tokenNl", &LLAMAContext::TokenNl),
                 InstanceMethod("getContextSize", &LLAMAContext::GetContextSize),
