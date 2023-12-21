@@ -121,6 +121,10 @@ export class LlamaContext {
         return this._ctx.decode(Uint32Array.from(tokens));
     }
 
+    public embeddings(text: string): Uint32Array {
+        return this._ctx.embeddings(text);
+    }
+
     public get prependBos() {
         return this._prependBos;
     }
