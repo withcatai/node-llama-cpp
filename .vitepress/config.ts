@@ -17,10 +17,10 @@ const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y"
 const hostname = "https://withcatai.github.io/node-llama-cpp/";
 
 const chatWrappersOrder = [
-    "GeneralChatPromptWrapper",
-    "LlamaChatPromptWrapper",
-    "ChatMLChatPromptWrapper",
-    "FalconChatPromptWrapper"
+    "GeneralChatWrapper",
+    "LlamaChatWrapper",
+    "ChatMLChatWrapper",
+    "FalconChatWrapper"
 ] as const;
 
 function resolveHref(href: string) {
@@ -217,8 +217,8 @@ function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedo
 }
 
 function orderClasses(sidebar: typeof typedocSidebar) {
-    const baseChatPromptWrapper = "ChatPromptWrapper";
-    const chatPromptWrapperItems: DefaultTheme.SidebarItem[] = [];
+    const baseChatWrapper = "ChatWrapper";
+    const chatWrapperItems: DefaultTheme.SidebarItem[] = [];
 
     const classes = sidebar.find((item) => item.text === "Classes");
 
@@ -228,24 +228,24 @@ function orderClasses(sidebar: typeof typedocSidebar) {
     (classes.items as DefaultTheme.SidebarItem[]).unshift({
         text: "Chat wrappers",
         collapsed: false,
-        items: chatPromptWrapperItems
+        items: chatWrapperItems
     });
 
-    const chatPromptWrapper = classes.items.find((item) => item.text === baseChatPromptWrapper);
-    if (chatPromptWrapper != null) {
-        classes.items.splice(classes.items.indexOf(chatPromptWrapper), 1);
-        classes.items.unshift(chatPromptWrapper);
+    const chatWrapper = classes.items.find((item) => item.text === baseChatWrapper);
+    if (chatWrapper != null) {
+        classes.items.splice(classes.items.indexOf(chatWrapper), 1);
+        classes.items.unshift(chatWrapper);
     }
 
     for (const item of classes.items.slice()) {
-        if (item.text === baseChatPromptWrapper || !item.text.endsWith(baseChatPromptWrapper))
+        if (item.text === baseChatWrapper || !item.text.endsWith(baseChatWrapper))
             continue;
 
         classes.items.splice(classes.items.indexOf(item), 1);
-        chatPromptWrapperItems.push(item);
+        chatWrapperItems.push(item);
     }
 
-    chatPromptWrapperItems.sort((a, b) => {
+    chatWrapperItems.sort((a, b) => {
         const aIndex = chatWrappersOrder.indexOf(a.text as typeof chatWrappersOrder[number]);
         const bIndex = chatWrappersOrder.indexOf(b.text as typeof chatWrappersOrder[number]);
 
@@ -332,6 +332,6 @@ function orderTypes(sidebar: typeof typedocSidebar) {
         (item) => item.text === "GbnfJsonSchema",
         (item) => item.text?.startsWith("GbnfJson")
     );
-    
+
     moveCollapseItemsToTheEnd();
 }

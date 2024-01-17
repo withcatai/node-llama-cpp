@@ -1,9 +1,11 @@
 import {parseModelFileName} from "../utils/parseModelFileName.js";
 import {parseModelTypeDescription} from "../utils/parseModelTypeDescription.js";
-import {LlamaChatPromptWrapper} from "./LlamaChatPromptWrapper.js";
-import {ChatMLChatPromptWrapper} from "./ChatMLChatPromptWrapper.js";
-import {GeneralChatPromptWrapper} from "./GeneralChatPromptWrapper.js";
-import {FalconChatPromptWrapper} from "./FalconChatPromptWrapper.js";
+import {LlamaChatWrapper} from "./LlamaChatWrapper.js";
+import {ChatMLChatWrapper} from "./ChatMLChatWrapper.js";
+import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
+import {FalconChatWrapper} from "./FalconChatWrapper.js";
+import {FunctionaryChatWrapper} from "./FunctionaryChatWrapper.js";
+import {AlpacaChatWrapper} from "./AlpacaChatWrapper.js";
 import type {ModelTypeDescription} from "../utils/getBin.js";
 
 
@@ -31,17 +33,21 @@ export function resolveChatWrapperBasedOnModel({
             const firstSplitLowercaseSubType = splitLowercaseSubType?.[0];
 
             if (lowercaseName === "llama")
-                return LlamaChatPromptWrapper;
+                return LlamaChatWrapper;
             else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
-                return LlamaChatPromptWrapper;
+                return LlamaChatWrapper;
             else if (lowercaseName === "orca")
-                return ChatMLChatPromptWrapper;
+                return ChatMLChatWrapper;
             else if (lowercaseName === "phind" && lowercaseSubType === "codellama")
-                return LlamaChatPromptWrapper;
+                return LlamaChatWrapper;
             else if (lowercaseName === "mistral")
-                return GeneralChatPromptWrapper;
+                return GeneralChatWrapper;
             else if (firstSplitLowercaseSubType === "llama")
-                return LlamaChatPromptWrapper;
+                return LlamaChatWrapper;
+            else if (lowercaseSubType === "alpaca")
+                return AlpacaChatWrapper;
+            else if (lowercaseName === "functionary")
+                return FunctionaryChatWrapper;
         }
     }
 
@@ -49,18 +55,18 @@ export function resolveChatWrapperBasedOnModel({
         const {arch} = parseModelTypeDescription(typeDescription);
 
         if (arch === "llama")
-            return LlamaChatPromptWrapper;
+            return LlamaChatWrapper;
         else if (arch === "falcon")
-            return FalconChatPromptWrapper;
+            return FalconChatWrapper;
     }
 
     if (bosString === "" || bosString == null)
         return null;
 
     if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
-        return LlamaChatPromptWrapper;
+        return LlamaChatWrapper;
     } else if ("<|im_start|>system\n".startsWith(bosString)) {
-        return ChatMLChatPromptWrapper;
+        return ChatMLChatWrapper;
     }
 
     return null;

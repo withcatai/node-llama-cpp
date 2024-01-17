@@ -95,8 +95,9 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             }
 
             std::string text = info[0].As<Napi::String>().Utf8Value();
+            bool specialTokens = info[1].As<Napi::Boolean>().Value();
 
-            std::vector<llama_token> tokens = llama_tokenize(model, text, true, true);
+            std::vector<llama_token> tokens = llama_tokenize(model, text, false, specialTokens);
 
             Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
             for (size_t i = 0; i < tokens.size(); ++i) {
@@ -162,7 +163,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
                 return info.Env().Undefined();
             }
-            
+
             char model_desc[128];
             int actual_length = llama_model_desc(model, model_desc, sizeof(model_desc));
 
@@ -352,25 +353,21 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             context_params.seed = -1;
             context_params.n_ctx = 4096;
             context_params.n_threads = 6;
-            context_params.n_threads_batch == -1 ? context_params.n_threads : context_params.n_threads_batch;
+            context_params.n_threads_batch = context_params.n_threads;
 
             if (info.Length() > 1 && info[1].IsObject()) {
                 Napi::Object options = info[1].As<Napi::Object>();
 
                 if (options.Has("seed")) {
-                    context_params.seed = options.Get("seed").As<Napi::Number>().Int32Value();
+                    context_params.seed = options.Get("seed").As<Napi::Number>().Uint32Value();
                 }
 
                 if (options.Has("contextSize")) {
-                    context_params.n_ctx = options.Get("contextSize").As<Napi::Number>().Int32Value();
+                    context_params.n_ctx = options.Get("contextSize").As<Napi::Number>().Uint32Value();
                 }
 
                 if (options.Has("batchSize")) {
-                    context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Int32Value();
-                }
-
-                if (options.Has("f16Kv")) {
-                    context_params.f16_kv = options.Get("f16Kv").As<Napi::Boolean>().Value();
+                    context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value();
                 }
 
                 if (options.Has("logitsAll")) {
@@ -382,8 +379,11 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                 }
 
                 if (options.Has("threads")) {
-                    context_params.n_threads = options.Get("threads").As<Napi::Number>().Int32Value();
-                    context_params.n_threads_batch == -1 ? context_params.n_threads : context_params.n_threads_batch;
+                    const auto n_threads = options.Get("threads").As<Napi::Number>().Uint32Value();
+                    const auto resolved_n_threads = n_threads == 0 ? std::thread::hardware_concurrency() : n_threads;
+
+                    context_params.n_threads = resolved_n_threads;
+                    context_params.n_threads_batch = resolved_n_threads
                 }
             }
 
@@ -533,6 +533,17 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value DecodeBatch(const Napi::CallbackInfo& info);
         Napi::Value SampleToken(const Napi::CallbackInfo& info);
 
+        Napi::Value AcceptGrammarEvaluationStateToken(const Napi::CallbackInfo& info) {
+            AddonGrammarEvaluationState* grammar_evaluation_state = Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
+            llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
+
+            if ((grammar_evaluation_state)->grammar != nullptr) {
+                llama_grammar_accept_token(ctx, (grammar_evaluation_state)->grammar, tokenId);
+            }
+
+            return info.Env().Undefined();
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonContext",
@@ -548,6 +559,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("shiftSequenceTokenCells", &AddonContext::ShiftSequenceTokenCells),
                         InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
+                        InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
                         InstanceMethod("dispose", &AddonContext::Dispose)
                     }
                 )

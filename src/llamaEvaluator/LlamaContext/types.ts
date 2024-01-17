@@ -23,16 +23,16 @@ export type LlamaContextOptions = {
     /** prompt processing batch size */
     batchSize?: number,
 
-    /** use fp16 for KV cache */
-    f16Kv?: boolean,
-
     /** the llama_eval() call computes all logits, not just the last one */
     logitsAll?: boolean,
 
     /** embedding mode only */
     embedding?: boolean
 
-    /** number of threads to use to evaluate tokens */
+    /**
+     * number of threads to use to evaluate tokens.
+     * set to 0 to use the maximum threads supported by the current machine hardware
+     */
     threads?: number,
 
     /** control the parallel sequences processing behavior */
@@ -40,7 +40,7 @@ export type LlamaContextOptions = {
 };
 export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */
-    punishTokens: Uint32Array | (() => Uint32Array),
+    punishTokens: Token[] | (() => Token[]),
 
     /**
      * The relative amount to lower the probability of the tokens in `punishTokens` by
@@ -76,7 +76,7 @@ export type CustomBatchingPrioritizeStrategy = (options: {
 
 export type ContextShiftOptions = {
     size?: number | ((sequence: LlamaContextSequence) => number | Promise<number>),
-    strategy?: "eraseLowestTokenPriorityBeginning" | "eraseBeginning" | ((options: {
+    strategy?: "eraseBeginning" | ((options: {
         sequence: LlamaContextSequence,
         size: number
     }) => ContextTokensDeleteRange[] | Promise<ContextTokensDeleteRange[]>)
@@ -93,12 +93,6 @@ export type ContextTokensDeleteRange = {
  * 5 - high
  */
 export type EvaluationPriority = 1 | 2 | 3 | 4 | 5;
-
-/**
- * 1 - low, minimum
- * Infinity - high, maximum
- */
-export type TokenPriority = number;
 
 export type BatchItem = {
     readonly tokens: readonly Token[],

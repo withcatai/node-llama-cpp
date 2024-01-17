@@ -110,7 +110,6 @@ export type BindingModule = {
             seed?: number,
             contextSize?: number,
             batchSize?: number,
-            f16Kv?: boolean,
             logitsAll?: boolean,
             embedding?: boolean,
             threads?: number,
@@ -129,7 +128,7 @@ export type BindingModule = {
 
 export type AddonModel = {
     dispose(): void,
-    tokenize(text: string): Uint32Array,
+    tokenize(text: string, specialTokens: boolean): Uint32Array,
     detokenize(tokens: Uint32Array): string,
     getTrainContextSize(): number,
     getTotalSize(): number,
@@ -172,7 +171,9 @@ export type AddonContext = {
     removeTokenCellsFromSequence(sequenceId: number, startPos: number, endPos: number): void,
 
     // startPos in inclusive, endPos is exclusive
-    shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void
+    shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
+
+    acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
 };
 
 export type BatchLogitIndex = number & {

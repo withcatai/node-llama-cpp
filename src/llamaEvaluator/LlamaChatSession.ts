@@ -1,37 +1,44 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {defaultChatSystemPrompt} from "../config.js";
-import {ChatPromptWrapper} from "../ChatPromptWrapper.js";
-import {AbortError} from "../AbortError.js";
-import {GeneralChatPromptWrapper} from "../chatWrappers/GeneralChatPromptWrapper.js";
-import {resolveChatWrapperBasedOnModel} from "../chatWrappers/resolveChatWrapperBasedOnModel.js";
-import {ConversationInteraction, Token} from "../types.js";
-import {generateContextTextFromConversationHistory} from "../chatWrappers/generateContextTextFromConversationHistory.js";
-import {removeNullFields} from "../utils/removeNullFields.js";
-import {LlamaModel} from "./LlamaModel.js";
+import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatHistoryItem, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions, Token} from "../types.js";
+import {appendUserMessageToChatHistory} from "../utils/appendUserMessageToChatHistory.js";
+import {GbnfJsonSchema, GbnfJsonSchemaToType} from "../utils/gbnfJson/types.js";
 import {LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
-import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
-
-const UNKNOWN_UNICODE_CHAR = "\ufffd";
+import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "./LlamaChat/LlamaChat.js";
+import {EvaluationPriority} from "./LlamaContext/types.js";
 
 
 export type LlamaChatSessionOptions = {
     contextSequence: LlamaContextSequence,
-    printLLamaSystemInfo?: boolean,
 
     /** `"auto"` is used by default */
-    promptWrapper?: "auto" | ChatPromptWrapper,
+    chatWrapper?: "auto" | ChatWrapper,
 
     systemPrompt?: string,
 
-    /** Conversation history to load into the context to continue an existing conversation */
-    conversationHistory?: readonly ConversationInteraction[]
-
     /** Automatically dispose the sequence when the session is disposed */
-    autoDisposeSequence?: boolean
+    autoDisposeSequence?: boolean,
+
+    contextShift?: LlamaChatSessionContextShiftOptions
 };
 
-export type LLamaChatPromptOptions = {
+export type LlamaChatSessionContextShiftOptions = {
+    /**
+     * The number of tokens to delete from the context window to make space for new ones.
+     * Defaults to 10% of the context size.
+     */
+    size?: LLamaChatContextShiftOptions["size"],
+
+    /**
+     * The strategy to use when deleting tokens from the context window.
+     * Defaults to `"eraseFirstResponseAndKeepFirstSystem"`.
+     */
+    strategy?: LLamaChatContextShiftOptions["strategy"]
+};
+
+export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions | undefined = ChatSessionModelFunctions | undefined> = {
     onToken?: (tokens: Token[]) => void,
     signal?: AbortSignal,
     maxTokens?: number,
@@ -68,16 +75,27 @@ export type LLamaChatPromptOptions = {
      */
     topP?: number,
 
-    grammar?: LlamaGrammar,
-
     /**
      * Trim whitespace from the end of the generated text
      * Disabled by default.
      */
     trimWhitespaceSuffix?: boolean,
 
+    /**
+     * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
+     */
+    evaluationPriority?: EvaluationPriority,
+
     repeatPenalty?: false | LlamaChatSessionRepeatPenalty
-};
+} & ({
+    grammar?: LlamaGrammar,
+    functions?: never,
+    documentFunctionParams?: never
+} | {
+    grammar?: never,
+    functions?: Functions | ChatSessionModelFunctions,
+    documentFunctionParams?: boolean
+});
 
 export type LlamaChatSessionRepeatPenalty = {
     /**
@@ -117,17 +135,12 @@ export type LlamaChatSessionRepeatPenalty = {
 };
 
 export class LlamaChatSession {
-    /** @internal */ private readonly _systemPrompt: string;
-    /** @internal */ private readonly _printLLamaSystemInfo: boolean;
-    /** @internal */ private readonly _promptWrapper: ChatPromptWrapper;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;
-    /** @internal */ private _promptIndex: number = 0;
-    /** @internal */ private _initialized: boolean = false;
-    /** @internal */ private _lastStopString: string | null = null;
-    /** @internal */ private _lastStopStringSuffix: string | null = null;
-    /** @internal */ private _conversationHistoryToLoad: readonly ConversationInteraction[] | null = null;
-    /** @internal */ private _sequence: LlamaContextSequence | null;
+    /** @internal */ private readonly _contextShift?: LlamaChatSessionContextShiftOptions;
+    /** @internal */ private _chatHistory: ChatHistoryItem[];
+    /** @internal */ private _lastEvaluation?: LlamaChatResponse["lastEvaluation"];
+    /** @internal */ private _chat: LlamaChat | null;
 
     public readonly onDispose = new EventRelay<void>();
 
@@ -136,53 +149,45 @@ export class LlamaChatSession {
      */
     public constructor({
         contextSequence,
-        printLLamaSystemInfo = false,
-        promptWrapper = "auto",
+        chatWrapper = "auto",
         systemPrompt = defaultChatSystemPrompt,
-        conversationHistory,
-        autoDisposeSequence = true
+        autoDisposeSequence = true,
+        contextShift
     }: LlamaChatSessionOptions) {
+        if (contextSequence == null)
+            throw new Error("contextSequence cannot be null");
+
         if (contextSequence.disposed)
             throw new DisposedError();
 
-        this._sequence = contextSequence;
-        this._printLLamaSystemInfo = printLLamaSystemInfo;
-        this._systemPrompt = systemPrompt;
-        this._conversationHistoryToLoad = (conversationHistory != null && conversationHistory.length > 0)
-            ? conversationHistory
-            : null;
+        this._contextShift = contextShift;
+        this._chatHistory = [{
+            type: "system",
+            text: systemPrompt
+        }];
+
+        this._chat = new LlamaChat({
+            autoDisposeSequence,
+            chatWrapper,
+            contextSequence
+        });
+
         this._autoDisposeSequence = autoDisposeSequence;
 
         this._disposeAggregator.add(
-            this._sequence.onDispose.createListener(() => {
+            this._chat.onDispose.createListener(() => {
                 this.dispose();
             })
         );
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
-
-        if (promptWrapper === "auto") {
-            const chatWrapper = resolveChatWrapperBasedOnModel({
-                bosString: contextSequence.model.tokens.bosString,
-                filename: contextSequence.model.filename,
-                typeDescription: contextSequence.model.typeDescription
-            });
-
-            if (chatWrapper != null)
-                this._promptWrapper = new chatWrapper();
-            else
-                this._promptWrapper = new GeneralChatPromptWrapper();
-        } else
-            this._promptWrapper = promptWrapper;
     }
 
-    public dispose({disposedSequence = this._autoDisposeSequence}: {disposedSequence?: boolean} = {}) {
-        if (this._sequence == null)
+    public dispose({disposeSequence = this._autoDisposeSequence}: {disposeSequence?: boolean} = {}) {
+        if (this._chat == null)
             return;
 
-        if (disposedSequence)
-            this._sequence.dispose();
-
-        this._sequence = null;
+        this._chat.dispose({disposeSequence});
+        this._chat = null;
 
         this._disposeAggregator.dispose();
     }
@@ -193,18 +198,14 @@ export class LlamaChatSession {
     }
 
     public get disposed() {
-        return this._sequence == null;
-    }
-
-    public get initialized() {
-        return this._initialized;
+        return this._chat == null || this._chat.disposed;
     }
 
     public get sequence() {
-        if (this._sequence == null)
+        if (this._chat == null)
             throw new DisposedError();
 
-        return this._sequence;
+        return this._chat.sequence;
     }
 
     public get context() {
@@ -215,25 +216,13 @@ export class LlamaChatSession {
         return this.sequence.model;
     }
 
-    public async init() {
-        await withLock(this, "init", async () => {
-            this._ensureNotDisposed();
-
-            if (this._initialized)
-                return;
-
-            if (this._printLLamaSystemInfo)
-                console.log("Llama system info", LlamaModel.systemInfo);
-
-            this._initialized = true;
-        });
-    }
-
     /**
      * @param prompt
      * @param [options]
      */
-    public async prompt(prompt: string, {
+    public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
+        functions,
+        documentFunctionParams,
         onToken,
         signal,
         maxTokens,
@@ -243,19 +232,25 @@ export class LlamaChatSession {
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty
-    }: LLamaChatPromptOptions = {}) {
-        const {text} = await this.promptWithMeta(prompt, {
+    }: LLamaChatPromptOptions<Functions> = {}) {
+        const {responseText} = await this.promptWithMeta<Functions>(prompt, {
+            // this is a workaround to allow passing both `functions` and `grammar`
+            functions: functions as undefined,
+            documentFunctionParams: documentFunctionParams as undefined,
+
             onToken, signal, maxTokens, temperature, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty
         });
 
-        return text;
+        return responseText;
     }
 
     /**
      * @param prompt
      * @param [options]
      */
-    public async promptWithMeta(prompt: string, {
+    public async promptWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
+        functions,
+        documentFunctionParams,
         onToken,
         signal,
         maxTokens,
@@ -264,267 +259,207 @@ export class LlamaChatSession {
         topP,
         grammar,
         trimWhitespaceSuffix = false,
-        repeatPenalty
-    }: LLamaChatPromptOptions = {}) {
+        repeatPenalty,
+        evaluationPriority
+    }: LLamaChatPromptOptions<Functions> = {}) {
         this._ensureNotDisposed();
-
-        if (!this.initialized)
-            await this.init();
 
         return await withLock(this, "prompt", async () => {
             this._ensureNotDisposed();
 
-            if (this._sequence == null)
+            if (this._chat == null)
                 throw new DisposedError();
 
-            let promptText = "";
+            let lastEvaluation = this._lastEvaluation;
+            let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
+            let newContextWindowChatHistory = lastEvaluation?.contextWindow == null
+                ? undefined
+                : appendUserMessageToChatHistory(lastEvaluation?.contextWindow, prompt);
 
-            if (this._promptIndex == 0 && this._conversationHistoryToLoad != null) {
-                const {text, stopString, stopStringSuffix} =
-                    generateContextTextFromConversationHistory(this._promptWrapper, this._conversationHistoryToLoad, {
-                        systemPrompt: this._systemPrompt,
-                        currentPromptIndex: this._promptIndex,
-                        lastStopString: this._lastStopString,
-                        lastStopStringSuffix: this._promptIndex == 0
-                            ? (
-                                this._sequence.prependBos
-                                    ? this._sequence.context.model.tokens.bosString
-                                    : null
-                            )
-                            : this._lastStopStringSuffix
+            newChatHistory.push({
+                type: "model",
+                response: []
+            });
+
+            if (newContextWindowChatHistory != null)
+                newContextWindowChatHistory.push({
+                    type: "model",
+                    response: []
+                });
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const {
+                    functionCall,
+                    lastEvaluation: currentLastEvaluation,
+                    metadata
+                } = await this._chat.generateResponse<Functions>(newChatHistory, {
+                    functions,
+                    documentFunctionParams,
+                    grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                    onToken,
+                    signal,
+                    repeatPenalty,
+                    topK,
+                    topP,
+                    maxTokens,
+                    temperature,
+                    trimWhitespaceSuffix,
+                    contextShift: {
+                        ...this._contextShift,
+                        lastEvaluationMetadata: lastEvaluation?.contextShiftMetadata
+                    },
+                    evaluationPriority,
+                    lastEvaluationContextWindow: {
+                        history: newContextWindowChatHistory,
+                        minimumOverlapPercentageToPreventContextShift: 0.01
+                    }
+                });
+                this._ensureNotDisposed();
+
+                lastEvaluation = currentLastEvaluation;
+                newChatHistory = lastEvaluation.cleanHistory;
+
+                if (functionCall != null) {
+                    const functionDefinition = functions?.[functionCall.functionName];
+
+                    if (functionDefinition == null)
+                        throw new Error(`The model tried to call function "${functionCall.functionName}" which is not defined`);
+
+                    const functionCallResult = await functionDefinition.handler(functionCall.params);
+                    this._ensureNotDisposed();
+
+                    newChatHistory = addFunctionCallToChatHistory({
+                        chatHistory: newChatHistory,
+                        functionName: functionCall.functionName,
+                        functionDescription: functionDefinition.description,
+                        callParams: functionCall.params,
+                        callResult: functionCallResult,
+                        raw: functionCall.raw + this._chat.chatWrapper.generateFunctionCallResult(
+                            functionCall.functionName,
+                            functionCall.params,
+                            functionCallResult
+                        )
                     });
 
-                promptText += text;
-                this._lastStopString = stopString;
-                this._lastStopStringSuffix = stopStringSuffix;
-                this._promptIndex += this._conversationHistoryToLoad.length;
+                    newContextWindowChatHistory = addFunctionCallToChatHistory({
+                        chatHistory: lastEvaluation.contextWindow,
+                        functionName: functionCall.functionName,
+                        functionDescription: functionDefinition.description,
+                        callParams: functionCall.params,
+                        callResult: functionCallResult,
+                        raw: functionCall.raw + this._chat.chatWrapper.generateFunctionCallResult(
+                            functionCall.functionName,
+                            functionCall.params,
+                            functionCallResult
+                        )
+                    });
+                    lastEvaluation.cleanHistory = newChatHistory;
+                    lastEvaluation.contextWindow = newContextWindowChatHistory;
 
-                this._conversationHistoryToLoad = null;
+                    continue;
+                }
+
+                this._lastEvaluation = lastEvaluation;
+                this._chatHistory = newChatHistory;
+
+                const lastModelResponseItem = getLastModelResponseItem(newChatHistory);
+
+                return {
+                    response: lastModelResponseItem.response,
+                    responseText: lastModelResponseItem.response
+                        .filter((item): item is string => typeof item === "string")
+                        .join(""),
+                    stopReason: metadata.stopReason,
+                    remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
+                };
             }
-
-            promptText += this._promptWrapper.wrapPrompt(prompt, {
-                systemPrompt: this._systemPrompt,
-                promptIndex: this._promptIndex,
-                lastStopString: this._lastStopString,
-                lastStopStringSuffix: this._promptIndex == 0
-                    ? (
-                        this._sequence.prependBos
-                            ? this._sequence.context.model.tokens.bosString
-                            : null
-                    )
-                    : this._lastStopStringSuffix
-            });
-            this._promptIndex++;
-            this._lastStopString = null;
-            this._lastStopStringSuffix = null;
-
-            const {text, stopReason, stopString, stopStringSuffix} =
-                await this._evalTokens(this._sequence.context.model.tokenize(promptText), {
-                    onToken, signal, maxTokens, temperature, topK, topP, grammar, trimWhitespaceSuffix,
-                    repeatPenalty: repeatPenalty == false ? {lastTokens: 0} : repeatPenalty
-                });
-            this._lastStopString = stopString;
-            this._lastStopStringSuffix = stopStringSuffix;
-
-            return {
-                text,
-                stopReason,
-                stopString,
-                stopStringSuffix
-            };
         });
     }
 
-    /** @internal */
-    private async _evalTokens(tokens: Token[], {
-        onToken,
-        signal,
-        maxTokens,
-        temperature,
-        topK,
-        topP,
-        grammar,
-        trimWhitespaceSuffix = false,
-        repeatPenalty: {
-            lastTokens: repeatPenaltyLastTokens = 64,
-            punishTokensFilter,
-            penalizeNewLine,
-            penalty,
-            frequencyPenalty,
-            presencePenalty
-        } = {}
-    }: {
-        onToken?: (tokens: Token[]) => void,
-        signal?: AbortSignal,
-        maxTokens?: number,
-        temperature?: number,
-        topK?: number,
-        topP?: number,
-        grammar?: LlamaGrammar,
-        trimWhitespaceSuffix?: boolean,
-        repeatPenalty?: LlamaChatSessionRepeatPenalty
-    } = {}) {
-        if (this._sequence == null)
-            throw new DisposedError();
-
-        let stopStrings = this._promptWrapper.getStopStrings();
-
-        if (grammar != null)
-            stopStrings = stopStrings.concat(grammar.stopStrings);
-
-        const stopStringIndexes: number[] = Array(stopStrings.length).fill(0);
-        const skippedChunksQueue: Token[] = [];
-        const res: Token[] = [];
-        const grammarEvaluationState = grammar != null
-            ? new LlamaGrammarEvaluationState({grammar})
-            : undefined;
-        const repeatPenaltyEnabled = repeatPenaltyLastTokens > 0;
-        let stopReason: "eosToken" | "stopString" | "maxTokens" = "eosToken";
-
-        const getPenaltyTokens = () => {
-            let punishTokens = res.slice(-repeatPenaltyLastTokens);
-
-            if (punishTokensFilter != null)
-                punishTokens = punishTokensFilter(punishTokens);
-
-            if (!penalizeNewLine) {
-                const nlToken = this.sequence.context.model.tokens.nl;
-
-                if (nlToken != null)
-                    punishTokens = punishTokens.filter(token => token !== nlToken);
-            }
-
-            return Uint32Array.from(punishTokens);
-        };
-
-        const evaluationIterator = this._sequence.evaluate(tokens, removeNullFields({
-            temperature, topK, topP, grammarEvaluationState,
-            repeatPenalty: !repeatPenaltyEnabled ? undefined : {
-                punishTokens: getPenaltyTokens,
-                penalty,
-                frequencyPenalty,
-                presencePenalty
-            }
-        }));
-
-        for await (const chunk of evaluationIterator) {
-            if (signal?.aborted)
-                throw new AbortError();
-
-            if (this._sequence == null)
-                throw new DisposedError();
-
-            const tokenStr = this._sequence.context.model.detokenize([chunk]);
-            const {
-                shouldReturn, skipTokenEvent, stopString, stopStringSuffix
-            } = this._checkStopString(tokenStr, stopStrings, stopStringIndexes);
-
-            if (shouldReturn) {
-                skippedChunksQueue.push(chunk);
-                const skippedChunksText = skippedChunksQueue.length > 0
-                    ? this._sequence.context.model.detokenize(skippedChunksQueue)
-                    : "";
-
-                let [queuedTextBeforeStopString] = skippedChunksText.split(stopString);
-
-                if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
-                    queuedTextBeforeStopString = queuedTextBeforeStopString.trimEnd();
-
-                if (queuedTextBeforeStopString.length > 0) {
-                    const beforeStopStringTokens: Token[] = Array.from(this._sequence.context.model.tokenize(queuedTextBeforeStopString));
-
-                    res.push(...beforeStopStringTokens);
-                    onToken?.(beforeStopStringTokens);
-                    skippedChunksQueue.length = 0;
-                }
-
-                stopReason = "stopString";
-
-                return {
-                    text: this._sequence.context.model.detokenize(res),
-                    stopReason,
-                    stopString,
-                    stopStringSuffix
-                };
-            }
-
-            // if the token is unknown, it means it's not complete character
-            if (tokenStr === UNKNOWN_UNICODE_CHAR || skipTokenEvent || (
-                (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && tokenStr.trim() === ""
-            )) {
-                skippedChunksQueue.push(chunk);
-                continue;
-            }
-
-            if (skippedChunksQueue.length > 0) {
-                res.push(...skippedChunksQueue);
-                onToken?.(skippedChunksQueue);
-                skippedChunksQueue.length = 0;
-            }
-
-            res.push(chunk);
-            onToken?.([chunk]);
-
-            if (maxTokens != null && maxTokens > 0 && res.length >= maxTokens) {
-                stopReason = "maxTokens";
-                break;
-            }
-        }
-
-        if (this._sequence == null)
-            throw new DisposedError();
-
-        let resText = this._sequence.context.model.detokenize(res);
-
-        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
-            resText = resText.trimEnd();
-
-        return {
-            text: resText,
-            stopReason,
-            stopString: null,
-            stopStringSuffix: null
-        };
+    public getChatHistory() {
+        return structuredClone(this._chatHistory);
     }
 
-    /** @internal */
-    private _checkStopString(tokenStr: string, stopStrings: string[], stopStringIndexes: number[]){
-        let skipTokenEvent = false;
+    public getLastEvaluationContextWindow() {
+        if (this._lastEvaluation == null)
+            return null;
 
-        for (let stopStringIndex = 0; stopStringIndex < stopStrings.length; stopStringIndex++) {
-            const stopString = stopStrings[stopStringIndex];
+        return structuredClone(this._lastEvaluation?.contextWindow);
+    }
 
-            let localShouldSkipTokenEvent = false;
-            let i = 0;
-            for (; i < tokenStr.length && stopStringIndexes[stopStringIndex] !== stopString.length; i++) {
-                if (tokenStr[i] === stopString[stopStringIndexes[stopStringIndex]]) {
-                    stopStringIndexes[stopStringIndex]++;
-                    localShouldSkipTokenEvent = true;
-                } else {
-                    stopStringIndexes[stopStringIndex] = 0;
-                    localShouldSkipTokenEvent = false;
-                }
-            }
-
-            if (stopStringIndexes[stopStringIndex] === stopString.length) {
-                return {
-                    shouldReturn: true,
-                    stopString,
-                    stopStringSuffix: tokenStr.length === i
-                        ? null
-                        : tokenStr.slice(i)
-                };
-            }
-
-            skipTokenEvent ||= localShouldSkipTokenEvent;
-        }
-
-        return {skipTokenEvent};
+    public setChatHistory(chatHistory: ChatHistoryItem[]) {
+        this._chatHistory = structuredClone(chatHistory);
+        this._lastEvaluation = undefined;
     }
 
     /** @internal */
     private _ensureNotDisposed() {
-        if (this._sequence == null)
+        if (this.disposed)
             throw new DisposedError();
     }
+}
+
+export function defineChatSessionFunction<const Params extends GbnfJsonSchema | undefined>({
+    description,
+    params,
+    handler
+}: {
+    description?: string,
+    params?: Params,
+    handler: (params: GbnfJsonSchemaToType<Params>) => any
+}): ChatSessionModelFunction<Params> {
+    return {
+        description,
+        params,
+        handler
+    };
+}
+
+function addFunctionCallToChatHistory({
+    chatHistory,
+    functionName,
+    functionDescription,
+    callParams,
+    callResult,
+    raw
+}: {
+    chatHistory: ChatHistoryItem[],
+    functionName: string,
+    functionDescription?: string,
+    callParams: any,
+    callResult: any,
+    raw?: string
+}) {
+    const newChatHistory = chatHistory.slice();
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
+        newChatHistory.push({
+            type: "model",
+            response: []
+        });
+
+    const lastModelResponseItem = newChatHistory[newChatHistory.length - 1] as ChatModelResponse;
+    const newLastModelResponseItem = {...lastModelResponseItem};
+    newChatHistory[newChatHistory.length - 1] = newLastModelResponseItem;
+
+    const modelResponse = newLastModelResponseItem.response.slice();
+    newLastModelResponseItem.response = modelResponse;
+
+    modelResponse.push({
+        type: "functionCall",
+        name: functionName,
+        description: functionDescription,
+        params: callParams,
+        result: callResult,
+        raw
+    });
+
+    return newChatHistory;
+}
+
+function getLastModelResponseItem(chatHistory: ChatHistoryItem[]) {
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "model")
+        throw new Error("Expected chat history to end with a model response");
+
+    return chatHistory[chatHistory.length - 1] as ChatModelResponse;
 }

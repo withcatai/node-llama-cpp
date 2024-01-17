@@ -4,20 +4,23 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
-import withOra from "../../utils/withOra.js";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
-import {LlamaChatPromptWrapper} from "../../chatWrappers/LlamaChatPromptWrapper.js";
-import {GeneralChatPromptWrapper} from "../../chatWrappers/GeneralChatPromptWrapper.js";
-import {ChatMLChatPromptWrapper} from "../../chatWrappers/ChatMLChatPromptWrapper.js";
+import {LlamaChatWrapper} from "../../chatWrappers/LlamaChatWrapper.js";
+import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
+import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
-import {ChatPromptWrapper} from "../../ChatPromptWrapper.js";
-import {FalconChatPromptWrapper} from "../../chatWrappers/FalconChatPromptWrapper.js";
+import {ChatWrapper} from "../../ChatWrapper.js";
+import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
+import withStatusLogs from "../../utils/withStatusLogs.js";
+import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
+import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.js";
+import {defineChatSessionFunction} from "../../llamaEvaluator/LlamaChatSession.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 import type {ModelTypeDescription} from "../../utils/getBin.js";
 
-const modelWrappers = ["auto", "general", "llamaChat", "chatML", "falconChat"] as const;
+const modelWrappers = ["auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"] as const;
 
 type ChatCommand = {
     model: string,
@@ -39,7 +42,8 @@ type ChatCommand = {
     repeatFrequencyPenalty?: number,
     repeatPresencePenalty?: number,
     maxTokens: number,
-    noHistory: boolean
+    noHistory: boolean,
+    environmentFunctions: boolean
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
@@ -81,7 +85,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("wrapper", {
                 alias: "w",
                 type: "string",
-                default: "general" as ChatCommand["wrapper"],
+                default: "auto" as ChatCommand["wrapper"],
                 choices: modelWrappers,
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
@@ -186,19 +190,27 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Don't load or save chat history",
                 group: "Optional:"
+            })
+            .option("environmentFunctions", {
+                alias: "ef",
+                type: "boolean",
+                default: false,
+                description: "Provide access to environment functions like `getDate` and `getTime`",
+                group: "Optional:"
             });
     },
     async handler({
         model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
-        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
+        environmentFunctions
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
                 topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens, noHistory
+                repeatPresencePenalty, maxTokens, noHistory, environmentFunctions
             });
         } catch (err) {
             console.error(err);
@@ -211,7 +223,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
-    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
+    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -219,16 +231,27 @@ async function RunChat({
     const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
     const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
 
+    if (systemInfo)
+        console.log(LlamaModel.systemInfo);
+
     let initialPrompt = prompt ?? null;
-    const model = new LlamaModel({
+    const model = await withStatusLogs({
+        loading: chalk.blue("Loading model"),
+        success: chalk.blue("Model loaded"),
+        fail: chalk.blue("Failed to load model")
+    }, async () => new LlamaModel({
         modelPath: path.resolve(process.cwd(), modelArg),
         gpuLayers: gpuLayers != null ? gpuLayers : undefined
-    });
-    const context = new LlamaContext({
+    }));
+    const context = await withStatusLogs({
+        loading: chalk.blue("Creating context"),
+        success: chalk.blue("Context created"),
+        fail: chalk.blue("Failed to create context")
+    }, async () => new LlamaContext({
         model,
         contextSize,
         threads
-    });
+    }));
     const grammar = jsonSchemaGrammarFilePath != null
         ? new LlamaJsonSchemaGrammar(
             await fs.readJson(
@@ -240,16 +263,15 @@ async function RunChat({
             : undefined;
     const bos = model.tokens.bosString; // bos = beginning of sequence
     const eos = model.tokens.bosString; // eos = end of sequence
-    const promptWrapper = getChatWrapper(wrapper, {
+    const chatWrapper = getChatWrapper(wrapper, {
         bosString: bos,
         filename: model.filename,
         typeDescription: model.typeDescription
     });
     const session = new LlamaChatSession({
         contextSequence: context.getSequence(),
-        printLLamaSystemInfo: systemInfo,
         systemPrompt,
-        promptWrapper
+        chatWrapper: chatWrapper
     });
 
     if (grammarArg != "text" && jsonSchemaGrammarFilePath != null)
@@ -257,9 +279,10 @@ async function RunChat({
 
     console.info(`${chalk.yellow("Context size:")} ${context.contextSize}`);
     console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
+    console.info(`${chalk.yellow("Model type:")} ${model.typeDescription}`);
     console.info(`${chalk.yellow("BOS:")} ${bos}`);
     console.info(`${chalk.yellow("EOS:")} ${eos}`);
-    console.info(`${chalk.yellow("Chat wrapper:")} ${promptWrapper.wrapperName}`);
+    console.info(`${chalk.yellow("Chat wrapper:")} ${chatWrapper.wrapperName}`);
     console.info(`${chalk.yellow("Repeat penalty:")} ${repeatPenalty} (apply to last ${lastTokensRepeatPenalty} tokens)`);
 
     if (repeatFrequencyPenalty != null)
@@ -278,13 +301,10 @@ async function RunChat({
     else if (grammarArg !== "text")
         console.info(`${chalk.yellow("Grammar:")} ${grammarArg}`);
 
-    await withOra({
-        loading: chalk.blue("Loading model"),
-        success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model")
-    }, async () => {
-        await session.init();
-    });
+    if (environmentFunctions && grammar != null) {
+        console.warn(chalk.yellow("Environment functions are disabled since a grammar is already specified"));
+        environmentFunctions = false;
+    }
 
     // this is for ora to not interfere with readline
     await new Promise(resolve => setTimeout(resolve, 1));
@@ -325,7 +345,7 @@ async function RunChat({
 
         process.stdout.write(startColor);
         await session.prompt(input, {
-            grammar,
+            grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
             temperature,
             topK,
             topP,
@@ -343,12 +363,30 @@ async function RunChat({
                     : maxTokens,
             onToken(chunk) {
                 process.stdout.write(model.detokenize(chunk));
-            }
+            },
+            functions: (grammar == null && environmentFunctions)
+                ? defaultEnvironmentFunctions
+                : undefined
         });
         process.stdout.write(endColor);
         console.log();
     }
 }
+
+const defaultEnvironmentFunctions = {
+    getDate: defineChatSessionFunction({
+        description: "Retrieve the current date",
+        handler() {
+            return new Date().toLocaleDateString();
+        }
+    }),
+    getTime: defineChatSessionFunction({
+        description: "Retrieve the current time",
+        handler() {
+            return new Date().toLocaleTimeString();
+        }
+    })
+};
 
 function getChatWrapper(wrapper: ChatCommand["wrapper"], {
     bosString,
@@ -358,16 +396,20 @@ function getChatWrapper(wrapper: ChatCommand["wrapper"], {
     bosString?: string | null,
     filename?: string,
     typeDescription?: ModelTypeDescription
-}): ChatPromptWrapper {
+}): ChatWrapper {
     switch (wrapper) {
         case "general":
-            return new GeneralChatPromptWrapper();
+            return new GeneralChatWrapper();
         case "llamaChat":
-            return new LlamaChatPromptWrapper();
+            return new LlamaChatWrapper();
+        case "alpacaChat":
+            return new AlpacaChatWrapper();
+        case "functionary":
+            return new FunctionaryChatWrapper();
         case "chatML":
-            return new ChatMLChatPromptWrapper();
+            return new ChatMLChatWrapper();
         case "falconChat":
-            return new FalconChatPromptWrapper();
+            return new FalconChatWrapper();
         default:
     }
 
@@ -381,7 +423,7 @@ function getChatWrapper(wrapper: ChatCommand["wrapper"], {
         if (chatWrapper != null)
             return new chatWrapper();
 
-        return new GeneralChatPromptWrapper();
+        return new GeneralChatWrapper();
     }
 
     void (wrapper satisfies never);
