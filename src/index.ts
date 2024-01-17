@@ -21,6 +21,7 @@ import {GeneralChatPromptWrapper} from "./chatWrappers/GeneralChatPromptWrapper.
 import {ChatMLChatPromptWrapper} from "./chatWrappers/ChatMLChatPromptWrapper.js";
 import {FalconChatPromptWrapper} from "./chatWrappers/FalconChatPromptWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "./chatWrappers/resolveChatWrapperBasedOnModel.js";
+import {LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText} from "./utils/LlamaText.js";
 import {getReleaseInfo} from "./utils/getReleaseInfo.js";
 
 import {type ConversationInteraction, type Token} from "./types.js";
@@ -68,6 +69,11 @@ export {
     ChatMLChatPromptWrapper,
     FalconChatPromptWrapper,
     resolveChatWrapperBasedOnModel,
+    LlamaText,
+    SpecialToken,
+    BuiltinSpecialToken,
+    isLlamaText,
+    tokenizeText,
     getReleaseInfo,
     type Token,
     type GbnfJsonSchema,

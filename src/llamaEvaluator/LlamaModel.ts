@@ -5,6 +5,7 @@ import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
 import {ModelTypeDescription} from "../utils/getBin.js";
 import {addonBinding, AddonModel} from "./LlamaBins.js";
+import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
 
 export type LlamaModelOptions = {
@@ -56,6 +57,9 @@ export class LlamaModel {
         }));
         this._tokens = LlamaModelTokens._create(this._model, this._disposedState);
         this._filename = path.basename(modelPath);
+
+        this.tokenize = this.tokenize.bind(this);
+        this.detokenize = this.detokenize.bind(this);
     }
 
     public dispose() {
@@ -84,14 +88,35 @@ export class LlamaModel {
         return this._filename;
     }
 
-    /** Transform text into tokens that can be fed to the model */
-    public tokenize(text: string): Token[] {
+    /**
+     * Transform text into tokens that can be fed to the model
+     * @param text - the text to tokenize
+     * @param [specialTokens] - if set to true, text that correspond to special tokens will be tokenized to those tokens.
+     * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
+     * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
+     */
+    public tokenize(text: string, specialTokens?: boolean): Token[];
+    public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
+    public tokenize(text: string, specialTokens: boolean | "builtin" = false): Token[] {
         this._ensureNotDisposed();
 
         if (text === "")
             return [];
 
-        return Array.from(this._model.tokenize(text)) as Token[];
+        if (specialTokens === "builtin") {
+            const builtinToken = text as BuiltinSpecialTokenValue;
+
+            switch (builtinToken) {
+                case "BOS": return this.tokens.bos == null ? [] : [this.tokens.bos];
+                case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
+                case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
+            }
+
+            void (builtinToken satisfies never);
+            throw new Error(`Unknown builtin special token: ${builtinToken}`);
+        }
+
+        return Array.from(this._model.tokenize(text, specialTokens)) as Token[];
     }
 
     /** Transform tokens into text */
