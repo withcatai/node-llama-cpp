@@ -21,6 +21,7 @@ const modelWrappers = ["auto", "general", "llamaChat", "chatML", "falconChat"] a
 type ChatCommand = {
     model: string,
     systemInfo: boolean,
+    printTimings: boolean,
     systemPrompt: string,
     prompt?: string,
     wrapper: (typeof modelWrappers)[number],
@@ -60,6 +61,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Print llama.cpp system info",
+                group: "Optional:"
+            })
+            .option("printTimings", {
+                type: "boolean",
+                default: false,
+                description: "Print llama.cpp timings",
                 group: "Optional:"
             })
             .option("systemPrompt", {
@@ -191,13 +198,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
-        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
                 topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens, noHistory
+                repeatPresencePenalty, maxTokens, noHistory, printTimings
             });
         } catch (err) {
             console.error(err);
@@ -210,7 +217,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
-    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory
+    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -340,6 +347,9 @@ async function RunChat({
         });
         process.stdout.write(endColor);
         console.log();
+
+        if (printTimings)
+            context.printTimings();
     }
 }
 

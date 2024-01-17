@@ -138,6 +138,7 @@ export type LLAMAContext = {
     tokenNl(): number,
     getContextSize(): number
     getTokenString(token: number): string
+    printTimings(): undefined
 };
 
 export type LLAMAGrammar = {
