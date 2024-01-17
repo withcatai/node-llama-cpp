@@ -383,7 +383,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                     const auto resolved_n_threads = n_threads == 0 ? std::thread::hardware_concurrency() : n_threads;
 
                     context_params.n_threads = resolved_n_threads;
-                    context_params.n_threads_batch = resolved_n_threads
+                    context_params.n_threads_batch = resolved_n_threads;
                 }
             }
 
