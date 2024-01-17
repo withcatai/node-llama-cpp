@@ -32,12 +32,6 @@ export class LlamaGrammar {
      * > More info here: [github:ggerganov/llama.cpp:grammars/README.md](
      * > https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
      * @param options
-     * @param options.grammar - GBNF grammar
-     * @param [options.stopStrings] - Consider any of these texts as EOS for the generated out.
-     * Only supported by `LlamaChatSession`
-     * @param [options.trimWhitespaceSuffix] - Trim whitespace from the end of the generated text.
-     * Only supported by `LlamaChatSession`
-     * @param [options.printGrammar] - print the grammar to stdout
      */
     public constructor({
         grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
