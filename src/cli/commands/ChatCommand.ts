@@ -16,9 +16,9 @@ import {ReplHistory} from "../../utils/ReplHistory.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.js";
+import {defineChatSessionFunction} from "../../llamaEvaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
 import type {ModelTypeDescription} from "../../utils/getBin.js";
-import {defineChatSessionFunction} from "../../llamaEvaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 
 const modelWrappers = ["auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"] as const;
 
