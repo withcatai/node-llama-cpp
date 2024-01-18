@@ -1,13 +1,12 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {defaultChatSystemPrompt} from "../config.js";
-import {ChatWrapper} from "../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions, Token} from "../types.js";
-import {appendUserMessageToChatHistory} from "../utils/appendUserMessageToChatHistory.js";
-import {GbnfJsonSchema, GbnfJsonSchemaToType} from "../utils/gbnfJson/types.js";
-import {LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
-import {LlamaGrammar} from "./LlamaGrammar.js";
-import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "./LlamaChat/LlamaChat.js";
-import {EvaluationPriority} from "./LlamaContext/types.js";
+import {defaultChatSystemPrompt} from "../../config.js";
+import {ChatWrapper} from "../../ChatWrapper.js";
+import {ChatHistoryItem, ChatModelResponse, ChatSessionModelFunctions, Token} from "../../types.js";
+import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToChatHistory.js";
+import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
+import {LlamaGrammar} from "../LlamaGrammar.js";
+import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../LlamaChat/LlamaChat.js";
+import {EvaluationPriority} from "../LlamaContext/types.js";
 
 
 export type LlamaChatSessionOptions = {
@@ -398,22 +397,6 @@ export class LlamaChatSession {
         if (this.disposed)
             throw new DisposedError();
     }
-}
-
-export function defineChatSessionFunction<const Params extends GbnfJsonSchema | undefined>({
-    description,
-    params,
-    handler
-}: {
-    description?: string,
-    params?: Params,
-    handler: (params: GbnfJsonSchemaToType<Params>) => any
-}): ChatSessionModelFunction<Params> {
-    return {
-        description,
-        params,
-        handler
-    };
 }
 
 function addFunctionCallToChatHistory({

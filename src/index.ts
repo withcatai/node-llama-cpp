@@ -11,9 +11,10 @@ import {
     type ContextTokensDeleteRange, type EvaluationPriority
 } from "./llamaEvaluator/LlamaContext/types.js";
 import {
-    LlamaChatSession, defineChatSessionFunction, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
+    LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
     type LLamaChatPromptOptions, type LlamaChatSessionRepeatPenalty
-} from "./llamaEvaluator/LlamaChatSession.js";
+} from "./llamaEvaluator/LlamaChatSession/LlamaChatSession.js";
+import {defineChatSessionFunction} from "./llamaEvaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
     LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatContextShiftOptions,
     type LLamaChatRepeatPenalty, type LlamaChatResponse, type LlamaChatResponseFunctionCall
