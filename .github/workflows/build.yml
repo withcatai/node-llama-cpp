@@ -260,10 +260,10 @@ jobs:
           name: llama.cpp
           path: llama/llama.cpp
 
-      - name: Install dependencies on ubuntu
+      - name: Install dependencies on macOS
         run: |
-          sudo apt-get update
-          sudo apt-get install ninja-build cmake 
+          brew install cmake ninja
+          alias make=cmake
 
       - name: Install modules
         run: npm ci
