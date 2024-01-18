@@ -5,7 +5,7 @@ import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, cliName: string = cliBinName) {
-    const title = cliName + " " + command.command ?? "";
+    const title = cliName + " " + (command.command ?? "");
     const description = command.describe ?? "";
     const optionGroups = await getOptionsGroupFromCommand(command);
 
