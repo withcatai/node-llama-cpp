@@ -239,7 +239,7 @@ jobs:
 
   model-dependant-tests:
     name: Model dependant tests
-    runs-on: macos-latest-xlarge
+    runs-on: macos-13
     needs:
       - build
     steps:
