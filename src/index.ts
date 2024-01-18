@@ -20,7 +20,7 @@ import {
     type LLamaChatRepeatPenalty, type LlamaChatResponse, type LlamaChatResponseFunctionCall
 } from "./llamaEvaluator/LlamaChat/LlamaChat.js";
 import {AbortError} from "./AbortError.js";
-import {ChatWrapper} from "./ChatWrapper.js";
+import {ChatWrapper, type ChatWrapperSettings} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {LlamaChatWrapper} from "./chatWrappers/LlamaChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
@@ -29,7 +29,10 @@ import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
 import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "./chatWrappers/resolveChatWrapperBasedOnModel.js";
-import {LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText} from "./utils/LlamaText.js";
+import {
+    LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
+    type LlamaTextSpecialTokenJSON
+} from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getReleaseInfo} from "./utils/getReleaseInfo.js";
 
@@ -83,6 +86,7 @@ export {
     AbortError,
     DisposedError,
     ChatWrapper,
+    type ChatWrapperSettings,
     EmptyChatWrapper,
     LlamaChatWrapper,
     GeneralChatWrapper,
@@ -96,6 +100,9 @@ export {
     BuiltinSpecialToken,
     isLlamaText,
     tokenizeText,
+    type LlamaTextJSON,
+    type LlamaTextJSONValue,
+    type LlamaTextSpecialTokenJSON,
     appendUserMessageToChatHistory,
     getReleaseInfo,
     type ChatHistoryItem,

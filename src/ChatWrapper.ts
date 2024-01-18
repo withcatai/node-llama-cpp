@@ -2,36 +2,38 @@ import {ChatHistoryItem, ChatModelFunctions, ChatModelResponse} from "./types.js
 import {LlamaText} from "./utils/LlamaText.js";
 import {getTypeScriptTypeStringForGbnfJsonSchema} from "./utils/getTypeScriptTypeStringForGbnfJsonSchema.js";
 
+export type ChatWrapperSettings = {
+    readonly functions: {
+        readonly call: {
+            readonly optionalPrefixSpace: boolean,
+            readonly prefix: string,
+            readonly paramsPrefix: string,
+            readonly suffix: string
+        },
+        readonly result: {
+            readonly prefix: string,
+            readonly suffix: string
+        }
+    }
+};
+
 export abstract class ChatWrapper {
     public abstract readonly wrapperName: string;
 
-    public readonly settings: {
-        readonly functions: {
-            readonly call: {
-                readonly optionalPrefixSpace: boolean,
-                readonly prefix: string,
-                readonly paramsPrefix: string,
-                readonly suffix: string
+    public readonly settings: ChatWrapperSettings = {
+        functions: {
+            call: {
+                optionalPrefixSpace: true,
+                prefix: "[[call: ",
+                paramsPrefix: "(",
+                suffix: ")]]"
             },
-            readonly result: {
-                readonly prefix: string,
-                readonly suffix: string
+            result: {
+                prefix: " [[result: ",
+                suffix: "]]"
             }
         }
-    } = {
-            functions: {
-                call: {
-                    optionalPrefixSpace: true,
-                    prefix: "[[call: ",
-                    paramsPrefix: "(",
-                    suffix: ")]]"
-                },
-                result: {
-                    prefix: " [[result: ",
-                    suffix: "]]"
-                }
-            }
-        };
+    };
 
     public generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
         availableFunctions?: ChatModelFunctions,
