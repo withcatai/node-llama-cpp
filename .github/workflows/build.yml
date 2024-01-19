@@ -269,7 +269,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --no-metal
 
       - name: Cache models
         id: cache-test-models
