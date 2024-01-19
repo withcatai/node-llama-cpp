@@ -240,8 +240,8 @@ jobs:
       - name: Run standalone tests
         run: npm run test:standalone
 
-  model-dependant-tests:
-    name: Model dependant tests
+  model-dependent-tests:
+    name: Model dependent tests
     runs-on: macos-13
     needs:
       - build
@@ -284,8 +284,8 @@ jobs:
       - name: Download models or ensure all models are downloaded
         run: npm run dev:setup:downloadAllTestModels
 
-      - name: Run model dependant tests
-        run: npm run test:modelDependant
+      - name: Run model dependent tests
+        run: npm run test:modelDependent
 
   release:
     name: Release
