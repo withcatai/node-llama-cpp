@@ -176,16 +176,19 @@ jobs:
           await $`mkdir -p llamaBins`;
           
           for (const arch of arches) {
+            const additionalFlags = [];
             let buildNodeVersion = nodeVersion;
             
             if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
               buildNodeVersion = windowsOnArmNodeVersion;
+            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "x64") {
+              additionalFlags.push("--no-metal");
             }
             
             console.log(`Building ${arch} for node ${buildNodeVersion}`);
             
-            const binName = `${process.env.ARTIFACT_NAME}-${arch}`; 
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion}`;
+            const binName = `${process.env.ARTIFACT_NAME}-${arch}`;
+            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion} ${additionalFlags}`;
             await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
           }
           
@@ -269,7 +272,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build --no-metal
+        run: node ./dist/cli/cli.js build
 
       - name: Cache models
         id: cache-test-models
