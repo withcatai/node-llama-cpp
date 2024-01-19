@@ -19,5 +19,6 @@
     "useCodeBlocks": true,
     "expandObjects": true,
     "parametersFormat": "table",
-    "hideInPageTOC": true
+    "hideInPageTOC": true,
+    "docsRoot": "../docs"
 }

@@ -17,10 +17,10 @@ const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y"
 const hostname = "https://withcatai.github.io/node-llama-cpp/";
 
 const chatWrappersOrder = [
-    "GeneralChatPromptWrapper",
-    "LlamaChatPromptWrapper",
-    "ChatMLChatPromptWrapper",
-    "FalconChatPromptWrapper"
+    "GeneralChatWrapper",
+    "LlamaChatWrapper",
+    "ChatMLChatWrapper",
+    "FalconChatWrapper"
 ] as const;
 
 function resolveHref(href: string) {
@@ -195,7 +195,7 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 
                     if (item.items instanceof Array)
                         item.items = item.items.map((subItem) => {
-                            if (subItem.collapsed)
+                            if ((subItem as {collapsed?: boolean}).collapsed)
                                 // @ts-ignore
                                 delete subItem.collapsed;
 
@@ -212,52 +212,70 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
     orderClasses(sidebar);
     orderTypes(sidebar);
+    orderFunctions(sidebar);
 
     return sidebar;
 }
 
 function orderClasses(sidebar: typeof typedocSidebar) {
-    const baseChatPromptWrapper = "ChatPromptWrapper";
-    const chatPromptWrapperItems: DefaultTheme.SidebarItem[] = [];
+    const baseChatWrapper = "ChatWrapper";
+    const chatWrapperItems: DefaultTheme.SidebarItem[] = [];
 
     const classes = sidebar.find((item) => item.text === "Classes");
 
     if (classes == null || !(classes.items instanceof Array))
         return;
 
-    (classes.items as DefaultTheme.SidebarItem[]).unshift({
+    const chatWrappersGroup = {
         text: "Chat wrappers",
         collapsed: false,
-        items: chatPromptWrapperItems
-    });
+        items: chatWrapperItems
+    };
+    (classes.items as DefaultTheme.SidebarItem[]).unshift(chatWrappersGroup);
 
-    const chatPromptWrapper = classes.items.find((item) => item.text === baseChatPromptWrapper);
-    if (chatPromptWrapper != null) {
-        classes.items.splice(classes.items.indexOf(chatPromptWrapper), 1);
-        classes.items.unshift(chatPromptWrapper);
-    }
+    moveItem(
+        classes.items,
+        (item) => item.text === baseChatWrapper,
+        0
+    );
 
-    for (const item of classes.items.slice()) {
-        if (item.text === baseChatPromptWrapper || !item.text.endsWith(baseChatPromptWrapper))
-            continue;
+    groupItems(
+        classes.items,
+        (item) => item === chatWrappersGroup,
+        (item) => item.text !== baseChatWrapper && item.text?.endsWith(baseChatWrapper),
+        {moveToEndIfGrouped: false, collapsed: false}
+    )
 
-        classes.items.splice(classes.items.indexOf(item), 1);
-        chatPromptWrapperItems.push(item);
-    }
+    groupItems(
+        classes.items,
+        (item) => item.text === "LlamaModelTokens",
+        (item) => item.text != null && ["LlamaModelInfillTokens"].includes(item.text),
+        {moveToEndIfGrouped: false}
+    )
+    groupItems(
+        classes.items,
+        (item) => item.text === "LlamaModel",
+        (item) => item.text != null && ["LlamaModelTokens"].includes(item.text),
+        {moveToEndIfGrouped: false}
+    )
 
-    chatPromptWrapperItems.sort((a, b) => {
-        const aIndex = chatWrappersOrder.indexOf(a.text as typeof chatWrappersOrder[number]);
-        const bIndex = chatWrappersOrder.indexOf(b.text as typeof chatWrappersOrder[number]);
+    const LlamaTextGroup = {
+        text: "LlamaText",
+        collapsed: true,
+        items: []
+    };
+    (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
+    const LlamaTextGroupItemsOrder = ["SpecialToken", "BuiltinSpecialToken"];
 
-        if (aIndex < 0 && bIndex < 0)
-            return 0;
-        if (aIndex < 0)
-            return 1;
-        if (bIndex < 0)
-            return -1;
+    groupItems(
+        classes.items,
+        (item) => item === LlamaTextGroup,
+        (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
+        {moveToEndIfGrouped: false}
+    )
+    sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
 
-        return aIndex - bIndex;
-    });
+    sortItemsInOrder(chatWrapperItems, chatWrappersOrder);
 }
 
 function orderTypes(sidebar: typeof typedocSidebar) {
@@ -266,55 +284,8 @@ function orderTypes(sidebar: typeof typedocSidebar) {
     if (types == null || !(types.items instanceof Array))
         return;
 
-    function groupItems(
-        findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-        findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-        {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
-    ) {
-        const children: DefaultTheme.SidebarItem[] = [];
-
-        if (types == null || !(types.items instanceof Array))
-            return;
-
-        const parent = types.items.find(findParent) as DefaultTheme.SidebarItem | null;
-
-        if (parent == null)
-            return;
-
-        for (const item of types.items.slice()) {
-            if (item === parent || !findChildren(item))
-                continue;
-
-            types.items.splice(types.items.indexOf(item), 1);
-            children.push(item);
-        }
-
-        if (children.length > 0) {
-            parent.collapsed = collapsed;
-            parent.items = children;
-
-            if (moveToEndIfGrouped) {
-                types.items.splice(types.items.indexOf(parent as typeof types.items[number]), 1);
-                types.items.push(parent as typeof types.items[number]);
-            }
-        }
-    }
-
-    function moveCollapseItemsToTheEnd() {
-        if (types == null || !(types.items instanceof Array))
-            return;
-
-        types.items.sort((a, b) => {
-            if (a.collapsed && !b.collapsed)
-                return 1;
-            if (!a.collapsed && b.collapsed)
-                return -1;
-
-            return 0;
-        });
-    }
-
     groupItems(
+        types.items,
         (item) => item.text === "BatchingOptions",
         (item) => (
             item.text === "BatchItem" ||
@@ -325,13 +296,149 @@ function orderTypes(sidebar: typeof typedocSidebar) {
         {collapsed: false}
     );
     groupItems(
+        types.items,
         (item) => item.text === "LlamaContextOptions",
         (item) => item.text === "BatchingOptions"
     );
     groupItems(
+        types.items,
         (item) => item.text === "GbnfJsonSchema",
         (item) => item.text?.startsWith("GbnfJson")
     );
-    
-    moveCollapseItemsToTheEnd();
+
+    groupItems(
+        types.items,
+        (item) => item.text === "LlamaChatSessionOptions",
+        (item) => item.text != null && ["LlamaChatSessionContextShiftOptions"].includes(item.text)
+    );
+
+    groupItems(
+        types.items,
+        (item) => item.text === "LLamaChatPromptOptions",
+        (item) => item.text != null && ["LlamaChatSessionRepeatPenalty", "ChatSessionModelFunctions"].includes(item.text)
+    );
+
+    groupItems(
+        types.items,
+        (item) => item.text === "ChatModelResponse",
+        (item) => item.text === "ChatModelFunctionCall"
+    );
+    groupItems(
+        types.items,
+        (item) => item.text === "ChatHistoryItem",
+        (item) => item.text != null && ["ChatSystemMessage", "ChatUserMessage", "ChatModelResponse"].includes(item.text)
+    );
+
+    groupItems(
+        types.items,
+        (item) => item.text === "LlamaChatResponse",
+        (item) => item.text === "LlamaChatResponseFunctionCall"
+    );
+
+    groupItems(
+        types.items,
+        (item) => item.text === "LlamaText",
+        (item) => item.text?.startsWith("LlamaText")
+    );
+
+    moveCollapseItemsToTheEnd(types.items);
+}
+
+function orderFunctions(sidebar: typeof typedocSidebar) {
+    const types = sidebar.find((item) => item.text === "Functions");
+
+    if (types == null || !(types.items instanceof Array))
+        return;
+
+    groupItems(
+        types.items,
+        (item) => item.text === "LlamaText",
+        (item) => item.text != null && ["isLlamaText", "tokenizeText"].includes(item.text)
+    );
+
+    moveCollapseItemsToTheEnd(types.items);
+}
+
+
+function groupItems(
+    items: DefaultTheme.SidebarItem[] | undefined,
+    findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
+    findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
+    {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
+) {
+    const children: DefaultTheme.SidebarItem[] = [];
+
+    if (items == null || !(items instanceof Array))
+        return;
+
+    const parent = items.find(findParent) as DefaultTheme.SidebarItem | null;
+
+    if (parent == null)
+        return;
+
+    for (const item of items.slice()) {
+        if (item === parent || !findChildren(item))
+            continue;
+
+        items.splice(items.indexOf(item), 1);
+        children.push(item);
+    }
+
+    if (children.length > 0) {
+        parent.collapsed = collapsed;
+        parent.items = children;
+
+        if (moveToEndIfGrouped) {
+            items.splice(items.indexOf(parent as typeof items[number]), 1);
+            items.push(parent as typeof items[number]);
+        }
+    }
+}
+
+function moveItem(
+    items: DefaultTheme.SidebarItem[] | undefined,
+    findItem: (item: DefaultTheme.SidebarItem) => boolean | undefined,
+    newIndex: number
+) {
+    if (items == null || !(items instanceof Array))
+        return;
+
+    const item = items.find(findItem);
+    if (item != null) {
+        items.splice(items.indexOf(item), 1);
+        items.splice(newIndex, 0, item);
+    }
+}
+
+function moveCollapseItemsToTheEnd(items: DefaultTheme.SidebarItem[] | undefined) {
+    if (items == null || !(items instanceof Array))
+        return;
+
+    items.sort((a, b) => {
+        if (a.collapsed && !b.collapsed)
+            return 1;
+        if (!a.collapsed && b.collapsed)
+            return -1;
+
+        return 0;
+    });
+}
+
+function sortItemsInOrder(items: DefaultTheme.SidebarItem[] | undefined, order: readonly string[]) {
+    if (items == null || !(items instanceof Array))
+        return;
+
+    items.sort((a, b) => {
+        const aIndex = order.indexOf(a.text as typeof order[number]);
+        const bIndex = order.indexOf(b.text as typeof order[number]);
+
+        if (aIndex < 0 && bIndex < 0)
+            return 0;
+        if (aIndex < 0)
+            return 1;
+        if (bIndex < 0)
+            return -1;
+
+        return aIndex - bIndex;
+    });
 }

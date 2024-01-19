@@ -8,4 +8,26 @@ export class GbnfGrammarGenerator {
 
         return `rule${ruleId}`;
     }
+
+    public generateGbnfFile(rootGrammar: string) {
+        const rules: {name: string, grammar: string}[] = [{
+            name: "root",
+            grammar: rootGrammar
+        }];
+
+        for (const [ruleName, grammar] of this.rules.entries()) {
+            if (grammar == null)
+                continue;
+
+            rules.push({
+                name: ruleName,
+                grammar
+            });
+        }
+
+        const ruleStrings = rules.map((rule) => rule.name + " ::= " + rule.grammar);
+        const gbnf = ruleStrings.join("\n");
+
+        return gbnf;
+    }
 }

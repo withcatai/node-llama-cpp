@@ -176,16 +176,19 @@ jobs:
           await $`mkdir -p llamaBins`;
           
           for (const arch of arches) {
+            const additionalFlags = [];
             let buildNodeVersion = nodeVersion;
             
             if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
               buildNodeVersion = windowsOnArmNodeVersion;
+            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "x64") {
+              additionalFlags.push("--no-metal");
             }
             
             console.log(`Building ${arch} for node ${buildNodeVersion}`);
             
-            const binName = `${process.env.ARTIFACT_NAME}-${arch}`; 
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion}`;
+            const binName = `${process.env.ARTIFACT_NAME}-${arch}`;
+            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion} ${additionalFlags}`;
             await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
           }
           
@@ -236,6 +239,53 @@ jobs:
 
       - name: Run standalone tests
         run: npm run test:standalone
+
+  model-dependent-tests:
+    name: Model dependent tests
+    runs-on: macos-13
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: dist
+
+      - name: Download llama.cpp artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: llama.cpp
+          path: llama/llama.cpp
+
+      - name: Install dependencies on macOS
+        run: |
+          brew install cmake ninja
+          alias make=cmake
+
+      - name: Install modules
+        run: npm ci
+
+      - name: Build binary
+        run: node ./dist/cli/cli.js build
+
+      - name: Cache models
+        id: cache-test-models
+        uses: actions/cache@v3
+        with:
+          path: "test/.models/**.gguf"
+          key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
+
+      - name: Download models or ensure all models are downloaded
+        run: npm run dev:setup:downloadAllTestModels
+
+      - name: Run model dependent tests
+        run: npm run test:modelDependent
 
   release:
     name: Release

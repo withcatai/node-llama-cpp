@@ -15,6 +15,8 @@
 
 </div>
 
+✨ New! [Try the beta of version `3.0.0`](https://github.com/withcatai/node-llama-cpp/pull/105) ✨
+
 ## Features
 * Run a text generation model locally on your machine
 * Metal and CUDA support

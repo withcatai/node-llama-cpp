@@ -5,9 +5,10 @@ import {BatchLogitIndex} from "../../utils/getBin.js";
 import {AddonContext} from "../LlamaBins.js";
 import {LlamaModel} from "../LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
+import {compareTokens} from "../../utils/compareTokens.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
-    LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, TokenPriority
+    LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
 import {resolveBatchItemsPrioritizingStrategy} from "./utils/resolveBatchItemsPrioritizingStrategy.js";
 
@@ -43,7 +44,6 @@ export class LlamaContext {
         seed = null,
         contextSize = model.trainContextSize,
         batchSize = contextSize,
-        f16Kv,
         logitsAll,
         embedding,
         threads = 6,
@@ -63,10 +63,9 @@ export class LlamaContext {
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
-            f16Kv,
             logitsAll,
             embedding,
-            threads
+            threads: Math.max(0, Math.floor(threads))
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
@@ -141,13 +140,11 @@ export class LlamaContext {
      * @param [options]
      */
     public getSequence({
-        prependBos = true,
         contextShift: {
             size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
         } = {}
     }: {
-        prependBos?: boolean,
         contextShift?: ContextShiftOptions
     } = {}): LlamaContextSequence {
         this._ensureNotDisposed();
@@ -160,7 +157,6 @@ export class LlamaContext {
         return LlamaContextSequence._create({
             sequenceId: nextSequenceId,
             context: this,
-            prependBos,
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
@@ -360,6 +356,11 @@ export class LlamaContext {
     }
 
     /** @internal */
+    public _acceptTokenOnGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
+        this._ctx.acceptGrammarEvaluationStateToken(grammarEvaluationState._state, token);
+    }
+
+    /** @internal */
     private _popSequenceId(): number | null {
         if (this._unusedSequenceIds.length > 0)
             return this._unusedSequenceIds.shift()!;
@@ -428,39 +429,25 @@ export class LlamaContextSequence {
     /** @internal */ private readonly _sequenceId: number;
     /** @internal */ private readonly _gcRegistry: FinalizationRegistry<number>;
     /** @internal */ private readonly _context: LlamaContext;
-    /** @internal */ private readonly _prependBos: boolean;
     /** @internal */ private readonly _contextShift: Required<ContextShiftOptions>;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private _contextTokens: Token[] = [];
-    /** @internal */ private _contextTokenPriorities: TokenPriority[] = [];
     /** @internal */ private _nextTokenIndex: number = 0;
-    /** @internal */ private _prependTokens: Token[] = [];
-    /** @internal */ private _prependTokenPriorities: TokenPriority[] = [];
     /** @internal */ private _disposed = false;
 
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        sequenceId, context, prependBos, contextShift
+        sequenceId, context, contextShift
     }: {
         sequenceId: number,
         context: LlamaContext,
-        prependBos: boolean,
         contextShift: Required<ContextShiftOptions>
     }) {
         this._sequenceId = sequenceId;
         this._context = context;
         this._contextShift = contextShift;
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
-
-        this._prependTokens = [];
-        this._prependTokenPriorities = [];
-        if (prependBos && this._context.model.tokens.bos != null) {
-            this._prependTokens.unshift(this._context.model.tokens.bos);
-            this._prependTokenPriorities.unshift(1);
-            this._prependBos = true;
-        } else
-            this._prependBos = false;
 
         this._gcRegistry.register(this, sequenceId);
         this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
@@ -484,7 +471,6 @@ export class LlamaContextSequence {
         this._disposeAggregator.dispose();
 
         this._contextTokens.length = 0;
-        this._contextTokenPriorities.length = 0;
 
         this._disposed = true;
     }
@@ -506,10 +492,6 @@ export class LlamaContextSequence {
         return this._context.model;
     }
 
-    public get prependBos() {
-        return this._prependBos;
-    }
-
     public get nextTokenIndex() {
         return this._nextTokenIndex;
     }
@@ -518,8 +500,25 @@ export class LlamaContextSequence {
         return this._contextTokens.slice();
     }
 
-    public get contextTokenPriorities() {
-        return this._contextTokenPriorities.slice();
+    public get isLoadedToMemory() {
+        return !this._disposed;
+    }
+
+    public compareContextTokens(tokens: Token[]): {
+        firstDifferentIndex: number
+    } {
+        for (let i = 0; i < this._contextTokens.length; i++) {
+            if (compareTokens(this._contextTokens[i], tokens[i]))
+                continue;
+
+            return {
+                firstDifferentIndex: i
+            };
+        }
+
+        return {
+            firstDifferentIndex: this._contextTokens.length
+        };
     }
 
     /**
@@ -530,14 +529,6 @@ export class LlamaContextSequence {
         this._ensureNotDisposed();
 
         await this.eraseContextTokenRanges([{start: 0, end: this._nextTokenIndex}]);
-
-        this._prependTokens.length = 0;
-        this._prependTokenPriorities.length = 0;
-
-        if (this._prependBos && this._context.model.tokens.bos != null) {
-            this._prependTokens.push(this._context.model.tokens.bos);
-            this._prependTokenPriorities.push(1);
-        }
     }
 
     /**
@@ -590,7 +581,6 @@ export class LlamaContextSequence {
             let lastDeleteRangeEndPos: number | null = null;
             for (const range of resolvedRanges) {
                 this._contextTokens.splice(range.start - removedTokens, range.end - range.start);
-                this._contextTokenPriorities.splice(range.start - removedTokens, range.end - range.start);
                 this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
 
                 if (lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
@@ -618,9 +608,14 @@ export class LlamaContextSequence {
         grammarEvaluationState,
         repeatPenalty,
         evaluationPriority = 5,
-        tokenPriority = 1
+        contextShift: {
+            size: contextShiftSize = this._contextShift.size,
+            strategy: contextShiftStrategy = this._contextShift.strategy
+        } = {},
+        yieldEosToken = false
     }: {
-        temperature?: number, topK?: number, topP?: number, grammarEvaluationState?: LlamaGrammarEvaluationState,
+        temperature?: number, topK?: number, topP?: number,
+        grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
         /**
@@ -634,14 +629,15 @@ export class LlamaContextSequence {
          */
         evaluationPriority?: EvaluationPriority,
 
+        /** Override the sequence context shift options for this evaluation */
+        contextShift?: ContextShiftOptions,
+
         /**
-         * When the context is full, tokens will be erased based on the context shift strategy chosen.
-         * By default, the lowest priority tokens at the beginning of the context will be erased.
-         * To mark the priority of the evaluated tokens, use this option.
-         * The higher the priority is, the less likely it will be erased.
-         * The default priority is `1`.
+         * Yield the EOS token when it's generated.
+         * When `false` the generation will stop when the EOS token is generated and the EOS token won't be yielded.
+         * Defaults to `false`.
          */
-        tokenPriority?: TokenPriority | TokenPriority[]
+        yieldEosToken?: boolean
     } = {}): AsyncGenerator<Token, void> {
         return this._evaluate(tokens, {
             temperature,
@@ -650,7 +646,11 @@ export class LlamaContextSequence {
             grammarEvaluationState,
             repeatPenalty,
             evaluationPriority,
-            tokenPriority
+            contextShiftOptions: {
+                size: contextShiftSize,
+                strategy: contextShiftStrategy
+            },
+            yieldEosToken
         });
     }
 
@@ -660,7 +660,11 @@ export class LlamaContextSequence {
      * @param [options]
      */
     public async evaluateWithoutGeneratingNewTokens(tokens: Token[], {
-        evaluationPriority = 5, tokenPriority = 1
+        evaluationPriority = 5,
+        contextShift: {
+            size: contextShiftSize = this._contextShift.size,
+            strategy: contextShiftStrategy = this._contextShift.strategy
+        } = {}
     }: {
         grammarEvaluationState?: LlamaGrammarEvaluationState,
 
@@ -675,19 +679,16 @@ export class LlamaContextSequence {
          */
         evaluationPriority?: EvaluationPriority,
 
-        /**
-         * When the context is full, tokens will be erased based on the context shift strategy chosen.
-         * By default, the lowest priority tokens at the beginning of the context will be erased.
-         * To mark the priority of the evaluated tokens, use this option.
-         * The higher the priority is, the less likely it will be erased.
-         * The default priority is `1`.
-         */
-        tokenPriority?: TokenPriority | TokenPriority[]
+        /** Override the sequence context shift options for this evaluation */
+        contextShift?: ContextShiftOptions
     } = {}): Promise<void> {
         const iterator = this._evaluate(tokens, {
             generateNewTokens: false,
             evaluationPriority,
-            tokenPriority
+            contextShiftOptions: {
+                size: contextShiftSize,
+                strategy: contextShiftStrategy
+            }
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -704,29 +705,18 @@ export class LlamaContextSequence {
         grammarEvaluationState,
         repeatPenalty,
         evaluationPriority = 5,
-        tokenPriority = 1,
-        generateNewTokens = true
+        generateNewTokens = true,
+        contextShiftOptions,
+        yieldEosToken = false
     }: {
-        temperature?: number, topK?: number, topP?: number, grammarEvaluationState?: LlamaGrammarEvaluationState,
+        temperature?: number, topK?: number, topP?: number,
+        grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, evaluationPriority?: EvaluationPriority,
-        tokenPriority?: TokenPriority | TokenPriority[], generateNewTokens?: boolean
-    } = {}): AsyncGenerator<Token, void> {
+        generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>, yieldEosToken?: boolean
+    }): AsyncGenerator<Token, void> {
         this._ensureNotDisposed();
 
-        if (!(tokenPriority instanceof Array))
-            tokenPriority = Array(tokens.length).fill(tokenPriority);
-
         let evalTokens = tokens;
-
-        if (generateNewTokens && tokens.length === 0)
-            return;
-
-        if (this._prependTokens.length > 0) {
-            evalTokens = this._prependTokens.concat(tokens);
-            tokenPriority = this._prependTokenPriorities.concat(tokenPriority);
-            this._prependTokens = [];
-            this._prependTokenPriorities = [];
-        }
 
         if (evalTokens.length === 0)
             return;
@@ -740,19 +730,27 @@ export class LlamaContextSequence {
                 evalTokens,
                 generateNewTokens,
                 evaluationPriority,
-                tokenPriority,
+                contextShiftOptions,
                 (batchLogitIndex) => {
+                    const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
+                        ? repeatPenalty.punishTokens()
+                        : repeatPenalty?.punishTokens;
+
+                    const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+                        ? grammarEvaluationState()
+                        : grammarEvaluationState;
+
                     return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
                         temperature,
                         topK,
                         topP,
                         repeatPenalty: repeatPenalty?.penalty,
-                        repeatPenaltyTokens: repeatPenalty?.punishTokens instanceof Function
-                            ? repeatPenalty.punishTokens()
-                            : repeatPenalty?.punishTokens,
+                        repeatPenaltyTokens: repeatPenaltyTokens != null
+                            ? Uint32Array.from(repeatPenaltyTokens)
+                            : undefined,
                         repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
                         repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
-                        grammarEvaluationState: grammarEvaluationState?._state
+                        grammarEvaluationState: resolvedGrammarEvaluationState?._state
                     }));
                 }
             );
@@ -761,7 +759,7 @@ export class LlamaContextSequence {
                 return;
 
             // the model finished generating text
-            if (nextToken === this._context.model.tokens.eos)
+            if (!yieldEosToken && nextToken === this._context.model.tokens.eos)
                 break;
 
             yield nextToken;
@@ -776,7 +774,7 @@ export class LlamaContextSequence {
         tokens: Token[],
         generateLogit: boolean,
         evaluationPriority: EvaluationPriority,
-        tokenPriority: TokenPriority[],
+        contextShiftOptions: Required<ContextShiftOptions>,
         onDecodeDone: ((batchLogitIndex: BatchLogitIndex) => T | Promise<T>)
     ): Promise<T | null> {
         this._ensureNotDisposed();
@@ -789,11 +787,11 @@ export class LlamaContextSequence {
 
                 let freeSpace = this._context.contextSize - this._nextTokenIndex;
 
-                if (freeSpace === 0) {
-                    await this._freeUpSpaceForTokens();
+                if (freeSpace <= 1) {
+                    await this._freeUpSpaceForTokens(contextShiftOptions);
                     freeSpace = this._context.contextSize - this._nextTokenIndex;
 
-                    if (freeSpace === 0)
+                    if (freeSpace <= 1)
                         throw new Error("Failed to free up space for new tokens");
                 }
 
@@ -813,12 +811,6 @@ export class LlamaContextSequence {
                 this._nextTokenIndex += tokensToDecode.length;
                 this._contextTokens = this._contextTokens.concat(tokensToDecode);
 
-                for (let i = 0; i < tokensToDecode.length; i++) {
-                    this._contextTokenPriorities.push(
-                        tokenPriority[i] ?? tokenPriority[tokenPriority.length - 1] ?? 1
-                    );
-                }
-
                 if (generateLogitAtTheEnd && nextToken != null)
                     return nextToken;
             }
@@ -828,69 +820,25 @@ export class LlamaContextSequence {
     }
 
     /** @internal */
-    private async _freeUpSpaceForTokens() {
+    private async _freeUpSpaceForTokens(contextShiftOptions: Required<ContextShiftOptions>) {
         this._ensureNotDisposed();
 
         const size = Math.min(
             this._nextTokenIndex,
             Math.max(
                 1,
-                this._contextShift.size instanceof Function
-                    ? await this._contextShift.size(this)
-                    : this._contextShift.size
+                contextShiftOptions.size instanceof Function
+                    ? await contextShiftOptions.size(this)
+                    : contextShiftOptions.size
             )
         );
 
         this._ensureNotDisposed();
 
-        if (this._contextShift.strategy === "eraseLowestTokenPriorityBeginning") {
-            let leftTokensToErase = Math.min(size, this._contextTokenPriorities.length);
-            let previousLowestPriority: number | null = null;
-            let indexesToErase: number[] = [];
-
-            while (leftTokensToErase > 0 && this._contextTokenPriorities.length > 0) {
-                let currentLowestPriorityIndexes: number[] = [];
-                let currentLowestPriorityFound: number | null = null;
-
-                for (let i = 0; leftTokensToErase > currentLowestPriorityIndexes.length && i < this._contextTokenPriorities.length; i++) {
-                    const tokenPriority = this._contextTokenPriorities[i];
-
-                    if (currentLowestPriorityFound == null || (
-                        tokenPriority < currentLowestPriorityFound && (
-                            previousLowestPriority == null || tokenPriority > previousLowestPriority
-                        )
-                    )) {
-                        currentLowestPriorityFound = tokenPriority;
-                        currentLowestPriorityIndexes = [i];
-                    } else if (tokenPriority === currentLowestPriorityFound) {
-                        currentLowestPriorityIndexes.push(i);
-                    }
-                }
-
-                previousLowestPriority = currentLowestPriorityFound;
-                indexesToErase = indexesToErase.concat(currentLowestPriorityIndexes);
-                leftTokensToErase -= currentLowestPriorityIndexes.length;
-            }
-
-            await this.eraseContextTokenRanges(
-                indexesToErase.reduce((ranges, index) => {
-                    if (ranges.length === 0)
-                        return [{start: index, end: index + 1}];
-
-                    const lastRange = ranges[ranges.length - 1];
-                    if (lastRange.end >= index) {
-                        lastRange.end = Math.max(lastRange.end, index + 1);
-                        return ranges;
-                    }
-
-                    ranges.push({start: index, end: index + 1});
-                    return ranges;
-                }, [] as ContextTokensDeleteRange[])
-            );
-        } else if (this._contextShift.strategy === "eraseBeginning") {
+        if (contextShiftOptions.strategy === "eraseBeginning") {
             await this.eraseContextTokenRanges([{start: 0, end: size}]);
         } else {
-            const ranges = await this._contextShift.strategy({
+            const ranges = await contextShiftOptions.strategy({
                 sequence: this,
                 size
             });
@@ -916,7 +864,7 @@ export class LlamaContextSequence {
      * @internal
      */
     public static _create({
-        sequenceId, context, prependBos = true,
+        sequenceId, context,
         contextShift: {
             size: contextShiftSize = Math.min(100, Math.ceil(context.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
@@ -924,13 +872,11 @@ export class LlamaContextSequence {
     }: {
         sequenceId: number,
         context: LlamaContext,
-        prependBos?: boolean,
         contextShift?: ContextShiftOptions
     }): LlamaContextSequence {
         return new LlamaContextSequence({
             sequenceId,
             context,
-            prependBos,
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
