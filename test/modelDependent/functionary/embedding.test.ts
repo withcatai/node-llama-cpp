@@ -10,18 +10,18 @@ describe("functionary", () => {
             const model = new LlamaModel({
                 modelPath
             });
-            const context = new LlamaEmbeddingContext({
+            const embeddingContext = new LlamaEmbeddingContext({
                 model,
                 contextSize: 4096
             });
 
-            const helloWorldEmbedding = await context.getEmbeddingFor("Hello world");
+            const helloWorldEmbedding = await embeddingContext.getEmbeddingFor("Hello world");
 
-            const helloThereEmbedding = await context.getEmbeddingFor("Hello there");
+            const helloThereEmbedding = await embeddingContext.getEmbeddingFor("Hello there");
 
             expect(helloWorldEmbedding.vector).to.not.eql(helloThereEmbedding.vector);
 
-            const helloWorld2Embedding = await context.getEmbeddingFor("Hello world");
+            const helloWorld2Embedding = await embeddingContext.getEmbeddingFor("Hello world");
 
             expect(helloWorld2Embedding.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloWorld2Embedding.vector).to.not.eql(helloThereEmbedding.vector);
@@ -37,25 +37,25 @@ describe("functionary", () => {
             const model = new LlamaModel({
                 modelPath
             });
-            const context = new LlamaEmbeddingContext({
+            const embeddingContext = new LlamaEmbeddingContext({
                 model,
                 contextSize: 4096
             });
 
-            const helloWorldEmbedding = await context.getEmbeddingFor("Hello world");
-            const helloThereEmbedding = await context.getEmbeddingFor("Hello there");
+            const helloWorldEmbedding = await embeddingContext.getEmbeddingFor("Hello world");
+            const helloThereEmbedding = await embeddingContext.getEmbeddingFor("Hello there");
 
             expect(helloWorldEmbedding.vector).to.not.eql(helloThereEmbedding.vector);
 
-            context.dispose();
+            embeddingContext.dispose();
 
-            const context2 = new LlamaEmbeddingContext({
+            const embeddingContext2 = new LlamaEmbeddingContext({
                 model,
                 contextSize: 4096
             });
 
-            const helloWorldEmbedding2 = await context2.getEmbeddingFor("Hello world");
-            const helloThereEmbedding2 = await context2.getEmbeddingFor("Hello there");
+            const helloWorldEmbedding2 = await embeddingContext2.getEmbeddingFor("Hello world");
+            const helloThereEmbedding2 = await embeddingContext2.getEmbeddingFor("Hello there");
 
             expect(helloWorldEmbedding2.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloThereEmbedding2.vector).to.eql(helloThereEmbedding.vector);
