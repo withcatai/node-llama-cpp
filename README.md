@@ -15,7 +15,7 @@
 
 </div>
 
-✨ New! [Try the beta of version `3.0.0`](https://github.com/withcatai/node-llama-cpp/pull/105) (included: function calling, automatic chat wrapper detection, and more) ✨
+✨ New! [Try the beta of version `3.0.0`](https://github.com/withcatai/node-llama-cpp/pull/105) ✨ (included: function calling, automatic chat wrapper detection, and more)
 
 ## Features
 * Run a text generation model locally on your machine
