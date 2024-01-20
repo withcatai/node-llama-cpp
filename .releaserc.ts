@@ -14,12 +14,12 @@ const homepageUrlWithoutTrailingSlash = homepageUrl.endsWith("/")
     ? homepageUrl.slice(0, -1)
     : homepageUrl;
 
-const newFooterTemplate = defaultFooterTemplate + "\n---\n" +
-    `Shipped with \`llama.cpp\` release: [\`${llamaCppRelease.split("`").join("")}\`](https://github.com/${defaultLlamaCppGitHubRepo}/releases/tag/${encodeURIComponent(llamaCppRelease)}) ` +
-    `(to use the latest \`llama.cpp\` release available, run \`npx --no ${cliBinName} download --release latest\`. [learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source))\n`;
+const newFooterTemplate = defaultFooterTemplate + "\n---\n\n" +
+    `Shipped with \`llama.cpp\` release [\`${llamaCppRelease.split("`").join("")}\`](https://github.com/${defaultLlamaCppGitHubRepo}/releases/tag/${encodeURIComponent(llamaCppRelease)})\n\n` +
+    `> To use the latest \`llama.cpp\` release available, run \`npx --no ${cliBinName} download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#downloading-a-newer-release))\n`;
 
 /**
- * @type {import('semantic-release').GlobalConfig}
+ * @type {import("semantic-release").GlobalConfig}
  */
 export default {
     "branches": [
