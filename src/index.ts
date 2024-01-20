@@ -6,6 +6,9 @@ import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObj
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./llamaEvaluator/LlamaGrammarEvaluationState.js";
 import {LlamaContext, LlamaContextSequence} from "./llamaEvaluator/LlamaContext/LlamaContext.js";
 import {
+    LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, LlamaEmbedding, type LlamaEmbeddingJSON
+} from "./llamaEvaluator/LlamaEmbeddingContext.js";
+import {
     type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizeStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
     type ContextTokensDeleteRange, type EvaluationPriority
@@ -70,6 +73,10 @@ export {
     type ContextTokensDeleteRange,
     type EvaluationPriority,
     type LlamaContextSequenceRepeatPenalty,
+    LlamaEmbeddingContext,
+    type LlamaEmbeddingContextOptions,
+    LlamaEmbedding,
+    type LlamaEmbeddingJSON,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,

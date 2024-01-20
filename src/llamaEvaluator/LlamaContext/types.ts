@@ -23,12 +23,6 @@ export type LlamaContextOptions = {
     /** prompt processing batch size */
     batchSize?: number,
 
-    /** the llama_eval() call computes all logits, not just the last one */
-    logitsAll?: boolean,
-
-    /** embedding mode only */
-    embedding?: boolean
-
     /**
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware
@@ -36,7 +30,19 @@ export type LlamaContextOptions = {
     threads?: number,
 
     /** control the parallel sequences processing behavior */
-    batching?: BatchingOptions
+    batching?: BatchingOptions,
+
+    /**
+     * embedding mode only
+     * @internal
+     */
+    _embedding?: boolean,
+
+    /**
+     * disable the seed generation
+     * @internal
+     */
+    _noSeed?: boolean
 };
 export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */

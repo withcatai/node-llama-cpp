@@ -358,7 +358,9 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             if (info.Length() > 1 && info[1].IsObject()) {
                 Napi::Object options = info[1].As<Napi::Object>();
 
-                if (options.Has("seed")) {
+                if (options.Has("noSeed")) {
+                    context_params.seed = time(NULL);
+                } else if (options.Has("seed")) {
                     context_params.seed = options.Get("seed").As<Napi::Number>().Uint32Value();
                 }
 
@@ -368,10 +370,6 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
                 if (options.Has("batchSize")) {
                     context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value();
-                }
-
-                if (options.Has("logitsAll")) {
-                    context_params.logits_all = options.Get("logitsAll").As<Napi::Boolean>().Value();
                 }
 
                 if (options.Has("embedding")) {
@@ -544,6 +542,23 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             return info.Env().Undefined();
         }
 
+        Napi::Value GetEmbedding(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            const int n_embd = llama_n_embd(model->model);
+            const auto * embeddings = llama_get_embeddings(ctx);
+
+            Napi::Float64Array result = Napi::Float64Array::New(info.Env(), n_embd);
+            for (size_t i = 0; i < n_embd; ++i) {
+                result[i] = embeddings[i];
+            }
+
+            return result;
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonContext",
@@ -560,6 +575,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
+                        InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                         InstanceMethod("dispose", &AddonContext::Dispose)
                     }
                 )
