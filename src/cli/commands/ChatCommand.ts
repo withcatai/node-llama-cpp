@@ -24,8 +24,10 @@ type ChatCommand = {
     printTimings: boolean,
     systemPrompt: string,
     prompt?: string,
+    promptFile?: string,
     wrapper: (typeof modelWrappers)[number],
     contextSize: number,
+    batchSize: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
     jsonSchemaGrammarFile?: string,
     threads: number,
@@ -84,6 +86,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "First prompt to automatically send to the model when starting the chat",
                 group: "Optional:"
             })
+            .option("promptFile", {
+                alias: "f",
+                type: "string",
+                description: "First prompt loaded from file to automatically send to the model when starting the chat",
+                group: "Optional:"
+            })
             .option("wrapper", {
                 alias: "w",
                 type: "string",
@@ -97,6 +105,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "number",
                 default: 1024 * 4,
                 description: "Context size to use for the model",
+                group: "Optional:"
+            })
+            .option("batchSize", {
+                alias: "b",
+                type: "number",
+                default: 1024 * 4,
+                description: "Batch size to use for the model",
                 group: "Optional:"
             })
             .option("grammar", {
@@ -195,16 +210,17 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             });
     },
     async handler({
-        model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
+        model, systemInfo, systemPrompt, prompt, promptFile, wrapper, contextSize, batchSize,
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings
     }) {
         try {
             await RunChat({
-                model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
-                topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens, noHistory, printTimings
+                model, systemInfo, systemPrompt, prompt, promptFile, wrapper, contextSize, batchSize,
+                grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
+                gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
+                repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings,
             });
         } catch (err) {
             console.error(err);
@@ -215,7 +231,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
+    model: modelArg, systemInfo, systemPrompt, prompt, promptFile, wrapper, contextSize, batchSize, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
     penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings
 }: ChatCommand) {
@@ -225,6 +241,9 @@ async function RunChat({
     const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
     const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
 
+    if (promptFile) {
+        prompt = (await fs.readFile(promptFile)).toString();
+    }
     let initialPrompt = prompt ?? null;
     const model = new LlamaModel({
         modelPath: path.resolve(process.cwd(), modelArg),
@@ -233,6 +252,7 @@ async function RunChat({
     const context = new LlamaContext({
         model,
         contextSize,
+        batchSize,
         threads
     });
     const grammar = jsonSchemaGrammarFilePath != null
