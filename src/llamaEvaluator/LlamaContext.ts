@@ -201,6 +201,10 @@ export class LlamaContext {
         return this._ctx.getContextSize();
     }
 
+    public printTimings() {
+        this._ctx.printTimings();
+    }
+
     /**
      * @param {Uint32Array} tokens
      * @param {object} options
