@@ -559,6 +559,12 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             return result;
         }
 
+        Napi::Value PrintTimings(const Napi::CallbackInfo& info) {
+            llama_print_timings(ctx);
+            llama_reset_timings(ctx);
+            return info.Env().Undefined();
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonContext",
@@ -576,6 +582,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
                         InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
+                        InstanceMethod("printTimings", &AddonContext::PrintTimings),
                         InstanceMethod("dispose", &AddonContext::Dispose)
                     }
                 )

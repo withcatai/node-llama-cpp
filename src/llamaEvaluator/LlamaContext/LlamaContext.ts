@@ -320,6 +320,10 @@ export class LlamaContext {
         });
     }
 
+    public printTimings() {
+        this._ctx.printTimings();
+    }
+
     /** @internal */
     public async _decodeTokens<T>({
         sequenceId, firstTokenSequenceIndex, tokens, generateLogitAtTheEnd = false, evaluationPriority = 5

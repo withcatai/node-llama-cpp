@@ -43,7 +43,8 @@ type ChatCommand = {
     repeatPresencePenalty?: number,
     maxTokens: number,
     noHistory: boolean,
-    environmentFunctions: boolean
+    environmentFunctions: boolean,
+    printTimings: boolean
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
@@ -197,6 +198,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Provide access to environment functions like `getDate` and `getTime`",
                 group: "Optional:"
+            })
+            .option("printTimings", {
+                alias: "pt",
+                type: "boolean",
+                default: false,
+                description: "Print llama.cpp timings after each response",
+                group: "Optional:"
             });
     },
     async handler({
@@ -204,13 +212,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
-        environmentFunctions
+        environmentFunctions, printTimings
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
                 topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens, noHistory, environmentFunctions
+                repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, printTimings
             });
         } catch (err) {
             console.error(err);
@@ -223,7 +231,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
-    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions
+    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions,
+    printTimings
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -370,6 +379,9 @@ async function RunChat({
         });
         process.stdout.write(endColor);
         console.log();
+
+        if (printTimings)
+            context.printTimings();
     }
 }
 
