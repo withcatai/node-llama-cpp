@@ -174,6 +174,8 @@ export type AddonContext = {
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
+
+    getEmbedding(): Float64Array
 };
 
 export type BatchLogitIndex = number & {

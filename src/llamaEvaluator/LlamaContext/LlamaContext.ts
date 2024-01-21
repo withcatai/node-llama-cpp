@@ -44,13 +44,13 @@ export class LlamaContext {
         seed = null,
         contextSize = model.trainContextSize,
         batchSize = contextSize,
-        logitsAll,
-        embedding,
         threads = 6,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemsPrioritizingStrategy: batchingItemsPrioritizingStrategy = "maximumParallelism"
-        } = {}
+        } = {},
+        _embedding,
+        _noSeed
     }: LlamaContextOptions) {
         if (model.disposed)
             throw new DisposedError();
@@ -63,9 +63,9 @@ export class LlamaContext {
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
-            logitsAll,
-            embedding,
-            threads: Math.max(0, Math.floor(threads))
+            threads: Math.max(0, Math.floor(threads)),
+            embedding: _embedding,
+            noSeed: _noSeed
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,

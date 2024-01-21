@@ -70,4 +70,15 @@ describe("parseModelFileName", () => {
                 parameters: "13B"
             });
     });
+
+    test("dolphin-2.1-mistral-7b.Q4_K_M.gguf", () => {
+        expect(parseModelFileName("dolphin-2.1-mistral-7b.Q4_K_M.gguf"))
+            .toEqual({
+                name: "dolphin",
+                subType: "2.1-mistral",
+                quantization: "Q4_K_M",
+                fileType: "gguf",
+                parameters: "7B"
+            });
+    });
 });

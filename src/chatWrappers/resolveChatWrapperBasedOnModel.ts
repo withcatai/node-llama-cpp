@@ -29,8 +29,8 @@ export function resolveChatWrapperBasedOnModel({
         if (fileType?.toLowerCase() === "gguf") {
             const lowercaseName = name?.toLowerCase();
             const lowercaseSubType = subType?.toLowerCase();
-            const splitLowercaseSubType = lowercaseSubType?.split("-");
-            const firstSplitLowercaseSubType = splitLowercaseSubType?.[0];
+            const splitLowercaseSubType = lowercaseSubType?.split("-") ?? [];
+            const firstSplitLowercaseSubType = splitLowercaseSubType[0];
 
             if (lowercaseName === "llama")
                 return LlamaChatWrapper;
@@ -48,6 +48,8 @@ export function resolveChatWrapperBasedOnModel({
                 return AlpacaChatWrapper;
             else if (lowercaseName === "functionary")
                 return FunctionaryChatWrapper;
+            else if (lowercaseName === "dolphin" && splitLowercaseSubType.includes("mistral"))
+                return ChatMLChatWrapper;
         }
     }
 
