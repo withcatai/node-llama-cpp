@@ -103,7 +103,6 @@ import path from "path";
 import {
     LlamaModel, LlamaContext, LlamaChatSession, Token
 } from "node-llama-cpp";
-import {context} from "esbuild";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
