@@ -220,7 +220,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 model, systemInfo, systemPrompt, prompt, promptFile, wrapper, contextSize, batchSize,
                 grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
-                repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings,
+                repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, printTimings
             });
         } catch (err) {
             console.error(err);
