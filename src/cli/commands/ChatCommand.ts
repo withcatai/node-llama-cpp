@@ -261,6 +261,8 @@ async function RunChat({
     const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
     const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
 
+    const logBatchSize = batchSize != null;
+
     if (systemInfo)
         console.log(LlamaModel.systemInfo);
 
@@ -330,6 +332,10 @@ async function RunChat({
         console.warn(chalk.yellow("Both `grammar` and `jsonSchemaGrammarFile` were specified. `jsonSchemaGrammarFile` will be used."));
 
     console.info(`${chalk.yellow("Context size:")} ${context.contextSize}`);
+
+    if (logBatchSize)
+        console.info(`${chalk.yellow("Batch size:")} ${context.batchSize}`);
+
     console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
     console.info(`${chalk.yellow("Model type:")} ${model.typeDescription}`);
     console.info(`${chalk.yellow("BOS:")} ${bos}`);
