@@ -26,9 +26,12 @@ type ChatCommand = {
     model: string,
     systemInfo: boolean,
     systemPrompt: string,
+    systemPromptFile?: string,
     prompt?: string,
+    promptFile?: string,
     wrapper: (typeof modelWrappers)[number],
     contextSize: number,
+    batchSize?: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
     jsonSchemaGrammarFile?: string,
     threads: number,
@@ -78,9 +81,19 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                     (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]")),
                 group: "Optional:"
             })
+            .option("systemPromptFile", {
+                type: "string",
+                description: "Path to a file to load text from and use as as the model system prompt",
+                group: "Optional:"
+            })
             .option("prompt", {
                 type: "string",
                 description: "First prompt to automatically send to the model when starting the chat",
+                group: "Optional:"
+            })
+            .option("promptFile", {
+                type: "string",
+                description: "Path to a file to load text from and use as a first prompt to automatically send to the model when starting the chat",
                 group: "Optional:"
             })
             .option("wrapper", {
@@ -95,7 +108,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "c",
                 type: "number",
                 default: 1024 * 4,
-                description: "Context size to use for the model",
+                description: "Context size to use for the model context",
+                group: "Optional:"
+            })
+            .option("batchSize", {
+                alias: "b",
+                type: "number",
+                description: "Batch size to use for the model context. The default value is the context size",
                 group: "Optional:"
             })
             .option("grammar", {
@@ -208,7 +227,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             });
     },
     async handler({
-        model, systemInfo, systemPrompt, prompt, wrapper, contextSize,
+        model, systemInfo, systemPrompt, systemPromptFile, prompt,
+        promptFile, wrapper, contextSize, batchSize,
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
@@ -216,9 +236,10 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     }) {
         try {
             await RunChat({
-                model, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar, jsonSchemaGrammarFile, threads, temperature, topK,
-                topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-                repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, printTimings
+                model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
+                grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty,
+                repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
+                noHistory, environmentFunctions, printTimings
             });
         } catch (err) {
             console.error(err);
@@ -229,10 +250,10 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, prompt, wrapper, contextSize, grammar: grammarArg,
-    jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty,
-    penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions,
-    printTimings
+    model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
+    grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers,
+    lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
+    maxTokens, noHistory, environmentFunctions, printTimings
 }: ChatCommand) {
     const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession/LlamaChatSession.js");
     const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
@@ -242,6 +263,27 @@ async function RunChat({
 
     if (systemInfo)
         console.log(LlamaModel.systemInfo);
+
+    if (systemPromptFile != null && systemPromptFile !== "") {
+        if (systemPrompt != null && systemPrompt !== "" && systemPrompt !== defaultChatSystemPrompt)
+            console.warn(chalk.yellow("Both `systemPrompt` and `systemPromptFile` were specified. `systemPromptFile` will be used."));
+
+        systemPrompt = await fs.readFile(path.resolve(process.cwd(), systemPromptFile), "utf8");
+    }
+
+    if (promptFile != null && promptFile !== "") {
+        if (prompt != null && prompt !== "")
+            console.warn(chalk.yellow("Both `prompt` and `promptFile` were specified. `promptFile` will be used."));
+
+        prompt = await fs.readFile(path.resolve(process.cwd(), promptFile), "utf8");
+    }
+
+    if (batchSize == null)
+        batchSize = contextSize;
+    else if (batchSize > contextSize) {
+        console.warn(chalk.yellow("Batch size is greater than the context size. Batch size will be set to the context size."));
+        batchSize = contextSize;
+    }
 
     let initialPrompt = prompt ?? null;
     const model = await withStatusLogs({
@@ -259,6 +301,7 @@ async function RunChat({
     }, async () => new LlamaContext({
         model,
         contextSize,
+        batchSize,
         threads
     }));
     const grammar = jsonSchemaGrammarFilePath != null
