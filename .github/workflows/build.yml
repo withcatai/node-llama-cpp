@@ -181,6 +181,8 @@ jobs:
             
             if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
               buildNodeVersion = windowsOnArmNodeVersion;
+            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "arm64") {
+              additionalFlags.push("--metal");
             } else if (process.env.ARTIFACT_NAME === "mac" && arch === "x64") {
               additionalFlags.push("--no-metal");
             }
