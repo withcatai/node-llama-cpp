@@ -18,5 +18,7 @@
     "preserveAnchorCasing": true,
     "useCodeBlocks": true,
     "expandObjects": true,
-    "parametersFormat": "table"
+    "parametersFormat": "table",
+    "hideInPageTOC": true,
+    "docsRoot": "../docs"
 }
