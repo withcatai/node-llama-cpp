@@ -1,214 +1,127 @@
 import {describe, expect, test} from "vitest";
-import {ChatMLChatWrapper, ChatHistoryItem} from "../../../src/index.js";
-import {defaultChatSystemPrompt} from "../../../src/config.js";
+import {generateContextTextFromConversationHistory} from "../../../src/chatWrappers/generateContextTextFromConversationHistory.js";
+import {ChatMLChatPromptWrapper, ConversationInteraction} from "../../../src/index.js";
 
 
-describe("ChatMLChatWrapper", () => {
-    const conversationHistory: ChatHistoryItem[] = [{
-        type: "system",
-        text: defaultChatSystemPrompt
-    }, {
-        type: "user",
-        text: "Hi there!"
-    }, {
-        type: "model",
-        response: ["Hello!"]
+describe("ChatMLChatPromptWrapper", () => {
+    const conversationHistory: ConversationInteraction[] = [{
+        prompt: "Hi there!",
+        response: "Hello!"
     }];
-    const conversationHistory2: ChatHistoryItem[] = [{
-        type: "system",
-        text: defaultChatSystemPrompt
+    const conversationHistory2: ConversationInteraction[] = [{
+        prompt: "Hi there!",
+        response: "Hello!"
     }, {
-        type: "user",
-        text: "Hi there!"
-    }, {
-        type: "model",
-        response: ["Hello!"]
-    }, {
-        type: "user",
-        text: "How are you?"
-    }, {
-        type: "model",
-        response: ["I'm good, how are you?"]
+        prompt: "How are you?",
+        response: "I'm good, how are you?"
     }];
 
-    test("should generate valid context text", () => {
-        const chatWrapper = new ChatMLChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+    test("should generate valid output for default roles", () => {
+        const chatWrapper = new ChatMLChatPromptWrapper();
+        const {text: response} = generateContextTextFromConversationHistory(chatWrapper, conversationHistory);
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>system
-          ",
-            },
-            "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
-          ",
-            },
-            "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-          ]
+        expect(response).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>"
         `);
 
-        const chatWrapper2 = new ChatMLChatWrapper();
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const chatWrapper2 = new ChatMLChatPromptWrapper();
+        const {text: response2} = generateContextTextFromConversationHistory(chatWrapper2, conversationHistory2);
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>system
-          ",
-            },
-            "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
-          ",
-            },
-            "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
-          ",
-            },
-            "How are you?",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-          ]
+        expect(response2).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>
+          <|im_start|>user
+          How are you?<|im_end|>
+          <|im_start|>assistant
+          I'm good, how are you?<|im_end|>"
         `);
 
-        const chatWrapper3 = new ChatMLChatWrapper();
-        const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const chatWrapper3 = new ChatMLChatPromptWrapper();
+        const {text: response3, stopStringSuffix, stopString} = generateContextTextFromConversationHistory(chatWrapper3, conversationHistory);
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>system
-          ",
-            },
-            "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
-          ",
-            },
-            "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-          ]
+        const newPrompt = conversationHistory2[1].prompt;
+        const wrappedNewPrompt = chatWrapper3.wrapPrompt(newPrompt, {
+            systemPrompt: response3,
+            promptIndex: 1,
+            lastStopString: stopString,
+            lastStopStringSuffix: stopStringSuffix
+        });
+
+        expect(response3).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>"
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>system
-          ",
-            },
-            "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
-          ",
-            },
-            "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
-          ",
-            },
-          ]
+        expect(wrappedNewPrompt).toMatchInlineSnapshot(`
+          "
+          <|im_start|>user
+          How are you?<|im_end|>
+          <|im_start|>assistant
+          "
+        `);
+
+        expect(response3 + wrappedNewPrompt).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>
+          <|im_start|>user
+          How are you?<|im_end|>
+          <|im_start|>assistant
+          "
+        `);
+    });
+
+    test("should generate valid output for custom system prompt", () => {
+        const chatWrapper = new ChatMLChatPromptWrapper();
+        const {text: response} = generateContextTextFromConversationHistory(chatWrapper, conversationHistory, {
+            systemPrompt: "Below is an instruction the describes a task, Write a response the appropriately completes the request."
+        });
+
+        expect(response).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          Below is an instruction the describes a task, Write a response the appropriately completes the request.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>"
+        `);
+
+        const chatWrapper2 = new ChatMLChatPromptWrapper();
+        const {text: response2} = generateContextTextFromConversationHistory(chatWrapper2, conversationHistory2, {
+            systemPrompt: "Below is an instruction the describes a task, Write a response the appropriately completes the request."
+        });
+
+        expect(response2).toMatchInlineSnapshot(`
+          "<|im_start|>system
+          Below is an instruction the describes a task, Write a response the appropriately completes the request.<|im_end|>
+          <|im_start|>user
+          Hi there!<|im_end|>
+          <|im_start|>assistant
+          Hello!<|im_end|>
+          <|im_start|>user
+          How are you?<|im_end|>
+          <|im_start|>assistant
+          I'm good, how are you?<|im_end|>"
         `);
     });
 });

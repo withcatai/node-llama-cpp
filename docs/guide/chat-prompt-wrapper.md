@@ -1,4 +1,4 @@
-# Chat wrapper
+# Chat prompt wrapper
 ## Background
 Text generation models are trained to predict the completion of incomplete text. 
 To have a conversation with a model, we have to generate a text the model can complete,
@@ -42,12 +42,12 @@ The [`LlamaChatSession`](/api/classes/LlamaChatSession) class allows you to chat
 
 To do that, it uses a chat prompt wrapper to handle the unique format of the model you use.
 
-For example, to chat with a LLama model, you can use [LlamaChatWrapper](/api/classes/LlamaChatWrapper):
+For example, to chat with a LLama model, you can use [LlamaChatPromptWrapper](/api/classes/LlamaChatPromptWrapper):
 
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession, LlamaChatWrapper} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession, LlamaChatPromptWrapper} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,7 +57,7 @@ const model = new LlamaModel({
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({
     context,
-    chatWrapper: new LlamaChatWrapper() // by default, "auto" is used
+    promptWrapper: new LlamaChatPromptWrapper() // by default, GeneralChatPromptWrapper is used
 });
 
 
@@ -75,19 +75,19 @@ const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
 
-> You can find the list of builtin chat prompt wrappers [here](/api/classes/ChatWrapper).
+> You can find the list of builtin chat prompt wrappers [here](/api/classes/ChatPromptWrapper).
 
 ## Custom chat prompt wrapper
-To create your own chat prompt wrapper, you need to extend the [`ChatPromptWrapper`](/api/classes/ChatWrapper) class:
+To create your own chat prompt wrapper, you need to extend the [`ChatPromptWrapper`](/api/classes/ChatPromptWrapper) class:
 
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession, ChatWrapper} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession, ChatPromptWrapper} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-class MyCustomChatWrapper extends ChatWrapper {
+class MyCustomChatPromptWrapper extends ChatPromptWrapper {
     public readonly wrapperName: string = "MyCustomChat";
     
     public override wrapPrompt(prompt: string, {systemPrompt, promptIndex}: {systemPrompt: string, promptIndex: number}) {
@@ -113,7 +113,7 @@ const model = new LlamaModel({
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({
     context,
-    promptWrapper: new MyCustomChatWrapper()
+    promptWrapper: new MyCustomChatPromptWrapper()
 });
 
 

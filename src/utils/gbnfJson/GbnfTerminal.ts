@@ -4,7 +4,7 @@ import {GbnfGrammarGenerator} from "./GbnfGrammarGenerator.js";
 export abstract class GbnfTerminal {
     private _ruleName: string | null = null;
 
-    protected getRuleName(grammarGenerator: GbnfGrammarGenerator): string {
+    public getRuleName(grammarGenerator: GbnfGrammarGenerator): string {
         if (this._ruleName != null)
             return this._ruleName;
 

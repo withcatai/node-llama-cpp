@@ -5,8 +5,6 @@ import {
 } from "../types.js";
 
 
-export function validateObjectAgainstGbnfSchema(object: any, schema: unknown): boolean;
-export function validateObjectAgainstGbnfSchema<T extends GbnfJsonSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T>;
 export function validateObjectAgainstGbnfSchema<T extends GbnfJsonSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
     try {
         return validateObjectWithGbnfSchema(object, schema);

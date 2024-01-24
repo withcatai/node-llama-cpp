@@ -64,9 +64,4 @@ node --loader ts-node/esm ./src/cli/cli.ts chat --model <path-to-a-model-file-on
 ```
 
 ## Opening a pull request
-Before starting to work on a new feature,
-search for a related issue on the [issues page](https://github.com/withcatai/node-llama-cpp/issues).
-If there's already an issue for the feature you want to work on,
-comment on that issue to let us know that you're working on it, to avoid duplicate work.
-
 To open a pull request, read the [pull request guidelines](./contributing.md).

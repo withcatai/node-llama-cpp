@@ -176,19 +176,16 @@ jobs:
           await $`mkdir -p llamaBins`;
           
           for (const arch of arches) {
-            const additionalFlags = [];
             let buildNodeVersion = nodeVersion;
             
             if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
               buildNodeVersion = windowsOnArmNodeVersion;
-            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "x64") {
-              additionalFlags.push("--no-metal");
             }
             
             console.log(`Building ${arch} for node ${buildNodeVersion}`);
             
-            const binName = `${process.env.ARTIFACT_NAME}-${arch}`;
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion} ${additionalFlags}`;
+            const binName = `${process.env.ARTIFACT_NAME}-${arch}`; 
+            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion}`;
             await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
           }
           
@@ -240,56 +237,9 @@ jobs:
       - name: Run standalone tests
         run: npm run test:standalone
 
-  model-dependent-tests:
-    name: Model dependent tests
-    runs-on: macos-13
-    needs:
-      - build
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: build
-          path: dist
-
-      - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: llama.cpp
-          path: llama/llama.cpp
-
-      - name: Install dependencies on macOS
-        run: |
-          brew install cmake ninja
-          alias make=cmake
-
-      - name: Install modules
-        run: npm ci
-
-      - name: Build binary
-        run: node ./dist/cli/cli.js build
-
-      - name: Cache models
-        id: cache-test-models
-        uses: actions/cache@v3
-        with:
-          path: "test/.models/**.gguf"
-          key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
-
-      - name: Download models or ensure all models are downloaded
-        run: npm run dev:setup:downloadAllTestModels
-
-      - name: Run model dependent tests
-        run: npm run test:modelDependent
-
   release:
     name: Release
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -346,20 +296,20 @@ jobs:
             echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
           fi
       - name: Generate docs with updated version
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
+        if: steps.set-npm-url.outputs.npm-url != ''
         env:
           DOCS_URL_BASE: "/node-llama-cpp/"
         run: |
           export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
           npm run docs:build
       - name: Upload docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
+        if: steps.set-npm-url.outputs.npm-url != ''
         uses: actions/upload-pages-artifact@v2
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
+        if: steps.set-npm-url.outputs.npm-url != ''
         uses: actions/deploy-pages@v2
         with:
           artifact_name: pages-docs

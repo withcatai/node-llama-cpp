@@ -10,5 +10,8 @@ insert_final_newline = true
 [{package.json,package-lock.json,manifest.json}]
 indent_size = 2
 
+[.babelrc]
+indent_size = 2
+
 [*.yml]
 indent_size = 2

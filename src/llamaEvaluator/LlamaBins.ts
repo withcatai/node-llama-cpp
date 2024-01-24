@@ -1,6 +1,6 @@
-import {loadBin, type AddonModel, type AddonContext, type AddonGrammar, type AddonGrammarEvaluationState} from "../utils/getBin.js";
+import {loadBin, type LLAMAModel, type LLAMAContext, type LLAMAGrammar, type LLAMAGrammarEvaluationState} from "../utils/getBin.js";
 
-export const addonBinding = await loadBin();
-const {AddonModel, AddonContext, AddonGrammar, AddonGrammarEvaluationState} = addonBinding;
+export const llamaCppNode = await loadBin();
+const {LLAMAModel, LLAMAContext, LLAMAGrammar, LLAMAGrammarEvaluationState} = llamaCppNode;
 
-export {AddonModel, AddonContext, AddonGrammar, AddonGrammarEvaluationState};
+export {LLAMAModel, LLAMAContext, LLAMAGrammar, LLAMAGrammarEvaluationState};

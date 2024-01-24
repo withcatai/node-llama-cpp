@@ -10,7 +10,6 @@ node_modules
 /.env
 /.eslintcache
 /.vitepress/.cache
-/test/.models
 /coverage
 
 /llama/compile_commands.json

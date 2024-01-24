@@ -38,7 +38,7 @@ export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .default(await getBinariesGithubRelease())
     .asString();
 export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
-    .default((process.platform === "darwin" && process.arch !== "x64") ? "true" : "false")
+    .default(process.platform === "darwin" ? "true" : "false")
     .asBool();
 export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
     .default("false")

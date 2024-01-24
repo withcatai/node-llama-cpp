@@ -1,9 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import {getGrammarsFolder} from "../utils/getGrammarsFolder.js";
-import {LlamaText} from "../utils/LlamaText.js";
-import {StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
-import {AddonGrammar} from "./LlamaBins.js";
+import {LLAMAGrammar} from "./LlamaBins.js";
 
 
 export type LlamaGrammarOptions = {
@@ -13,17 +11,17 @@ export type LlamaGrammarOptions = {
     /** print the grammar to stdout */
     printGrammar?: boolean
 
-    /** Consider any of these as EOS for the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
-    stopGenerationTriggers?: readonly (StopGenerationTrigger | LlamaText)[],
+    /** Consider any of these texts as EOS for the generated out. Only supported by `LlamaChatSession` */
+    stopStrings?: string[],
 
-    /** Trim whitespace from the end of the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
+    /** Trim whitespace from the end of the generated text. Only supported by `LlamaChatSession` */
     trimWhitespaceSuffix?: boolean
 };
 
 export class LlamaGrammar {
     /** @internal */
-    public readonly _grammar: AddonGrammar;
-    private readonly _stopGenerationTriggers: readonly (StopGenerationTrigger | LlamaText)[];
+    public readonly _grammar: LLAMAGrammar;
+    private readonly _stopStrings: readonly string[];
     private readonly _trimWhitespaceSuffix: boolean;
     private readonly _grammarText: string;
 
@@ -31,15 +29,21 @@ export class LlamaGrammar {
      * > GBNF files are supported.
      * > More info here: [github:ggerganov/llama.cpp:grammars/README.md](
      * > https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
-     * @param options
+     * @param {object} options
+     * @param {string} options.grammar - GBNF grammar
+     * @param {string[]} [options.stopStrings] - Consider any of these texts as EOS for the generated out.
+     * Only supported by `LlamaChatSession`
+     * @param {boolean} [options.trimWhitespaceSuffix] - Trim whitespace from the end of the generated text.
+     * Only supported by `LlamaChatSession`
+     * @param {boolean} [options.printGrammar] - print the grammar to stdout
      */
     public constructor({
-        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
+        grammar, stopStrings = [], trimWhitespaceSuffix = false, printGrammar = false
     }: LlamaGrammarOptions) {
-        this._grammar = new AddonGrammar(grammar, {
+        this._grammar = new LLAMAGrammar(grammar, {
             printGrammar
         });
-        this._stopGenerationTriggers = stopGenerationTriggers ?? [];
+        this._stopStrings = stopStrings ?? [];
         this._trimWhitespaceSuffix = trimWhitespaceSuffix;
         this._grammarText = grammar;
     }
@@ -48,8 +52,8 @@ export class LlamaGrammar {
         return this._grammarText;
     }
 
-    public get stopGenerationTriggers() {
-        return this._stopGenerationTriggers;
+    public get stopStrings() {
+        return this._stopStrings;
     }
 
     public get trimWhitespaceSuffix() {
@@ -65,7 +69,7 @@ export class LlamaGrammar {
             const grammar = await fs.readFile(grammarFile, "utf8");
             return new LlamaGrammar({
                 grammar,
-                stopGenerationTriggers: [LlamaText(["\n".repeat(10)])], // this is a workaround for the model not stopping to generate text,
+                stopStrings: ["\n".repeat(10)], // this is a workaround for the model not stopping to generate text,
                 trimWhitespaceSuffix: true
             });
         }

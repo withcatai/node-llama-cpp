@@ -1,20 +1,20 @@
 BasedOnStyle: Google
-IndentWidth: 4
+IndentWidth: 2
 UseTab: Never
-TabWidth: 4
-ColumnLimit: 140
+TabWidth: 2
+ColumnLimit: 500
 AllowShortCaseLabelsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
 AlignTrailingComments: false
 SpaceAfterTemplateKeyword: false
-AllowShortBlocksOnASingleLine: false
+AllowShortBlocksOnASingleLine: true
 MaxEmptyLinesToKeep: 3
 NamespaceIndentation: None
 CommentPragmas: '^[^ ]'
 FixNamespaceComments: false
-IndentAccessModifiers: true
+AccessModifierOffset: -4
 SpaceAfterCStyleCast: false
 PointerAlignment: Left
 IndentCaseLabels: false
@@ -31,7 +31,6 @@ UseCRLF: false
 AllowAllArgumentsOnNextLine: true
 AlignAfterOpenBracket: DontAlign
 PackConstructorInitializers: CurrentLine
-AlignAfterOpenBracket: BlockIndent
 BraceWrapping:
   AfterStruct: false
   AfterClass: false

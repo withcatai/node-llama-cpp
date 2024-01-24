@@ -7,8 +7,7 @@
     },
     "ignorePatterns": ["/dist", "/llama", "/docs-site"],
     "extends": [
-        "eslint:recommended",
-        "plugin:jsdoc/recommended"
+        "eslint:recommended"
     ],
     "globals": {
         "Atomics": "readonly",
@@ -25,15 +24,13 @@
         "files": ["**.ts"],
         "extends": [
             "eslint:recommended",
-            "plugin:@typescript-eslint/recommended",
-            "plugin:jsdoc/recommended-typescript"
+            "plugin:@typescript-eslint/recommended"
         ],
         "parser": "@typescript-eslint/parser",
         "plugins": [
             "@typescript-eslint",
             "import",
-            "jsdoc",
-            "n"
+            "node"
         ],
         "rules": {
             "@typescript-eslint/explicit-module-boundary-types": ["off"],
@@ -41,15 +38,7 @@
             "@typescript-eslint/no-explicit-any": ["off"],
             "semi": ["off"],
             "@typescript-eslint/semi": ["warn", "always"],
-            "@typescript-eslint/no-inferrable-types": ["off"],
-            "jsdoc/require-param": ["off"],
-            "jsdoc/check-param-names": ["warn", {
-                "checkDestructured": false
-            }],
-            "jsdoc/require-returns": ["off"],
-            "jsdoc/require-jsdoc": ["off"],
-            "jsdoc/require-yields": ["off"],
-            "jsdoc/require-param-description": ["off"]
+            "@typescript-eslint/no-inferrable-types": ["off"]
         }
     }, {
         "files": ["test/**/**.ts"],
@@ -60,18 +49,11 @@
     "plugins": [
         "@typescript-eslint",
         "import",
-        "jsdoc",
-        "n"
+        "node"
     ],
     "settings": {
         "import/parsers": {
             "@typescript-eslint/parser": [".ts"]
-        },
-        "jsdoc": {
-            "exemptDestructuredRootsFromChecks": true,
-            "tagNamePreference": {
-                "hidden": "hidden"
-            }
         }
     },
     "rules": {
@@ -108,7 +90,9 @@
             "groups": ["builtin", "external","internal", "parent", "sibling", "index", "type", "object", "unknown"],
             "warnOnUnassignedImports": true
         }],
-        "n/file-extension-in-import": ["error", "always"],
+        "node/file-extension-in-import": ["error", "always", {
+            "tryExtensions": [".js", ".json"]
+        }],
         "newline-per-chained-call": ["error", {
             "ignoreChainWithDepth": 2
         }],
@@ -124,6 +108,13 @@
         }],
         "no-eval": ["error"],
         "array-callback-return": ["error"],
+        "valid-jsdoc": ["error", {
+            "requireParamType": true,
+            "requireReturnType": true,
+            "requireReturn": false,
+            "requireParamDescription": false,
+            "requireReturnDescription": false
+        }],
         "no-empty": ["error", {
             "allowEmptyCatch": true
         }],

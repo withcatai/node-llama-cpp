@@ -68,7 +68,7 @@ body:
       description: >-
         Add any other context about the bug report here.
   - type: checkboxes
-    id: features
+    id: drivers
     attributes:
       label: Relevant Features Used
       options:
