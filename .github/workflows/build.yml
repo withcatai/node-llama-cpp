@@ -102,7 +102,7 @@ jobs:
 
       - name: Install Cuda on Windows
         if: startsWith(matrix.config.os, 'windows')
-        uses: Jimver/cuda-toolkit@v0.2.14
+        uses: Jimver/cuda-toolkit@v0.2.11
         with:
           cuda: '12.2.2'
           method: 'network'
@@ -111,7 +111,7 @@ jobs:
 
       - name: Install Cuda on Ubuntu
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
-        uses: Jimver/cuda-toolkit@v0.2.14
+        uses: Jimver/cuda-toolkit@v0.2.11
         with:
           cuda: '12.2.2'
           method: 'network'
