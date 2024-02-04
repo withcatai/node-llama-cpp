@@ -20,7 +20,7 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        run: node ./dist/cli/cli.js download --release latest --skipBuild --noBundle --updateBinariesReleaseMetadataAndSaveGitBundle
+        run: node ./dist/cli/cli.js download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +104,7 @@ jobs:
         if: startsWith(matrix.config.os, 'windows')
         uses: Jimver/cuda-toolkit@v0.2.14
         with:
-          cuda: '12.2.5.6'
+          cuda: '12.2.2'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
@@ -113,7 +113,7 @@ jobs:
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
         uses: Jimver/cuda-toolkit@v0.2.14
         with:
-          cuda: '12.2.5.6'
+          cuda: '12.2.2'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust"]'
           use-local-cache: false
@@ -174,7 +174,7 @@ jobs:
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
             
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
+            await $`node ./dist/cli/cli.js build --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
           }
           
           // build binaries
