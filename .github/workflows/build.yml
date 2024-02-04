@@ -53,7 +53,7 @@ jobs:
             generators: "Visual Studio 17 2022"
             artifact: "win"
           - name: "Ubuntu GCC"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             cc: "gcc"
             cxx: "g++"
             generators: "Ninja"
@@ -111,12 +111,10 @@ jobs:
 
       - name: Install Cuda on Ubuntu
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
-        uses: Jimver/cuda-toolkit@v0.2.14
+        uses: Jimver/cuda-toolkit@v0.2.11
         with:
-          cuda: '12.2.2'
+          cuda: '12.2.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust"]'
-          use-local-cache: false
 
       - name: Install dependencies on macOS
         if: startsWith(matrix.config.os, 'macos')
