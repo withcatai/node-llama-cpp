@@ -1,5 +1,5 @@
-import {Llama} from "../llamaBin/Llama.js";
-import {AddonGrammarEvaluationState} from "../utils/getBin.js";
+import {Llama} from "../bindings/Llama.js";
+import {AddonGrammarEvaluationState} from "../bindings/AddonTypes.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
 

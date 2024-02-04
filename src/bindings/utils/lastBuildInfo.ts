@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import {lastBuildInfoJsonPath} from "../config.js";
+import {lastBuildInfoJsonPath} from "../../config.js";
 
 type LastBuildInfo = {
     folderName: string

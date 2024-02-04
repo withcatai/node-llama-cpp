@@ -1,11 +1,11 @@
 import {DisposeAggregator, EventRelay, withLock, DisposedError} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
-import {BatchLogitIndex, AddonContext} from "../../utils/getBin.js";
+import {BatchLogitIndex, AddonContext} from "../../bindings/AddonTypes.js";
 import {LlamaModel} from "../LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
-import {Llama} from "../../llamaBin/Llama.js";
+import {Llama} from "../../bindings/Llama.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem

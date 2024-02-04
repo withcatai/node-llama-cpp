@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import chalk from "chalk";
 import {llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
 import withOra from "../../utils/withOra.js";
-import {clearAllLocalBuilds} from "../../utils/clearAllLocalBuilds.js";
+import {clearAllLocalBuilds} from "../../bindings/utils/clearAllLocalBuilds.js";
 import {clearLocalCmake, fixXpackPermissions} from "../../utils/cmake.js";
 
 type ClearCommand = {

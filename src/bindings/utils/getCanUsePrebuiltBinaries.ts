@@ -1,5 +1,5 @@
-import {getClonedLlamaCppRepoReleaseInfo} from "../../utils/cloneLlamaCppRepo.js";
 import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease} from "../../config.js";
+import {getClonedLlamaCppRepoReleaseInfo} from "./cloneLlamaCppRepo.js";
 
 export async function getCanUsePrebuiltBinaries() {
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();

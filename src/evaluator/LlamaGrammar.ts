@@ -3,8 +3,8 @@ import fs from "fs-extra";
 import {getGrammarsFolder} from "../utils/getGrammarsFolder.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
-import {AddonGrammar} from "../utils/getBin.js";
-import {Llama} from "../llamaBin/Llama.js";
+import {AddonGrammar} from "../bindings/AddonTypes.js";
+import {Llama} from "../bindings/Llama.js";
 
 
 export type LlamaGrammarOptions = {

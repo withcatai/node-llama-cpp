@@ -1,7 +1,7 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../chatWrappers/resolveChatWrapperBasedOnModel.js";
 import {GeneralChatWrapper} from "../chatWrappers/GeneralChatWrapper.js";
-import {LlamaModel} from "../llamaEvaluator/LlamaModel.js";
+import {LlamaModel} from "../evaluator/LlamaModel.js";
 
 export function resolveChatWrapper(chatWrapper: "auto" | ChatWrapper, model: LlamaModel) {
     if (chatWrapper === "auto") {

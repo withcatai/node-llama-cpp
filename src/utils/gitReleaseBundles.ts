@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import simpleGit from "simple-git";
 import {currentReleaseGitBundlePath, builtinLlamaCppGitHubRepo, llamaCppDirectory} from "../config.js";
-import {getBinariesGithubRelease} from "./binariesGithubRelease.js";
+import {getBinariesGithubRelease} from "../bindings/utils/binariesGithubRelease.js";
 import {isGithubReleaseNeedsResolving} from "./resolveGithubRelease.js";
 
 

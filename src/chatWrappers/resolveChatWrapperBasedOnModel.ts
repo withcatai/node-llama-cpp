@@ -1,12 +1,12 @@
 import {parseModelFileName} from "../utils/parseModelFileName.js";
 import {parseModelTypeDescription} from "../utils/parseModelTypeDescription.js";
+import {ModelTypeDescription} from "../bindings/AddonTypes.js";
 import {LlamaChatWrapper} from "./LlamaChatWrapper.js";
 import {ChatMLChatWrapper} from "./ChatMLChatWrapper.js";
 import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
 import {FalconChatWrapper} from "./FalconChatWrapper.js";
 import {FunctionaryChatWrapper} from "./FunctionaryChatWrapper.js";
 import {AlpacaChatWrapper} from "./AlpacaChatWrapper.js";
-import type {ModelTypeDescription} from "../utils/getBin.js";
 
 
 /**

@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 import {getLlama, LlamaChatWrapper} from "../../../src/index.js";
-import {FunctionCallGrammar} from "../../../src/llamaEvaluator/LlamaChat/utils/FunctionCallGrammar.js";
+import {FunctionCallGrammar} from "../../../src/evaluator/LlamaChat/utils/FunctionCallGrammar.js";
 
 
 describe("grammar for functions", () => {

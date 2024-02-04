@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import {binariesGithubReleasePath} from "../config.js";
+import {binariesGithubReleasePath} from "../../config.js";
 
 type BinariesGithubReleaseFile = {
     release: "latest" | string

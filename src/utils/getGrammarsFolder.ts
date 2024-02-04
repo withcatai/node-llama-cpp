@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import {llamaBinsGrammarsDirectory, llamaCppGrammarsDirectory} from "../config.js";
-import {Llama} from "../llamaBin/Llama.js";
-import {isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
+import {Llama} from "../bindings/Llama.js";
+import {isLlamaCppRepoCloned} from "../bindings/utils/cloneLlamaCppRepo.js";
 
 export async function getGrammarsFolder(buildType: Llama["buildType"]) {
     if (buildType === "localBuild") {

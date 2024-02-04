@@ -3,14 +3,14 @@ import simpleGit, {SimpleGit} from "simple-git";
 import cliProgress from "cli-progress";
 import chalk from "chalk";
 import fs from "fs-extra";
-import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../config.js";
-import {getGitBundlePathForRelease} from "./gitReleaseBundles.js";
-import {withLockfile} from "./withLockfile.js";
-import {waitForLockfileRelease} from "./waitForLockfileRelease.js";
-import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
-import {isLockfileActive} from "./isLockfileActive.js";
-import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "./resolveGithubRelease.js";
-import withStatusLogs from "./withStatusLogs.js";
+import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
+import {getGitBundlePathForRelease} from "../../utils/gitReleaseBundles.js";
+import {withLockfile} from "../../utils/withLockfile.js";
+import {waitForLockfileRelease} from "../../utils/waitForLockfileRelease.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {isLockfileActive} from "../../utils/isLockfileActive.js";
+import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
+import withStatusLogs from "../../utils/withStatusLogs.js";
 
 type ClonedLlamaCppRepoTagFile = {
     tag: string,

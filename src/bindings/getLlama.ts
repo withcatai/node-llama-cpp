@@ -6,15 +6,15 @@ import {
     builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppDebugLogs, defaultLlamaCppGitHubRepo,
     defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultSkipDownload, llamaLocalBuildBinsDirectory
 } from "../config.js";
-import {BindingModule} from "../utils/getBin.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
+import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../utils/resolveGithubRelease.js";
+import {BindingModule} from "./AddonTypes.js";
 import {
     compileLlamaCpp, getLocalBuildBinaryBuildMetadata, getLocalBuildBinaryPath, getPrebuiltBinaryBuildMetadata, getPrebuiltBinaryPath
-} from "../utils/compileLLamaCpp.js";
-import {getLastBuildInfo} from "../utils/lastBuildInfo.js";
-import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../utils/cloneLlamaCppRepo.js";
-import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../utils/resolveGithubRelease.js";
+} from "./utils/compileLLamaCpp.js";
+import {getLastBuildInfo} from "./utils/lastBuildInfo.js";
+import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "./utils/cloneLlamaCppRepo.js";
 import {BuildOptions, LlamaLogLevel} from "./types.js";
 import {getPlatform} from "./utils/getPlatform.js";
 import {getBuildFolderNameForBuildOptions} from "./utils/getBuildFolderNameForBuildOptions.js";

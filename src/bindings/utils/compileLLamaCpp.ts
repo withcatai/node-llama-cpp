@@ -6,14 +6,14 @@ import chalk from "chalk";
 import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
-} from "../config.js";
-import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../llamaBin/types.js";
-import {getBuildFolderNameForBuildOptions} from "../llamaBin/utils/getBuildFolderNameForBuildOptions.js";
-import {spawnCommand} from "./spawnCommand.js";
-import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "./cmake.js";
-import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+} from "../../config.js";
+import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
+import {spawnCommand} from "../../utils/spawnCommand.js";
+import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "../../utils/cmake.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {withLockfile} from "../../utils/withLockfile.js";
 import {ensureLlamaCppRepoIsCloned, isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
-import {withLockfile} from "./withLockfile.js";
+import {getBuildFolderNameForBuildOptions} from "./getBuildFolderNameForBuildOptions.js";
 import {setLastBuildInfo} from "./lastBuildInfo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

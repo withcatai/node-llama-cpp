@@ -1,7 +1,7 @@
 import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
-import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
+import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {
@@ -10,11 +10,11 @@ import {
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../state.js";
-import {logBinaryUsageExampleToConsole} from "../../llamaBin/utils/logBinaryUsageExampleToConsole.js";
-import {getPlatform} from "../../llamaBin/utils/getPlatform.js";
-import {resolveCustomCmakeOptions} from "../../llamaBin/utils/resolveCustomCmakeOptions.js";
-import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../../utils/cloneLlamaCppRepo.js";
-import {BuildOptions} from "../../llamaBin/types.js";
+import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
+import {getPlatform} from "../../bindings/utils/getPlatform.js";
+import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
+import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../../bindings/utils/cloneLlamaCppRepo.js";
+import {BuildOptions} from "../../bindings/types.js";
 
 type BuildCommand = {
     arch?: string,

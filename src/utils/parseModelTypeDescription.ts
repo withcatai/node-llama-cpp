@@ -1,4 +1,4 @@
-import type {AddonModelArchName, AddonModelFileTypeName, AddonModelTypeName, ModelTypeDescription} from "./getBin.js";
+import type {AddonModelArchName, AddonModelFileTypeName, AddonModelTypeName, ModelTypeDescription} from "../bindings/AddonTypes.js";
 
 export function parseModelTypeDescription(modelTypeDescription: ModelTypeDescription) {
     const [arch, type, ...fileTypeParts] = modelTypeDescription.split(" ");

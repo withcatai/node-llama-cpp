@@ -1,6 +1,6 @@
 import chalk from "chalk";
-import {BindingModule} from "../utils/getBin.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
+import {BindingModule} from "./AddonTypes.js";
 import {BuildMetadataFile, LlamaLogLevel} from "./types.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([

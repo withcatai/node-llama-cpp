@@ -16,15 +16,15 @@ import {ReplHistory} from "../../utils/ReplHistory.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.js";
-import {defineChatSessionFunction} from "../../llamaEvaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
-import {getLlama} from "../../llamaBin/getLlama.js";
-import {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
-import {ModelTypeDescription} from "../../utils/getBin.js";
-import {LlamaChatSession} from "../../llamaEvaluator/LlamaChatSession/LlamaChatSession.js";
-import {LlamaModel} from "../../llamaEvaluator/LlamaModel.js";
-import {LlamaContext} from "../../llamaEvaluator/LlamaContext/LlamaContext.js";
-import {LlamaJsonSchemaGrammar} from "../../llamaEvaluator/LlamaJsonSchemaGrammar.js";
-import {LlamaLogLevel} from "../../llamaBin/types.js";
+import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
+import {getLlama} from "../../bindings/getLlama.js";
+import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
+import {ModelTypeDescription} from "../../bindings/AddonTypes.js";
+import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
+import {LlamaModel} from "../../evaluator/LlamaModel.js";
+import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
+import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
+import {LlamaLogLevel} from "../../bindings/types.js";
 
 const modelWrappers = ["auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"] as const;
 

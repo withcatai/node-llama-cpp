@@ -1,6 +1,6 @@
 import {CommandModule} from "yargs";
 import {defaultSkipDownload} from "../../config.js";
-import {getLlama} from "../../llamaBin/getLlama.js";
+import {getLlama} from "../../bindings/getLlama.js";
 
 type OnPostInstallCommand = null;
 

@@ -3,8 +3,8 @@ import path from "path";
 import {DisposedError, EventRelay} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
-import {ModelTypeDescription, AddonModel} from "../utils/getBin.js";
-import {Llama} from "../llamaBin/Llama.js";
+import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
+import {Llama} from "../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
 

@@ -1,10 +1,10 @@
 import path from "path";
 import fs from "fs-extra";
-import {lastBuildInfoJsonPath, llamaLocalBuildBinsDirectory} from "../config.js";
-import {clearTempFolder} from "./clearTempFolder.js";
-import {withLockfile} from "./withLockfile.js";
-import {isLockfileActive} from "./isLockfileActive.js";
-import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+import {lastBuildInfoJsonPath, llamaLocalBuildBinsDirectory} from "../../config.js";
+import {clearTempFolder} from "../../utils/clearTempFolder.js";
+import {withLockfile} from "../../utils/withLockfile.js";
+import {isLockfileActive} from "../../utils/isLockfileActive.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 
 export async function clearAllLocalBuilds(waitForLocks = false) {
     async function removeBuilds() {

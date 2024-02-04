@@ -10,7 +10,7 @@ import {GbnfTerminal} from "../../../utils/gbnfJson/GbnfTerminal.js";
 import {GbnfOr} from "../../../utils/gbnfJson/terminals/GbnfOr.js";
 import {LlamaChatResponseFunctionCall} from "../LlamaChat.js";
 import {GbnfVerbatimText} from "../../../utils/gbnfJson/terminals/GbnfVerbatimText.js";
-import {Llama} from "../../../llamaBin/Llama.js";
+import {Llama} from "../../../bindings/Llama.js";
 
 
 export class FunctionCallGrammar<const Functions extends ChatModelFunctions> extends LlamaGrammar {

@@ -4,8 +4,8 @@ import * as os from "os";
 import process from "process";
 import envVar from "env-var";
 import * as uuid from "uuid";
-import {getBinariesGithubRelease} from "./utils/binariesGithubRelease.js";
-import {LlamaLogLevel, LlamaLogLevelValues} from "./llamaBin/types.js";
+import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
+import {LlamaLogLevel, LlamaLogLevelValues} from "./bindings/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
