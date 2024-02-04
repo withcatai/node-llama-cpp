@@ -1,6 +1,6 @@
 import spawn from "cross-spawn";
 
-export function spawnCommand(command: string, args: string[], cwd: string, env = process.env) {
+export function spawnCommand(command: string, args: string[], cwd: string, env = process.env, progressLogs: boolean = true) {
     function getCommandString() {
         let res = command;
 
@@ -17,7 +17,9 @@ export function spawnCommand(command: string, args: string[], cwd: string, env =
 
     return new Promise<void>((resolve, reject) => {
         const child = spawn(command, args, {
-            stdio: "inherit",
+            stdio: progressLogs
+                ? "inherit"
+                : ["ignore", "ignore", process.stderr],
             cwd,
             env,
             detached: false,

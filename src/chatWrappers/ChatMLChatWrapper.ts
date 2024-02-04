@@ -11,7 +11,12 @@ export class ChatMLChatWrapper extends ChatWrapper {
         documentFunctionParams?: boolean
     } = {}): {
         contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
+        stopGenerationTriggers: LlamaText[],
+        ignoreStartText?: LlamaText[],
+        functionCall?: {
+            initiallyEngaged: boolean,
+            disengageInitiallyEngaged: LlamaText[]
+        }
     } {
         const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
             documentParams: documentFunctionParams

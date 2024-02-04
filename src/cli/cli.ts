@@ -7,6 +7,7 @@ import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
 import {cliBinName} from "../config.js";
+import {setIsRunningFromCLI} from "../state.js";
 import {DownloadCommand} from "./commands/DownloadCommand.js";
 import {BuildCommand} from "./commands/BuildCommand.js";
 import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
@@ -16,6 +17,8 @@ import {ChatCommand} from "./commands/ChatCommand.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const packageJson = fs.readJSONSync(path.join(__dirname, "..", "..", "package.json"));
+
+setIsRunningFromCLI(true);
 
 const yarg = yargs(hideBin(process.argv));
 

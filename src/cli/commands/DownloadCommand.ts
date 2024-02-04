@@ -1,24 +1,25 @@
 import process from "process";
 import {CommandModule} from "yargs";
-import {Octokit} from "octokit";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI,
-    llamaCppDirectory, llamaCppDirectoryTagFilePath
+    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI, llamaCppDirectory,
+    llamaCppDirectoryInfoFilePath
 } from "../../config.js";
-import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
+import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {setBinariesGithubRelease} from "../../utils/binariesGithubRelease.js";
+import {setBinariesGithubRelease} from "../../bindings/utils/binariesGithubRelease.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../state.js";
-import {
-    getGitBundlePathForRelease,
-    unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle
-} from "../../utils/gitReleaseBundles.js";
-import {cloneLlamaCppRepo} from "../../utils/cloneLlamaCppRepo.js";
+import {getGitBundlePathForRelease, unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
+import {cloneLlamaCppRepo} from "../../bindings/utils/cloneLlamaCppRepo.js";
+import {getPlatform} from "../../bindings/utils/getPlatform.js";
+import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
+import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
+import {resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
+import {BuildOptions} from "../../bindings/types.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -29,6 +30,7 @@ type DownloadCommandArgs = {
     cuda?: boolean,
     skipBuild?: boolean,
     noBundle?: boolean,
+    noUsageExample?: boolean,
 
     /** @internal */
     updateBinariesReleaseMetadataAndSaveGitBundle?: boolean
@@ -84,6 +86,12 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 default: false,
                 description: "Download a llama.cpp release only from GitHub, even if a local git bundle exists for the release"
             })
+            .option("noUsageExample", {
+                alias: "nu",
+                type: "boolean",
+                default: false,
+                description: "Don't print code usage example after building"
+            })
             .option("updateBinariesReleaseMetadataAndSaveGitBundle", {
                 type: "boolean",
                 hidden: true, // this for the CI to use
@@ -94,6 +102,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     handler: DownloadLlamaCppCommand
 };
 
+// TODO: clear the builds folder
 export async function DownloadLlamaCppCommand({
     repo = defaultLlamaCppGitHubRepo,
     release = defaultLlamaCppRelease,
@@ -103,16 +112,18 @@ export async function DownloadLlamaCppCommand({
     cuda = defaultLlamaCppCudaSupport,
     skipBuild = false,
     noBundle = false,
+    noUsageExample = false,
     updateBinariesReleaseMetadataAndSaveGitBundle = false
 }: DownloadCommandArgs) {
     const useBundle = noBundle != true;
-    const octokit = new Octokit();
+    const platform = getPlatform();
+    const customCmakeOptions = resolveCustomCmakeOptions();
     const [githubOwner, githubRepo] = repo.split("/");
 
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
     if (!skipBuild) {
-        if (metal && process.platform === "darwin") {
+        if (metal && platform === "mac") {
             console.log(`${chalk.yellow("Metal:")} enabled`);
         }
 
@@ -121,9 +132,6 @@ export async function DownloadLlamaCppCommand({
         }
     }
     console.log();
-
-    type GithubReleaseType = Awaited<ReturnType<typeof octokit.rest.repos.getLatestRelease>> |
-        Awaited<ReturnType<typeof octokit.rest.repos.getReleaseByTag>>;
 
     let githubReleaseTag: string | null = (useBundle && (await getGitBundlePathForRelease(githubOwner, githubRepo, release)) != null)
         ? release
@@ -135,34 +143,7 @@ export async function DownloadLlamaCppCommand({
             success: chalk.blue("Fetched llama.cpp info"),
             fail: chalk.blue("Failed to fetch llama.cpp info")
         }, async () => {
-            let githubRelease: GithubReleaseType | null = null;
-
-            try {
-                if (release === "latest") {
-                    githubRelease = await octokit.rest.repos.getLatestRelease({
-                        owner: githubOwner,
-                        repo: githubRepo
-                    });
-                } else {
-                    githubRelease = await octokit.rest.repos.getReleaseByTag({
-                        owner: githubOwner,
-                        repo: githubRepo,
-                        tag: release
-                    });
-                }
-            } catch (err) {
-                console.error("Failed to fetch llama.cpp release info", err);
-            }
-
-            if (githubRelease == null) {
-                throw new Error(`Failed to find release "${release}" of "${repo}"`);
-            }
-
-            if (githubRelease.data.tag_name == null) {
-                throw new Error(`Failed to find tag of release "${release}" of "${repo}"`);
-            }
-
-            githubReleaseTag = githubRelease.data.tag_name;
+            githubReleaseTag = await resolveGithubRelease(githubOwner, githubRepo, release);
         });
 
     await clearTempFolder();
@@ -173,11 +154,28 @@ export async function DownloadLlamaCppCommand({
         fail: chalk.blue("Failed to remove existing llama.cpp directory")
     }, async () => {
         await fs.remove(llamaCppDirectory);
-        await fs.remove(llamaCppDirectoryTagFilePath);
+        await fs.remove(llamaCppDirectoryInfoFilePath);
     });
 
     console.log(chalk.blue("Cloning llama.cpp"));
     await cloneLlamaCppRepo(githubOwner, githubRepo, githubReleaseTag!, useBundle);
+
+    const buildOptions: BuildOptions = {
+        customCmakeOptions,
+        progressLogs: true,
+        platform,
+        arch: arch
+            ? arch as typeof process.arch
+            : process.arch,
+        computeLayers: {
+            metal,
+            cuda
+        },
+        llamaCpp: {
+            repo,
+            release: githubReleaseTag!
+        }
+    };
 
     if (!skipBuild) {
         await downloadCmakeIfNeeded(true);
@@ -187,12 +185,12 @@ export async function DownloadLlamaCppCommand({
             success: chalk.blue("Compiled llama.cpp"),
             fail: chalk.blue("Failed to compile llama.cpp")
         }, async () => {
-            await compileLlamaCpp({
-                arch: arch ? arch : undefined,
+            await compileLlamaCpp(buildOptions, {
                 nodeTarget: nodeTarget ? nodeTarget : undefined,
-                setUsedBinFlag: true,
-                metal,
-                cuda
+                updateLastBuildInfo: true,
+                downloadCmakeIfNeeded: false,
+                ensureLlamaCppRepoIsCloned: false,
+                includeBuildOptionsInBinaryFolderName: true
             });
         });
     }
@@ -202,6 +200,12 @@ export async function DownloadLlamaCppCommand({
         await unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle();
     }
 
+    if (!noUsageExample) {
+        console.log();
+        console.log();
+        logBinaryUsageExampleToConsole(buildOptions, true);
+    }
+
     console.log();
     console.log();
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
@@ -209,3 +213,4 @@ export async function DownloadLlamaCppCommand({
     console.log();
     console.log(chalk.green("Done"));
 }
+
