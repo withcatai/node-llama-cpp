@@ -104,16 +104,16 @@ jobs:
         if: startsWith(matrix.config.os, 'windows')
         uses: Jimver/cuda-toolkit@v0.2.11
         with:
-          cuda: '12.2.2'
+          cuda: '12.2.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
 
       - name: Install Cuda on Ubuntu
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
-        uses: Jimver/cuda-toolkit@v0.2.11
+        uses: Jimver/cuda-toolkit@v0.2.14
         with:
-          cuda: '12.2.2'
+          cuda: '12.3.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust"]'
           use-local-cache: false
