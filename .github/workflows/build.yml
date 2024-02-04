@@ -53,7 +53,7 @@ jobs:
             generators: "Visual Studio 17 2022"
             artifact: "win"
           - name: "Ubuntu GCC"
-            os: ubuntu-22.04
+            os: ubuntu-20.04
             cc: "gcc"
             cxx: "g++"
             generators: "Ninja"
@@ -113,7 +113,7 @@ jobs:
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
         uses: Jimver/cuda-toolkit@v0.2.14
         with:
-          cuda: '12.3.0'
+          cuda: '12.2.2'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust"]'
           use-local-cache: false
