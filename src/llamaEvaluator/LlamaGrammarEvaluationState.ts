@@ -1,4 +1,5 @@
-import {AddonGrammarEvaluationState} from "./LlamaBins.js";
+import {Llama} from "../llamaBin/Llama.js";
+import {AddonGrammarEvaluationState} from "../utils/getBin.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
 
@@ -12,13 +13,14 @@ export type LlamaGrammarEvaluationStateOptions = {
  * This is only needed when using the `LlamaContext` class directly, as `LlamaChatSession` already handles this for you.
  */
 export class LlamaGrammarEvaluationState {
-    /** @internal */
-    public readonly _state: AddonGrammarEvaluationState;
+    /** @internal */ public readonly _llama: Llama;
+    /** @internal */ public readonly _state: AddonGrammarEvaluationState;
 
     /**
      * @param options
      */
     public constructor({grammar}: LlamaGrammarEvaluationStateOptions) {
-        this._state = new AddonGrammarEvaluationState(grammar._grammar);
+        this._llama = grammar._llama;
+        this._state = new grammar._llama._bindings.AddonGrammarEvaluationState(grammar._grammar);
     }
 }

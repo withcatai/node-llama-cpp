@@ -15,13 +15,16 @@ node_modules
 
 /llama/compile_commands.json
 /llama/llama.cpp
-/llama/llama.cpp.tag.json
+/llama/llama.cpp.lock
+/llama/llama.cpp.info.json
+/llama/lastBuild.json
 /llama/gitRelease.bundle
 /llama/.temp
-/llama/build
+/llama/localBuilds
 /llama/Release
 /llama/Debug
 /llama/xpack/cache
 /llama/xpack/store
 /llama/xpack/xpacks
+/llama/xpack/cmakeInstall.lock
 /llamaBins

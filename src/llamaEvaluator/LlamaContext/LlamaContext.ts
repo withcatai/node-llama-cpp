@@ -1,11 +1,11 @@
 import {DisposeAggregator, EventRelay, withLock, DisposedError} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
-import {BatchLogitIndex} from "../../utils/getBin.js";
-import {AddonContext} from "../LlamaBins.js";
+import {BatchLogitIndex, AddonContext} from "../../utils/getBin.js";
 import {LlamaModel} from "../LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
+import {Llama} from "../../llamaBin/Llama.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
@@ -14,6 +14,7 @@ import {resolveBatchItemsPrioritizingStrategy} from "./utils/resolveBatchItemsPr
 
 
 export class LlamaContext {
+    /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _ctx: AddonContext;
     /** @internal */ public readonly _onReclaimUnusedSequenceId = new EventRelay<void>();
 
@@ -55,11 +56,12 @@ export class LlamaContext {
         if (model.disposed)
             throw new DisposedError();
 
+        this._llama = model._llama;
         this._model = model;
         this._totalSequences = Math.max(1, Math.floor(sequences));
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
-        this._ctx = new AddonContext(this._model._model, removeNullFields({
+        this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
@@ -743,6 +745,9 @@ export class LlamaContextSequence {
                     const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
                         ? grammarEvaluationState()
                         : grammarEvaluationState;
+
+                    if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
+                        throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
                     return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
                         temperature,

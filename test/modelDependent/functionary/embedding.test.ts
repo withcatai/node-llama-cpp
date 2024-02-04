@@ -1,13 +1,15 @@
 import {describe, expect, test} from "vitest";
-import {LlamaEmbeddingContext, LlamaModel} from "../../../src/index.js";
+import {getLlama, LlamaEmbeddingContext, LlamaModel} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 
 describe("functionary", () => {
     describe("embedding", () => {
         test("deterministic", async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const llama = await getLlama();
 
             const model = new LlamaModel({
+                llama,
                 modelPath
             });
             const embeddingContext = new LlamaEmbeddingContext({
@@ -25,16 +27,16 @@ describe("functionary", () => {
 
             expect(helloWorld2Embedding.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloWorld2Embedding.vector).to.not.eql(helloThereEmbedding.vector);
-
-            console.log(helloWorld2Embedding.vector);
         }, {
-            timeout: 1000 * 60 * 60
+            timeout: 1000 * 60 * 60 * 2
         });
 
         test("deterministic between runs", async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const llama = await getLlama();
 
             const model = new LlamaModel({
+                llama,
                 modelPath
             });
             const embeddingContext = new LlamaEmbeddingContext({
@@ -60,7 +62,7 @@ describe("functionary", () => {
             expect(helloWorldEmbedding2.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloThereEmbedding2.vector).to.eql(helloThereEmbedding.vector);
         }, {
-            timeout: 1000 * 60 * 60
+            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

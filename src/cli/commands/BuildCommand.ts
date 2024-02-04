@@ -1,20 +1,27 @@
 import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
-import fs from "fs-extra";
 import {compileLlamaCpp} from "../../utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, llamaCppDirectory} from "../../config.js";
+import {
+    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport
+} from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../state.js";
+import {logBinaryUsageExampleToConsole} from "../../llamaBin/utils/logBinaryUsageExampleToConsole.js";
+import {getPlatform} from "../../llamaBin/utils/getPlatform.js";
+import {resolveCustomCmakeOptions} from "../../llamaBin/utils/resolveCustomCmakeOptions.js";
+import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../../utils/cloneLlamaCppRepo.js";
+import {BuildOptions} from "../../llamaBin/types.js";
 
 type BuildCommand = {
     arch?: string,
     nodeTarget?: string,
     metal?: boolean,
-    cuda?: boolean
+    cuda?: boolean,
+    noUsageExample?: boolean
 };
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
@@ -43,6 +50,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 type: "boolean",
                 default: defaultLlamaCppCudaSupport,
                 description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
+            })
+            .option("noUsageExample", {
+                alias: "nu",
+                type: "boolean",
+                default: false,
+                description: "Don't print code usage example after building"
             });
     },
     handler: BuildLlamaCppCommand
@@ -52,12 +65,18 @@ export async function BuildLlamaCppCommand({
     arch = undefined,
     nodeTarget = undefined,
     metal = defaultLlamaCppMetalSupport,
-    cuda = defaultLlamaCppCudaSupport
+    cuda = defaultLlamaCppCudaSupport,
+    noUsageExample = false
 }: BuildCommand) {
-    if (!(await fs.pathExists(llamaCppDirectory))) {
+    if (!(await isLlamaCppRepoCloned())) {
         console.log(chalk.red('llama.cpp is not downloaded. Please run "node-llama-cpp download" first'));
         process.exit(1);
     }
+
+    const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
+
+    const platform = getPlatform();
+    const customCmakeOptions = resolveCustomCmakeOptions();
 
     if (metal && process.platform === "darwin") {
         console.log(`${chalk.yellow("Metal:")} enabled`);
@@ -69,17 +88,34 @@ export async function BuildLlamaCppCommand({
 
     await downloadCmakeIfNeeded(true);
 
+    const buildOptions: BuildOptions = {
+        customCmakeOptions,
+        progressLogs: true,
+        platform,
+        arch: arch
+            ? arch as typeof process.arch
+            : process.arch,
+        computeLayers: {
+            metal,
+            cuda
+        },
+        llamaCpp: {
+            repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
+            release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
+        }
+    };
+
     await withStatusLogs({
         loading: chalk.blue("Compiling llama.cpp"),
         success: chalk.blue("Compiled llama.cpp"),
         fail: chalk.blue("Failed to compile llama.cpp")
     }, async () => {
-        await compileLlamaCpp({
-            arch: arch ? arch : undefined,
+        await compileLlamaCpp(buildOptions, {
             nodeTarget: nodeTarget ? nodeTarget : undefined,
-            setUsedBinFlag: true,
-            metal,
-            cuda
+            updateLastBuildInfo: true,
+            downloadCmakeIfNeeded: false,
+            ensureLlamaCppRepoIsCloned: false,
+            includeBuildOptionsInBinaryFolderName: true
         });
     });
 
@@ -90,4 +126,10 @@ export async function BuildLlamaCppCommand({
     }, async () => {
         await clearTempFolder();
     });
+
+    if (!noUsageExample) {
+        console.log();
+        logBinaryUsageExampleToConsole(buildOptions, true);
+        console.log();
+    }
 }

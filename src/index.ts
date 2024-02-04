@@ -1,4 +1,8 @@
 import {DisposedError} from "lifecycle-utils";
+import {Llama} from "./llamaBin/Llama.js";
+import {getLlama, LlamaOptions} from "./llamaBin/getLlama.js";
+import {NoBinaryFoundError} from "./llamaBin/utils/NoBinaryFoundError.js";
+import {LlamaLogLevel} from "./llamaBin/types.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./llamaEvaluator/LlamaModel.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./llamaEvaluator/LlamaGrammar.js";
 import {LlamaJsonSchemaGrammar} from "./llamaEvaluator/LlamaJsonSchemaGrammar.js";
@@ -37,7 +41,7 @@ import {
     type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
-import {getReleaseInfo} from "./utils/getReleaseInfo.js";
+import {getModuleVersion} from "./utils/getModuleVersion.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -51,6 +55,11 @@ import {
 
 
 export {
+    Llama,
+    getLlama,
+    type LlamaOptions,
+    LlamaLogLevel,
+    NoBinaryFoundError,
     LlamaModel,
     LlamaModelTokens,
     LlamaModelInfillTokens,
@@ -111,7 +120,7 @@ export {
     type LlamaTextJSONValue,
     type LlamaTextSpecialTokenJSON,
     appendUserMessageToChatHistory,
-    getReleaseInfo,
+    getModuleVersion,
     type ChatHistoryItem,
     type ChatModelFunctionCall,
     type ChatModelFunctions,

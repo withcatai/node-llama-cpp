@@ -1,13 +1,15 @@
 import {describe, expect, test} from "vitest";
-import {LlamaChatSession, LlamaContext, LlamaJsonSchemaGrammar, LlamaModel} from "../../../src/index.js";
+import {getLlama, LlamaChatSession, LlamaContext, LlamaJsonSchemaGrammar, LlamaModel} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 
 describe("functionary", () => {
     describe("grammar", () => {
         test("JSON schema", async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const llama = await getLlama();
 
             const model = new LlamaModel({
+                llama,
                 modelPath
             });
             const context = new LlamaContext({
@@ -18,7 +20,7 @@ describe("functionary", () => {
                 contextSequence: context.getSequence()
             });
 
-            const grammar = new LlamaJsonSchemaGrammar({
+            const grammar = new LlamaJsonSchemaGrammar(llama, {
                 type: "object",
                 properties: {
                     "userMessagePositivityScoreFromOneToTen": {
@@ -41,7 +43,7 @@ describe("functionary", () => {
             expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(10);
             expect(parsedRes.verbsInUserMessage).to.eql(["going"]);
         }, {
-            timeout: 1000 * 60 * 60
+            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

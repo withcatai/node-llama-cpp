@@ -9,6 +9,16 @@
 #include "llama.h"
 #include "napi.h"
 
+Napi::FunctionReference loggerCallbackFunctionReference;
+Napi::ThreadSafeFunction threadSafeLoggerCallback;
+bool loggerCallbackSet = false;
+int addonLoggerLogLevel = 5;
+
+struct addon_logger_log {
+    const int logLevelNumber;
+    const std::stringstream* stringStream;
+};
+
 std::string addon_model_token_to_piece(const struct llama_model * model, llama_token token) {
     std::vector<char> result(8, 0);
     const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size());
@@ -799,15 +809,107 @@ Napi::Value systemInfo(const Napi::CallbackInfo& info) {
     return Napi::String::From(info.Env(), llama_print_system_info());
 }
 
+int addonGetGgmlLogLevelNumber(ggml_log_level level) {
+    switch (level) {
+        case GGML_LOG_LEVEL_ERROR: return 2;
+        case GGML_LOG_LEVEL_WARN: return 3;
+        case GGML_LOG_LEVEL_INFO: return 4;
+        case GGML_LOG_LEVEL_DEBUG: return 5;
+    }
+
+    return 1;
+}
+
+static void addonWrapperJSLogCallback(Napi::Env env, Napi::Function jsCallback, addon_logger_log* data) {
+    auto status = jsCallback.Call({
+        Napi::Number::New(env, data->logLevelNumber),
+        Napi::String::New(env, data->stringStream->str())
+    });
+
+    delete data->stringStream;
+    delete data;
+}
+
+static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, void * user_data) {
+    int logLevelNumber = addonGetGgmlLogLevelNumber(level);
+
+    if (logLevelNumber > addonLoggerLogLevel) {
+        return;
+    }
+
+    if (loggerCallbackSet) {
+        std::stringstream* stringStream = new std::stringstream();
+        if (text != nullptr) {
+            *stringStream << text;
+        }
+
+        addon_logger_log* data = new addon_logger_log {
+            logLevelNumber,
+            stringStream
+        };
+
+        auto status = threadSafeLoggerCallback.NonBlockingCall(data, addonWrapperJSLogCallback);
+
+        if (status == napi_ok) {
+            return;
+        }
+    }
+
+    if (level == GGML_LOG_LEVEL_ERROR) {
+        fputs(text, stderr);
+        fflush(stderr);
+    } else {
+        fputs(text, stdout);
+        fflush(stdout);
+    }
+}
+
+Napi::Value setLogger(const Napi::CallbackInfo& info) {
+    if (info.Length() < 1 || !info[0].IsFunction()) {
+        if (loggerCallbackSet) {
+            threadSafeLoggerCallback.Release();
+            threadSafeLoggerCallback = nullptr;
+            loggerCallbackFunctionReference.Unref();
+            loggerCallbackSet = false;
+        }
+
+        return info.Env().Undefined();
+    }
+
+    loggerCallbackFunctionReference = Napi::Persistent(info[0].As<Napi::Function>());
+    loggerCallbackFunctionReference.Ref();
+    threadSafeLoggerCallback = Napi::ThreadSafeFunction::New(info.Env(), loggerCallbackFunctionReference.Value(), "loggerCallback", 0, 1);
+    loggerCallbackSet = true;
+
+    return info.Env().Undefined();
+}
+
+Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        addonLoggerLogLevel = 5;
+        
+        return info.Env().Undefined();
+    }
+
+    addonLoggerLogLevel = info[0].As<Napi::Number>().Int32Value();
+
+    return info.Env().Undefined();
+}
+
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     llama_backend_init(false);
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
+        Napi::PropertyDescriptor::Function("setLogger", setLogger),
+        Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel)
     });
     AddonModel::init(exports);
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
+
+    llama_log_set(addonLlamaCppLogCallback, nullptr);
+
     return exports;
 }
 

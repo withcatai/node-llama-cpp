@@ -324,7 +324,7 @@ export class LlamaChat {
             ? new LlamaGrammarEvaluationState({grammar})
             : undefined;
         let functionsGrammar = functionsEnabled
-            ? new FunctionCallGrammar(functions as NonNullable<Functions>, this._chatWrapper, false)
+            ? new FunctionCallGrammar(model._llama, functions as NonNullable<Functions>, this._chatWrapper, false)
             : undefined;
         let functionsEvaluationState = (functionsEnabled && functionsGrammar != null)
             ? new LlamaGrammarEvaluationState({
@@ -490,7 +490,12 @@ export class LlamaChat {
 
                     if (initiallyEngagedFunctionMode) {
                         inFunctionEvaluationMode = true;
-                        functionsGrammar = new FunctionCallGrammar(functions as NonNullable<Functions>, this._chatWrapper, true);
+                        functionsGrammar = new FunctionCallGrammar(
+                            model._llama,
+                            functions as NonNullable<Functions>,
+                            this._chatWrapper,
+                            true
+                        );
                         functionsEvaluationState = new LlamaGrammarEvaluationState({
                             grammar: functionsGrammar
                         });
@@ -596,7 +601,11 @@ export class LlamaChat {
 
                     if (shouldStopFunctionEvaluationMode) {
                         inFunctionEvaluationMode = false;
-                        functionsGrammar = new FunctionCallGrammar(functions as NonNullable<Functions>, this._chatWrapper, false);
+                        functionsGrammar = new FunctionCallGrammar(
+                            model._llama,
+                            functions as NonNullable<Functions>,
+                            this._chatWrapper, false
+                        );
                         functionsEvaluationState = new LlamaGrammarEvaluationState({
                             grammar: functionsGrammar
                         });
@@ -957,7 +966,10 @@ async function compressHistoryToFitContextSize({
     });
 
     if (!checkIfHistoryFitsContext(chatHistory))
-        throw new Error("The default context shift strategy did not return a history that fits the context size");
+        throw new Error(
+            "The default context shift strategy did not return a history that fits the context size. " +
+            "This may happen due to the system prompt being too long"
+        );
 
     return {
         compressedHistory: chatHistory,

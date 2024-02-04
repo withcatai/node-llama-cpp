@@ -1,6 +1,7 @@
-import {withLock} from "lifecycle-utils";
+import {DisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
 import {Token} from "../types.js";
-import {isLlamaText, LlamaText} from "../utils/LlamaText.js";
+import {LlamaText} from "../utils/LlamaText.js";
+import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {LlamaModel} from "./LlamaModel.js";
 import {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
@@ -23,6 +24,9 @@ export type LlamaEmbeddingContextOptions = {
 export class LlamaEmbeddingContext {
     /** @internal */ private readonly _llamaContext: LlamaContext;
     /** @internal */ private readonly _sequence: LlamaContextSequence;
+    /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
+
+    public readonly onDispose = new EventRelay<void>();
 
     public constructor({
         model,
@@ -42,14 +46,20 @@ export class LlamaEmbeddingContext {
             _noSeed: true
         });
         this._sequence = this._llamaContext.getSequence();
+
+        this._disposeAggregator.add(
+            this._llamaContext.onDispose.createListener(() => {
+                this._disposeAggregator.dispose();
+            })
+        );
+        this._disposeAggregator.add(this.onDispose.dispatchEvent);
+        this._disposeAggregator.add(() => {
+            this._llamaContext.dispose();
+        });
     }
 
     public async getEmbeddingFor(input: Token[] | string | LlamaText) {
-        const resolvedInput = typeof input === "string"
-            ? this._llamaContext.model.tokenize(input)
-            : isLlamaText(input)
-                ? input.tokenize(this._llamaContext.model.tokenize)
-                : input;
+        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenize);
 
         if (resolvedInput.length > this._llamaContext.contextSize)
             throw new Error(
@@ -75,7 +85,7 @@ export class LlamaEmbeddingContext {
     }
 
     public dispose() {
-        return this._llamaContext.dispose();
+        this._disposeAggregator.dispose();
     }
 
     /** @hidden */

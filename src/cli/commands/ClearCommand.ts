@@ -1,10 +1,9 @@
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {llamaCppDirectory, llamaCppDirectoryTagFilePath} from "../../config.js";
+import {llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
 import withOra from "../../utils/withOra.js";
-import {clearLlamaBuild} from "../../utils/clearLlamaBuild.js";
-import {setUsedBinFlag} from "../../utils/usedBinFlag.js";
+import {clearAllLocalBuilds} from "../../utils/clearAllLocalBuilds.js";
 import {clearLocalCmake, fixXpackPermissions} from "../../utils/cmake.js";
 
 type ClearCommand = {
@@ -35,7 +34,7 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
             fail: chalk.blue("Failed to clear source")
         }, async () => {
             await fs.remove(llamaCppDirectory);
-            await fs.remove(llamaCppDirectoryTagFilePath);
+            await fs.remove(llamaCppDirectoryInfoFilePath);
         });
     }
 
@@ -45,7 +44,7 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
             success: chalk.blue("Cleared build"),
             fail: chalk.blue("Failed to clear build")
         }, async () => {
-            await clearLlamaBuild();
+            await clearAllLocalBuilds();
         });
     }
 
@@ -59,6 +58,4 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
             await clearLocalCmake();
         });
     }
-
-    await setUsedBinFlag("prebuiltBinaries");
 }

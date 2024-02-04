@@ -9,8 +9,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
@@ -22,25 +22,19 @@ jobs:
           CI: true
         run: node ./dist/cli/cli.js download --release latest --skipBuild --noBundle --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "build"
           path: "dist"
-      - name: Upload binariesGithubRelease.json artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: "binariesGithubRelease"
-          path: "llama/binariesGithubRelease.json"
       - name: Upload llama.cpp artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "llama.cpp"
-          path: "llama/llama.cpp"
-      - name: Upload gitRelease.bundle artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: "gitReleaseBundle"
-          path: "llama/gitRelease.bundle"
+          path: |
+            llama/binariesGithubRelease.json
+            llama/llama.cpp.info.json
+            llama/llama.cpp
+            llama/gitRelease.bundle
 
   build-binaries:
     name: Build binaries - ${{ matrix.config.name }}
@@ -72,22 +66,22 @@ jobs:
             artifact: "mac"
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: llama.cpp
-          path: llama/llama.cpp
+          path: llama
 
       - name: Install dependencies on windows
         if: startsWith(matrix.config.os, 'windows')
@@ -105,6 +99,14 @@ jobs:
           
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
+
+      - name: Install Cuda
+        if: startsWith(matrix.config.os, 'windows') || startsWith(matrix.config.name, 'Ubuntu GCC')
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: 12.2.0
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
 
       - name: Install dependencies on macos
         if: startsWith(matrix.config.os, 'macos')
@@ -148,50 +150,46 @@ jobs:
             return {versions, latestVersion};
           }
           
-          function getArches() {
-            switch (process.env.ARTIFACT_NAME) {
-              case "win":
-                return ["x64" /*, "arm64" */ ]; // disabled arm64 for now as compilation doesn't work
-              case "linux":
-                return ["x64", "arm64", "armv7l"];
-              case "mac":
-                return ["x64", "arm64"];
-            }
-            
-            return ["x64"];
-          }
-          
           const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
           
           const nodeVersion = latestNodeVersions.get(18);
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
-          const arches = getArches();
           
           if (nodeVersion == null || windowsOnArmNodeVersion == null) {
             throw new Error("Could not find node versions");
           }
           
-          console.log("Building for node version", nodeVersion, "and archs", arches);
-          
           await $`mkdir -p llamaBins`;
           
-          for (const arch of arches) {
-            const additionalFlags = [];
-            let buildNodeVersion = nodeVersion;
+          async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
+            console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
             
-            if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
-              buildNodeVersion = windowsOnArmNodeVersion;
-            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "arm64") {
-              additionalFlags.push("--metal");
-            } else if (process.env.ARTIFACT_NAME === "mac" && arch === "x64") {
-              additionalFlags.push("--no-metal");
-            }
-            
-            console.log(`Building ${arch} for node ${buildNodeVersion}`);
-            
-            const binName = `${process.env.ARTIFACT_NAME}-${arch}`;
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion} ${additionalFlags}`;
-            await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
+            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
+          }
+          
+          // build binaries
+          if (process.env.ARTIFACT_NAME === "win") {
+            await buildBinary("x64");
+            await buildBinary("x64", ["--cuda"]);
+            // await buildBinary("arm64", [], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
+          } else if (process.env.ARTIFACT_NAME === "linux") {
+            await buildBinary("x64");
+            await buildBinary("x64", ["--cuda"]);
+            await buildBinary("arm64");
+            await buildBinary("armv7l");
+          } else if (process.env.ARTIFACT_NAME === "mac") {
+            await buildBinary("x64", ["--metal"]);
+            await buildBinary("arm64", ["--no-metal"]);
+          }
+          
+          // move binaries to llamaBins
+          const localBuildsDirectoryPath = path.join(process.cwd(), "llama", "localBuilds");
+          const llamaBinsDirectoryPath = path.join(process.cwd(), "llamaBins");
+          for (const folderName of await fs.readdir(localBuildsDirectoryPath)) {
+            await fs.move(
+              path.join(localBuildsDirectoryPath, folderName, "Release"),
+              path.join(llamaBinsDirectoryPath, folderName)
+            );
           }
           
           await $`echo "Built binaries:"`;
@@ -200,7 +198,7 @@ jobs:
           EOF
 
       - name: Publish artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "bins-${{ matrix.config.artifact }}"
           path: "llamaBins/*"
@@ -211,22 +209,22 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: llama.cpp
-          path: llama/llama.cpp
+          path: llama
 
       - name: Install dependencies on ubuntu
         run: |
@@ -248,22 +246,22 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: llama.cpp
-          path: llama/llama.cpp
+          path: llama
 
       - name: Install dependencies on macOS
         run: |
@@ -278,7 +276,7 @@ jobs:
 
       - name: Cache models
         id: cache-test-models
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: "test/.models/**.gguf"
           key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
@@ -307,15 +305,15 @@ jobs:
       - build
       - build-binaries
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Move artifacts
@@ -324,13 +322,16 @@ jobs:
           mv artifacts/bins-*/* llamaBins/
           mv artifacts/build dist/
           
-          cp -r artifacts/llama.cpp/grammars llama/grammars
+          cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
           
           rm -f ./llama/binariesGithubRelease.json
-          mv artifacts/binariesGithubRelease/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          
+          rm -f ./llama/llama.cpp.info.json
+          mv artifacts/llama.cpp/llama.cpp.info.json ./llama/llama.cpp.info.json
           
           rm -f ./llama/gitRelease.bundle
-          mv artifacts/gitReleaseBundle/gitRelease.bundle ./llama/gitRelease.bundle
+          mv artifacts/llama.cpp/gitRelease.bundle ./llama/gitRelease.bundle
           
           echo "Built binaries:"
           ls llamaBins
@@ -356,12 +357,12 @@ jobs:
           npm run docs:build
       - name: Upload docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
         with:
           artifact_name: pages-docs

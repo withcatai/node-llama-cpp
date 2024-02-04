@@ -17,8 +17,14 @@ import withStatusLogs from "../../utils/withStatusLogs.js";
 import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.js";
 import {defineChatSessionFunction} from "../../llamaEvaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
-import type {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
-import type {ModelTypeDescription} from "../../utils/getBin.js";
+import {getLlama} from "../../llamaBin/getLlama.js";
+import {LlamaGrammar} from "../../llamaEvaluator/LlamaGrammar.js";
+import {ModelTypeDescription} from "../../utils/getBin.js";
+import {LlamaChatSession} from "../../llamaEvaluator/LlamaChatSession/LlamaChatSession.js";
+import {LlamaModel} from "../../llamaEvaluator/LlamaModel.js";
+import {LlamaContext} from "../../llamaEvaluator/LlamaContext/LlamaContext.js";
+import {LlamaJsonSchemaGrammar} from "../../llamaEvaluator/LlamaJsonSchemaGrammar.js";
+import {LlamaLogLevel} from "../../llamaBin/types.js";
 
 const modelWrappers = ["auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"] as const;
 
@@ -32,7 +38,7 @@ type ChatCommand = {
     wrapper: (typeof modelWrappers)[number],
     contextSize: number,
     batchSize?: number,
-    grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[0],
+    grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
     threads: number,
     temperature: number,
@@ -47,6 +53,7 @@ type ChatCommand = {
     maxTokens: number,
     noHistory: boolean,
     environmentFunctions: boolean,
+    noInfoLog: boolean,
     printTimings: boolean
 };
 
@@ -218,6 +225,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Provide access to environment functions like `getDate` and `getTime`",
                 group: "Optional:"
             })
+            .option("noInfoLog", {
+                alias: "nl",
+                type: "boolean",
+                default: false,
+                description: "Disable llama.cpp info logs",
+                group: "Optional:"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -232,14 +246,14 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
         gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
-        environmentFunctions, printTimings
+        environmentFunctions, noInfoLog, printTimings
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
                 grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                noHistory, environmentFunctions, printTimings
+                noHistory, environmentFunctions, noInfoLog, printTimings
             });
         } catch (err) {
             console.error(err);
@@ -253,18 +267,20 @@ async function RunChat({
     model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
     grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    maxTokens, noHistory, environmentFunctions, printTimings
+    maxTokens, noHistory, environmentFunctions, noInfoLog, printTimings
 }: ChatCommand) {
-    const {LlamaChatSession} = await import("../../llamaEvaluator/LlamaChatSession/LlamaChatSession.js");
-    const {LlamaModel} = await import("../../llamaEvaluator/LlamaModel.js");
-    const {LlamaContext} = await import("../../llamaEvaluator/LlamaContext/LlamaContext.js");
-    const {LlamaGrammar} = await import("../../llamaEvaluator/LlamaGrammar.js");
-    const {LlamaJsonSchemaGrammar} = await import("../../llamaEvaluator/LlamaJsonSchemaGrammar.js");
+    if (noInfoLog)
+        console.info(`${chalk.yellow("Log level:")} warn`);
 
+    const llama = await getLlama("lastBuild", {
+        logLevel: noInfoLog
+            ? LlamaLogLevel.warn
+            : LlamaLogLevel.debug
+    });
     const logBatchSize = batchSize != null;
 
     if (systemInfo)
-        console.log(LlamaModel.systemInfo);
+        console.log(llama.systemInfo);
 
     if (systemPromptFile != null && systemPromptFile !== "") {
         if (systemPrompt != null && systemPrompt !== "" && systemPrompt !== defaultChatSystemPrompt)
@@ -293,6 +309,7 @@ async function RunChat({
         success: chalk.blue("Model loaded"),
         fail: chalk.blue("Failed to load model")
     }, async () => new LlamaModel({
+        llama,
         modelPath: path.resolve(process.cwd(), modelArg),
         gpuLayers: gpuLayers != null ? gpuLayers : undefined
     }));
@@ -308,12 +325,13 @@ async function RunChat({
     }));
     const grammar = jsonSchemaGrammarFilePath != null
         ? new LlamaJsonSchemaGrammar(
+            llama,
             await fs.readJson(
                 path.resolve(process.cwd(), jsonSchemaGrammarFilePath)
             )
         )
         : grammarArg !== "text"
-            ? await LlamaGrammar.getFor(grammarArg)
+            ? await LlamaGrammar.getFor(llama, grammarArg)
             : undefined;
     const bos = model.tokens.bosString; // bos = beginning of sequence
     const eos = model.tokens.bosString; // eos = end of sequence

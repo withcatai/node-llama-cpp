@@ -132,12 +132,38 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                 }
             }
 
+            function compressLastModelResponse(minCharactersToKeep: number = 20) {
+                const lastHistoryItem = res[res.length - 1];
+
+                if (lastHistoryItem == null || lastHistoryItem.type !== "model")
+                    return;
+
+                const lastResponseItem = lastHistoryItem.response[lastHistoryItem.response.length - 1];
+
+                if (lastResponseItem == null || typeof lastResponseItem !== "string")
+                    return;
+
+                const nextTextLength = lastResponseItem.length - charactersLeftToRemove;
+                const charactersToRemoveFromText = charactersLeftToRemove + Math.max(0, nextTextLength - minCharactersToKeep);
+                const newText = truncateTextAndRoundToWords(lastResponseItem, charactersToRemoveFromText);
+
+                if (newText.length < lastResponseItem.length) {
+                    lastHistoryItem.response[lastHistoryItem.response.length - 1] = newText;
+                    charactersLeftToRemove -= lastResponseItem.length - newText.length;
+                }
+            }
+
             compressFunctionCalls();
 
             if (charactersLeftToRemove <= 0)
                 return res;
 
             compressFirstModelResponse();
+
+            if (charactersLeftToRemove <= 0)
+                return res;
+
+            compressLastModelResponse();
 
             return res;
         }

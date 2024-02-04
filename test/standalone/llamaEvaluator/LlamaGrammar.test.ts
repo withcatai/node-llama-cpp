@@ -1,10 +1,11 @@
 import {describe, expect, test, expectTypeOf} from "vitest";
-import {LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {getLlama, LlamaJsonSchemaGrammar} from "../../../src/index.js";
 
 
 describe("grammar for JSON schema", () => {
-    test("object", () => {
-        const grammar = new LlamaJsonSchemaGrammar({
+    test("object", async () => {
+        const llama = await getLlama();
+        const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
                 "message": {
@@ -175,8 +176,9 @@ describe("grammar for JSON schema", () => {
         }
     });
 
-    test("array", () => {
-        const grammar = new LlamaJsonSchemaGrammar({
+    test("array", async () => {
+        const llama = await getLlama();
+        const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "array",
             items: {
                 oneOf: [{
@@ -241,8 +243,9 @@ describe("grammar for JSON schema", () => {
         }
     });
 
-    test("const", () => {
-        const grammar = new LlamaJsonSchemaGrammar({
+    test("const", async () => {
+        const llama = await getLlama();
+        const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
                 "onlyPositiveText": {
@@ -318,8 +321,9 @@ describe("grammar for JSON schema", () => {
         }
     });
 
-    test("missing keys", () => {
-        const grammar = new LlamaJsonSchemaGrammar({
+    test("missing keys", async () => {
+        const llama = await getLlama();
+        const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
                 "onlyPositiveText": {
@@ -395,8 +399,9 @@ describe("grammar for JSON schema", () => {
         }
     });
 
-    test("unexpected keys", () => {
-        const grammar = new LlamaJsonSchemaGrammar({
+    test("unexpected keys", async () => {
+        const llama = await getLlama();
+        const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
                 "onlyPositiveText": {

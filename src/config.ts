@@ -5,6 +5,7 @@ import process from "process";
 import envVar from "env-var";
 import * as uuid from "uuid";
 import {getBinariesGithubRelease} from "./utils/binariesGithubRelease.js";
+import {LlamaLogLevel, LlamaLogLevelValues} from "./llamaBin/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,29 +14,33 @@ const env = envVar.from(process.env);
 
 export const llamaDirectory = path.join(__dirname, "..", "llama");
 export const llamaToolchainsDirectory = path.join(llamaDirectory, "toolchains");
-export const llamaBinsDirectory = path.join(__dirname, "..", "llamaBins");
+export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "llamaBins");
+export const llamaLocalBuildBinsDirectory = path.join(llamaDirectory, "localBuilds");
 export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
 export const chatCommandHistoryFilePath = path.join(os.homedir(), ".node-llama-cpp.chat_repl_history");
-export const usedBinFlagJsonPath = path.join(llamaDirectory, "usedBin.json");
+export const lastBuildInfoJsonPath = path.join(llamaDirectory, "lastBuild.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
-export const llamaCppDirectoryTagFilePath = path.join(llamaDirectory, "llama.cpp.tag.json");
+export const llamaCppDirectoryInfoFilePath = path.join(llamaDirectory, "llama.cpp.info.json");
 export const currentReleaseGitBundlePath = path.join(llamaDirectory, "gitRelease.bundle");
 export const xpackDirectory = path.join(llamaDirectory, "xpack");
 export const localXpacksStoreDirectory = path.join(xpackDirectory, "store");
 export const localXpacksCacheDirectory = path.join(xpackDirectory, "cache");
+export const buildMetadataFileName = ".buildMetadata.json";
 export const xpmVersion = "^0.16.3";
+export const builtinLlamaCppGitHubRepo = "ggerganov/llama.cpp";
+export const builtinLlamaCppRelease = await getBinariesGithubRelease();
 
 export const isCI = env.get("CI")
     .default("false")
     .asBool();
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
-    .default("ggerganov/llama.cpp")
+    .default(builtinLlamaCppGitHubRepo)
     .asString();
 export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
-    .default(await getBinariesGithubRelease())
+    .default(builtinLlamaCppRelease)
     .asString();
 export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
     .default((process.platform === "darwin" && process.arch !== "x64") ? "true" : "false")
@@ -43,6 +48,9 @@ export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
 export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
     .default("false")
     .asBool();
+export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
+    .default(LlamaLogLevel.debug)
+    .asEnum(LlamaLogLevelValues);
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();

@@ -3,10 +3,13 @@ import fs from "fs-extra";
 import {getGrammarsFolder} from "../utils/getGrammarsFolder.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
-import {AddonGrammar} from "./LlamaBins.js";
+import {AddonGrammar} from "../utils/getBin.js";
+import {Llama} from "../llamaBin/Llama.js";
 
 
 export type LlamaGrammarOptions = {
+    llama: Llama,
+
     /** GBNF grammar */
     grammar: string,
 
@@ -21,8 +24,8 @@ export type LlamaGrammarOptions = {
 };
 
 export class LlamaGrammar {
-    /** @internal */
-    public readonly _grammar: AddonGrammar;
+    /** @internal */ public readonly _llama: Llama;
+    /** @internal */ public readonly _grammar: AddonGrammar;
     private readonly _stopGenerationTriggers: readonly (StopGenerationTrigger | LlamaText)[];
     private readonly _trimWhitespaceSuffix: boolean;
     private readonly _grammarText: string;
@@ -34,9 +37,10 @@ export class LlamaGrammar {
      * @param options
      */
     public constructor({
-        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
+        llama, grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
     }: LlamaGrammarOptions) {
-        this._grammar = new AddonGrammar(grammar, {
+        this._llama = llama;
+        this._grammar = new this._llama._bindings.AddonGrammar(grammar, {
             printGrammar
         });
         this._stopGenerationTriggers = stopGenerationTriggers ?? [];
@@ -56,14 +60,15 @@ export class LlamaGrammar {
         return this._trimWhitespaceSuffix;
     }
 
-    public static async getFor(type: "json" | "list" | "arithmetic" | "japanese" | "chess") {
-        const grammarsFolder = await getGrammarsFolder();
+    public static async getFor(llama: Llama, type: "json" | "list" | "arithmetic" | "japanese" | "chess") {
+        const grammarsFolder = await getGrammarsFolder(llama.buildType);
 
         const grammarFile = path.join(grammarsFolder, type + ".gbnf");
 
         if (await fs.pathExists(grammarFile)) {
             const grammar = await fs.readFile(grammarFile, "utf8");
             return new LlamaGrammar({
+                llama,
                 grammar,
                 stopGenerationTriggers: [LlamaText(["\n".repeat(10)])], // this is a workaround for the model not stopping to generate text,
                 trimWhitespaceSuffix: true

@@ -3,12 +3,14 @@ import path from "path";
 import {DisposedError, EventRelay} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
-import {ModelTypeDescription} from "../utils/getBin.js";
-import {addonBinding, AddonModel} from "./LlamaBins.js";
+import {ModelTypeDescription, AddonModel} from "../utils/getBin.js";
+import {Llama} from "../llamaBin/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
 
 export type LlamaModelOptions = {
+    llama: Llama,
+
     /** path to the model on the filesystem */
     modelPath: string,
 
@@ -26,6 +28,7 @@ export type LlamaModelOptions = {
 };
 
 export class LlamaModel {
+    /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _model: AddonModel;
     /** @internal */ private readonly _tokens: LlamaModelTokens;
     /** @internal */ private readonly _filename?: string;
@@ -47,9 +50,10 @@ export class LlamaModel {
      * @param [options.useMlock] - force system to keep model in RAM
      */
     public constructor({
-        modelPath, gpuLayers, vocabOnly, useMmap, useMlock
+        llama, modelPath, gpuLayers, vocabOnly, useMmap, useMlock
     }: LlamaModelOptions) {
-        this._model = new AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
+        this._llama = llama;
+        this._model = new this._llama._bindings.AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
             gpuLayers,
             vocabOnly,
             useMmap,
@@ -153,10 +157,6 @@ export class LlamaModel {
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
             throw new DisposedError();
-    }
-
-    public static get systemInfo() {
-        return addonBinding.systemInfo();
     }
 }
 

@@ -10,16 +10,18 @@ import {GbnfTerminal} from "../../../utils/gbnfJson/GbnfTerminal.js";
 import {GbnfOr} from "../../../utils/gbnfJson/terminals/GbnfOr.js";
 import {LlamaChatResponseFunctionCall} from "../LlamaChat.js";
 import {GbnfVerbatimText} from "../../../utils/gbnfJson/terminals/GbnfVerbatimText.js";
+import {Llama} from "../../../llamaBin/Llama.js";
 
 
 export class FunctionCallGrammar<const Functions extends ChatModelFunctions> extends LlamaGrammar {
     private readonly _functions: Functions;
     private readonly _chatWrapper: ChatWrapper;
 
-    public constructor(functions: Functions, chatWrapper: ChatWrapper, initialFunctionCallEngaged: boolean) {
+    public constructor(llama: Llama, functions: Functions, chatWrapper: ChatWrapper, initialFunctionCallEngaged: boolean) {
         const grammar = getGbnfGrammarForFunctionCalls(functions, chatWrapper, initialFunctionCallEngaged);
 
         super({
+            llama,
             grammar,
             stopGenerationTriggers: [LlamaText(chatWrapper.settings.functions.call.suffix, "\n".repeat(4))],
             trimWhitespaceSuffix: true

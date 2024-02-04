@@ -4,137 +4,208 @@ import process from "process";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    customCmakeOptionsEnvVarPrefix, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaToolchainsDirectory
+    buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
+    llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
 } from "../config.js";
-import {clearLlamaBuild} from "./clearLlamaBuild.js";
-import {setUsedBinFlag} from "./usedBinFlag.js";
+import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../llamaBin/types.js";
+import {getBuildFolderNameForBuildOptions} from "../llamaBin/utils/getBuildFolderNameForBuildOptions.js";
 import {spawnCommand} from "./spawnCommand.js";
-import {fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "./cmake.js";
+import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "./cmake.js";
+import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+import {ensureLlamaCppRepoIsCloned, isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
+import {withLockfile} from "./withLockfile.js";
+import {setLastBuildInfo} from "./lastBuildInfo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function compileLlamaCpp({
-    arch = process.arch, nodeTarget = process.version, setUsedBinFlag: setUsedBinFlagArg = true, metal = process.platform === "darwin",
-    cuda = false
+export async function compileLlamaCpp(buildOptions: BuildOptions, {
+    nodeTarget = process.version,
+    updateLastBuildInfo: updateLastBuildInfoArg = true,
+    includeBuildOptionsInBinaryFolderName = true,
+    ensureLlamaCppRepoIsCloned: ensureLlamaCppRepoIsClonedArg = false,
+    downloadCmakeIfNeeded: downloadCmakeIfNeededArg = false
 }: {
-    arch?: string, nodeTarget?: string, setUsedBinFlag?: boolean, metal?: boolean, cuda?: boolean
+    nodeTarget?: string,
+    updateLastBuildInfo?: boolean,
+    includeBuildOptionsInBinaryFolderName?: boolean,
+    ensureLlamaCppRepoIsCloned?: boolean,
+    downloadCmakeIfNeeded?: boolean
 }) {
-    try {
-        if (!(await fs.pathExists(llamaCppDirectory))) {
-            throw new Error(`"${llamaCppDirectory}" directory does not exist`);
-        }
+    const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
+    const finalBuildFolderName = includeBuildOptionsInBinaryFolderName
+        ? buildFolderName.withCustomCmakeOptions
+        : buildFolderName.withoutCustomCmakeOptions;
 
-        const cmakePathArgs = await getCmakePathArgs();
-        const toolchainFile = await getToolchainFileForArch(arch);
-        const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
-        const cmakeCustomOptions = new Map<string, string>();
+    const outDirectory = path.join(llamaLocalBuildBinsDirectory, finalBuildFolderName);
 
-        if ((metal && process.platform === "darwin") || process.env.LLAMA_METAL === "1") cmakeCustomOptions.set("LLAMA_METAL", "1");
-        else cmakeCustomOptions.set("LLAMA_METAL", "OFF");
+    await fs.mkdirp(llamaLocalBuildBinsDirectory);
+    await withLockfile({
+        resourcePath: outDirectory
+    }, async () => {
+        try {
+            if (ensureLlamaCppRepoIsClonedArg)
+                await ensureLlamaCppRepoIsCloned({progressLogs: buildOptions.progressLogs});
+            else if (!(await isLlamaCppRepoCloned()))
+                throw new Error(`"${llamaCppDirectory}" directory does not exist`);
 
-        if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
+            if (downloadCmakeIfNeededArg)
+                await downloadCmakeIfNeeded(buildOptions.progressLogs);
 
-        if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.set("LLAMA_MPI", "1");
-        if (process.env.LLAMA_OPENBLAS === "1") cmakeCustomOptions.set("LLAMA_OPENBLAS", "1");
-        if (process.env.LLAMA_BLAS_VENDOR != null) cmakeCustomOptions.set("LLAMA_BLAS_VENDOR", process.env.LLAMA_BLAS_VENDOR);
-        if (process.env.LLAMA_CUDA_FORCE_DMMV != null) cmakeCustomOptions.set("LLAMA_CUDA_FORCE_DMMV", process.env.LLAMA_CUDA_FORCE_DMMV);
-        if (process.env.LLAMA_CUDA_DMMV_X != null) cmakeCustomOptions.set("LLAMA_CUDA_DMMV_X", process.env.LLAMA_CUDA_DMMV_X);
-        if (process.env.LLAMA_CUDA_MMV_Y != null) cmakeCustomOptions.set("LLAMA_CUDA_MMV_Y", process.env.LLAMA_CUDA_MMV_Y);
-        if (process.env.LLAMA_CUDA_F16 != null) cmakeCustomOptions.set("LLAMA_CUDA_F16", process.env.LLAMA_CUDA_F16);
-        if (process.env.LLAMA_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.set("LLAMA_CUDA_KQUANTS_ITER", process.env.LLAMA_CUDA_KQUANTS_ITER);
-        if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.set("LLAMA_CUDA_PEER_MAX_BATCH_SIZE", process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
-        if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.set("LLAMA_HIPBLAS", "1");
-        if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.set("LLAMA_CLBLAST", "1");
+            const cmakePathArgs = await getCmakePathArgs();
+            const toolchainFile = await getToolchainFileForArch(buildOptions.arch);
+            const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
+            const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
 
-        if (toolchainFile != null)
-            cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
+            if (buildOptions.computeLayers.metal && process.platform === "darwin" && !cmakeCustomOptions.has("LLAMA_METAL"))
+                cmakeCustomOptions.set("LLAMA_METAL", "1");
+            else if (!cmakeCustomOptions.has("LLAMA_METAL"))
+                cmakeCustomOptions.set("LLAMA_METAL", "OFF");
 
-        for (const key in process.env) {
-            if (key.startsWith(customCmakeOptionsEnvVarPrefix)) {
-                const option = key.slice(customCmakeOptionsEnvVarPrefix.length);
-                const value = process.env[key];
-                cmakeCustomOptions.set(option, value!);
-            }
-        }
+            if (buildOptions.computeLayers.cuda && !cmakeCustomOptions.has("LLAMA_CUBLAS"))
+                cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
 
-        await clearLlamaBuild();
+            if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
+                cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
-        await spawnCommand("npm", ["run", "-s", "cmake-js-llama", "--", "clean", "--log-level", "warn", ...cmakePathArgs], __dirname);
+            await fs.remove(outDirectory);
 
-        await spawnCommand(
-            "npm",
-            ["run", "-s", "cmake-js-llama", "--", "compile", "--log-level", "warn", "--arch=" + arch, "--runtime-version=" + runtimeVersion, ...cmakePathArgs]
-                .concat([...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)),
-            __dirname
-        );
-
-        const binFilesDirPaths = [
-            path.join(llamaDirectory, "build", "bin"),
-            path.join(llamaDirectory, "build", "llama.cpp", "bin")
-        ];
-        const compiledResultDirPath = await getCompiledResultDir(true);
-
-        for (const binFilesDirPath of binFilesDirPaths) {
-            if (await fs.pathExists(binFilesDirPath)) {
-                const files = await fs.readdir(binFilesDirPath);
-
-                await Promise.all(
-                    files.map((fileName) => (
-                        fs.copy(path.join(binFilesDirPath, fileName), path.join(compiledResultDirPath, fileName), {
-                            overwrite: false
-                        })
-                    ))
-                );
-            }
-        }
-
-        if (setUsedBinFlagArg) {
-            await setUsedBinFlag("localBuildFromSource");
-        }
-    } catch (err) {
-        if (setUsedBinFlagArg)
-            await setUsedBinFlag("prebuiltBinaries");
-
-        if (cuda)
-            console.info("\n" +
-                chalk.grey("[node-llama-cpp] ") +
-                chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
-                documentationPageUrls.CUDA
+            await spawnCommand(
+                "npm",
+                [
+                    "run", "-s", "cmake-js-llama", "--", "clean",
+                    "--log-level", "warn",
+                    "--out", path.relative(llamaDirectory, outDirectory),
+                    ...cmakePathArgs
+                ],
+                __dirname,
+                process.env,
+                buildOptions.progressLogs
             );
 
-        throw err;
-    } finally {
-        await fixXpackPermissions();
-    }
+            await spawnCommand(
+                "npm",
+                [
+                    "run", "-s", "cmake-js-llama", "--", "compile",
+                    "--log-level", "warn",
+                    "--config", "Release",
+                    "--arch=" + buildOptions.arch,
+                    "--out", path.relative(llamaDirectory, outDirectory),
+                    "--runtime-version=" + runtimeVersion,
+                    ...cmakePathArgs,
+                    ...(
+                        [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
+                    )
+                ],
+                __dirname,
+                process.env,
+                buildOptions.progressLogs
+            );
+
+            const binFilesDirPaths = [
+                path.join(outDirectory, "bin"),
+                path.join(outDirectory, "llama.cpp", "bin")
+            ];
+            const compiledResultDirPath = path.join(outDirectory, "Release");
+
+            if (!await fs.pathExists(compiledResultDirPath))
+                throw new Error("Could not find Release directory");
+
+            for (const binFilesDirPath of binFilesDirPaths) {
+                if (await fs.pathExists(binFilesDirPath)) {
+                    const files = await fs.readdir(binFilesDirPath);
+
+                    await Promise.all(
+                        files.map((fileName) => (
+                            fs.copy(path.join(binFilesDirPath, fileName), path.join(compiledResultDirPath, fileName), {
+                                overwrite: false
+                            })
+                        ))
+                    );
+                }
+            }
+            await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
+                buildOptions: convertBuildOptionsToBuildOptionsJSON(buildOptions)
+            } satisfies BuildMetadataFile), "utf8");
+
+            await fs.writeFile(path.join(outDirectory, "buildDone.status"), "", "utf8");
+
+            if (updateLastBuildInfoArg) {
+                await setLastBuildInfo({
+                    folderName: finalBuildFolderName
+                });
+            }
+        } catch (err) {
+            if (buildOptions.computeLayers.cuda)
+                console.info("\n" +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
+                    documentationPageUrls.CUDA
+                );
+
+            throw err;
+        } finally {
+            await fixXpackPermissions();
+        }
+    });
 }
 
-export async function getCompiledLlamaCppBinaryPath() {
-    const compiledResultDirPath = await getCompiledResultDir(false);
+export async function getLocalBuildBinaryPath(folderName: string) {
+    const binaryPath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", "llama-addon.node");
+    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", buildMetadataFileName);
+    const buildDoneStatusPath = path.join(llamaLocalBuildBinsDirectory, folderName, "buildDone.status");
 
-    if (compiledResultDirPath == null)
-        return null;
+    const [
+        binaryExists,
+        buildMetadataExists,
+        buildDoneStatusExists
+    ] = await Promise.all([
+        fs.pathExists(binaryPath),
+        fs.pathExists(buildMetadataFilePath),
+        fs.pathExists(buildDoneStatusPath)
+    ]);
 
-    const modulePath = path.join(compiledResultDirPath, "llama-addon.node");
-
-    if (await fs.pathExists(modulePath))
-        return modulePath;
+    if (binaryExists && buildMetadataExists && buildDoneStatusExists)
+        return binaryPath;
 
     return null;
 }
 
-async function getCompiledResultDir(failIfNotFound?: false): Promise<string | null>;
-async function getCompiledResultDir(failIfNotFound: true): Promise<string>;
-async function getCompiledResultDir(failIfNotFound: boolean = false) {
-    if (await fs.pathExists(path.join(llamaDirectory, "build", "Release"))) {
-        return path.join(llamaDirectory, "build", "Release");
-    } else if (await fs.pathExists(path.join(llamaDirectory, "build", "Debug"))) {
-        return path.join(llamaDirectory, "build", "Debug");
-    }
+export async function getLocalBuildBinaryBuildMetadata(folderName: string) {
+    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", buildMetadataFileName);
 
-    if (failIfNotFound)
-        throw new Error("Could not find Release or Debug directory");
+    if (!(await fs.pathExists(buildMetadataFilePath)))
+        throw new Error(`Could not find build metadata file for local build "${folderName}"`);
+
+    const buildMetadata: BuildMetadataFile = await fs.readJson(buildMetadataFilePath);
+    return buildMetadata;
+}
+
+export async function getPrebuiltBinaryPath(folderName: string) {
+    const binaryPath = path.join(llamaPrebuiltBinsDirectory, folderName, "llama-addon.node");
+    const buildMetadataFilePath = path.join(llamaPrebuiltBinsDirectory, folderName, buildMetadataFileName);
+
+    const [
+        binaryExists,
+        buildMetadataExists
+    ] = await Promise.all([
+        fs.pathExists(binaryPath),
+        fs.pathExists(buildMetadataFilePath)
+    ]);
+
+    if (binaryExists && buildMetadataExists)
+        return binaryPath;
 
     return null;
+}
+
+export async function getPrebuiltBinaryBuildMetadata(folderName: string) {
+    const buildMetadataFilePath = path.join(llamaPrebuiltBinsDirectory, folderName, buildMetadataFileName);
+
+    if (!(await fs.pathExists(buildMetadataFilePath)))
+        throw new Error(`Could not find build metadata file for prebuilt build "${folderName}"`);
+
+    const buildMetadata: BuildMetadataFile = await fs.readJson(buildMetadataFilePath);
+    return buildMetadata;
 }
 
 async function getCmakePathArgs() {
