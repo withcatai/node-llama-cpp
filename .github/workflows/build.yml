@@ -186,8 +186,8 @@ jobs:
             await buildBinary("arm64");
             await buildBinary("armv7l");
           } else if (process.env.ARTIFACT_NAME === "mac") {
-            await buildBinary("x64", ["--metal"]);
-            await buildBinary("arm64", ["--no-metal"]);
+            await buildBinary("arm64", ["--metal"]);
+            await buildBinary("x64", ["--no-metal"]);
           }
           
           // move binaries to llamaBins
