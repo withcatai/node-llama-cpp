@@ -10,36 +10,30 @@
 #include "napi.h"
 
 struct addon_logger_log {
-    const int logLevelNumber;
-    const std::stringstream* stringStream;
+    public:
+        const int logLevelNumber;
+        const std::stringstream* stringStream;
 };
 
 using AddonThreadSafeLogCallbackFunctionContext = Napi::Reference<Napi::Value>;
 void addonCallJsLogCallback(
-    Napi::Env env,
-    Napi::Function callback,
-    AddonThreadSafeLogCallbackFunctionContext *context,
-    addon_logger_log* data
+    Napi::Env env, Napi::Function callback, AddonThreadSafeLogCallbackFunctionContext* context, addon_logger_log* data
 );
-using AddonThreadSafeLogCallbackFunction = Napi::TypedThreadSafeFunction<
-    AddonThreadSafeLogCallbackFunctionContext,
-    addon_logger_log,
-    addonCallJsLogCallback
->;
+using AddonThreadSafeLogCallbackFunction =
+    Napi::TypedThreadSafeFunction<AddonThreadSafeLogCallbackFunctionContext, addon_logger_log, addonCallJsLogCallback>;
 
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
 int addonLoggerLogLevel = 5;
 
-std::string addon_model_token_to_piece(const struct llama_model * model, llama_token token) {
+std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token) {
     std::vector<char> result(8, 0);
     const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size());
     if (n_tokens < 0) {
         result.resize(-n_tokens);
         int check = llama_token_to_piece(model, token, result.data(), result.size());
         GGML_ASSERT(check == -n_tokens);
-    }
-    else {
+    } else {
         result.resize(n_tokens);
     }
 
@@ -288,7 +282,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
-                        InstanceMethod("dispose", &AddonModel::Dispose)
+                        InstanceMethod("dispose", &AddonModel::Dispose),
                     }
                 )
             );
@@ -554,7 +548,8 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value SampleToken(const Napi::CallbackInfo& info);
 
         Napi::Value AcceptGrammarEvaluationStateToken(const Napi::CallbackInfo& info) {
-            AddonGrammarEvaluationState* grammar_evaluation_state = Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
+            AddonGrammarEvaluationState* grammar_evaluation_state =
+                Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
             llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
 
             if ((grammar_evaluation_state)->grammar != nullptr) {
@@ -571,7 +566,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             }
 
             const int n_embd = llama_n_embd(model->model);
-            const auto * embeddings = llama_get_embeddings(ctx);
+            const auto* embeddings = llama_get_embeddings(ctx);
 
             Napi::Float64Array result = Napi::Float64Array::New(info.Env(), n_embd);
             for (size_t i = 0; i < n_embd; ++i) {
@@ -605,7 +600,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
                         InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                         InstanceMethod("printTimings", &AddonContext::PrintTimings),
-                        InstanceMethod("dispose", &AddonContext::Dispose)
+                        InstanceMethod("dispose", &AddonContext::Dispose),
                     }
                 )
             );
@@ -833,15 +828,12 @@ int addonGetGgmlLogLevelNumber(ggml_log_level level) {
 }
 
 void addonCallJsLogCallback(
-    Napi::Env env,
-    Napi::Function callback,
-    AddonThreadSafeLogCallbackFunctionContext * context,
-    addon_logger_log * data
+    Napi::Env env, Napi::Function callback, AddonThreadSafeLogCallbackFunctionContext* context, addon_logger_log* data
 ) {
     if (env != nullptr && callback != nullptr) {
         callback.Call({
             Napi::Number::New(env, data->logLevelNumber),
-            Napi::String::New(env, data->stringStream->str())
+            Napi::String::New(env, data->stringStream->str()),
         });
     } else if (data != nullptr) {
         if (data->logLevelNumber == 2) {
@@ -859,7 +851,7 @@ void addonCallJsLogCallback(
     }
 }
 
-static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, void * user_data) {
+static void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user_data) {
     int logLevelNumber = addonGetGgmlLogLevelNumber(level);
 
     if (logLevelNumber > addonLoggerLogLevel) {
@@ -874,7 +866,7 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, vo
 
         addon_logger_log* data = new addon_logger_log {
             logLevelNumber,
-            stringStream
+            stringStream,
         };
 
         auto status = addonThreadSafeLoggerCallback.NonBlockingCall(data);
@@ -904,7 +896,7 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
     }
 
     auto addonLoggerJSCallback = info[0].As<Napi::Function>();
-    AddonThreadSafeLogCallbackFunctionContext *context = new Napi::Reference<Napi::Value>(Napi::Persistent(info.This()));
+    AddonThreadSafeLogCallbackFunctionContext* context = new Napi::Reference<Napi::Value>(Napi::Persistent(info.This()));
     addonThreadSafeLoggerCallback = AddonThreadSafeLogCallbackFunction::New(
         info.Env(),
         addonLoggerJSCallback,
@@ -912,7 +904,7 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
         0,
         1,
         context,
-        []( Napi::Env, void *, AddonThreadSafeLogCallbackFunctionContext *ctx ) {
+        [](Napi::Env, void*, AddonThreadSafeLogCallbackFunctionContext* ctx) {
             addonJsLoggerCallbackSet = false;
 
             delete ctx;
@@ -943,7 +935,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
-        Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel)
+        Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
     });
     AddonModel::init(exports);
     AddonGrammar::init(exports);

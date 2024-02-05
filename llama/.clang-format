@@ -17,7 +17,7 @@ FixNamespaceComments: false
 IndentAccessModifiers: true
 SpaceAfterCStyleCast: false
 PointerAlignment: Left
-IndentCaseLabels: false
+IndentCaseLabels: true
 BinPackArguments: false
 BinPackParameters: false
 Cpp11BracedListStyle: false
@@ -29,7 +29,6 @@ AlwaysBreakTemplateDeclarations: No
 DeriveLineEnding: false
 UseCRLF: false
 AllowAllArgumentsOnNextLine: true
-AlignAfterOpenBracket: DontAlign
 PackConstructorInitializers: CurrentLine
 AlignAfterOpenBracket: BlockIndent
 BraceWrapping:
