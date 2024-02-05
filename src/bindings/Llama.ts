@@ -35,7 +35,6 @@ export class Llama {
     /** @internal */ private _previousLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
 
-
     private constructor({
         bindings, metal, cuda, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
     }: {
@@ -68,31 +67,6 @@ export class Llama {
 
         this._bindings.setLogger(this._onAddonLog);
         this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
-    }
-
-    /** @internal */
-    public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger
-    }: {
-        bindings: BindingModule
-        buildType: "localBuild" | "prebuilt",
-        buildMetadata: BuildMetadataFile,
-        logLevel: LlamaLogLevel,
-        logger: (level: LlamaLogLevel, message: string) => void,
-    }) {
-        return new Llama({
-            bindings,
-            buildType,
-            metal: buildMetadata.buildOptions.computeLayers.metal,
-            cuda: buildMetadata.buildOptions.computeLayers.cuda,
-            cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
-            llamaCppRelease: {
-                repo: buildMetadata.buildOptions.llamaCpp.repo,
-                release: buildMetadata.buildOptions.llamaCpp.release
-            },
-            logLevel,
-            logger
-        });
     }
 
     public get metal() {
@@ -142,6 +116,7 @@ export class Llama {
         return this._bindings.systemInfo();
     }
 
+    /** @internal */
     private _onAddonLog(level: number, message: string) {
         const llamaLogLevel = addonLogLevelToLlamaLogLevel.get(level) ?? LlamaLogLevel.fatal;
 
@@ -173,6 +148,7 @@ export class Llama {
             this._pendingLog = null;
     }
 
+    /** @internal */
     private _dispatchPendingLogMicrotask() {
         this._logDispatchQueuedMicrotasks--;
         if (this._logDispatchQueuedMicrotasks !== 0)
@@ -184,6 +160,7 @@ export class Llama {
         }
     }
 
+    /** @internal */
     private _callLogger(level: LlamaLogLevel, message: string) {
         // llama.cpp uses dots to indicate progress, so we don't want to print them as different lines,
         // and instead, append to the same log line
@@ -209,6 +186,31 @@ export class Llama {
 
         this._previousLog = message;
         this._previousLogLevel = level;
+    }
+
+    /** @internal */
+    public static async _create({
+        bindings, buildType, buildMetadata, logLevel, logger
+    }: {
+        bindings: BindingModule
+        buildType: "localBuild" | "prebuilt",
+        buildMetadata: BuildMetadataFile,
+        logLevel: LlamaLogLevel,
+        logger: (level: LlamaLogLevel, message: string) => void,
+    }) {
+        return new Llama({
+            bindings,
+            buildType,
+            metal: buildMetadata.buildOptions.computeLayers.metal,
+            cuda: buildMetadata.buildOptions.computeLayers.cuda,
+            cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
+            llamaCppRelease: {
+                repo: buildMetadata.buildOptions.llamaCpp.repo,
+                release: buildMetadata.buildOptions.llamaCpp.release
+            },
+            logLevel,
+            logger
+        });
     }
 
     public static defaultConsoleLogger(level: LlamaLogLevel, message: string) {
