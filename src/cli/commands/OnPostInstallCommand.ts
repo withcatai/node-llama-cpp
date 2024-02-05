@@ -15,6 +15,7 @@ export const OnPostInstallCommand: CommandModule<object, OnPostInstallCommand> =
             await getLlama({
                 progressLogs: true
             });
+            process.exit(0);
         } catch (err) {
             console.error(err);
             process.exit(1);
