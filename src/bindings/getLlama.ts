@@ -122,9 +122,13 @@ export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOp
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
         const lastBuildInfo = await getLastBuildInfo();
+        const getLlamaOptions: LlamaOptions = {
+            logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppDebugLogs,
+            logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger
+        };
 
         if (lastBuildInfo == null)
-            return getLlamaForOptions({});
+            return getLlamaForOptions(getLlamaOptions);
 
         const localBuildFolder = path.join(llamaLocalBuildBinsDirectory, lastBuildInfo.folderName);
         const localBuildBinPath = await getLocalBuildBinaryPath(lastBuildInfo.folderName);
@@ -148,7 +152,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             }
         }
 
-        return getLlamaForOptions({});
+        return getLlamaForOptions(getLlamaOptions);
     }
 
     return getLlamaForOptions(options ?? {});
