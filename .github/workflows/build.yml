@@ -243,7 +243,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --noUsageExample
 
       - name: Run standalone tests
         run: npm run test:standalone
@@ -280,7 +280,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --noUsageExample --no-metal
 
       - name: Cache models
         id: cache-test-models
