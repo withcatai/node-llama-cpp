@@ -74,6 +74,9 @@ export async function cloneLlamaCppRepo(
 
                     await simpleGit(llamaCppDirectory).removeRemote("origin");
                 });
+
+                await updateClonedLlamaCppRepoTagFile(githubOwner, githubRepo, tag);
+
                 return;
             } catch (err) {
                 await fs.remove(llamaCppDirectory);
@@ -94,23 +97,10 @@ export async function cloneLlamaCppRepo(
                     "--quiet": null
                 });
             });
+
+            await updateClonedLlamaCppRepoTagFile(githubOwner, githubRepo, tag);
         } catch (err) {
             printCloneErrorHelp(String(err));
-
-            throw err;
-        }
-
-        try {
-            const clonedLlamaCppRepoTagJson: ClonedLlamaCppRepoTagFile = {
-                tag,
-                llamaCppGithubRepo: githubOwner + "/" + githubRepo
-            };
-
-            await fs.writeJson(llamaCppDirectoryInfoFilePath, clonedLlamaCppRepoTagJson, {
-                spaces: 4
-            });
-        } catch (err) {
-            console.error(getConsoleLogPrefix() + "Failed to write llama.cpp tag file", err);
 
             throw err;
         }
@@ -187,4 +177,21 @@ export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progres
     }
 
     await cloneLlamaCppRepo(githubOwner, githubRepo, releaseTag, true, progressLogs);
+}
+
+async function updateClonedLlamaCppRepoTagFile(githubOwner: string, githubRepo: string, tag: string) {
+    try {
+        const clonedLlamaCppRepoTagJson: ClonedLlamaCppRepoTagFile = {
+            tag,
+            llamaCppGithubRepo: githubOwner + "/" + githubRepo
+        };
+
+        await fs.writeJson(llamaCppDirectoryInfoFilePath, clonedLlamaCppRepoTagJson, {
+            spaces: 4
+        });
+    } catch (err) {
+        console.error(getConsoleLogPrefix() + "Failed to write llama.cpp tag file", err);
+
+        throw err;
+    }
 }
