@@ -346,6 +346,8 @@ async function RunChat({
         chatWrapper: chatWrapper
     });
 
+    await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+
     if (grammarArg != "text" && jsonSchemaGrammarFilePath != null)
         console.warn(chalk.yellow("Both `grammar` and `jsonSchemaGrammarFile` were specified. `jsonSchemaGrammarFile` will be used."));
 
@@ -448,7 +450,7 @@ async function RunChat({
         console.log();
 
         if (printTimings)
-            context.printTimings();
+            await context.printTimings();
     }
 }
 

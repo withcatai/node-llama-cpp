@@ -30,7 +30,7 @@ export class Llama {
     /** @internal */ private _logLevel: LlamaLogLevel;
     /** @internal */ private _pendingLog: string | null = null;
     /** @internal */ private _pendingLogLevel: LlamaLogLevel | null = null;
-    /** @internal */ private _logDispatchTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
+    /** @internal */ private _logDispatchQueuedMicrotasks: number = 0;
     /** @internal */ private _previousLog: string | null = null;
     /** @internal */ private _previousLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
@@ -63,7 +63,7 @@ export class Llama {
             release: llamaCppRelease.release
         });
 
-        this._dispatchPendingLog = this._dispatchPendingLog.bind(this);
+        this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
 
         this._bindings.setLogger(this._onAddonLog);
@@ -145,8 +145,6 @@ export class Llama {
     private _onAddonLog(level: number, message: string) {
         const llamaLogLevel = addonLogLevelToLlamaLogLevel.get(level) ?? LlamaLogLevel.fatal;
 
-        clearTimeout(this._logDispatchTimeout);
-
         if (this._pendingLog != null && this._pendingLogLevel != null && this._pendingLogLevel != llamaLogLevel) {
             this._callLogger(this._pendingLogLevel, this._pendingLog);
             this._pendingLog = null;
@@ -168,14 +166,17 @@ export class Llama {
         if (nextLog !== "") {
             this._pendingLog = nextLog;
             this._pendingLogLevel = llamaLogLevel;
-            clearTimeout(this._logDispatchTimeout);
-            this._logDispatchTimeout = setTimeout(this._dispatchPendingLog, 0);
+
+            queueMicrotask(this._dispatchPendingLogMicrotask);
+            this._logDispatchQueuedMicrotasks++;
         } else
             this._pendingLog = null;
     }
 
-    private _dispatchPendingLog() {
-        clearTimeout(this._logDispatchTimeout);
+    private _dispatchPendingLogMicrotask() {
+        this._logDispatchQueuedMicrotasks--;
+        if (this._logDispatchQueuedMicrotasks !== 0)
+            return;
 
         if (this._pendingLog != null && this._pendingLogLevel != null) {
             this._callLogger(this._pendingLogLevel, this._pendingLog);

@@ -322,8 +322,9 @@ export class LlamaContext {
         });
     }
 
-    public printTimings() {
+    public async printTimings() {
         this._ctx.printTimings();
+        await new Promise((accept) => setTimeout(accept, 0)); // wait for the logs to finish printing
     }
 
     /** @internal */
