@@ -1,12 +1,13 @@
 import {describe, expect, test} from "vitest";
-import {getLlama, LlamaChatSession, LlamaContext, LlamaModel} from "../../../src/index.js";
+import {LlamaChatSession, LlamaContext, LlamaModel} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
+import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("functionary", () => {
     describe("sanity", () => {
         test("How much is 6+6", async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
-            const llama = await getLlama();
+            const llama = await getTestLlama();
 
             const model = new LlamaModel({
                 llama,

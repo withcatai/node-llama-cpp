@@ -1,4 +1,5 @@
 import ora from "ora";
+import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 
 export default async function withOra<T>(
     message: string | {
@@ -8,7 +9,14 @@ export default async function withOra<T>(
     },
     callback: () => Promise<T>
 ): Promise<T> {
-    const spinner = ora(typeof message === "string" ? message : message.loading);
+    const spinner = ora({
+        prefixText: getConsoleLogPrefix(),
+        ...(
+            typeof message === "string"
+                ? {text: message} satisfies Parameters<typeof ora>[0]
+                : message
+        )
+    });
 
     spinner.start();
 

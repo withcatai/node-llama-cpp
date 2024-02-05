@@ -243,14 +243,16 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --noUsageExample
 
       - name: Run standalone tests
         run: npm run test:standalone
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-13
+    runs-on: macos-14
+    env:
+      NODE_LLAMA_CPP_METAL: false
     needs:
       - build
     steps:
@@ -280,7 +282,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --noUsageExample
 
       - name: Cache models
         id: cache-test-models

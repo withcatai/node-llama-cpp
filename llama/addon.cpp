@@ -9,15 +9,27 @@
 #include "llama.h"
 #include "napi.h"
 
-Napi::FunctionReference loggerCallbackFunctionReference;
-Napi::ThreadSafeFunction threadSafeLoggerCallback;
-bool loggerCallbackSet = false;
-int addonLoggerLogLevel = 5;
-
 struct addon_logger_log {
     const int logLevelNumber;
     const std::stringstream* stringStream;
 };
+
+using AddonThreadSafeLogCallbackFunctionContext = Napi::Reference<Napi::Value>;
+void addonCallJsLogCallback(
+    Napi::Env env,
+    Napi::Function callback,
+    AddonThreadSafeLogCallbackFunctionContext *context,
+    addon_logger_log* data
+);
+using AddonThreadSafeLogCallbackFunction = Napi::TypedThreadSafeFunction<
+    AddonThreadSafeLogCallbackFunctionContext,
+    addon_logger_log,
+    addonCallJsLogCallback
+>;
+
+AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
+bool addonJsLoggerCallbackSet = false;
+int addonLoggerLogLevel = 5;
 
 std::string addon_model_token_to_piece(const struct llama_model * model, llama_token token) {
     std::vector<char> result(8, 0);
@@ -820,14 +832,31 @@ int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     return 1;
 }
 
-static void addonWrapperJSLogCallback(Napi::Env env, Napi::Function jsCallback, addon_logger_log* data) {
-    auto status = jsCallback.Call({
-        Napi::Number::New(env, data->logLevelNumber),
-        Napi::String::New(env, data->stringStream->str())
-    });
+void addonCallJsLogCallback(
+    Napi::Env env,
+    Napi::Function callback,
+    AddonThreadSafeLogCallbackFunctionContext * context,
+    addon_logger_log * data
+) {
+    if (env != nullptr && callback != nullptr) {
+        callback.Call({
+            Napi::Number::New(env, data->logLevelNumber),
+            Napi::String::New(env, data->stringStream->str())
+        });
+    } else if (data != nullptr) {
+        if (data->logLevelNumber == 2) {
+            fputs(data->stringStream->str().c_str(), stderr);
+            fflush(stderr);
+        } else {
+            fputs(data->stringStream->str().c_str(), stdout);
+            fflush(stdout);
+        }
+    }
 
-    delete data->stringStream;
-    delete data;
+    if (data != nullptr) {
+        delete data->stringStream;
+        delete data;
+    }
 }
 
 static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, void * user_data) {
@@ -837,7 +866,7 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, vo
         return;
     }
 
-    if (loggerCallbackSet) {
+    if (addonJsLoggerCallbackSet) {
         std::stringstream* stringStream = new std::stringstream();
         if (text != nullptr) {
             *stringStream << text;
@@ -848,14 +877,14 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, vo
             stringStream
         };
 
-        auto status = threadSafeLoggerCallback.NonBlockingCall(data, addonWrapperJSLogCallback);
+        auto status = addonThreadSafeLoggerCallback.NonBlockingCall(data);
 
         if (status == napi_ok) {
             return;
         }
     }
 
-    if (level == GGML_LOG_LEVEL_ERROR) {
+    if (level == 2) {
         fputs(text, stderr);
         fflush(stderr);
     } else {
@@ -866,20 +895,33 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char * text, vo
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {
     if (info.Length() < 1 || !info[0].IsFunction()) {
-        if (loggerCallbackSet) {
-            threadSafeLoggerCallback.Release();
-            threadSafeLoggerCallback = nullptr;
-            loggerCallbackFunctionReference.Unref();
-            loggerCallbackSet = false;
+        if (addonJsLoggerCallbackSet) {
+            addonJsLoggerCallbackSet = false;
+            addonThreadSafeLoggerCallback.Release();
         }
 
         return info.Env().Undefined();
     }
 
-    loggerCallbackFunctionReference = Napi::Persistent(info[0].As<Napi::Function>());
-    loggerCallbackFunctionReference.Ref();
-    threadSafeLoggerCallback = Napi::ThreadSafeFunction::New(info.Env(), loggerCallbackFunctionReference.Value(), "loggerCallback", 0, 1);
-    loggerCallbackSet = true;
+    auto addonLoggerJSCallback = info[0].As<Napi::Function>();
+    AddonThreadSafeLogCallbackFunctionContext *context = new Napi::Reference<Napi::Value>(Napi::Persistent(info.This()));
+    addonThreadSafeLoggerCallback = AddonThreadSafeLogCallbackFunction::New(
+        info.Env(),
+        addonLoggerJSCallback,
+        "loggerCallback",
+        0,
+        1,
+        context,
+        []( Napi::Env, void *, AddonThreadSafeLogCallbackFunctionContext *ctx ) {
+            addonJsLoggerCallbackSet = false;
+
+            delete ctx;
+        }
+    );
+    addonJsLoggerCallbackSet = true;
+
+    // prevent blocking the main node process from exiting due to active resources
+    addonThreadSafeLoggerCallback.Unref(info.Env());
 
     return info.Env().Undefined();
 }
@@ -887,7 +929,7 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
 Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     if (info.Length() < 1 || !info[0].IsNumber()) {
         addonLoggerLogLevel = 5;
-        
+
         return info.Env().Undefined();
     }
 

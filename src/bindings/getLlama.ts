@@ -122,9 +122,13 @@ export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOp
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
         const lastBuildInfo = await getLastBuildInfo();
+        const getLlamaOptions: LlamaOptions = {
+            logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppDebugLogs,
+            logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger
+        };
 
         if (lastBuildInfo == null)
-            return getLlamaForOptions({});
+            return getLlamaForOptions(getLlamaOptions);
 
         const localBuildFolder = path.join(llamaLocalBuildBinsDirectory, lastBuildInfo.folderName);
         const localBuildBinPath = await getLocalBuildBinaryPath(lastBuildInfo.folderName);
@@ -132,7 +136,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
         await waitForLockfileRelease({resourcePath: localBuildFolder});
         if (localBuildBinPath != null) {
             try {
-                const binding: BindingModule = require(localBuildBinPath);
+                const binding = loadBindingModule(localBuildBinPath);
                 const buildMetadata = await getLocalBuildBinaryBuildMetadata(lastBuildInfo.folderName);
 
                 return await Llama._create({
@@ -145,14 +149,10 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             } catch (err) {
                 console.error(getConsoleLogPrefix() + "Failed to load last build. Error:", err);
                 console.info(getConsoleLogPrefix() + "Falling back to default binaries");
-
-                try {
-                    delete require.cache[require.resolve(localBuildBinPath)];
-                } catch (err) {}
             }
         }
 
-        return getLlamaForOptions({});
+        return getLlamaForOptions(getLlamaOptions);
     }
 
     return getLlamaForOptions(options ?? {});
@@ -213,7 +213,7 @@ async function getLlamaForOptions({
         await waitForLockfileRelease({resourcePath: localBuildFolder});
         if (localBuildBinPath != null) {
             try {
-                const binding: BindingModule = require(localBuildBinPath);
+                const binding = loadBindingModule(localBuildBinPath);
                 const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
 
                 return await Llama._create({
@@ -227,10 +227,6 @@ async function getLlamaForOptions({
                 const binaryDescription = describeBinary(buildOptions);
                 console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);
                 console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
-
-                try {
-                    delete require.cache[require.resolve(localBuildBinPath)];
-                } catch (err) {}
             }
         }
 
@@ -243,7 +239,7 @@ async function getLlamaForOptions({
 
             if (prebuiltBinPath != null) {
                 try {
-                    const binding: BindingModule = require(prebuiltBinPath);
+                    const binding = loadBindingModule(prebuiltBinPath);
                     const buildMetadata = await getPrebuiltBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
 
                     return await Llama._create({
@@ -266,10 +262,6 @@ async function getLlamaForOptions({
                                 ? ", falling back to building from source"
                                 : ""
                         ) + ". Error:", err);
-
-                    try {
-                        delete require.cache[require.resolve(prebuiltBinPath)];
-                    } catch (err) {}
                 }
             } else if (progressLogs)
                 console.warn(
@@ -315,7 +307,7 @@ async function getLlamaForOptions({
         throw new Error("Failed to build llama.cpp");
     }
 
-    const binding: BindingModule = require(localBuildBinPath);
+    const binding = loadBindingModule(localBuildBinPath);
     const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
 
     return await Llama._create({
@@ -356,4 +348,21 @@ function describeBinary(binaryOptions: BuildOptions) {
         .join("");
 
     return res;
+}
+
+function loadBindingModule(bindingModulePath: string) {
+    // each llama instance has its own settings, such as a different logger, so we have to make sure we load a new instance every time
+    try {
+        delete require.cache[require.resolve(bindingModulePath)];
+    } catch (err) {}
+
+    try {
+        const binding: BindingModule = require(bindingModulePath);
+
+        return binding;
+    } finally {
+        try {
+            delete require.cache[require.resolve(bindingModulePath)];
+        } catch (err) {}
+    }
 }

@@ -1,10 +1,11 @@
 import {describe, expect, test, expectTypeOf} from "vitest";
-import {getLlama, LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {getTestLlama} from "../../utils/getTestLlama.js";
 
 
 describe("grammar for JSON schema", () => {
     test("object", async () => {
-        const llama = await getLlama();
+        const llama = await getTestLlama();
         const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
@@ -177,7 +178,7 @@ describe("grammar for JSON schema", () => {
     });
 
     test("array", async () => {
-        const llama = await getLlama();
+        const llama = await getTestLlama();
         const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "array",
             items: {
@@ -244,7 +245,7 @@ describe("grammar for JSON schema", () => {
     });
 
     test("const", async () => {
-        const llama = await getLlama();
+        const llama = await getTestLlama();
         const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
@@ -322,7 +323,7 @@ describe("grammar for JSON schema", () => {
     });
 
     test("missing keys", async () => {
-        const llama = await getLlama();
+        const llama = await getTestLlama();
         const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
@@ -400,7 +401,7 @@ describe("grammar for JSON schema", () => {
     });
 
     test("unexpected keys", async () => {
-        const llama = await getLlama();
+        const llama = await getTestLlama();
         const grammar = new LlamaJsonSchemaGrammar(llama, {
             type: "object",
             properties: {
