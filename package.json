@@ -111,6 +111,7 @@
     "@commitlint/cli": "^17.7.1",
     "@commitlint/config-conventional": "^17.7.0",
     "@semantic-release/exec": "^6.0.3",
+    "@types/bytes": "^3.1.4",
     "@types/cli-progress": "^3.11.0",
     "@types/cross-spawn": "^6.0.2",
     "@types/fs-extra": "^11.0.1",
@@ -142,6 +143,7 @@
     "zx": "^7.2.3"
   },
   "dependencies": {
+    "bytes": "^3.1.2",
     "chalk": "^5.3.0",
     "chmodrp": "^1.0.2",
     "cli-progress": "^3.12.0",

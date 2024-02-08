@@ -116,6 +116,16 @@ export class Llama {
         return this._bindings.systemInfo();
     }
 
+    public getVramStatus() {
+        const {total, used} = this._bindings.getGpuVramInfo();
+
+        return {
+            total,
+            used,
+            free: Math.max(0, total - used)
+        };
+    }
+
     /** @internal */
     private _onAddonLog(level: number, message: string) {
         const llamaLogLevel = addonLogLevelToLlamaLogLevel.get(level) ?? LlamaLogLevel.fatal;
