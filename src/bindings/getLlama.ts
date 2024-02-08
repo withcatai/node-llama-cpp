@@ -158,7 +158,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
     return getLlamaForOptions(options ?? {});
 }
 
-async function getLlamaForOptions({
+export async function getLlamaForOptions({
     metal = defaultLlamaCppMetalSupport,
     cuda = defaultLlamaCppCudaSupport,
     logLevel = defaultLlamaCppDebugLogs,
@@ -169,7 +169,11 @@ async function getLlamaForOptions({
     usePrebuiltBinaries = true,
     progressLogs = true,
     skipDownload = defaultSkipDownload
-}: LlamaOptions): Promise<Llama> {
+}: LlamaOptions, {
+    updateLastBuildInfoOnCompile = false
+}: {
+    updateLastBuildInfoOnCompile?: boolean
+} = {}): Promise<Llama> {
     const platform = getPlatform();
     const arch = process.arch;
 
@@ -295,7 +299,7 @@ async function getLlamaForOptions({
     await compileLlamaCpp(buildOptions, {
         ensureLlamaCppRepoIsCloned: !skipDownload,
         downloadCmakeIfNeeded: true,
-        updateLastBuildInfo: false
+        updateLastBuildInfo: updateLastBuildInfoOnCompile
     });
 
     const localBuildFolder = path.join(llamaLocalBuildBinsDirectory, buildFolderName.withCustomCmakeOptions);
