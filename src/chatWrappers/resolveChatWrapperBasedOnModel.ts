@@ -32,9 +32,12 @@ export function resolveChatWrapperBasedOnModel({
             const splitLowercaseSubType = lowercaseSubType?.split("-") ?? [];
             const firstSplitLowercaseSubType = splitLowercaseSubType[0];
 
-            if (lowercaseName === "llama")
-                return LlamaChatWrapper;
-            else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
+            if (lowercaseName === "llama") {
+                if (splitLowercaseSubType.includes("chat"))
+                    return LlamaChatWrapper;
+
+                return GeneralChatWrapper;
+            } else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
                 return LlamaChatWrapper;
             else if (lowercaseName === "orca")
                 return ChatMLChatWrapper;
