@@ -10,7 +10,7 @@
 #include "napi.h"
 
 #ifdef GPU_INFO_USE_CUBLAS
-#  include "ggml-cuda.h"
+#  include "gpuInfo/cuda-gpu-info.h"
 #endif
 #ifdef GPU_INFO_USE_METAL
 #  include "gpuInfo/metal-gpu-info.h"
