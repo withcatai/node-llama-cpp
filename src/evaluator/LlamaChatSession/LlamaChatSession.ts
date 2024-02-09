@@ -200,6 +200,13 @@ export class LlamaChatSession {
         return this._chat == null || this._chat.disposed;
     }
 
+    public get chatWrapper() {
+        if (this._chat == null)
+            throw new DisposedError();
+
+        return this._chat.chatWrapper;
+    }
+
     public get sequence() {
         if (this._chat == null)
             throw new DisposedError();
