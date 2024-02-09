@@ -20,7 +20,6 @@ include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
 include_directories("gpuInfo")
-include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
 if (LLAMA_CUBLAS)
@@ -38,10 +37,17 @@ if (LLAMA_CUBLAS)
         add_compile_definitions(GPU_INFO_USE_CUBLAS)
 
         set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
+
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            set(CMAKE_CUDA_ARCHITECTURES "")
+        endif()
+    endif()
     else()
         message(WARNING "cuBLAS not found. Not using it for GPU info")
     endif()
 endif()
+
+include_directories("llama.cpp")
 
 if (LLAMA_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
