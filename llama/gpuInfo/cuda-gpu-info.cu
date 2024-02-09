@@ -41,7 +41,7 @@ bool gpuInfoSetCudaDevice(const int device, gpuInfoErrorLogCallback_t errorLogCa
 }
 
 bool gpuInfoGetCudaDeviceInfo(int device, size_t * total, size_t * used, gpuInfoErrorLogCallback_t errorLogCallback) {
-    gpuInfoSetCudaDevice(device);
+    gpuInfoSetCudaDevice(device, errorLogCallback);
 
     size_t freeMem;
     size_t totalMem;
