@@ -9,11 +9,21 @@
 #include "llama.h"
 #include "napi.h"
 
+#ifdef GPU_INFO_USE_CUBLAS
+#  include "gpuInfo/cuda-gpu-info.h"
+#endif
+#ifdef GPU_INFO_USE_METAL
+#  include "gpuInfo/metal-gpu-info.h"
+#endif
+
+
 struct addon_logger_log {
     public:
         const int logLevelNumber;
         const std::stringstream* stringStream;
 };
+
+static void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user_data);
 
 using AddonThreadSafeLogCallbackFunctionContext = Napi::Reference<Napi::Value>;
 void addonCallJsLogCallback(
@@ -38,6 +48,43 @@ std::string addon_model_token_to_piece(const struct llama_model* model, llama_to
     }
 
     return std::string(result.data(), result.size());
+}
+
+#ifdef GPU_INFO_USE_CUBLAS
+void lodCudaError(const char* message) {
+    addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
+}
+#endif
+
+Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
+    uint64_t total = 0;
+    uint64_t used = 0;
+
+#ifdef GPU_INFO_USE_CUBLAS
+    size_t cudaDeviceTotal = 0;
+    size_t cudaDeviceUsed = 0;
+    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, lodCudaError);
+
+    if (cudeGetInfoSuccess) {
+        total += cudaDeviceTotal;
+        used += cudaDeviceUsed;
+    }
+#endif
+
+#ifdef GPU_INFO_USE_METAL
+    uint64_t metalDeviceTotal = 0;
+    uint64_t metalDeviceUsed = 0;
+    get_metal_gpu_info(&metalDeviceTotal, &metalDeviceUsed);
+
+    total += metalDeviceTotal;
+    used += metalDeviceUsed;
+#endif
+
+    Napi::Object result = Napi::Object::New(info.Env());
+    result.Set("total", Napi::Number::From(info.Env(), total));
+    result.Set("used", Napi::Number::From(info.Env(), used));
+
+    return result;
 }
 
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
@@ -830,12 +877,21 @@ int addonGetGgmlLogLevelNumber(ggml_log_level level) {
 void addonCallJsLogCallback(
     Napi::Env env, Napi::Function callback, AddonThreadSafeLogCallbackFunctionContext* context, addon_logger_log* data
 ) {
+    bool called = false;
+
     if (env != nullptr && callback != nullptr) {
-        callback.Call({
-            Napi::Number::New(env, data->logLevelNumber),
-            Napi::String::New(env, data->stringStream->str()),
-        });
-    } else if (data != nullptr) {
+        try {
+            callback.Call({
+                Napi::Number::New(env, data->logLevelNumber),
+                Napi::String::New(env, data->stringStream->str()),
+            });
+            called = true;
+        } catch (const Napi::Error& e) {
+            called = false;
+        }
+    }
+    
+    if (!called && data != nullptr) {
         if (data->logLevelNumber == 2) {
             fputs(data->stringStream->str().c_str(), stderr);
             fflush(stderr);
@@ -936,6 +992,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
+        Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
     });
     AddonModel::init(exports);
     AddonGrammar::init(exports);

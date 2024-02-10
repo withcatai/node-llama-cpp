@@ -19,16 +19,101 @@ execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
+include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
-file(GLOB SOURCE_FILES "addon.cpp")
+if (LLAMA_CUBLAS)
+    cmake_minimum_required(VERSION 3.17)
 
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+    find_package(CUDAToolkit)
+    if (CUDAToolkit_FOUND)
+        message(STATUS "Using cuBLAS for GPU info")
+
+        enable_language(CUDA)
+
+        set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS} gpuInfo/cuda-gpu-info.h)
+        set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/cuda-gpu-info.cu)
+
+        add_compile_definitions(GPU_INFO_USE_CUBLAS)
+
+        if (LLAMA_STATIC)
+            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
+        else()
+            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart)
+        endif()
+
+        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
+
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            # copied from llama.cpp/CMakLists.txt under "if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)"
+            if (LLAMA_CUDA_F16 OR LLAMA_CUDA_DMMV_F16)
+                set(CMAKE_CUDA_ARCHITECTURES "60;61;70")
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES "52;61;70")
+            endif()
+        endif()
+    else()
+        message(WARNING "cuBLAS not found. Not using it for GPU info")
+    endif()
+endif()
+
+if (LLAMA_HIPBLAS)
+    list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
+
+    if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
+        message(WARNING "Only LLVM is supported for HIP, hint: CC=/opt/rocm/llvm/bin/clang")
+    endif()
+    if (NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
+    endif()
+
+    find_package(hip)
+    find_package(hipblas)
+    find_package(rocblas)
+
+    if (${hipblas_FOUND} AND ${hip_FOUND})
+        message(STATUS "Using HIP and hipBLAS for GPU info")
+        add_compile_definitions(GPU_INFO_USE_HIPBLAS GPU_INFO_USE_CUBLAS)
+        add_library(gpu-info-rocm OBJECT gpuInfo/cuda-gpu-info.cu gpuInfo/cuda-gpu-info.h)
+        set_source_files_properties(gpuInfo/cuda-gpu-info.cu PROPERTIES LANGUAGE CXX)
+        target_link_libraries(gpu-info-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
+
+        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} gpu-info-rocm)
+    else()
+        message(WARNING "hipBLAS or HIP not found. Try setting CMAKE_PREFIX_PATH=/opt/rocm")
+    endif()
+endif()
+
+if (LLAMA_METAL)
+    find_library(FOUNDATION_LIBRARY Foundation REQUIRED)
+    find_library(METAL_FRAMEWORK    Metal      REQUIRED)
+    find_library(METALKIT_FRAMEWORK MetalKit   REQUIRED)
+
+    message(STATUS "Using Metal for GPU info")
+    set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS}  gpuInfo/metal-gpu-info.h)
+    set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/metal-gpu-info.mm)
+
+    add_compile_definitions(GPU_INFO_USE_METAL)
+
+    set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS}
+        ${FOUNDATION_LIBRARY}
+        ${METAL_FRAMEWORK}
+        ${METALKIT_FRAMEWORK}
+        )
+endif()
+
+file(GLOB SOURCE_FILES "addon.cpp" ${GPU_INFO_SOURCES})
+
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} ${GPU_INFO_HEADERS})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 target_link_libraries(${PROJECT_NAME} "llama")
 target_link_libraries(${PROJECT_NAME} "common")
+
+if (DEFINED GPU_INFO_EXTRA_LIBS)
+    target_link_libraries(${PROJECT_NAME} ${GPU_INFO_EXTRA_LIBS})
+endif()
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib

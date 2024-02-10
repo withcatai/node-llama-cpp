@@ -25,8 +25,7 @@ export function prettyPrintObject(obj: any, indent: number = 4): string {
 
         rows.push([
             " ".repeat(indent),
-            (JSON.stringify(key)
-                .slice(1, -1) === key)
+            canStringBeKeyWithoutQuotes(key)
                 ? chalk.red(key)
                 : chalk.green(JSON.stringify(key)),
             chalk.whiteBright(": "),
@@ -39,4 +38,8 @@ export function prettyPrintObject(obj: any, indent: number = 4): string {
         return chalk.whiteBright("{}");
 
     return chalk.whiteBright("{\n") + rows.join(chalk.whiteBright(",\n")) + chalk.whiteBright("\n") + chalk.whiteBright("}");
+}
+
+function canStringBeKeyWithoutQuotes(key: string): boolean {
+    return JSON.stringify(key).slice(1, -1) === key && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key);
 }

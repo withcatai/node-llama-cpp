@@ -36,6 +36,9 @@ export const builtinLlamaCppRelease = await getBinariesGithubRelease();
 export const isCI = env.get("CI")
     .default("false")
     .asBool();
+export const isRunningInsideGoogleColab = env.get("COLAB_RELEASE_TAG")
+    .default("")
+    .asString() !== "";
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default(builtinLlamaCppGitHubRepo)
     .asString();

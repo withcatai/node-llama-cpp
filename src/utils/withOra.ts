@@ -1,5 +1,7 @@
 import ora from "ora";
+import {isRunningInsideGoogleColab} from "../config.js";
 import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+import withStatusLogs from "./withStatusLogs.js";
 
 export default async function withOra<T>(
     message: string | {
@@ -9,6 +11,9 @@ export default async function withOra<T>(
     },
     callback: () => Promise<T>
 ): Promise<T> {
+    if (isRunningInsideGoogleColab)
+        return withStatusLogs(message, callback);
+
     const spinner = ora({
         prefixText: getConsoleLogPrefix(),
         ...(

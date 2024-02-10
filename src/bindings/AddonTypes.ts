@@ -30,7 +30,11 @@ export type BindingModule = {
     },
     systemInfo(): string,
     setLogger(logger: (level: number, message: string) => void): void,
-    setLoggerLogLevel(level: number): void
+    setLoggerLogLevel(level: number): void,
+    getGpuVramInfo(): {
+        total: number,
+        used: number
+    }
 };
 
 export type AddonModel = {

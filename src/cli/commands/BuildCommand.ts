@@ -5,7 +5,7 @@ import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport
+    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, isCI
 } from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
@@ -21,7 +21,10 @@ type BuildCommand = {
     nodeTarget?: string,
     metal?: boolean,
     cuda?: boolean,
-    noUsageExample?: boolean
+    noUsageExample?: boolean,
+
+    /** @internal */
+    noCustomCmakeBuildOptionsInBinaryFolderName?: boolean
 };
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
@@ -56,6 +59,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Don't print code usage example after building"
+            })
+            .option("noCustomCmakeBuildOptionsInBinaryFolderName", {
+                type: "boolean",
+                hidden: true, // this is only for the CI to use
+                default: false,
+                description: "Don't include custom CMake build options in build folder name"
             });
     },
     handler: BuildLlamaCppCommand
@@ -66,12 +75,15 @@ export async function BuildLlamaCppCommand({
     nodeTarget = undefined,
     metal = defaultLlamaCppMetalSupport,
     cuda = defaultLlamaCppCudaSupport,
-    noUsageExample = false
+    noUsageExample = false,
+    noCustomCmakeBuildOptionsInBinaryFolderName = false
 }: BuildCommand) {
     if (!(await isLlamaCppRepoCloned())) {
         console.log(chalk.red('llama.cpp is not downloaded. Please run "node-llama-cpp download" first'));
         process.exit(1);
     }
+
+    const includeBuildOptionsInBinaryFolderName = !noCustomCmakeBuildOptionsInBinaryFolderName || !isCI;
 
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
 
@@ -115,7 +127,7 @@ export async function BuildLlamaCppCommand({
             updateLastBuildInfo: true,
             downloadCmakeIfNeeded: false,
             ensureLlamaCppRepoIsCloned: false,
-            includeBuildOptionsInBinaryFolderName: true
+            includeBuildOptionsInBinaryFolderName
         });
     });
 
