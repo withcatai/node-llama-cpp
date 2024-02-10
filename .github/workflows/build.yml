@@ -178,11 +178,19 @@ jobs:
           // build binaries
           if (process.env.ARTIFACT_NAME === "win") {
             await buildBinary("x64");
-            await buildBinary("x64", ["--cuda"]);
+            
+            $.env.NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_STATIC = "1";
+            await buildBinary("x64", ["--cuda", "--noCustomCmakeBuildOptionsInBinaryFolderName"]);
+            delete $.env.NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_STATIC;
+            
             // await buildBinary("arm64", [], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
           } else if (process.env.ARTIFACT_NAME === "linux") {
             await buildBinary("x64");
-            await buildBinary("x64", ["--cuda"]);
+            
+            $.env.NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_STATIC = "1";
+            await buildBinary("x64", ["--cuda", "--noCustomCmakeBuildOptionsInBinaryFolderName"]);
+            delete $.env.NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_STATIC;
+            
             await buildBinary("arm64");
             await buildBinary("armv7l");
           } else if (process.env.ARTIFACT_NAME === "mac") {

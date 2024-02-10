@@ -94,7 +94,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             })
             .option("updateBinariesReleaseMetadataAndSaveGitBundle", {
                 type: "boolean",
-                hidden: true, // this for the CI to use
+                hidden: true, // this is only for the CI to use
                 default: false,
                 description: "Update the binariesGithubRelease.json file with the release of llama.cpp that was downloaded"
             });

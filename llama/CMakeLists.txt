@@ -37,6 +37,12 @@ if (LLAMA_CUBLAS)
 
         add_compile_definitions(GPU_INFO_USE_CUBLAS)
 
+        if (LLAMA_STATIC)
+            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
+        else()
+            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart)
+        endif()
+
         set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
 
         if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
