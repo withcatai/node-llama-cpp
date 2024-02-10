@@ -46,7 +46,12 @@ if (LLAMA_CUBLAS)
         set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
 
         if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            set(CMAKE_CUDA_ARCHITECTURES "")
+            # copied from llama.cpp/CMakLists.txt under "if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)"
+            if (LLAMA_CUDA_F16 OR LLAMA_CUDA_DMMV_F16)
+                set(CMAKE_CUDA_ARCHITECTURES "60;61;70")
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES "52;61;70")
+            endif()
         endif()
     else()
         message(WARNING "cuBLAS not found. Not using it for GPU info")
