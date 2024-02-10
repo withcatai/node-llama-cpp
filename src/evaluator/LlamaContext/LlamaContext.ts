@@ -610,6 +610,7 @@ export class LlamaContextSequence {
      */
     public evaluate(tokens: Token[], {
         temperature = 0,
+        minP = 0,
         topK = 40,
         topP = 0.95,
         grammarEvaluationState,
@@ -621,7 +622,7 @@ export class LlamaContextSequence {
         } = {},
         yieldEosToken = false
     }: {
-        temperature?: number, topK?: number, topP?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
@@ -648,6 +649,7 @@ export class LlamaContextSequence {
     } = {}): AsyncGenerator<Token, void> {
         return this._evaluate(tokens, {
             temperature,
+            minP,
             topK,
             topP,
             grammarEvaluationState,
@@ -707,6 +709,7 @@ export class LlamaContextSequence {
     /** @internal */
     private async *_evaluate(tokens: Token[], {
         temperature = 0,
+        minP = 0,
         topK = 40,
         topP = 0.95,
         grammarEvaluationState,
@@ -716,7 +719,7 @@ export class LlamaContextSequence {
         contextShiftOptions,
         yieldEosToken = false
     }: {
-        temperature?: number, topK?: number, topP?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, evaluationPriority?: EvaluationPriority,
         generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>, yieldEosToken?: boolean
@@ -752,6 +755,7 @@ export class LlamaContextSequence {
 
                     return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
                         temperature,
+                        minP,
                         topK,
                         topP,
                         repeatPenalty: repeatPenalty?.penalty,

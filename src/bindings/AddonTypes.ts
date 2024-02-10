@@ -68,6 +68,7 @@ export type AddonContext = {
     decodeBatch(): Promise<void>,
     sampleToken(batchLogitIndex: BatchLogitIndex, options?: {
         temperature?: number,
+        minP?: number,
         topK?: number,
         topP?: number,
         repeatPenalty?: number,
