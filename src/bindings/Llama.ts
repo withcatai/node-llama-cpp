@@ -116,7 +116,7 @@ export class Llama {
         return this._bindings.systemInfo();
     }
 
-    public getVramStatus() {
+    public getVramState() {
         const {total, used} = this._bindings.getGpuVramInfo();
 
         return {
