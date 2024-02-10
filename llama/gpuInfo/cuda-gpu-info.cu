@@ -27,7 +27,7 @@ bool gpuInfoSetCudaDevice(const int device, gpuInfoErrorLogCallback_t errorLogCa
     }
 
     if (device == current_device) {
-        return;
+        return true;
     }
 
     const auto setDeviceResult = cudaSetDevice(device);
