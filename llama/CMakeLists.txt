@@ -20,6 +20,7 @@ include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
 include_directories("gpuInfo")
+include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
 if (LLAMA_CUBLAS)
@@ -45,8 +46,6 @@ if (LLAMA_CUBLAS)
         message(WARNING "cuBLAS not found. Not using it for GPU info")
     endif()
 endif()
-
-include_directories("llama.cpp")
 
 if (LLAMA_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
