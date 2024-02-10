@@ -99,7 +99,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 target_link_libraries(${PROJECT_NAME} "llama")
 target_link_libraries(${PROJECT_NAME} "common")
-target_link_libraries(${PROJECT_NAME} ${GPU_INFO_EXTRA_LIBS})
+
+if (DEFINED GPU_INFO_EXTRA_LIBS)
+    target_link_libraries(${PROJECT_NAME} ${GPU_INFO_EXTRA_LIBS})
+endif()
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
