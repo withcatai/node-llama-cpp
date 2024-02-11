@@ -89,6 +89,7 @@
     "function-calling",
     "embedding",
     "temperature",
+    "minP",
     "topK",
     "topP",
     "json-schema",

@@ -709,6 +709,7 @@ class AddonContextSampleTokenWorker : Napi::AsyncWorker, Napi::Promise::Deferred
         bool use_grammar = false;
         llama_token result;
         float temperature = 0.0f;
+        float min_p = 0;
         int32_t top_k = 40;
         float top_p = 0.95f;
         float repeat_penalty = 1.10f;  // 1.0 = disabled
@@ -730,6 +731,10 @@ class AddonContextSampleTokenWorker : Napi::AsyncWorker, Napi::Promise::Deferred
 
                 if (options.Has("temperature")) {
                     temperature = options.Get("temperature").As<Napi::Number>().FloatValue();
+                }
+
+                if (options.Has("minP")) {
+                    min_p = options.Get("minP").As<Napi::Number>().FloatValue();
                 }
 
                 if (options.Has("topK")) {
@@ -833,6 +838,7 @@ class AddonContextSampleTokenWorker : Napi::AsyncWorker, Napi::Promise::Deferred
                 llama_sample_tail_free(ctx->ctx, &candidates_p, tfs_z, min_keep);
                 llama_sample_typical(ctx->ctx, &candidates_p, typical_p, min_keep);
                 llama_sample_top_p(ctx->ctx, &candidates_p, resolved_top_p, min_keep);
+                llama_sample_min_p(ctx->ctx, &candidates_p, min_p, min_keep);
                 llama_sample_temp(ctx->ctx, &candidates_p, temperature);
                 new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
             }
@@ -879,7 +885,7 @@ void addonCallJsLogCallback(
 ) {
     bool called = false;
 
-    if (env != nullptr && callback != nullptr) {
+    if (env != nullptr && callback != nullptr && addonJsLoggerCallbackSet) {
         try {
             callback.Call({
                 Napi::Number::New(env, data->logLevelNumber),

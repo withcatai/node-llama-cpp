@@ -42,6 +42,7 @@ type ChatCommand = {
     jsonSchemaGrammarFile?: string,
     threads: number,
     temperature: number,
+    minP: number,
     topK: number,
     topP: number,
     gpuLayers?: number,
@@ -151,6 +152,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Temperature is a hyperparameter that controls the randomness of the generated text. It affects the probability distribution of the model's output tokens. A higher temperature (e.g., 1.5) makes the output more random and creative, while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative. The suggested temperature is 0.8, which provides a balance between randomness and determinism. At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run. Set to `0` to disable.",
                 group: "Optional:"
             })
+            .option("minP", {
+                alias: "mp",
+                type: "number",
+                default: 0,
+                description: "From the next token candidates, discard the percentage of tokens with the lowest probability. For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded. This is useful for generating more high-quality results when using a high temperature. Set to a value between `0` and `1` to enable. Only relevant when `temperature` is set to a value greater than `0`.",
+                group: "Optional:"
+            })
             .option("topK", {
                 alias: "k",
                 type: "number",
@@ -243,15 +251,15 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     async handler({
         model, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, contextSize, batchSize,
-        grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP,
-        gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
+        topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
         environmentFunctions, noInfoLog, printTimings
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
-                grammar, jsonSchemaGrammarFile, threads, temperature, topK, topP, gpuLayers, lastTokensRepeatPenalty,
+                grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 noHistory, environmentFunctions, noInfoLog, printTimings
             });
@@ -265,7 +273,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 async function RunChat({
     model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
-    grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, topK, topP, gpuLayers,
+    grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, noHistory, environmentFunctions, noInfoLog, printTimings
 }: ChatCommand) {
@@ -425,6 +433,7 @@ async function RunChat({
         await session.prompt(input, {
             grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
             temperature,
+            minP,
             topK,
             topP,
             repeatPenalty: {

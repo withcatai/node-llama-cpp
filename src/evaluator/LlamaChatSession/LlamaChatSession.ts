@@ -56,6 +56,17 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     temperature?: number,
 
     /**
+     * From the next token candidates, discard the percentage of tokens with the lowest probability.
+     * For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded.
+     * This is useful for generating more high-quality results when using a high temperature.
+     * Set to a value between `0` and `1` to enable.
+     *
+     * Only relevant when `temperature` is set to a value greater than `0`.
+     * Disabled by default.
+     */
+    minP?: number,
+
+    /**
      * Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation.
      * An integer number between `1` and the size of the vocabulary.
      * Set to `0` to disable (which uses the full vocabulary).
@@ -233,6 +244,7 @@ export class LlamaChatSession {
         signal,
         maxTokens,
         temperature,
+        minP,
         topK,
         topP,
         grammar,
@@ -244,7 +256,7 @@ export class LlamaChatSession {
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
 
-            onToken, signal, maxTokens, temperature, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty
+            onToken, signal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty
         });
 
         return responseText;
@@ -261,6 +273,7 @@ export class LlamaChatSession {
         signal,
         maxTokens,
         temperature,
+        minP,
         topK,
         topP,
         grammar,
@@ -309,6 +322,7 @@ export class LlamaChatSession {
                     onToken,
                     signal,
                     repeatPenalty,
+                    minP,
                     topK,
                     topP,
                     maxTokens,
