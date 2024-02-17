@@ -139,7 +139,6 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 }
             }
 
-            llama_backend_init(false);
             model = llama_load_model_from_file(modelPath.c_str(), model_params);
 
             if (model == NULL) {
@@ -1048,7 +1047,7 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
 }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
-    llama_backend_init(false);
+    llama_backend_init();
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
