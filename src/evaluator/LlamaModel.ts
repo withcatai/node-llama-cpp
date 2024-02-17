@@ -23,7 +23,10 @@ export type LlamaModelOptions = {
     /** use mmap if possible */
     useMmap?: boolean,
 
-    /** force system to keep model in RAM */
+    /**
+     * Force the system to keep the model in the RAM/VRAM.
+     * Use with caution as this can crash your system if the available resources are insufficient.
+     */
     useMlock?: boolean
 };
 
@@ -35,6 +38,7 @@ export class LlamaModel {
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
+    /** @internal */ private _embeddingVectorSize?: number;
 
     public readonly onDispose = new EventRelay<void>();
 
@@ -153,6 +157,16 @@ export class LlamaModel {
         return this._trainContextSize;
     }
 
+    /** The size of an embedding vector the model can produce */
+    public get embeddingVectorSize(): number {
+        this._ensureNotDisposed();
+
+        if (this._embeddingVectorSize == null)
+            this._embeddingVectorSize = this._model.getEmbeddingVectorSize();
+
+        return this._embeddingVectorSize;
+    }
+
     /** @internal */
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
@@ -170,6 +184,7 @@ export class LlamaModelTokens {
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
     /** @internal */ private _nlString?: string;
+    /** @internal */ private _shouldPrependBosToken?: boolean;
 
     private constructor(model: AddonModel, disposedState: DisposedState) {
         this._model = model;
@@ -284,6 +299,18 @@ export class LlamaModelTokens {
         return this._nlString;
     }
 
+    /**
+     * @returns Whether we should prepend a BOS (Beginning Of Sequence) token for evaluations with this model.
+     */
+    public get shouldPrependBosToken(): boolean {
+        this._ensureNotDisposed();
+
+        if (this._shouldPrependBosToken == null)
+            this._shouldPrependBosToken = this.bos != null && this._model.shouldPrependBosToken();
+
+        return this._shouldPrependBosToken;
+    }
+
     /** @internal */
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
@@ -320,7 +347,7 @@ export class LlamaModelInfillTokens {
         this._ensureNotDisposed();
 
         if (this._prefixToken == null)
-            this._prefixToken = this._model.prefixToken();
+            this._prefixToken = this._resolveSpecialToken(this._model.prefixToken(), ["<fim_prefix>"]);
 
         if (this._prefixToken === -1)
             return null;
@@ -335,7 +362,7 @@ export class LlamaModelInfillTokens {
         this._ensureNotDisposed();
 
         if (this._middleToken == null)
-            this._middleToken = this._model.middleToken();
+            this._middleToken = this._resolveSpecialToken(this._model.middleToken(), ["<fim_middle>"]);
 
         if (this._middleToken === -1)
             return null;
@@ -350,7 +377,7 @@ export class LlamaModelInfillTokens {
         this._ensureNotDisposed();
 
         if (this._suffixToken == null)
-            this._suffixToken = this._model.suffixToken();
+            this._suffixToken = this._resolveSpecialToken(this._model.suffixToken(), ["<fim_suffix>"]);
 
         if (this._suffixToken === -1)
             return null;
@@ -445,6 +472,22 @@ export class LlamaModelInfillTokens {
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
             throw new DisposedError();
+    }
+
+    /** @internal */
+    private _resolveSpecialToken(token: Token, fallbackTexts: string[]): Token {
+        if (token != null && token !== -1)
+            return token;
+
+        for (const text of fallbackTexts) {
+            const tokens = this._model.tokenize(text, true);
+            if (tokens.length !== 1)
+                continue;
+
+            return tokens[0] as Token;
+        }
+
+        return -1 as Token;
     }
 
     /** @internal */

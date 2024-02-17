@@ -13,6 +13,8 @@ import {BuildCommand} from "./commands/BuildCommand.js";
 import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
 import {ClearCommand} from "./commands/ClearCommand.js";
 import {ChatCommand} from "./commands/ChatCommand.js";
+import {CompleteCommand} from "./commands/CompleteCommand.js";
+import {InfillCommand} from "./commands/InfillCommand.js";
 import {DebugCommand} from "./commands/DebugCommand.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +32,8 @@ yarg
     .command(BuildCommand)
     .command(ClearCommand)
     .command(ChatCommand)
+    .command(CompleteCommand)
+    .command(InfillCommand)
     .command(OnPostInstallCommand)
     .command(DebugCommand)
     .recommendCommands()

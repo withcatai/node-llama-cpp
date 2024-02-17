@@ -42,6 +42,7 @@ export type AddonModel = {
     tokenize(text: string, specialTokens: boolean): Uint32Array,
     detokenize(tokens: Uint32Array): string,
     getTrainContextSize(): number,
+    getEmbeddingVectorSize(): number,
     getTotalSize(): number,
     getTotalParameters(): number,
     getModelDescription(): ModelTypeDescription,
@@ -52,7 +53,9 @@ export type AddonModel = {
     middleToken(): Token,
     suffixToken(): Token,
     eotToken(): Token,
-    getTokenString(token: number): string
+    getTokenString(token: number): string,
+    getTokenType(token: Token): number,
+    shouldPrependBosToken(): boolean
 };
 
 export type AddonContext = {
