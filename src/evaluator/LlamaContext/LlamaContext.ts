@@ -63,7 +63,7 @@ export class LlamaContext {
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
-            contextSize: contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
+            contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             threads: Math.max(0, Math.floor(threads)),
             embedding: _embedding,
@@ -850,7 +850,13 @@ export class LlamaContextSequence {
         this._ensureNotDisposed();
 
         if (contextShiftOptions.strategy === "eraseBeginning") {
-            await this.eraseContextTokenRanges([{start: 0, end: size}]);
+            let eraseStartIndex = 0;
+            if (this.model.tokens.shouldPrependBosToken && this.model.tokens.bos != null &&
+                this._contextTokens[0] === this.model.tokens.bos
+            )
+                eraseStartIndex = 1;
+
+            await this.eraseContextTokenRanges([{start: eraseStartIndex, end: size}]);
         } else {
             const ranges = await contextShiftOptions.strategy({
                 sequence: this,
