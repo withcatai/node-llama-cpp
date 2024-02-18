@@ -40,6 +40,9 @@ import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "./chatWrappers/resolveChatWrapperBasedOnModel.js";
 import {
+    resolveChatWrapperBasedOnWrapperTypeName, chatWrapperTypeNames, type ChatWrapperTypeName
+} from "./bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
+import {
     LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
     type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
@@ -118,6 +121,9 @@ export {
     AlpacaChatWrapper,
     FunctionaryChatWrapper,
     resolveChatWrapperBasedOnModel,
+    resolveChatWrapperBasedOnWrapperTypeName,
+    chatWrapperTypeNames,
+    type ChatWrapperTypeName,
     LlamaText,
     SpecialToken,
     BuiltinSpecialToken,
