@@ -87,6 +87,26 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     return result;
 }
 
+static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    auto tokenType = llama_token_get_type(model, token);
+
+    if (tokenType == LLAMA_TOKEN_TYPE_UNDEFINED || tokenType == LLAMA_TOKEN_TYPE_UNKNOWN) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+
+    return Napi::Number::From(info.Env(), token);
+}
+
+static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    auto tokenType = llama_token_get_type(model, token);
+
+    if (tokenType != LLAMA_TOKEN_TYPE_CONTROL) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+
+    return Napi::Number::From(info.Env(), token);
+}
+
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
         llama_model_params model_params;
@@ -119,7 +139,6 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 }
             }
 
-            llama_backend_init(false);
             model = llama_load_model_from_file(modelPath.c_str(), model_params);
 
             if (model == NULL) {
@@ -203,6 +222,15 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             return Napi::Number::From(info.Env(), llama_n_ctx_train(model));
         }
 
+        Napi::Value GetEmbeddingVectorSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_n_embd(model));
+        }
+
         Napi::Value GetTotalSize(const Napi::CallbackInfo& info) {
             if (disposed) {
                 Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
@@ -239,7 +267,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_bos(model));
+            return getNapiControlToken(info, model, llama_token_bos(model));
         }
         Napi::Value TokenEos(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -247,7 +275,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_eos(model));
+            return getNapiControlToken(info, model, llama_token_eos(model));
         }
         Napi::Value TokenNl(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -255,7 +283,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_nl(model));
+            return getNapiToken(info, model, llama_token_nl(model));
         }
         Napi::Value PrefixToken(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -263,7 +291,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_prefix(model));
+            return getNapiControlToken(info, model, llama_token_prefix(model));
         }
         Napi::Value MiddleToken(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -271,7 +299,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_middle(model));
+            return getNapiControlToken(info, model, llama_token_middle(model));
         }
         Napi::Value SuffixToken(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -279,7 +307,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_suffix(model));
+            return getNapiControlToken(info, model, llama_token_suffix(model));
         }
         Napi::Value EotToken(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -287,7 +315,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_token_eot(model));
+            return getNapiControlToken(info, model, llama_token_eot(model));
         }
         Napi::Value GetTokenString(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -308,6 +336,29 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             return Napi::String::New(info.Env(), ss.str());
         }
 
+        Napi::Value GetTokenType(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            if (info[0].IsNumber() == false) {
+                return Napi::Number::From(info.Env(), int32_t(LLAMA_TOKEN_TYPE_UNDEFINED));
+            }
+
+            int token = info[0].As<Napi::Number>().Int32Value();
+            auto tokenType = llama_token_get_type(model, token);
+
+            return Napi::Number::From(info.Env(), int32_t(tokenType));
+        }
+        Napi::Value ShouldPrependBosToken(const Napi::CallbackInfo& info) {
+            const int addBos = llama_add_bos_token(model);
+
+            bool shouldPrependBos = addBos != -1 ? bool(addBos) : (llama_vocab_type(model) == LLAMA_VOCAB_TYPE_SPM);
+
+            return Napi::Boolean::New(info.Env(), shouldPrependBos);
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonModel",
@@ -318,6 +369,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("tokenize", &AddonModel::Tokenize),
                         InstanceMethod("detokenize", &AddonModel::Detokenize),
                         InstanceMethod("getTrainContextSize", &AddonModel::GetTrainContextSize),
+                        InstanceMethod("getEmbeddingVectorSize", &AddonModel::GetEmbeddingVectorSize),
                         InstanceMethod("getTotalSize", &AddonModel::GetTotalSize),
                         InstanceMethod("getTotalParameters", &AddonModel::GetTotalParameters),
                         InstanceMethod("getModelDescription", &AddonModel::GetModelDescription),
@@ -329,6 +381,8 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
+                        InstanceMethod("getTokenType", &AddonModel::GetTokenType),
+                        InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
                         InstanceMethod("dispose", &AddonModel::Dispose),
                     }
                 )
@@ -993,7 +1047,7 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
 }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
-    llama_backend_init(false);
+    llama_backend_init();
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),

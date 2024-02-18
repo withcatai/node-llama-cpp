@@ -106,7 +106,27 @@ export type LastBuildOptions = {
     /**
      * Set a custom logger for llama.cpp logs.
      */
-    logger?: (level: LlamaLogLevel, message: string) => void
+    logger?: (level: LlamaLogLevel, message: string) => void,
+
+    /**
+     * If a local build is not found, use prebuilt binaries.
+     * Enabled by default.
+     */
+    usePrebuiltBinaries?: boolean,
+
+    /**
+     * If a local build is not found, and prebuilt binaries are not found, when building from source,
+     * print binary compilation progress logs.
+     * Enabled by default.
+     */
+    progressLogs?: boolean,
+
+    /**
+     * If a local build is not found, and prebuilt binaries are not found, don't download llama.cpp source if it's not found.
+     * When set to `true`, and llama.cpp source is needed but is not found, a `NoBinaryFoundError` error will be thrown.
+     * Disabled by default.
+     */
+    skipDownload?: boolean
 };
 
 export const getLlamaFunctionName = "getLlama";
@@ -124,7 +144,10 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
         const lastBuildInfo = await getLastBuildInfo();
         const getLlamaOptions: LlamaOptions = {
             logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppDebugLogs,
-            logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger
+            logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
+            usePrebuiltBinaries: lastBuildOptions?.usePrebuiltBinaries ?? true,
+            progressLogs: lastBuildOptions?.progressLogs ?? true,
+            skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload
         };
 
         if (lastBuildInfo == null)

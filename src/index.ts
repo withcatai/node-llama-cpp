@@ -24,9 +24,12 @@ import {
 import {defineChatSessionFunction} from "./evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
     LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatContextShiftOptions,
-    type LLamaChatRepeatPenalty, type LlamaChatResponse, type LlamaChatResponseFunctionCall
+    type LlamaChatResponse, type LlamaChatResponseFunctionCall
 } from "./evaluator/LlamaChat/LlamaChat.js";
-import {AbortError} from "./AbortError.js";
+import {
+    LlamaCompletion, type LlamaCompletionOptions, type LlamaCompletionGenerationOptions, type LlamaInfillGenerationOptions
+} from "./evaluator/LlamaCompletion.js";
+import {UnsupportedError} from "./utils/UnsupportedError.js";
 import {ChatWrapper, type ChatWrapperSettings} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {LlamaChatWrapper} from "./chatWrappers/LlamaChatWrapper.js";
@@ -46,7 +49,7 @@ import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
     type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
-    type Token, isChatModelResponseFunctionCall
+    type Token, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
@@ -96,10 +99,14 @@ export {
     type LlamaChatOptions,
     type LLamaChatGenerateResponseOptions,
     type LLamaChatContextShiftOptions,
-    type LLamaChatRepeatPenalty,
+    type LLamaContextualRepeatPenalty,
     type LlamaChatResponse,
     type LlamaChatResponseFunctionCall,
-    AbortError,
+    LlamaCompletion,
+    type LlamaCompletionOptions,
+    type LlamaCompletionGenerationOptions,
+    type LlamaInfillGenerationOptions,
+    UnsupportedError,
     DisposedError,
     ChatWrapper,
     type ChatWrapperSettings,
