@@ -39,7 +39,7 @@ class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
             }
         }
 
-        llama_backend_init(false);
+        llama_backend_init();
         model = llama_load_model_from_file(modelPath.c_str(), model_params);
 
         if (model == NULL) {
@@ -436,7 +436,7 @@ Napi::Value LLAMAContext::Eval(const Napi::CallbackInfo& info) {
 Napi::Value systemInfo(const Napi::CallbackInfo& info) { return Napi::String::From(info.Env(), llama_print_system_info()); }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
-  llama_backend_init(false);
+  llama_backend_init();
   exports.DefineProperties({
       Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
   });
