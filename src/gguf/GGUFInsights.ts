@@ -1,7 +1,7 @@
 import {Llama} from "../bindings/Llama.js";
 import MissingNodeLlamaError from "./errors/MissingNodeLlamaError.js";
-import NotEnoughVRAMError from "./errors/model-score/NotEnoughVRamError.js";
 import {GGUFMetadataResponse} from "./gguf-parser/GGUFParser.js";
+import NotEnoughVRamError from "./errors/ModelScore/NotEnoughVRamError.js";
 
 const PAD_AVAILABLE_VRAM = 1024 ** 2 * 500; // 500MB
 
@@ -68,7 +68,7 @@ export default class GGUFInsights {
     public modelScore(){
         const vramScore = this.VRAMUsage / this._availableVRam;
         if (vramScore >= 1){
-            throw new NotEnoughVRAMError(this.VRAMUsage, this._availableVRam);
+            throw new NotEnoughVRamError(this.VRAMUsage, this._availableVRam);
         }
 
         return vramScore;
