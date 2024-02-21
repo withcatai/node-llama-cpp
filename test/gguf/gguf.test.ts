@@ -6,7 +6,7 @@ import {getModelFile} from "../utils/modelFiles.js";
 import GGUFInsights from "../../src/gguf/GGUFInsights.js";
 import {getTestLlama} from "../utils/getTestLlama.js";
 import {LlamaModel} from "../../src/index.js";
-import GGUFMetadata from '../../src/gguf/GGUFMetadata.js';
+import GGUFMetadata from "../../src/gguf/GGUFMetadata.js";
 
 const remoteGGUFModel = "https://huggingface.co/TheBloke/Falcon-180B-Chat-GGUF/resolve/main/falcon-180b-chat.Q6_K.gguf-split-a?download=true";
 
@@ -64,7 +64,7 @@ describe("GGUF Parser", async () => {
 
         const usedRam = llama.getVramState().used;
 
-        expect(ggufInsights.VRAMUsage).toMatchInlineSnapshot(`4474643028.666667`);
+        expect(ggufInsights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");
         expect(usedRam).to.be.gte(3.5 * Math.pow(1024, 3));
         expect(usedRam).to.be.lte(4.5 * Math.pow(1024, 3));
     });
@@ -74,6 +74,6 @@ describe("GGUF Parser", async () => {
         await ggufMetadata.parse();
 
         expect(ggufMetadata.metadata).toMatchSnapshot();
-        expect(ggufMetadata.insights.VRAMUsage).toMatchInlineSnapshot(`4474643028.666667`);
+        expect(ggufMetadata.insights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");
     });
 });
