@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="node-llama-cpp Logo" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" width="360px" />
+    <img alt="node-llama-cpp Logo" src="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" width="360px" />
     <h1>node-llama-cpp</h1>
     <p>Run AI models locally on your machine</p>
     <sub>Pre-built bindings are provided with a fallback to building from source with cmake</sub>
@@ -84,7 +84,7 @@ To contribute to `node-llama-cpp` read the [contribution guide](https://withcata
 <br />
 
 <div align="center" width="360">
-    <img alt="Star please" src="https://media.githubusercontent.com/media/withcatai/node-llama-cpp/master/assets/star.please.roundEdges.png" width="360" margin="auto" />
+    <img alt="Star please" src="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/star.please.roundEdges.png" width="360" margin="auto" />
     <br/>
     <p align="right">
         <i>If you like this repo, star it ✨</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
