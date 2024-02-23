@@ -1,9 +1,9 @@
 import retry from "async-retry";
 import MetadataNotParsedYetError from "./errors/MetadataNotParsedYetError.js";
 import GGUFInsights, {GGUFInsightsOptions} from "./GGUFInsights.js";
-import GGUFParser, {GGUFMetadataResponse} from "./gguf-parser/GGUFParser.js";
-import GGUFFetchStream from "./gguf-parser/stream/GGUFFetchStream.js";
-import GGUFReadStream from "./gguf-parser/stream/GGUFReadStream.js";
+import GGUFParser, {GGUFMetadataResponse} from "./ggufParser/GGUFParser.js";
+import GGUFFetchStream from "./ggufParser/stream/GGUFFetchStream.js";
+import GGUFReadStream from "./ggufParser/stream/GGUFReadStream.js";
 
 export type GGUFMetadataOptions = {
     source?: "network" | "local";

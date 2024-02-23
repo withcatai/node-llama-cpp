@@ -1,7 +1,7 @@
 import {describe, expect, it} from "vitest";
-import GGUFReadStream from "../../src/gguf/gguf-parser/stream/GGUFReadStream.js";
-import GGUFParser from "../../src/gguf/gguf-parser/GGUFParser.js";
-import GGUFFetchStream from "../../src/gguf/gguf-parser/stream/GGUFFetchStream.js";
+import GGUFReadStream from "../../src/gguf/ggufParser/stream/GGUFReadStream.js";
+import GGUFParser from "../../src/gguf/ggufParser/GGUFParser.js";
+import GGUFFetchStream from "../../src/gguf/ggufParser/stream/GGUFFetchStream.js";
 import {getModelFile} from "../utils/modelFiles.js";
 import GGUFInsights from "../../src/gguf/GGUFInsights.js";
 import {getTestLlama} from "../utils/getTestLlama.js";

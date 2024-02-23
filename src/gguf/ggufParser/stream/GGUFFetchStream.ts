@@ -1,5 +1,6 @@
 import retry from "async-retry";
-import AwaitLock from "await-lock";
+import {withLock} from "lifecycle-utils";
+
 import GgufBaseStream, {ALLOCATION_SIZE} from "./GGUFBaseStream.js";
 
 type GGUFFetchStreamOptions = {
@@ -7,16 +8,13 @@ type GGUFFetchStreamOptions = {
 };
 
 export default class GGUFFetchStream extends GgufBaseStream {
-    private _lock = new ("default" in AwaitLock && AwaitLock || AwaitLock)();
 
     constructor(public readonly url: string, public readonly options: Partial<GGUFFetchStreamOptions> = {}) {
         super();
     }
 
     override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {
-        await this._lock.acquireAsync();
-
-        try {
+        return await withLock(this, "_lock", async function readNBytesWithoutLock(): Promise<Buffer> {
             if (offset + numBytes < this._buffer.length) {
                 return this._buffer.subarray(offset, offset + numBytes);
             }
@@ -26,10 +24,8 @@ export default class GGUFFetchStream extends GgufBaseStream {
             }, this.options.retry);
 
             this._addToBuffer(fetchMissingBytes);
-            return this.readNBytes(numBytes, offset);
-        } finally {
-            this._lock.release();
-        }
+            return await readNBytesWithoutLock.call(this);
+        });
     }
 
     private async _fetchBytesWithoutRetry(start: number, end: number) {
