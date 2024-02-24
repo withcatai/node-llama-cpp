@@ -29,7 +29,7 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkan
             std::any_of(
                 extensionProperties.begin(),
                 extensionProperties.end(),
-                [](const vk::ExtensionProperties& ext) { return std::string(ext.extensionName) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;}
+                [](const vk::ExtensionProperties& ext) { return std::string(ext.extensionName.data()) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;}
             );
 
         if (memoryBudgetExtensionSupported) {
