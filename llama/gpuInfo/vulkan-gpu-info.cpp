@@ -1,11 +1,12 @@
 #include <stddef.h>
+
 #include <vulkan/vulkan.hpp>
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
-    vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION);
+    vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
-    
+
     auto physicalDevices = instance.enumeratePhysicalDevices();
 
     size_t usedMem = 0;
@@ -16,11 +17,10 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
         vk::PhysicalDeviceMemoryProperties memProps = physicalDevice.getMemoryProperties();
 
         std::vector<vk::ExtensionProperties> extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
-        bool memoryBudgetExtensionSupported = std::any_of(
-            extensionProperties.begin(), 
-            extensionProperties.end(), 
-            [](const vk::ExtensionProperties& ext) { return std::string(ext.extensionName) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME; }
-        );
+        bool memoryBudgetExtensionSupported =
+            std::any_of(extensionProperties.begin(), extensionProperties.end(), [](const vk::ExtensionProperties& ext) {
+                return std::string(ext.extensionName) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+            });
 
         if (memoryBudgetExtensionSupported) {
             vk::PhysicalDeviceMemoryBudgetPropertiesEXT memoryBudgetProperties;
@@ -38,7 +38,8 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
             }
         } else {
             // VK_EXT_memory_budget extension is not supported, se we cannot determine used memory
-            std::cerr << "VK_EXT_memory_budget extension not supported" << std::endl;
+            fputs("VK_EXT_memory_budget extension not supported", stderr);
+            fflush(stderr);
             return false;
         }
     }

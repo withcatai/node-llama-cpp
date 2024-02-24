@@ -44,11 +44,18 @@ async function DebugVramFunction() {
 
     logComputeLayers(llama);
 
-    console.info(`${chalk.yellow("Used VRAM:")} ${Math.ceil((vramStatus.used / vramStatus.total) * 100 * 100) / 100}% ${chalk.grey("(" + bytes(vramStatus.used) + "/" + bytes(vramStatus.total) + ")")}`);
-    console.info(`${chalk.yellow("Free VRAM:")} ${Math.floor((vramStatus.free / vramStatus.total) * 100 * 100) / 100}% ${chalk.grey("(" + bytes(vramStatus.free) + "/" + bytes(vramStatus.total) + ")")}`);
+    const getPercentageString = (amount: number, total: number) => {
+        if (total === 0)
+            return "0";
+
+        return String(Math.floor((amount / total) * 100 * 100) / 100);
+    };
+
+    console.info(`${chalk.yellow("Used VRAM:")} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.grey("(" + bytes(vramStatus.used) + "/" + bytes(vramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Free VRAM:")} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.grey("(" + bytes(vramStatus.free) + "/" + bytes(vramStatus.total) + ")")}`);
     console.info();
-    console.info(`${chalk.yellow("Used RAM:")} ${Math.ceil((usedMemory / totalMemory) * 100 * 100) / 100}% ${chalk.grey("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
-    console.info(`${chalk.yellow("Free RAM:")} ${Math.floor((freeMemory / totalMemory) * 100 * 100) / 100}% ${chalk.grey("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.grey("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.grey("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);
 }
 
 async function DebugCmakeOptionsFunction() {
