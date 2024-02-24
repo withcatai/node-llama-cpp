@@ -41,6 +41,7 @@ export type LlamaOptions = {
 
     /**
      * Toggle Vulkan support on llama.cpp.
+     * Currently, Vulkan support is experimental. Use with caution.
      * Disabled by default.
      */
     vulkan?: boolean,
