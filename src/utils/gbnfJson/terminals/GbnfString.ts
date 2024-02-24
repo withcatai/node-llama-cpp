@@ -3,7 +3,7 @@ import {reservedRuleNames} from "./gbnfConsts.js";
 
 
 export class GbnfString extends GbnfTerminal {
-    getGrammar(): string {
+    public getGrammar(): string {
         return '"\\"" ( ' +
             '[^"\\\\]' +
             " | " +
@@ -11,7 +11,7 @@ export class GbnfString extends GbnfTerminal {
             ')* "\\""';
     }
 
-    override getRuleName(): string {
+    protected override getRuleName(): string {
         return reservedRuleNames.string;
     }
 }

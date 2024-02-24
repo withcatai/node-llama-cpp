@@ -4,7 +4,7 @@ import {LlamaGrammar} from "./LlamaGrammar.js";
 
 
 export type LlamaGrammarEvaluationStateOptions = {
-    grammar: LlamaGrammar,
+    grammar: LlamaGrammar
 };
 
 /**

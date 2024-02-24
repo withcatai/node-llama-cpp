@@ -866,8 +866,8 @@ async function compressHistoryToFitContextSize({
 }: {
     history: ChatHistoryItem[],
     contextShiftSize: number,
-    contextShiftStrategy: LLamaChatContextShiftOptions["strategy"]
-    contextShiftLastEvaluationMetadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"]
+    contextShiftStrategy: LLamaChatContextShiftOptions["strategy"],
+    contextShiftLastEvaluationMetadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"],
     contextSize: number,
     tokenizer: Tokenizer,
     chatWrapper: ChatWrapper,

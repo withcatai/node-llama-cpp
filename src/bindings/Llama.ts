@@ -39,7 +39,7 @@ export class Llama {
     private constructor({
         bindings, metal, cuda, vulkan, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
     }: {
-        bindings: BindingModule
+        bindings: BindingModule,
         metal: boolean,
         cuda: boolean,
         vulkan: boolean,
@@ -209,11 +209,11 @@ export class Llama {
     public static async _create({
         bindings, buildType, buildMetadata, logLevel, logger
     }: {
-        bindings: BindingModule
+        bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
-        logger: (level: LlamaLogLevel, message: string) => void,
+        logger: (level: LlamaLogLevel, message: string) => void
     }) {
         return new Llama({
             bindings,

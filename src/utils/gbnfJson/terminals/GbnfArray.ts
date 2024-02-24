@@ -14,7 +14,7 @@ export class GbnfArray extends GbnfTerminal {
         this.items = items;
     }
 
-    getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
+    public getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
         const whitespaceRuleName = new GbnfWhitespace().resolve(grammarGenerator);
         const itemsGrammarRuleName = this.items.resolve(grammarGenerator);
 

@@ -6,14 +6,14 @@ import {reservedRuleNames} from "./gbnfConsts.js";
 
 
 export class GbnfBoolean extends GbnfTerminal {
-    getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
+    public getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
         return new GbnfOr([
             new GbnfGrammar('"true"'),
             new GbnfGrammar('"false"')
         ]).getGrammar(grammarGenerator);
     }
 
-    override getRuleName(): string {
+    protected override getRuleName(): string {
         return reservedRuleNames.boolean;
     }
 }
