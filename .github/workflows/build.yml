@@ -1,7 +1,10 @@
 name: Build
 on:
   push:
-
+    branches:
+      - master
+      - beta
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -319,7 +322,7 @@ jobs:
 
   release:
     name: Release
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta')
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -387,7 +390,7 @@ jobs:
           npm run docs:build
       - name: Upload docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           name: pages-docs
           path: docs-site
