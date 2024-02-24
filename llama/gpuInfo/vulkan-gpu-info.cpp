@@ -1,6 +1,5 @@
 #include <stddef.h>
-#include <vulkan/vulkan>
-// #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.hpp>
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION);
