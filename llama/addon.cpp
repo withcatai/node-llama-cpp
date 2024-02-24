@@ -38,6 +38,7 @@ using AddonThreadSafeLogCallbackFunction =
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
 int addonLoggerLogLevel = 5;
+bool backendInitialized = false;
 
 std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token) {
     std::vector<char> result(8, 0);
@@ -969,7 +970,7 @@ void addonCallJsLogCallback(
             called = false;
         }
     }
-    
+
     if (!called && data != nullptr) {
         if (data->logLevelNumber == 2) {
             fputs(data->stringStream->str().c_str(), stderr);
@@ -1065,8 +1066,17 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+static void addonFreeLlamaBackend(Napi::Env env, int* data) {
+    if (backendInitialized) {
+        llama_backend_free();
+        backendInitialized = false;
+    }
+}
+
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     llama_backend_init();
+    backendInitialized = true;
+
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
@@ -1079,6 +1089,8 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonContext::init(exports);
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);
+
+    exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
 
     return exports;
 }
