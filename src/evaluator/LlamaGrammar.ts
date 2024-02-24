@@ -14,7 +14,7 @@ export type LlamaGrammarOptions = {
     grammar: string,
 
     /** print the grammar to stdout */
-    printGrammar?: boolean
+    printGrammar?: boolean,
 
     /** Consider any of these as EOS for the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
     stopGenerationTriggers?: readonly (StopGenerationTrigger | LlamaText)[],

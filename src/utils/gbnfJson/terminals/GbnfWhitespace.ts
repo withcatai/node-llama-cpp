@@ -10,14 +10,14 @@ export class GbnfWhitespace extends GbnfTerminal {
         this.newLinesAllowed = newLinesAllowed;
     }
 
-    getGrammar(): string {
+    public getGrammar(): string {
         if (this.newLinesAllowed)
             return "[\\n]? [ \\t]* [\\n]?";
 
         return "[ \\t]*";
     }
 
-    override getRuleName(): string {
+    protected override getRuleName(): string {
         if (this.newLinesAllowed)
             return reservedRuleNames.whitespace.withNewLines;
 

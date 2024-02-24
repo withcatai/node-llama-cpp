@@ -14,7 +14,7 @@ export abstract class GbnfTerminal {
         return ruleName;
     }
 
-    abstract getGrammar(grammarGenerator: GbnfGrammarGenerator): string;
+    public abstract getGrammar(grammarGenerator: GbnfGrammarGenerator): string;
 
     public resolve(grammarGenerator: GbnfGrammarGenerator): string {
         const ruleName = this.getRuleName(grammarGenerator);

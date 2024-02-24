@@ -9,7 +9,7 @@ export class GbnfVerbatimText extends GbnfTerminal {
         this.value = value;
     }
 
-    override getGrammar(): string {
+    public override getGrammar(): string {
         return [
             '"',
             this.value

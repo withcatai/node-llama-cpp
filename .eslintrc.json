@@ -42,6 +42,25 @@
             "semi": ["off"],
             "@typescript-eslint/semi": ["warn", "always"],
             "@typescript-eslint/no-inferrable-types": ["off"],
+            "@typescript-eslint/member-ordering": ["warn", {
+                "default": ["field", "constructor", "method", "signature"],
+                "typeLiterals": []
+            }],
+            "@typescript-eslint/parameter-properties": ["warn", {
+                "allow": []
+            }],
+            "@typescript-eslint/explicit-member-accessibility": ["warn"],
+            "@typescript-eslint/member-delimiter-style": ["warn", {
+                "multiline": {
+                    "delimiter": "comma",
+                    "requireLast": false
+                },
+                "singleline": {
+                    "delimiter": "comma",
+                    "requireLast": false
+                },
+                "multilineDetection": "brackets"
+            }],
             "jsdoc/require-param": ["off"],
             "jsdoc/check-param-names": ["warn", {
                 "checkDestructured": false

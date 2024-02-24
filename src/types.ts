@@ -2,12 +2,12 @@ import {GbnfJsonSchema, GbnfJsonSchemaToType} from "./utils/gbnfJson/types.js";
 import {BuiltinSpecialTokenValue} from "./utils/LlamaText.js";
 
 export type Token = number & {
-    __token: never;
+    __token: never
 };
 
 export type Tokenizer = {
-    tokenize(text: string, specialTokens?: boolean): Token[];
-    tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
+    tokenize(text: string, specialTokens?: boolean): Token[],
+    tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[]
 }["tokenize"];
 
 
