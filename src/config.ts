@@ -51,6 +51,9 @@ export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
 export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
     .default("false")
     .asBool();
+export const defaultLlamaCppVulkanSupport = env.get("NODE_LLAMA_CPP_VULKAN")
+    .default("false")
+    .asBool();
 export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
     .default(LlamaLogLevel.debug)
     .asEnum(LlamaLogLevelValues);

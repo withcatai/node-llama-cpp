@@ -5,6 +5,7 @@ import chalk from "chalk";
 import {getLlama} from "../../bindings/getLlama.js";
 import {Llama} from "../../bindings/Llama.js";
 import {prettyPrintObject} from "../../utils/prettyPrintObject.js";
+import {logEnabledComputeLayers} from "../utils/logEnabledComputeLayers.js";
 
 const debugFunctions = ["vram", "cmakeOptions"] as const;
 type DebugCommand = {
@@ -59,17 +60,13 @@ async function DebugCmakeOptionsFunction() {
 }
 
 function logComputeLayers(llama: Llama) {
-    let hasEnabledLayers = false;
+    logEnabledComputeLayers({
+        metal: llama.metal,
+        cuda: llama.cuda,
+        vulkan: llama.vulkan
+    });
 
-    if (llama.metal) {
-        console.info(`${chalk.yellow("Metal:")} enabled`);
-        hasEnabledLayers = true;
-    }
-
-    if (llama.cuda) {
-        console.info(`${chalk.yellow("Metal:")} enabled`);
-        hasEnabledLayers = true;
-    }
+    const hasEnabledLayers = llama.metal || llama.cuda || llama.vulkan;
 
     if (hasEnabledLayers)
         console.info();

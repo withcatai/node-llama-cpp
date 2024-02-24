@@ -5,7 +5,8 @@ import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
 import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppMetalSupport, isCI
+    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppMetalSupport, defaultLlamaCppCudaSupport,
+    defaultLlamaCppVulkanSupport, isCI
 } from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
@@ -15,12 +16,14 @@ import {getPlatform} from "../../bindings/utils/getPlatform.js";
 import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
 import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../../bindings/utils/cloneLlamaCppRepo.js";
 import {BuildOptions} from "../../bindings/types.js";
+import {logEnabledComputeLayers} from "../utils/logEnabledComputeLayers.js";
 
 type BuildCommand = {
     arch?: string,
     nodeTarget?: string,
     metal?: boolean,
     cuda?: boolean,
+    vulkan?: boolean,
     noUsageExample?: boolean,
 
     /** @internal */
@@ -54,6 +57,11 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 default: defaultLlamaCppCudaSupport,
                 description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
             })
+            .option("vulkan", {
+                type: "boolean",
+                default: defaultLlamaCppVulkanSupport,
+                description: "Compile llama.cpp with Vulkan support. Can also be set via the NODE_LLAMA_CPP_VULKAN environment variable"
+            })
             .option("noUsageExample", {
                 alias: "nu",
                 type: "boolean",
@@ -75,6 +83,7 @@ export async function BuildLlamaCppCommand({
     nodeTarget = undefined,
     metal = defaultLlamaCppMetalSupport,
     cuda = defaultLlamaCppCudaSupport,
+    vulkan = defaultLlamaCppVulkanSupport,
     noUsageExample = false,
     noCustomCmakeBuildOptionsInBinaryFolderName = false
 }: BuildCommand) {
@@ -90,13 +99,7 @@ export async function BuildLlamaCppCommand({
     const platform = getPlatform();
     const customCmakeOptions = resolveCustomCmakeOptions();
 
-    if (metal && process.platform === "darwin") {
-        console.log(`${chalk.yellow("Metal:")} enabled`);
-    }
-
-    if (cuda) {
-        console.log(`${chalk.yellow("CUDA:")} enabled`);
-    }
+    logEnabledComputeLayers({metal, cuda, vulkan}, {platform});
 
     await downloadCmakeIfNeeded(true);
 
@@ -109,7 +112,8 @@ export async function BuildLlamaCppCommand({
             : process.arch,
         computeLayers: {
             metal,
-            cuda
+            cuda,
+            vulkan
         },
         llamaCpp: {
             repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,

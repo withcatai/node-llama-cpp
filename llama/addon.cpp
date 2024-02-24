@@ -12,6 +12,9 @@
 #ifdef GPU_INFO_USE_CUBLAS
 #  include "gpuInfo/cuda-gpu-info.h"
 #endif
+#ifdef GPU_INFO_USE_VULKAN
+#  include "gpuInfo/vulkan-gpu-info.h"
+#endif
 #ifdef GPU_INFO_USE_METAL
 #  include "gpuInfo/metal-gpu-info.h"
 #endif
@@ -68,6 +71,17 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     if (cudeGetInfoSuccess) {
         total += cudaDeviceTotal;
         used += cudaDeviceUsed;
+    }
+#endif
+
+#ifdef GPU_INFO_USE_VULKAN
+    uint64_t vulkanDeviceTotal = 0;
+    uint64_t vulkanDeviceUsed = 0;
+    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed);
+
+    if (vulkanDeviceSupportsMemoryBudgetExtension) {
+        total += vulkanDeviceTotal;
+        used += vulkanDeviceUsed;
     }
 #endif
 

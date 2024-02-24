@@ -4,7 +4,7 @@ import console from "console";
 import {createRequire} from "module";
 import {
     builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppDebugLogs, defaultLlamaCppGitHubRepo,
-    defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultSkipDownload, llamaLocalBuildBinsDirectory
+    defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultLlamaCppVulkanSupport, defaultSkipDownload, llamaLocalBuildBinsDirectory
 } from "../config.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
@@ -38,6 +38,12 @@ export type LlamaOptions = {
      * Disabled by default.
      */
     cuda?: boolean,
+
+    /**
+     * Toggle Vulkan support on llama.cpp.
+     * Disabled by default.
+     */
+    vulkan?: boolean,
 
     /**
      * Set the minimum log level for llama.cpp.
@@ -184,6 +190,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
 export async function getLlamaForOptions({
     metal = defaultLlamaCppMetalSupport,
     cuda = defaultLlamaCppCudaSupport,
+    vulkan = defaultLlamaCppVulkanSupport,
     logLevel = defaultLlamaCppDebugLogs,
     logger = Llama.defaultConsoleLogger,
     build = "auto",
@@ -220,7 +227,8 @@ export async function getLlamaForOptions({
         arch,
         computeLayers: {
             metal,
-            cuda
+            cuda,
+            vulkan
         },
         llamaCpp: {
             repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
@@ -355,6 +363,9 @@ function describeBinary(binaryOptions: BuildOptions) {
 
     if (binaryOptions.computeLayers.cuda)
         additions.push("with CUDA support");
+
+    if (binaryOptions.computeLayers.vulkan)
+        additions.push("with Vulkan support");
 
     if (binaryOptions.customCmakeOptions.size > 0)
         additions.push("with custom build options");
