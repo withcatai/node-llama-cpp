@@ -54,8 +54,13 @@ std::string addon_model_token_to_piece(const struct llama_model* model, llama_to
 }
 
 #ifdef GPU_INFO_USE_CUBLAS
-void lodCudaError(const char* message) {
+void logCudaError(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
+}
+#endif
+#ifdef GPU_INFO_USE_VULKAN
+void logVulkanWarning(const char* message) {
+    addonLlamaCppLogCallback(GGML_LOG_LEVEL_WARN, (std::string("Vulkan warning: ") + std::string(message)).c_str(), nullptr);
 }
 #endif
 
@@ -66,7 +71,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_CUBLAS
     size_t cudaDeviceTotal = 0;
     size_t cudaDeviceUsed = 0;
-    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, lodCudaError);
+    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, logCudaError);
 
     if (cudeGetInfoSuccess) {
         total += cudaDeviceTotal;
@@ -77,7 +82,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_VULKAN
     uint64_t vulkanDeviceTotal = 0;
     uint64_t vulkanDeviceUsed = 0;
-    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed);
+    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, logVulkanWarning);
 
     if (vulkanDeviceSupportsMemoryBudgetExtension) {
         total += vulkanDeviceTotal;

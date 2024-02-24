@@ -2,7 +2,9 @@
 
 #include <vulkan/vulkan.hpp>
 
-bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
+typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
+
+bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
@@ -24,9 +26,11 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
 
         std::vector<vk::ExtensionProperties> extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
         bool memoryBudgetExtensionSupported =
-            std::any_of(extensionProperties.begin(), extensionProperties.end(), [](const vk::ExtensionProperties& ext) {
-                return std::string(ext.extensionName) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
-            });
+            std::any_of(
+                extensionProperties.begin(),
+                extensionProperties.end(),
+                [](const vk::ExtensionProperties& ext) { return std::string(ext.extensionName) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;}
+            );
 
         if (memoryBudgetExtensionSupported) {
             vk::PhysicalDeviceMemoryBudgetPropertiesEXT memoryBudgetProperties;
@@ -44,8 +48,13 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
             }
         } else {
             // VK_EXT_memory_budget extension is not supported, so we cannot determine used memory
-            fputs("VK_EXT_memory_budget extension not supported", stderr);
-            fflush(stderr);
+            warningLogCallback(
+                (
+                    "Vulkan VK_EXT_memory_budget extension not supported for device \"" +
+                    std::string(deviceProps.deviceName.data()) + "\", so VRAM info cannot be determained for it"
+                )
+                    .c_str()
+            );
             return false;
         }
     }
