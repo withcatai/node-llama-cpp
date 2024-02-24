@@ -82,6 +82,7 @@
     "gguf",
     "metal",
     "cuda",
+    "vulkan",
     "grammar",
     "json-grammar",
     "json-schema-grammar",

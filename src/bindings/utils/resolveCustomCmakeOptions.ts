@@ -8,6 +8,7 @@ export function resolveCustomCmakeOptions(customCmakeOptions?: Record<string, st
 
     if (process.env.LLAMA_METAL === "1") newCustomCmakeOptions.set("LLAMA_METAL", "1");
     if (process.env.LLAMA_CUBLAS === "1") newCustomCmakeOptions.set("LLAMA_CUBLAS", "1");
+    if (process.env.LLAMA_VULKAN === "1") newCustomCmakeOptions.set("LLAMA_VULKAN", "1");
 
     if (process.env.LLAMA_MPI === "1") newCustomCmakeOptions.set("LLAMA_MPI", "1");
     if (process.env.LLAMA_OPENBLAS === "1") newCustomCmakeOptions.set("LLAMA_OPENBLAS", "1");

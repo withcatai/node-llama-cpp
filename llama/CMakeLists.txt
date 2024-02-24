@@ -58,6 +58,26 @@ if (LLAMA_CUBLAS)
     endif()
 endif()
 
+if (LLAMA_VULKAN OR LLAMA_KOMPUTE)
+    find_package(Vulkan)
+    if (Vulkan_FOUND)
+        if (LLAMA_VULKAN)
+            message(STATUS "Using Vulkan for GPU info")
+        elseif (LLAMA_KOMPUTE)
+            message(STATUS "Using Vulkan for GPU info because Kompute is enabled")
+        endif()
+
+        set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS} gpuInfo/vulkan-gpu-info.h)
+        set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/vulkan-gpu-info.cpp)
+
+        add_compile_definitions(GPU_INFO_USE_VULKAN)
+
+        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} Vulkan::Vulkan)
+    else()
+        message(WARNING "Vulkan not found. Not using it for GPU info")
+    endif()
+endif()
+
 if (LLAMA_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
 

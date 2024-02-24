@@ -15,9 +15,9 @@
 #endif
 
 
-typedef void (*gpuInfoErrorLogCallback_t)(const char* message);
+typedef void (*gpuInfoCudaErrorLogCallback_t)(const char* message);
 
-bool gpuInfoSetCudaDevice(const int device, gpuInfoErrorLogCallback_t errorLogCallback) {
+bool gpuInfoSetCudaDevice(const int device, gpuInfoCudaErrorLogCallback_t errorLogCallback) {
     int current_device;
     auto getDeviceResult = cudaGetDevice(&current_device);
 
@@ -40,7 +40,7 @@ bool gpuInfoSetCudaDevice(const int device, gpuInfoErrorLogCallback_t errorLogCa
     return true;
 }
 
-bool gpuInfoGetCudaDeviceInfo(int device, size_t * total, size_t * used, gpuInfoErrorLogCallback_t errorLogCallback) {
+bool gpuInfoGetCudaDeviceInfo(int device, size_t * total, size_t * used, gpuInfoCudaErrorLogCallback_t errorLogCallback) {
     gpuInfoSetCudaDevice(device, errorLogCallback);
 
     size_t freeMem;
@@ -58,7 +58,7 @@ bool gpuInfoGetCudaDeviceInfo(int device, size_t * total, size_t * used, gpuInfo
     return true;
 }
 
-int gpuInfoGetCudaDeviceCount(gpuInfoErrorLogCallback_t errorLogCallback) {
+int gpuInfoGetCudaDeviceCount(gpuInfoCudaErrorLogCallback_t errorLogCallback) {
     int deviceCount;
     auto getDeviceCountResult = cudaGetDeviceCount(&deviceCount);
 
@@ -70,7 +70,7 @@ int gpuInfoGetCudaDeviceCount(gpuInfoErrorLogCallback_t errorLogCallback) {
     return deviceCount;
 }
 
-bool gpuInfoGetTotalCudaDevicesInfo(size_t * total, size_t * used, gpuInfoErrorLogCallback_t errorLogCallback) {
+bool gpuInfoGetTotalCudaDevicesInfo(size_t * total, size_t * used, gpuInfoCudaErrorLogCallback_t errorLogCallback) {
     int deviceCount = gpuInfoGetCudaDeviceCount(errorLogCallback);
 
     if (deviceCount < 0) {

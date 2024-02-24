@@ -7,8 +7,8 @@ and parse its response to know whether it finished answering, or should we tell 
 For example, to prompt a model with "Where do llamas come from?" we can give the model a text like this to predict the completion of:
 ```txt
 You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct.
-If you don't know the answer to a question, please don't share false information.
+If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly.
+If you don't know the answer to a question, don't share false information.
 
 ### Human
 Where do llamas come from?

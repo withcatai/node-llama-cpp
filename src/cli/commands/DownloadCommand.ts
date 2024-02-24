@@ -3,8 +3,8 @@ import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, isCI, llamaCppDirectory,
-    llamaCppDirectoryInfoFilePath
+    defaultLlamaCppCudaSupport, defaultLlamaCppVulkanSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport,
+    defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath
 } from "../../config.js";
 import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -20,6 +20,7 @@ import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmake
 import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
 import {resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
 import {BuildOptions} from "../../bindings/types.js";
+import {logEnabledComputeLayers} from "../utils/logEnabledComputeLayers.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -28,6 +29,7 @@ type DownloadCommandArgs = {
     nodeTarget?: string,
     metal?: boolean,
     cuda?: boolean,
+    vulkan?: boolean,
     skipBuild?: boolean,
     noBundle?: boolean,
     noUsageExample?: boolean,
@@ -74,6 +76,11 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 default: defaultLlamaCppCudaSupport,
                 description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
             })
+            .option("vulkan", {
+                type: "boolean",
+                default: defaultLlamaCppVulkanSupport,
+                description: "Compile llama.cpp with Vulkan support. Can also be set via the NODE_LLAMA_CPP_VULKAN environment variable"
+            })
             .option("skipBuild", {
                 alias: "sb",
                 type: "boolean",
@@ -110,6 +117,7 @@ export async function DownloadLlamaCppCommand({
     nodeTarget = undefined,
     metal = defaultLlamaCppMetalSupport,
     cuda = defaultLlamaCppCudaSupport,
+    vulkan = defaultLlamaCppVulkanSupport,
     skipBuild = false,
     noBundle = false,
     noUsageExample = false,
@@ -123,13 +131,7 @@ export async function DownloadLlamaCppCommand({
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
     if (!skipBuild) {
-        if (metal && platform === "mac") {
-            console.log(`${chalk.yellow("Metal:")} enabled`);
-        }
-
-        if (cuda) {
-            console.log(`${chalk.yellow("CUDA:")} enabled`);
-        }
+        logEnabledComputeLayers({metal, cuda, vulkan}, {platform});
     }
     console.log();
 
@@ -169,7 +171,8 @@ export async function DownloadLlamaCppCommand({
             : process.arch,
         computeLayers: {
             metal,
-            cuda
+            cuda,
+            vulkan
         },
         llamaCpp: {
             repo,
