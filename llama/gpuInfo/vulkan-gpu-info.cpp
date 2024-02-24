@@ -15,6 +15,12 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
     for (size_t i = 0; i < physicalDevices.size(); i++) {
         vk::PhysicalDevice physicalDevice = physicalDevices[i];
         vk::PhysicalDeviceMemoryProperties memProps = physicalDevice.getMemoryProperties();
+        vk::PhysicalDeviceProperties deviceProps = physicalDevice.getProperties();
+
+        if (deviceProps.deviceType == vk::PhysicalDeviceType::eCpu) {
+            // ignore CPU devices, as we don't want to count RAM from the CPU as VRAM
+            continue;
+        }
 
         std::vector<vk::ExtensionProperties> extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
         bool memoryBudgetExtensionSupported =
@@ -37,7 +43,7 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used) {
                 }
             }
         } else {
-            // VK_EXT_memory_budget extension is not supported, se we cannot determine used memory
+            // VK_EXT_memory_budget extension is not supported, so we cannot determine used memory
             fputs("VK_EXT_memory_budget extension not supported", stderr);
             fflush(stderr);
             return false;
