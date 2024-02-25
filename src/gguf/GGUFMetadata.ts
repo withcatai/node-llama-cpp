@@ -14,6 +14,8 @@ export type GGUFMetadataOptions = {
 
 export default class GGUFMetadata {
     protected _metadata?: GGUFMetadataResponse;
+    public readonly path: string;
+    public readonly options: Partial<GGUFMetadataOptions> = {};
 
     public get metadata() {
         if (!this._metadata) {
@@ -26,7 +28,9 @@ export default class GGUFMetadata {
         return new GGUFInsights(this.metadata, this.options.insights);
     }
 
-    public constructor(public readonly path: string, public readonly options: Partial<GGUFMetadataOptions> = {}) {
+    public constructor(path: string, options: Partial<GGUFMetadataOptions> = {}) {
+        this.options = options;
+        this.path = path;
     }
 
     public async parse() {

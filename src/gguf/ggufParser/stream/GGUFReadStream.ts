@@ -14,9 +14,11 @@ const DEFAULT_OPTIONS: GGUFReadStreamOptions = {
 
 export default class GGUFReadStream extends GgufBaseStream {
     public readonly options: GGUFReadStreamOptions;
+    public readonly path: string;
 
-    public constructor(public readonly path: string, options: Partial<GGUFReadStreamOptions> = {}) {
+    public constructor(path: string, options: Partial<GGUFReadStreamOptions> = {}) {
         super();
+        this.path = path;
         this.options = {...DEFAULT_OPTIONS, ...options};
     }
 

@@ -12,6 +12,9 @@ export type GGUFInsightsOptions = {
 };
 
 export default class GGUFInsights {
+    public readonly metadataResponse: GGUFMetadataResponse;
+    public readonly options: GGUFInsightsOptions = {};
+
     public get metadata() {
         return this.metadataResponse.metadata;
     }
@@ -57,7 +60,10 @@ export default class GGUFInsights {
         }
         return this.options.nodeLlama.getVramState().total - PAD_AVAILABLE_VRAM;
     }
-    public constructor(public readonly metadataResponse: GGUFMetadataResponse, public readonly options: GGUFInsightsOptions = {}) {
+
+    public constructor(metadataResponse: GGUFMetadataResponse, options: GGUFInsightsOptions = {}) {
+        this.options = options;
+        this.metadataResponse = metadataResponse;
 
     }
 

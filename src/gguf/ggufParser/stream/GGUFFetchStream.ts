@@ -8,9 +8,13 @@ type GGUFFetchStreamOptions = {
 };
 
 export default class GGUFFetchStream extends GgufBaseStream {
+    public readonly url: string;
+    public readonly options: Partial<GGUFFetchStreamOptions> = {};
 
-    public constructor(public readonly url: string, public readonly options: Partial<GGUFFetchStreamOptions> = {}) {
+    public constructor(url: string, options: Partial<GGUFFetchStreamOptions> = {}) {
         super();
+        this.options = options;
+        this.url = url;
     }
 
     public override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {

@@ -28,7 +28,13 @@ export type GGUFMetadataResponse = {
 };
 
 export default class GGUFParser {
-    constructor(protected readonly _stream: GGUFBaseStream, public ignoreKeys = DEFAULT_IGNORE_METADATA_KEYS) {
+    protected readonly _stream: GGUFBaseStream;
+
+    public ignoreKeys = DEFAULT_IGNORE_METADATA_KEYS;
+
+    public constructor(_stream: GGUFBaseStream, ignoreKeys = DEFAULT_IGNORE_METADATA_KEYS) {
+        this.ignoreKeys = ignoreKeys;
+        this._stream = _stream;
     }
 
     private async _readMetadataValue(type: keyof typeof METADATA_VALUE_TO_METHOD | 8 | 9, offset: number): Promise<{
@@ -114,7 +120,7 @@ export default class GGUFParser {
         };
     }
 
-    async parseMetadata(): Promise<GGUFMetadataResponse> {
+    public async parseMetadata(): Promise<GGUFMetadataResponse> {
         const metadataRaw = await this._parseMetadataRaw();
         const metadata: { [key: string]: any } = {};
 
