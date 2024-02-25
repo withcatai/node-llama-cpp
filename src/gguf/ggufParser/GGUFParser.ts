@@ -20,7 +20,7 @@ const METADATA_ARRAY = 9;
 
 const GGUF_MAGIC = "GGUF";
 
-const DEFAULT_IGNORE_METADATA_KEYS = ["tokenizer.ggml.tokens", "tokenizer.ggml.scores", "tokenizer.ggml.token_type"];
+const DEFAULT_IGNORE_METADATA_KEYS = ["tokenizer.ggml.tokens", "tokenizer.ggml.scores", "tokenizer.ggml.token_type", "tokenizer.ggml.merges"];
 
 export type GGUFMetadataResponse = {
     metadataSize: number,
