@@ -9,11 +9,11 @@ type GGUFFetchStreamOptions = {
 
 export default class GGUFFetchStream extends GgufBaseStream {
 
-    constructor(public readonly url: string, public readonly options: Partial<GGUFFetchStreamOptions> = {}) {
+    public constructor(public readonly url: string, public readonly options: Partial<GGUFFetchStreamOptions> = {}) {
         super();
     }
 
-    override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {
+    public override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {
         return await withLock(this, "_lock", async function readNBytesWithoutLock(): Promise<Buffer> {
             if (offset + numBytes < this._buffer.length) {
                 return this._buffer.subarray(offset, offset + numBytes);

@@ -6,9 +6,9 @@ import NotEnoughVRamError from "./errors/ModelScore/NotEnoughVRamError.js";
 const PAD_AVAILABLE_VRAM = 1024 ** 2 * 500; // 500MB
 
 export type GGUFInsightsOptions = {
-    contextCount?: number;
-    nodeLlama?: Llama;
-    modelSize?: number;
+    contextCount?: number,
+    nodeLlama?: Llama,
+    modelSize?: number
 };
 
 export default class GGUFInsights {
@@ -57,7 +57,7 @@ export default class GGUFInsights {
         }
         return this.options.nodeLlama.getVramState().total - PAD_AVAILABLE_VRAM;
     }
-    constructor(public readonly metadataResponse: GGUFMetadataResponse, public readonly options: GGUFInsightsOptions = {}) {
+    public constructor(public readonly metadataResponse: GGUFMetadataResponse, public readonly options: GGUFInsightsOptions = {}) {
 
     }
 

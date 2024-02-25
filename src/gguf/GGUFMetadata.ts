@@ -6,30 +6,30 @@ import GGUFFetchStream from "./ggufParser/stream/GGUFFetchStream.js";
 import GGUFReadStream from "./ggufParser/stream/GGUFReadStream.js";
 
 export type GGUFMetadataOptions = {
-    source?: "network" | "local";
-    retry?: retry.Options
-    ignoreKeys?: string[];
+    source?: "network" | "local",
+    retry?: retry.Options,
+    ignoreKeys?: string[],
     insights?: GGUFInsightsOptions
 };
 
 export default class GGUFMetadata {
     protected _metadata?: GGUFMetadataResponse;
 
-    get metadata() {
+    public get metadata() {
         if (!this._metadata) {
             throw new MetadataNotParsedYetError(this.path);
         }
         return this._metadata;
     }
 
-    get insights(){
+    public get insights(){
         return new GGUFInsights(this.metadata, this.options.insights);
     }
 
-    constructor(public readonly path: string, public readonly options: Partial<GGUFMetadataOptions> = {}) {
+    public constructor(public readonly path: string, public readonly options: Partial<GGUFMetadataOptions> = {}) {
     }
 
-    async parse() {
+    public async parse() {
         const stream = this._createStream();
         const parser = new GGUFParser(stream, this.options.ignoreKeys);
         return this._metadata = await parser.parseMetadata();

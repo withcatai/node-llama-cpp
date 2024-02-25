@@ -4,8 +4,8 @@ import {withLock} from "lifecycle-utils";
 import GgufBaseStream, {ALLOCATION_SIZE} from "./GGUFBaseStream.js";
 
 type GGUFReadStreamOptions = {
-    retry?: retry.Options
-    mode: string;
+    retry?: retry.Options,
+    mode: string
 };
 
 const DEFAULT_OPTIONS: GGUFReadStreamOptions = {
@@ -15,12 +15,12 @@ const DEFAULT_OPTIONS: GGUFReadStreamOptions = {
 export default class GGUFReadStream extends GgufBaseStream {
     public readonly options: GGUFReadStreamOptions;
 
-    constructor(public readonly path: string, options: Partial<GGUFReadStreamOptions> = {}) {
+    public constructor(public readonly path: string, options: Partial<GGUFReadStreamOptions> = {}) {
         super();
         this.options = {...DEFAULT_OPTIONS, ...options};
     }
 
-    override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {
+    public override async readNBytes(numBytes: number, offset = 0): Promise<Buffer> {
         return await withLock(this, "_lock", async function readNBytesWithoutLock(): Promise<Buffer> {
             if (offset + numBytes < this._buffer.length) {
                 return this._buffer.subarray(offset, offset + numBytes);
