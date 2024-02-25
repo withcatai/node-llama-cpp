@@ -7,7 +7,7 @@ export default async function withOra<T>(
     message: string | {
         loading: string,
         success?: string,
-        fail?: string,
+        fail?: string
     },
     callback: () => Promise<T>
 ): Promise<T> {

@@ -8,7 +8,8 @@ export type BuildOptions = {
     arch: typeof process.arch,
     computeLayers: {
         metal: boolean,
-        cuda: boolean
+        cuda: boolean,
+        vulkan: boolean
     },
     llamaCpp: {
         repo: string,

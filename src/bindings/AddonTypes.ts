@@ -17,12 +17,12 @@ export type BindingModule = {
             batchSize?: number,
             logitsAll?: boolean,
             embedding?: boolean,
-            threads?: number,
-        }): AddonContext,
+            threads?: number
+        }): AddonContext
     },
     AddonGrammar: {
         new (grammarPath: string, params?: {
-            printGrammar?: boolean,
+            printGrammar?: boolean
         }): AddonGrammar
     },
     AddonGrammarEvaluationState: {
@@ -60,7 +60,7 @@ export type AddonModel = {
 
 export type AddonContext = {
     dispose(): void,
-    getContextSize(): number
+    getContextSize(): number,
     initBatch(size: number): void, // size must be less or equal to batchSize
     addToBatch(
         sequenceId: number,

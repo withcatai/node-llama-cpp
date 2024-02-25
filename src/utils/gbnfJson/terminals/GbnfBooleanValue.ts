@@ -9,7 +9,7 @@ export class GbnfBooleanValue extends GbnfTerminal {
         this.value = value;
     }
 
-    getGrammar(): string {
+    public getGrammar(): string {
         if (this.value)
             return '"true"';
 

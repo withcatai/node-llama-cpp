@@ -64,6 +64,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
             if (buildOptions.computeLayers.cuda && !cmakeCustomOptions.has("LLAMA_CUBLAS"))
                 cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
 
+            if (buildOptions.computeLayers.vulkan && !cmakeCustomOptions.has("LLAMA_VULKAN"))
+                cmakeCustomOptions.set("LLAMA_VULKAN", "1");
+
             if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                 cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 

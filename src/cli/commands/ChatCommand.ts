@@ -5,28 +5,20 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
-import {LlamaChatWrapper} from "../../chatWrappers/LlamaChatWrapper.js";
-import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
-import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
-import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
-import {ChatWrapper} from "../../ChatWrapper.js";
-import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
-import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
-import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.js";
 import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
-import {ModelTypeDescription} from "../../bindings/AddonTypes.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
 import {LlamaModel} from "../../evaluator/LlamaModel.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
-
-const modelWrappers = ["auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"] as const;
+import {
+    resolveChatWrapperBasedOnWrapperTypeName, chatWrapperTypeNames, ChatWrapperTypeName
+} from "../../bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
 
 type ChatCommand = {
     model: string,
@@ -35,7 +27,7 @@ type ChatCommand = {
     systemPromptFile?: string,
     prompt?: string,
     promptFile?: string,
-    wrapper: (typeof modelWrappers)[number],
+    wrapper: ChatWrapperTypeName,
     contextSize: number,
     batchSize?: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
@@ -108,7 +100,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "w",
                 type: "string",
                 default: "auto" as ChatCommand["wrapper"],
-                choices: modelWrappers,
+                choices: chatWrapperTypeNames,
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
             })
@@ -343,7 +335,7 @@ async function RunChat({
             : undefined;
     const bos = model.tokens.bosString; // bos = beginning of sequence
     const eos = model.tokens.bosString; // eos = end of sequence
-    const chatWrapper = getChatWrapper(wrapper, {
+    const chatWrapper = resolveChatWrapperBasedOnWrapperTypeName(wrapper, {
         bosString: bos,
         filename: model.filename,
         typeDescription: model.typeDescription
@@ -477,46 +469,3 @@ const defaultEnvironmentFunctions = {
         }
     })
 };
-
-function getChatWrapper(wrapper: ChatCommand["wrapper"], {
-    bosString,
-    filename,
-    typeDescription
-}: {
-    bosString?: string | null,
-    filename?: string,
-    typeDescription?: ModelTypeDescription
-}): ChatWrapper {
-    switch (wrapper) {
-        case "general":
-            return new GeneralChatWrapper();
-        case "llamaChat":
-            return new LlamaChatWrapper();
-        case "alpacaChat":
-            return new AlpacaChatWrapper();
-        case "functionary":
-            return new FunctionaryChatWrapper();
-        case "chatML":
-            return new ChatMLChatWrapper();
-        case "falconChat":
-            return new FalconChatWrapper();
-        default:
-    }
-
-    if (wrapper === "auto") {
-        const chatWrapper = resolveChatWrapperBasedOnModel({
-            bosString,
-            filename,
-            typeDescription
-        });
-
-        if (chatWrapper != null)
-            return new chatWrapper();
-
-        return new GeneralChatWrapper();
-    }
-
-    void (wrapper satisfies never);
-
-    throw new Error("Unknown wrapper: " + wrapper);
-}

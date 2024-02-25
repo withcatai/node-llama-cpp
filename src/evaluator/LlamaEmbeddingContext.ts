@@ -18,7 +18,7 @@ export type LlamaEmbeddingContextOptions = {
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware
      */
-    threads?: number,
+    threads?: number
 };
 
 export class LlamaEmbeddingContext {

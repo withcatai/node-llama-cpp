@@ -12,6 +12,9 @@
 #ifdef GPU_INFO_USE_CUBLAS
 #  include "gpuInfo/cuda-gpu-info.h"
 #endif
+#ifdef GPU_INFO_USE_VULKAN
+#  include "gpuInfo/vulkan-gpu-info.h"
+#endif
 #ifdef GPU_INFO_USE_METAL
 #  include "gpuInfo/metal-gpu-info.h"
 #endif
@@ -35,6 +38,7 @@ using AddonThreadSafeLogCallbackFunction =
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
 int addonLoggerLogLevel = 5;
+bool backendInitialized = false;
 
 std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token) {
     std::vector<char> result(8, 0);
@@ -51,8 +55,13 @@ std::string addon_model_token_to_piece(const struct llama_model* model, llama_to
 }
 
 #ifdef GPU_INFO_USE_CUBLAS
-void lodCudaError(const char* message) {
+void logCudaError(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
+}
+#endif
+#ifdef GPU_INFO_USE_VULKAN
+void logVulkanWarning(const char* message) {
+    addonLlamaCppLogCallback(GGML_LOG_LEVEL_WARN, (std::string("Vulkan warning: ") + std::string(message)).c_str(), nullptr);
 }
 #endif
 
@@ -63,11 +72,22 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_CUBLAS
     size_t cudaDeviceTotal = 0;
     size_t cudaDeviceUsed = 0;
-    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, lodCudaError);
+    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, logCudaError);
 
     if (cudeGetInfoSuccess) {
         total += cudaDeviceTotal;
         used += cudaDeviceUsed;
+    }
+#endif
+
+#ifdef GPU_INFO_USE_VULKAN
+    uint64_t vulkanDeviceTotal = 0;
+    uint64_t vulkanDeviceUsed = 0;
+    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, logVulkanWarning);
+
+    if (vulkanDeviceSupportsMemoryBudgetExtension) {
+        total += vulkanDeviceTotal;
+        used += vulkanDeviceUsed;
     }
 #endif
 
@@ -950,7 +970,7 @@ void addonCallJsLogCallback(
             called = false;
         }
     }
-    
+
     if (!called && data != nullptr) {
         if (data->logLevelNumber == 2) {
             fputs(data->stringStream->str().c_str(), stderr);
@@ -1046,8 +1066,17 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+static void addonFreeLlamaBackend(Napi::Env env, int* data) {
+    if (backendInitialized) {
+        llama_backend_free();
+        backendInitialized = false;
+    }
+}
+
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     llama_backend_init();
+    backendInitialized = true;
+
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
@@ -1060,6 +1089,8 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonContext::init(exports);
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);
+
+    exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
 
     return exports;
 }

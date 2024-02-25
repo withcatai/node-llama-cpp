@@ -13,7 +13,7 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
 }: {
     compressChatHistory(options: {
         chatHistory: readonly ChatHistoryItem[], charactersToRemove: number
-    }): ChatHistoryItem[] | Promise<ChatHistoryItem[]>
+    }): ChatHistoryItem[] | Promise<ChatHistoryItem[]>,
     chatHistory: ChatHistoryItem[],
     tokensCountToFit: number,
     tokenizer: Tokenizer,

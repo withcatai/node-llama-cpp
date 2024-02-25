@@ -20,6 +20,7 @@ export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
     /** @internal */ private readonly _metal: boolean;
     /** @internal */ private readonly _cuda: boolean;
+    /** @internal */ private readonly _vulkan: boolean;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _llamaCppRelease: {
@@ -36,11 +37,12 @@ export class Llama {
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
 
     private constructor({
-        bindings, metal, cuda, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
+        bindings, metal, cuda, vulkan, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
     }: {
-        bindings: BindingModule
+        bindings: BindingModule,
         metal: boolean,
         cuda: boolean,
+        vulkan: boolean,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
         buildType: "localBuild" | "prebuilt",
@@ -53,6 +55,7 @@ export class Llama {
         this._bindings = bindings;
         this._metal = metal;
         this._cuda = cuda;
+        this._vulkan = vulkan;
         this._logLevel = logLevel ?? LlamaLogLevel.debug;
         this._logger = logger;
         this._buildType = buildType;
@@ -75,6 +78,10 @@ export class Llama {
 
     public get cuda() {
         return this._cuda;
+    }
+
+    public get vulkan() {
+        return this._vulkan;
     }
 
     public get logLevel() {
@@ -202,17 +209,18 @@ export class Llama {
     public static async _create({
         bindings, buildType, buildMetadata, logLevel, logger
     }: {
-        bindings: BindingModule
+        bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
-        logger: (level: LlamaLogLevel, message: string) => void,
+        logger: (level: LlamaLogLevel, message: string) => void
     }) {
         return new Llama({
             bindings,
             buildType,
             metal: buildMetadata.buildOptions.computeLayers.metal,
             cuda: buildMetadata.buildOptions.computeLayers.cuda,
+            vulkan: buildMetadata.buildOptions.computeLayers.vulkan,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
             llamaCppRelease: {
                 repo: buildMetadata.buildOptions.llamaCpp.repo,

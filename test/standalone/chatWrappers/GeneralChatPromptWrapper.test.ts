@@ -43,7 +43,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",
@@ -70,7 +70,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",
@@ -116,7 +116,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",
@@ -140,7 +140,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",
@@ -177,7 +177,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",
@@ -207,7 +207,7 @@ describe("GeneralChatWrapper", () => {
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             "
 
           ",

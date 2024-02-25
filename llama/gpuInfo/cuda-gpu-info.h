@@ -2,6 +2,6 @@
 
 #include <stddef.h>
 
-typedef void (*gpuInfoErrorLogCallback_t)(const char* message);
+typedef void (*gpuInfoCudaErrorLogCallback_t)(const char* message);
 
-bool gpuInfoGetTotalCudaDevicesInfo(size_t * total, size_t * used, gpuInfoErrorLogCallback_t errorLogCallback);
+bool gpuInfoGetTotalCudaDevicesInfo(size_t * total, size_t * used, gpuInfoCudaErrorLogCallback_t errorLogCallback);

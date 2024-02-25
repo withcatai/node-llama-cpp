@@ -10,6 +10,9 @@ export async function getBuildFolderNameForBuildOptions(buildOptions: BuildOptio
     else if (buildOptions.computeLayers.cuda)
         nameParts.push("cuda");
 
+    if (buildOptions.computeLayers.vulkan)
+        nameParts.push("vulkan");
+
     if (buildOptions.llamaCpp.repo !== builtinLlamaCppGitHubRepo || buildOptions.llamaCpp.release !== builtinLlamaCppRelease)
         nameParts.push("release-" + await getFolderNamePartForRelease(buildOptions.llamaCpp.repo, buildOptions.llamaCpp.release));
 
