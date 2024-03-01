@@ -677,7 +677,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             int32_t endPos = info[2].As<Napi::Number>().Int32Value();
             int32_t shiftDelta = info[3].As<Napi::Number>().Int32Value();
 
-            llama_kv_cache_seq_shift(ctx, sequenceId, startPos, endPos, shiftDelta);
+            llama_kv_cache_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
 
             return info.Env().Undefined();
         }
