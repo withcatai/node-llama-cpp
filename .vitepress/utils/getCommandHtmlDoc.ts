@@ -161,11 +161,11 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
         }
 
         if (option.type != null) {
-            optionDescription.push(`(<code>${htmlEscape(option.type)}</code>)`);
+            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape(option.type)}<span style="opacity: 0.4">)</span></code>`);
         }
 
         if (option.demandOption) {
-            optionDescription.push(`(<code>${htmlEscape("required")}</code>)`);
+            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape("required")}<span style="opacity: 0.4">)</span></code>`);
         }
 
         if (option.choices != null) {

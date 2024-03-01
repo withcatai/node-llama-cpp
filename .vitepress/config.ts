@@ -23,6 +23,19 @@ const chatWrappersOrder = [
     "FalconChatWrapper"
 ] as const;
 
+const categoryOrder = [
+    "Functions",
+    "Classes",
+    "Types",
+    "Enums"
+] as const;
+
+const functionsOrder = [
+    "getLlama",
+    "defineChatSessionFunction",
+    "LlamaText"
+] as const;
+
 function resolveHref(href: string) {
     if (urlBase == null)
         return href;
@@ -149,7 +162,9 @@ export default defineConfig({
                 items: [
                     {text: "Building from source", link: "/building-from-source"},
                     {text: "Metal support", link: "/Metal"},
-                    {text: "CUDA support", link: "/CUDA"}
+                    {text: "CUDA support", link: "/CUDA"},
+                    {text: "Vulkan support", link: "/vulkan"},
+                    {text: "Troubleshooting", link: "/troubleshooting"}
                 ]
             }, {
                 text: "Contributing",
@@ -187,6 +202,7 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
                 case "README":
                 case "API":
                     return null;
+
                 case "Classes":
                 case "Type Aliases":
                 case "Functions":
@@ -203,7 +219,23 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
                                 delete subItem.collapsed;
 
                             return subItem;
-                        })
+                        });
+
+                    return item;
+
+                case "Enumerations":
+                    item.text = "Enums";
+
+                    if (item.collapsed)
+                        item.collapsed = false;
+                    return item;
+
+                case "Variables":
+                    item.text = "Enums";
+
+                    if (item.collapsed)
+                        item.collapsed = false;
+
                     return item;
             }
 
@@ -216,6 +248,8 @@ function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedo
     orderClasses(sidebar);
     orderTypes(sidebar);
     orderFunctions(sidebar);
+
+    sortItemsInOrder(sidebar, categoryOrder);
 
     return sidebar;
 }
@@ -348,18 +382,20 @@ function orderTypes(sidebar: typeof typedocSidebar) {
 }
 
 function orderFunctions(sidebar: typeof typedocSidebar) {
-    const types = sidebar.find((item) => item.text === "Functions");
+    const functions = sidebar.find((item) => item.text === "Functions");
 
-    if (types == null || !(types.items instanceof Array))
+    if (functions == null || !(functions.items instanceof Array))
         return;
 
     groupItems(
-        types.items,
+        functions.items,
         (item) => item.text === "LlamaText",
         (item) => item.text != null && ["isLlamaText", "tokenizeText"].includes(item.text)
     );
 
-    moveCollapseItemsToTheEnd(types.items);
+    sortItemsInOrder(functions.items, functionsOrder);
+
+    moveCollapseItemsToTheEnd(functions.items);
 }
 
 
