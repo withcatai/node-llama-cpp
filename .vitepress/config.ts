@@ -166,6 +166,9 @@ export default defineConfig({
                 items: [
                     {text: "Chat", link: "/chat"},
                     {text: "Download", link: "/download"},
+                    {text: "Complete", link: "/complete"},
+                    {text: "Infill", link: "/infill"},
+                    {text: "Inspect", link: "/inspect"},
                     {text: "Build", link: "/build"},
                     {text: "Clear", link: "/clear"}
                 ]

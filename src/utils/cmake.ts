@@ -7,10 +7,10 @@ import {
     defaultXpacksCacheDirectory, defaultXpacksStoreDirectory, llamaDirectory, localXpacksCacheDirectory, localXpacksStoreDirectory,
     xpackDirectory, xpmVersion
 } from "../config.js";
+import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
 import {spawnCommand} from "./spawnCommand.js";
 import withStatusLogs from "./withStatusLogs.js";
 import {withLockfile} from "./withLockfile.js";
-import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
 
 
 export async function hasBuiltinCmake() {
