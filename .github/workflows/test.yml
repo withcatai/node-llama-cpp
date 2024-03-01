@@ -5,6 +5,9 @@ on:
       - master
       - beta
   pull_request:
+    branches-ignore:
+      - master
+      - beta
   workflow_dispatch:
 
 jobs:
