@@ -5,7 +5,7 @@ import process from "process";
 import envVar from "env-var";
 import * as uuid from "uuid";
 import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
-import {LlamaLogLevel, LlamaLogLevelValues} from "./bindings/types.js";
+import {nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption} from "./bindings/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,15 +45,11 @@ export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
 export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .default(builtinLlamaCppRelease)
     .asString();
-export const defaultLlamaCppMetalSupport = env.get("NODE_LLAMA_CPP_METAL")
-    .default((process.platform === "darwin" && process.arch !== "x64") ? "true" : "false")
-    .asBool();
-export const defaultLlamaCppCudaSupport = env.get("NODE_LLAMA_CPP_CUDA")
-    .default("false")
-    .asBool();
-export const defaultLlamaCppVulkanSupport = env.get("NODE_LLAMA_CPP_VULKAN")
-    .default("false")
-    .asBool();
+export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
+    env.get("NODE_LLAMA_CPP_GPU")
+        .default("auto")
+        .asEnum(nodeLlamaCppGpuOptions)
+);
 export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
     .default(LlamaLogLevel.debug)
     .asEnum(LlamaLogLevelValues);
@@ -75,5 +71,7 @@ export const npxRunPrefix = "npx --no ";
 
 const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
 export const documentationPageUrls = {
-    CUDA: documentationUrl + "/guide/CUDA"
+    CUDA: documentationUrl + "/guide/CUDA",
+    Vulkan: documentationUrl + "/guide/vulkan"
 } as const;
+export const recommendedBaseDockerImage = "node:20";

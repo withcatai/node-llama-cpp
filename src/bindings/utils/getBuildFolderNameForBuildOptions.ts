@@ -5,13 +5,8 @@ import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease} from "../../config.js
 export async function getBuildFolderNameForBuildOptions(buildOptions: BuildOptions) {
     const nameParts: string[] = [buildOptions.platform, buildOptions.arch];
 
-    if (buildOptions.platform === "mac" && buildOptions.computeLayers.metal)
-        nameParts.push("metal");
-    else if (buildOptions.computeLayers.cuda)
-        nameParts.push("cuda");
-
-    if (buildOptions.computeLayers.vulkan)
-        nameParts.push("vulkan");
+    if (buildOptions.gpu !== false)
+        nameParts.push(makeStringSafeForPathName(buildOptions.gpu));
 
     if (buildOptions.llamaCpp.repo !== builtinLlamaCppGitHubRepo || buildOptions.llamaCpp.release !== builtinLlamaCppRelease)
         nameParts.push("release-" + await getFolderNamePartForRelease(buildOptions.llamaCpp.repo, buildOptions.llamaCpp.release));
@@ -78,6 +73,19 @@ async function getFolderNamePartForRelease(repo: string, release: string) {
 
     if (shouldHash)
         return await hashString(res);
+
+    return res;
+}
+
+function makeStringSafeForPathName(str: string) {
+    let res = "";
+
+    for (const char of str) {
+        if (isCharacterSafe(char))
+            res += char;
+        else
+            res += "_" + char.codePointAt(0)!.toString(32) + "_";
+    }
 
     return res;
 }

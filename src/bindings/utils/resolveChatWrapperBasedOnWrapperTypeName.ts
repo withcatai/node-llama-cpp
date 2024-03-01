@@ -7,9 +7,9 @@ import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
 
-export const chatWrapperTypeNames = [
+export const chatWrapperTypeNames = Object.freeze([
     "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"
-] as const;
+] as const);
 export type ChatWrapperTypeName = (typeof chatWrapperTypeNames)[number];
 
 const chatWrappers = {
@@ -24,6 +24,10 @@ const chatWrapperToConfigType = new Map(
     Object.entries(chatWrappers).map(([configType, Wrapper]) => [Wrapper, configType])
 );
 
+/**
+ * @param configType
+ * @param options
+ */
 export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapperTypeName, {
     bosString,
     filename,
@@ -32,7 +36,10 @@ export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapper
 }: {
     bosString?: string | null,
     filename?: string,
+
+    /** @hidden this type alias is too long in the documentation */
     typeDescription?: ModelTypeDescription,
+
     customWrapperSettings?: {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     }

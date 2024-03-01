@@ -4,26 +4,24 @@ import chalk from "chalk";
 import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppMetalSupport, defaultLlamaCppCudaSupport,
-    defaultLlamaCppVulkanSupport, isCI
-} from "../../config.js";
+import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, isCI, defaultLlamaCppGpuSupport} from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
-import {getIsInDocumentationMode} from "../../state.js";
 import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
 import {getPlatform} from "../../bindings/utils/getPlatform.js";
 import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
 import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "../../bindings/utils/cloneLlamaCppRepo.js";
-import {BuildOptions} from "../../bindings/types.js";
-import {logEnabledComputeLayers} from "../utils/logEnabledComputeLayers.js";
+import {BuildGpu, BuildOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../bindings/types.js";
+import {logUsedGpuTypeOption} from "../utils/logUsedGpuTypeOption.js";
+import {getGpuTypesToUseForOption} from "../../bindings/utils/getGpuTypesToUseForOption.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {getPlatformInfo} from "../../bindings/utils/getPlatformInfo.js";
 
 type BuildCommand = {
-    arch?: string,
+    arch?: typeof process.arch,
     nodeTarget?: string,
-    metal?: boolean,
-    cuda?: boolean,
-    vulkan?: boolean,
+    gpu?: BuildGpu | "auto",
     noUsageExample?: boolean,
 
     /** @internal */
@@ -34,12 +32,11 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
     command: "build",
     describe: "Compile the currently downloaded llama.cpp",
     builder(yargs) {
-        const isInDocumentationMode = getIsInDocumentationMode();
-
         return yargs
             .option("arch", {
                 alias: "a",
                 type: "string",
+                coerce: (value) => value,
                 description: "The architecture to compile llama.cpp for"
             })
             .option("nodeTarget", {
@@ -47,20 +44,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
             })
-            .option("metal", {
-                type: "boolean",
-                default: defaultLlamaCppMetalSupport || isInDocumentationMode,
-                description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
-            })
-            .option("cuda", {
-                type: "boolean",
-                default: defaultLlamaCppCudaSupport,
-                description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
-            })
-            .option("vulkan", {
-                type: "boolean",
-                default: defaultLlamaCppVulkanSupport,
-                description: "Compile llama.cpp with Vulkan support. Can also be set via the NODE_LLAMA_CPP_VULKAN environment variable"
+            .option("gpu", {
+                type: "string",
+                default: defaultLlamaCppGpuSupport,
+                choices: nodeLlamaCppGpuOptions,
+                coerce: parseNodeLlamaCppGpuOption,
+                description: "Compute layer implementation type to use for llama.cpp"
             })
             .option("noUsageExample", {
                 alias: "nu",
@@ -81,9 +70,7 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
 export async function BuildLlamaCppCommand({
     arch = undefined,
     nodeTarget = undefined,
-    metal = defaultLlamaCppMetalSupport,
-    cuda = defaultLlamaCppCudaSupport,
-    vulkan = defaultLlamaCppVulkanSupport,
+    gpu = defaultLlamaCppGpuSupport,
     noUsageExample = false,
     noCustomCmakeBuildOptionsInBinaryFolderName = false
 }: BuildCommand) {
@@ -97,55 +84,84 @@ export async function BuildLlamaCppCommand({
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
 
     const platform = getPlatform();
+    const platformInfo = await getPlatformInfo();
     const customCmakeOptions = resolveCustomCmakeOptions();
+    const buildGpusToTry: BuildGpu[] = await getGpuTypesToUseForOption(gpu, {platform, arch});
+    let downloadedCmake = false;
 
-    logEnabledComputeLayers({metal, cuda, vulkan}, {platform});
+    for (let i = 0; i < buildGpusToTry.length; i++) {
+        const gpuToTry = buildGpusToTry[i];
+        const isLastItem = i === buildGpusToTry.length - 1;
 
-    await downloadCmakeIfNeeded(true);
+        logUsedGpuTypeOption(gpuToTry);
 
-    const buildOptions: BuildOptions = {
-        customCmakeOptions,
-        progressLogs: true,
-        platform,
-        arch: arch
-            ? arch as typeof process.arch
-            : process.arch,
-        computeLayers: {
-            metal,
-            cuda,
-            vulkan
-        },
-        llamaCpp: {
-            repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
-            release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
+        if (!downloadedCmake) {
+            await downloadCmakeIfNeeded(true);
+            downloadedCmake = true;
         }
-    };
 
-    await withStatusLogs({
-        loading: chalk.blue("Compiling llama.cpp"),
-        success: chalk.blue("Compiled llama.cpp"),
-        fail: chalk.blue("Failed to compile llama.cpp")
-    }, async () => {
-        await compileLlamaCpp(buildOptions, {
-            nodeTarget: nodeTarget ? nodeTarget : undefined,
-            updateLastBuildInfo: true,
-            downloadCmakeIfNeeded: false,
-            ensureLlamaCppRepoIsCloned: false,
-            includeBuildOptionsInBinaryFolderName
+        const buildOptions: BuildOptions = {
+            customCmakeOptions,
+            progressLogs: true,
+            platform,
+            platformInfo,
+            arch: arch
+                ? arch as typeof process.arch
+                : process.arch,
+            gpu: gpuToTry,
+            llamaCpp: {
+                repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
+                release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
+            }
+        };
+
+        try {
+            await withStatusLogs({
+                loading: chalk.blue("Compiling llama.cpp"),
+                success: chalk.blue("Compiled llama.cpp"),
+                fail: chalk.blue("Failed to compile llama.cpp")
+            }, async () => {
+                await compileLlamaCpp(buildOptions, {
+                    nodeTarget: nodeTarget ? nodeTarget : undefined,
+                    updateLastBuildInfo: true,
+                    downloadCmakeIfNeeded: false,
+                    ensureLlamaCppRepoIsCloned: false,
+                    includeBuildOptionsInBinaryFolderName
+                });
+            });
+        } catch (err) {
+            console.error(
+                getConsoleLogPrefix() +
+                `Failed to build llama.cpp with ${getPrettyBuildGpuName(gpuToTry)} support. ` +
+                (
+                    !isLastItem
+                        ? `falling back to building llama.cpp with ${getPrettyBuildGpuName(buildGpusToTry[i + 1])} support. `
+                        : ""
+                ) +
+                "Error:",
+                err
+            );
+
+            if (isLastItem)
+                throw err;
+
+            continue;
+        }
+
+        await withOra({
+            loading: chalk.blue("Removing temporary files"),
+            success: chalk.blue("Removed temporary files"),
+            fail: chalk.blue("Failed to remove temporary files")
+        }, async () => {
+            await clearTempFolder();
         });
-    });
 
-    await withOra({
-        loading: chalk.blue("Removing temporary files"),
-        success: chalk.blue("Removed temporary files"),
-        fail: chalk.blue("Failed to remove temporary files")
-    }, async () => {
-        await clearTempFolder();
-    });
+        if (!noUsageExample) {
+            console.log();
+            logBinaryUsageExampleToConsole(buildOptions, gpu !== "auto", true);
+            console.log();
+        }
 
-    if (!noUsageExample) {
-        console.log();
-        logBinaryUsageExampleToConsole(buildOptions, true);
-        console.log();
+        break;
     }
 }

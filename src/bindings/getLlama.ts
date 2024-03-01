@@ -3,8 +3,8 @@ import path from "path";
 import console from "console";
 import {createRequire} from "module";
 import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppCudaSupport, defaultLlamaCppDebugLogs, defaultLlamaCppGitHubRepo,
-    defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultLlamaCppVulkanSupport, defaultSkipDownload, llamaLocalBuildBinsDirectory
+    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppDebugLogs, defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport,
+    defaultLlamaCppRelease, defaultSkipDownload, llamaLocalBuildBinsDirectory, recommendedBaseDockerImage
 } from "../config.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
@@ -15,36 +15,36 @@ import {
 } from "./utils/compileLLamaCpp.js";
 import {getLastBuildInfo} from "./utils/lastBuildInfo.js";
 import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "./utils/cloneLlamaCppRepo.js";
-import {BuildOptions, LlamaLogLevel} from "./types.js";
-import {getPlatform} from "./utils/getPlatform.js";
+import {BuildGpu, BuildMetadataFile, BuildOptions, LlamaLogLevel} from "./types.js";
+import {BinaryPlatform, getPlatform} from "./utils/getPlatform.js";
 import {getBuildFolderNameForBuildOptions} from "./utils/getBuildFolderNameForBuildOptions.js";
 import {resolveCustomCmakeOptions} from "./utils/resolveCustomCmakeOptions.js";
 import {getCanUsePrebuiltBinaries} from "./utils/getCanUsePrebuiltBinaries.js";
 import {NoBinaryFoundError} from "./utils/NoBinaryFoundError.js";
 import {Llama} from "./Llama.js";
+import {getGpuTypesToUseForOption} from "./utils/getGpuTypesToUseForOption.js";
+import {getPrettyBuildGpuName} from "./consts.js";
+import {detectGlibc} from "./utils/detectGlibc.js";
+import {getLinuxDistroInfo, isDistroAlpineLinux} from "./utils/getLinuxDistroInfo.js";
+import {testBindingBinary} from "./utils/testBindingBinary.js";
+import {BinaryPlatformInfo, getPlatformInfo} from "./utils/getPlatformInfo.js";
 
 const require = createRequire(import.meta.url);
 
 export type LlamaOptions = {
     /**
-     * Toggle Metal support in llama.cpp.
-     * Only supported on macOS.
-     * Enabled by default on Apple Silicon Macs.
+     * The compute layer implementation type to use for llama.cpp.
+     * - **`"auto"`**: Automatically detect and use the best GPU available (Metal on macOS, and CUDA or Vulkan on Windows and Linux)
+     * - **`"metal"`**: Use Metal.
+     *   Only supported on macOS.
+     *   Enabled by default on Apple Silicon Macs.
+     * - **`"cuda"`**: Use CUDA.
+     * - **`"vulkan"`**: Use Vulkan.
+     * - **`false`**: Disable any GPU support and only use the CPU.
+     *
+     * `"auto"` by default.
      */
-    metal?: boolean,
-
-    /**
-     * Toggle CUDA support on llama.cpp.
-     * Disabled by default.
-     */
-    cuda?: boolean,
-
-    /**
-     * Toggle Vulkan support on llama.cpp.
-     * Currently, Vulkan support is experimental. Use with caution.
-     * Disabled by default.
-     */
-    vulkan?: boolean,
+    gpu?: "auto" | "metal" | "cuda" | "vulkan" | false,
 
     /**
      * Set the minimum log level for llama.cpp.
@@ -143,8 +143,7 @@ export const getLlamaFunctionName = "getLlama";
  * Defaults to prefer a prebuilt binary, and fallbacks to building from source if a prebuilt binary is not found.
  * Pass `"lastCliBuild"` to default to use the last successful build created using the `download` or `build` CLI commands if one exists.
  */
-export async function getLlama(): Promise<Llama>;
-export async function getLlama(options: LlamaOptions, lastBuildOptions?: never): Promise<Llama>;
+export async function getLlama(options?: LlamaOptions): Promise<Llama>;
 export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOptions): Promise<Llama>;
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
@@ -189,9 +188,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
 }
 
 export async function getLlamaForOptions({
-    metal = defaultLlamaCppMetalSupport,
-    cuda = defaultLlamaCppCudaSupport,
-    vulkan = defaultLlamaCppVulkanSupport,
+    gpu = defaultLlamaCppGpuSupport,
     logLevel = defaultLlamaCppDebugLogs,
     logger = Llama.defaultConsoleLogger,
     build = "auto",
@@ -201,15 +198,15 @@ export async function getLlamaForOptions({
     progressLogs = true,
     skipDownload = defaultSkipDownload
 }: LlamaOptions, {
-    updateLastBuildInfoOnCompile = false
+    updateLastBuildInfoOnCompile = false,
+    skipLlamaInit = false
 }: {
-    updateLastBuildInfoOnCompile?: boolean
+    updateLastBuildInfoOnCompile?: boolean,
+    skipLlamaInit?: boolean
 } = {}): Promise<Llama> {
     const platform = getPlatform();
     const arch = process.arch;
 
-    if (platform !== "mac") metal = false;
-    else if (platform === "mac" && arch === "arm64") cuda = false;
     if (logLevel == null) logLevel = defaultLlamaCppDebugLogs;
     if (logger == null) logger = Llama.defaultConsoleLogger;
     if (build == null) build = "auto";
@@ -220,95 +217,65 @@ export async function getLlamaForOptions({
     if (skipDownload == null) skipDownload = defaultSkipDownload;
 
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
-
-    const buildOptions: BuildOptions = {
-        customCmakeOptions: resolveCustomCmakeOptions(cmakeOptions),
-        progressLogs,
-        platform,
-        arch,
-        computeLayers: {
-            metal,
-            cuda,
-            vulkan
-        },
-        llamaCpp: {
-            repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
-            release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
-        }
-    };
-
-    const canUsePrebuiltBinaries = (build === "forceRebuild" || !usePrebuiltBinaries)
+    let canUsePrebuiltBinaries = (build === "forceRebuild" || !usePrebuiltBinaries)
         ? false
         : await getCanUsePrebuiltBinaries();
-    let buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
+    const buildGpusToTry: BuildGpu[] = await getGpuTypesToUseForOption(gpu, {platform, arch});
+    const platformInfo = await getPlatformInfo();
+    const llamaCppInfo: BuildOptions["llamaCpp"] = {
+        repo: clonedLlamaCppRepoReleaseInfo?.llamaCppGithubRepo ?? builtinLlamaCppGitHubRepo,
+        release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
+    };
+    let shouldLogNoGlibcWarningIfNoBuildIsAvailable = false;
 
-    if (build === "auto" || build === "never") {
-        const localBuildFolder = path.join(llamaLocalBuildBinsDirectory, buildFolderName.withCustomCmakeOptions);
-        const localBuildBinPath = await getLocalBuildBinaryPath(buildFolderName.withCustomCmakeOptions);
-
-        await waitForLockfileRelease({resourcePath: localBuildFolder});
-        if (localBuildBinPath != null) {
-            try {
-                const binding = loadBindingModule(localBuildBinPath);
-                const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
-
-                return await Llama._create({
-                    bindings: binding,
-                    buildType: "localBuild",
-                    buildMetadata,
-                    logLevel,
-                    logger
-                });
-            } catch (err) {
-                const binaryDescription = describeBinary(buildOptions);
-                console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);
-                console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
-            }
-        }
-
-        if (canUsePrebuiltBinaries) {
-            const prebuiltBinPath = await getPrebuiltBinaryPath(
-                existingPrebuiltBinaryMustMatchBuildOptions
-                    ? buildFolderName.withCustomCmakeOptions
-                    : buildFolderName.withoutCustomCmakeOptions
-            );
-
-            if (prebuiltBinPath != null) {
-                try {
-                    const binding = loadBindingModule(prebuiltBinPath);
-                    const buildMetadata = await getPrebuiltBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
-
-                    return await Llama._create({
-                        bindings: binding,
-                        buildType: "prebuilt",
-                        buildMetadata,
-                        logLevel,
-                        logger
-                    });
-                } catch (err) {
-                    const binaryDescription = describeBinary({
-                        ...buildOptions,
-                        customCmakeOptions: existingPrebuiltBinaryMustMatchBuildOptions
-                            ? buildOptions.customCmakeOptions
-                            : new Map()
-                    });
-                    console.error(
-                        getConsoleLogPrefix() + `Failed to load a prebuilt ${binaryDescription}` + (
-                            build !== "never"
-                                ? ", falling back to building from source"
-                                : ""
-                        ) + ". Error:", err);
-                }
-            } else if (progressLogs)
-                console.warn(
-                    getConsoleLogPrefix() + "A prebuilt binary was not found" + (
-                        build !== "never"
-                            ? ", falling back to building from source"
-                            : ""
-                    )
-                );
+    if (canUsePrebuiltBinaries && platform === "linux") {
+        if (!(await detectGlibc({platform}))) {
+            canUsePrebuiltBinaries = false;
+            shouldLogNoGlibcWarningIfNoBuildIsAvailable = true;
         }
     }
+
+    if (build === "auto" || build === "never") {
+        for (let i = 0; i < buildGpusToTry.length; i++) {
+            const gpu = buildGpusToTry[i];
+            const isLastItem = i === buildGpusToTry.length - 1;
+
+            const buildOptions: BuildOptions = {
+                customCmakeOptions: resolveCustomCmakeOptions(cmakeOptions),
+                progressLogs,
+                platform,
+                platformInfo,
+                arch,
+                gpu,
+                llamaCpp: llamaCppInfo
+            };
+
+            const llama = await loadExistingLlamaBinary({
+                buildOptions,
+                canUsePrebuiltBinaries,
+                logLevel,
+                logger,
+                existingPrebuiltBinaryMustMatchBuildOptions,
+                progressLogs,
+                platform,
+                platformInfo,
+                skipLlamaInit,
+                fallbackMessage: !isLastItem
+                    ? `falling back to using ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}`
+                    : (
+                        build !== "never"
+                            ? "falling back to building from source"
+                            : null
+                    )
+            });
+
+            if (llama != null)
+                return llama;
+        }
+    }
+
+    if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs)
+        await logNoGlibcWarning();
 
     if (build === "never")
         throw new NoBinaryFoundError();
@@ -318,15 +285,194 @@ export async function getLlamaForOptions({
         if (skipDownload)
             throw new NoBinaryFoundError("No prebuilt binaries found, no llama.cpp source found and `skipDownload` or NODE_LLAMA_CPP_SKIP_DOWNLOAD env var is set to true, so llama.cpp cannot be built from source");
 
-        buildOptions.llamaCpp.repo = defaultLlamaCppGitHubRepo;
-        buildOptions.llamaCpp.release = defaultLlamaCppRelease;
+        llamaCppInfo.repo = defaultLlamaCppGitHubRepo;
+        llamaCppInfo.release = defaultLlamaCppRelease;
 
-        if (isGithubReleaseNeedsResolving(buildOptions.llamaCpp.release)) {
+        if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
             const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-            buildOptions.llamaCpp.release = await resolveGithubRelease(owner, name, buildOptions.llamaCpp.release);
-            buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
+            llamaCppInfo.release = await resolveGithubRelease(owner, name, llamaCppInfo.release);
         }
     }
+
+    for (let i = 0; i < buildGpusToTry.length; i++) {
+        const gpu = buildGpusToTry[i];
+        const isLastItem = i === buildGpusToTry.length - 1;
+
+        const buildOptions: BuildOptions = {
+            customCmakeOptions: resolveCustomCmakeOptions(cmakeOptions),
+            progressLogs,
+            platform,
+            platformInfo,
+            arch,
+            gpu,
+            llamaCpp: llamaCppInfo
+        };
+
+        try {
+            return await buildAndLoadLlamaBinary({
+                buildOptions,
+                skipDownload,
+                logLevel,
+                logger,
+                updateLastBuildInfoOnCompile,
+                skipLlamaInit
+            });
+        } catch (err) {
+            console.error(
+                getConsoleLogPrefix() +
+                `Failed to build llama.cpp with ${getPrettyBuildGpuName(gpu)} support. ` +
+                (
+                    !isLastItem
+                        ? `falling back to building llama.cpp with ${getPrettyBuildGpuName(buildGpusToTry[i + 1])} support. `
+                        : ""
+                ) +
+                "Error:",
+                err
+            );
+
+            if (isLastItem)
+                throw err;
+        }
+    }
+
+    throw new Error("Failed to build llama.cpp");
+}
+
+async function loadExistingLlamaBinary({
+    buildOptions,
+    canUsePrebuiltBinaries,
+    logLevel,
+    logger,
+    existingPrebuiltBinaryMustMatchBuildOptions,
+    progressLogs,
+    platform,
+    platformInfo,
+    skipLlamaInit,
+    fallbackMessage
+}: {
+    buildOptions: BuildOptions,
+    canUsePrebuiltBinaries: boolean,
+    logLevel: Required<LlamaOptions>["logLevel"],
+    logger: Required<LlamaOptions>["logger"],
+    existingPrebuiltBinaryMustMatchBuildOptions: boolean,
+    progressLogs: boolean,
+    platform: BinaryPlatform,
+    platformInfo: BinaryPlatformInfo,
+    skipLlamaInit: boolean,
+    fallbackMessage: string | null
+}) {
+    const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
+
+    const localBuildFolder = path.join(llamaLocalBuildBinsDirectory, buildFolderName.withCustomCmakeOptions);
+    const localBuildBinPath = await getLocalBuildBinaryPath(buildFolderName.withCustomCmakeOptions);
+
+    await waitForLockfileRelease({resourcePath: localBuildFolder});
+    if (localBuildBinPath != null) {
+        try {
+            const binding = loadBindingModule(localBuildBinPath);
+            const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
+
+            return await Llama._create({
+                bindings: binding,
+                buildType: "localBuild",
+                buildMetadata,
+                logLevel,
+                logger,
+                skipLlamaInit
+            });
+        } catch (err) {
+            const binaryDescription = describeBinary(buildOptions);
+            console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);
+
+            if (canUsePrebuiltBinaries)
+                console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+            else if (fallbackMessage != null)
+                console.info(getConsoleLogPrefix() + fallbackMessage);
+        }
+    }
+
+    if (canUsePrebuiltBinaries) {
+        const prebuiltBinPath = await getPrebuiltBinaryPath(
+            existingPrebuiltBinaryMustMatchBuildOptions
+                ? buildFolderName.withCustomCmakeOptions
+                : buildFolderName.withoutCustomCmakeOptions
+        );
+
+        if (prebuiltBinPath != null) {
+            try {
+                const buildMetadata = await getPrebuiltBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
+                const shouldTestBinaryBeforeLoading = getShouldTestBinaryBeforeLoading({
+                    isPrebuiltBinary: true,
+                    platform,
+                    platformInfo,
+                    buildMetadata
+                });
+                const binaryCompatible = shouldTestBinaryBeforeLoading
+                    ? await testBindingBinary(prebuiltBinPath)
+                    : true;
+
+                if (binaryCompatible) {
+                    const binding = loadBindingModule(prebuiltBinPath);
+
+                    return await Llama._create({
+                        bindings: binding,
+                        buildType: "prebuilt",
+                        buildMetadata,
+                        logLevel,
+                        logger,
+                        skipLlamaInit
+                    });
+                } else if (progressLogs)
+                    console.warn(
+                        getConsoleLogPrefix() + "The prebuilt binary is not compatible with the current system" + (
+                            fallbackMessage != null
+                                ? ", " + fallbackMessage
+                                : ""
+                        )
+                    );
+            } catch (err) {
+                const binaryDescription = describeBinary({
+                    ...buildOptions,
+                    customCmakeOptions: existingPrebuiltBinaryMustMatchBuildOptions
+                        ? buildOptions.customCmakeOptions
+                        : new Map()
+                });
+                console.error(
+                    getConsoleLogPrefix() + `Failed to load a prebuilt ${binaryDescription}` + (
+                        fallbackMessage != null
+                            ? ", " + fallbackMessage
+                            : ""
+                    ) + ". Error:", err);
+            }
+        } else if (progressLogs)
+            console.warn(
+                getConsoleLogPrefix() + "A prebuilt binary was not found" + (
+                    fallbackMessage != null
+                        ? ", " + fallbackMessage
+                        : ""
+                )
+            );
+    }
+
+    return null;
+}
+
+async function buildAndLoadLlamaBinary({
+    buildOptions,
+    skipDownload,
+    logLevel,
+    logger,
+    updateLastBuildInfoOnCompile,
+    skipLlamaInit
+}: {
+    buildOptions: BuildOptions,
+    skipDownload: boolean,
+    logLevel: Required<LlamaOptions>["logLevel"],
+    logger: Required<LlamaOptions>["logger"],
+    updateLastBuildInfoOnCompile: boolean,
+    skipLlamaInit: boolean
+}) {
+    const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
     await compileLlamaCpp(buildOptions, {
         ensureLlamaCppRepoIsCloned: !skipDownload,
@@ -351,22 +497,39 @@ export async function getLlamaForOptions({
         buildType: "localBuild",
         buildMetadata,
         logLevel,
-        logger
+        logger,
+        skipLlamaInit
     });
+}
+
+async function logNoGlibcWarning() {
+    console.warn(
+        getConsoleLogPrefix() +
+        "The prebuilt binaries cannot be used in this Linux distro, as `glibc` is not detected"
+    );
+
+    const linuxDistroInfo = await getLinuxDistroInfo();
+    const isAlpineLinux = await isDistroAlpineLinux(linuxDistroInfo);
+
+    if (isAlpineLinux) {
+        console.warn(
+            getConsoleLogPrefix() +
+            "Using Alpine Linux is not recommended for running LLMs, " +
+            "as using GPU drivers is complicated and suboptimal in this distro at the moment.\n" +
+            getConsoleLogPrefix() +
+            "Consider using a different Linux distro, such as Debian or Ubuntu." +
+            getConsoleLogPrefix() +
+            `If you're trying to run this inside of a Docker container, consider using "${recommendedBaseDockerImage}" image`
+        );
+    }
 }
 
 function describeBinary(binaryOptions: BuildOptions) {
     let res = `binary for platform "${binaryOptions.platform}" "${binaryOptions.arch}"`;
     const additions: string[] = [];
 
-    if (binaryOptions.computeLayers.metal)
-        additions.push("with Metal support");
-
-    if (binaryOptions.computeLayers.cuda)
-        additions.push("with CUDA support");
-
-    if (binaryOptions.computeLayers.vulkan)
-        additions.push("with Vulkan support");
+    if (binaryOptions.gpu != false)
+        additions.push(`with ${getPrettyBuildGpuName(binaryOptions.gpu)} support`);
 
     if (binaryOptions.customCmakeOptions.size > 0)
         additions.push("with custom build options");
@@ -404,4 +567,28 @@ function loadBindingModule(bindingModulePath: string) {
             delete require.cache[require.resolve(bindingModulePath)];
         } catch (err) {}
     }
+}
+
+function getShouldTestBinaryBeforeLoading({
+    isPrebuiltBinary,
+    platform,
+    platformInfo,
+    buildMetadata
+}: {
+    isPrebuiltBinary: boolean,
+    platform: BinaryPlatform,
+    platformInfo: BinaryPlatformInfo,
+    buildMetadata: BuildMetadataFile
+}) {
+    if (platform === "linux") {
+        if (isPrebuiltBinary)
+            return true;
+
+        if (platformInfo.name !== buildMetadata.buildOptions.platformInfo.name ||
+            platformInfo.version !== buildMetadata.buildOptions.platformInfo.version
+        )
+            return true;
+    }
+
+    return false;
 }

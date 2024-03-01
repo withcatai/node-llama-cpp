@@ -10,6 +10,7 @@ import {
 import {spawnCommand} from "./spawnCommand.js";
 import withStatusLogs from "./withStatusLogs.js";
 import {withLockfile} from "./withLockfile.js";
+import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
 
 
 export async function hasBuiltinCmake() {
@@ -23,9 +24,11 @@ export async function hasBuiltinCmake() {
 
 export async function getCmakePath() {
     try {
-        const resolvedPath = await which("cmake");
+        const resolvedPath = await which("cmake", {
+            nothrow: true
+        });
 
-        if (resolvedPath !== "")
+        if (resolvedPath !== "" && resolvedPath != null)
             return resolvedPath;
     } catch (err) {}
 
@@ -58,14 +61,23 @@ export async function downloadCmakeIfNeeded(wrapWithStatusLogs: boolean = false)
 
     if (!wrapWithStatusLogs)
         await downloadCmake({progressLogs: wrapWithStatusLogs});
-    else
-        await withStatusLogs({
-            loading: chalk.blue("Downloading cmake"),
-            success: chalk.blue("Downloaded cmake"),
-            fail: chalk.blue("Failed to download cmake")
-        }, async () => {
-            await downloadCmake({progressLogs: wrapWithStatusLogs});
-        });
+    else {
+        try {
+            await withStatusLogs({
+                loading: chalk.blue("Downloading cmake"),
+                success: chalk.blue("Downloaded cmake"),
+                fail: chalk.blue("Failed to download cmake")
+            }, async () => {
+                await downloadCmake({progressLogs: wrapWithStatusLogs});
+            });
+        } catch (err) {
+            await logDistroInstallInstruction('To install "cmake", ', {
+                linuxPackages: {apt: ["cmake"]},
+                macOsPackages: {brew: ["cmake"]}
+            });
+            throw err;
+        }
+    }
 }
 
 export async function clearLocalCmake() {

@@ -3,6 +3,7 @@ import {fileURLToPath} from "url";
 import process from "process";
 import fs from "fs-extra";
 import chalk from "chalk";
+import which from "which";
 import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
@@ -15,6 +16,8 @@ import {withLockfile} from "../../utils/withLockfile.js";
 import {ensureLlamaCppRepoIsCloned, isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
 import {getBuildFolderNameForBuildOptions} from "./getBuildFolderNameForBuildOptions.js";
 import {setLastBuildInfo} from "./lastBuildInfo.js";
+import {getPlatform} from "./getPlatform.js";
+import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,16 +59,19 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
             const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
             const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
 
-            if (buildOptions.computeLayers.metal && process.platform === "darwin" && !cmakeCustomOptions.has("LLAMA_METAL"))
+            if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("LLAMA_METAL"))
                 cmakeCustomOptions.set("LLAMA_METAL", "1");
             else if (!cmakeCustomOptions.has("LLAMA_METAL"))
                 cmakeCustomOptions.set("LLAMA_METAL", "OFF");
 
-            if (buildOptions.computeLayers.cuda && !cmakeCustomOptions.has("LLAMA_CUBLAS"))
+            if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("LLAMA_CUBLAS"))
                 cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
 
-            if (buildOptions.computeLayers.vulkan && !cmakeCustomOptions.has("LLAMA_VULKAN"))
+            if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("LLAMA_VULKAN"))
                 cmakeCustomOptions.set("LLAMA_VULKAN", "1");
+
+            if (!cmakeCustomOptions.has("LLAMA_CCACHE"))
+                cmakeCustomOptions.set("LLAMA_CCACHE", "OFF");
 
             if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                 cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
@@ -138,11 +144,34 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                 });
             }
         } catch (err) {
-            if (buildOptions.computeLayers.cuda)
+            const platform = getPlatform();
+            if (platform === "linux" && await which("make", {nothrow: true}) == null) {
+                console.info("\n" +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow('It seems that "make" is not installed in your system. Install it to resolve build issues')
+                );
+                await logDistroInstallInstruction('To install "make", ', {
+                    linuxPackages: {apt: ["make"]},
+                    macOsPackages: {brew: ["make"]}
+                });
+            } else if (platform === "mac" && await which("clang", {nothrow: true}) == null)
+                console.info("\n" +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow("It seems that Xcode command line tools are not installed in your system. Install it to resolve build issues\n") +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow('To install Xcode command line tools, run "xcode-select --install"')
+                );
+            else if (buildOptions.gpu === "cuda")
                 console.info("\n" +
                     getConsoleLogPrefix(true) +
                     chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
                     documentationPageUrls.CUDA
+                );
+            else if (buildOptions.gpu === "vulkan")
+                console.info("\n" +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow("To resolve errors related to Vulkan compilation, see the Vulkan guide: ") +
+                    documentationPageUrls.Vulkan
                 );
 
             throw err;
