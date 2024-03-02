@@ -15,6 +15,7 @@ export function testBindingBinary(bindingBinaryPath: string, testTimeout: number
         }
     });
     let testPassed = false;
+    let forkSucceeded = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     function cleanup() {
@@ -36,9 +37,19 @@ export function testBindingBinary(bindingBinaryPath: string, testTimeout: number
                 cleanup();
             }, testTimeout);
         }),
-        new Promise((resolve) => {
+        new Promise((resolve, reject) => {
+            function done() {
+                if (!forkSucceeded)
+                    reject(new Error(`Binding binary test failed to run a test process via file "${__filename}"`));
+                else
+                    resolve(testPassed);
+
+                cleanup();
+            }
+
             subProcess.on("message", (message: ChildToParentMessage) => {
                 if (message.type === "ready") {
+                    forkSucceeded = true;
                     subProcess.send({type: "start", bindingBinaryPath} satisfies ParentToChildMessage);
                 } else if (message.type === "done") {
                     testPassed = true;
@@ -50,16 +61,14 @@ export function testBindingBinary(bindingBinaryPath: string, testTimeout: number
                 if (code !== 0)
                     testPassed = false;
 
-                resolve(testPassed);
-                cleanup();
+                done();
             });
 
             if (subProcess.killed || subProcess.exitCode != null) {
                 if (subProcess.exitCode !== 0)
                     testPassed = false;
 
-                resolve(testPassed);
-                cleanup();
+                done();
             }
         })
     ]);
