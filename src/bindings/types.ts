@@ -5,8 +5,9 @@ import {BinaryPlatformInfo} from "./utils/getPlatformInfo.js";
 export const buildGpuOptions = ["metal", "cuda", "vulkan", false] as const;
 export const nodeLlamaCppGpuOptions = [
     "auto",
-    ...buildGpuOptions.map((option) => (option === false ? "false" : option))
+    ...buildGpuOptions
 ] as const;
+export const nodeLlamaCppGpuOffStringOptions = ["false", "off", "none", "disable", "disabled"] as const;
 export type BuildGpu = (typeof buildGpuOptions)[number];
 export type BuildOptions = {
     customCmakeOptions: Map<string, string>,
@@ -25,10 +26,12 @@ export type BuildOptionsJSON = Omit<BuildOptions, "customCmakeOptions"> & {
     customCmakeOptions: Record<string, string>
 };
 
-export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOptions)[number]): BuildGpu | "auto" {
-    if (option === "false" || option as string === "off" || option as string === "none" || option as string === "disable" ||
-        option as string === "disabled"
-    )
+export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOptions)[number] | (typeof nodeLlamaCppGpuOffStringOptions)[number]): BuildGpu | "auto" {
+    function optionIsGpuOff(opt: typeof option): opt is (typeof nodeLlamaCppGpuOffStringOptions)[number] {
+        return nodeLlamaCppGpuOffStringOptions.includes(opt as (typeof nodeLlamaCppGpuOffStringOptions)[number]);
+    }
+
+    if (optionIsGpuOff(option))
         return false;
     else if (option === "auto")
         return "auto";

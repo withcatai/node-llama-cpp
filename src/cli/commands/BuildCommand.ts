@@ -47,7 +47,9 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
             .option("gpu", {
                 type: "string",
                 default: defaultLlamaCppGpuSupport,
-                choices: nodeLlamaCppGpuOptions,
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: nodeLlamaCppGpuOptions as any as Exclude<typeof nodeLlamaCppGpuOptions[number], false>[],
                 coerce: parseNodeLlamaCppGpuOption,
                 description: "Compute layer implementation type to use for llama.cpp"
             })

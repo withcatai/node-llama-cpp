@@ -5,7 +5,9 @@ import process from "process";
 import envVar from "env-var";
 import * as uuid from "uuid";
 import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
-import {nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption} from "./bindings/types.js";
+import {
+    nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption, nodeLlamaCppGpuOffStringOptions
+} from "./bindings/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,7 +50,14 @@ export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
 export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
     env.get("NODE_LLAMA_CPP_GPU")
         .default("auto")
-        .asEnum(nodeLlamaCppGpuOptions)
+        .asEnum(
+            nodeLlamaCppGpuOptions
+                .flatMap((option) => (
+                    option === false
+                        ? nodeLlamaCppGpuOffStringOptions
+                        : [option]
+                ))
+        )
 );
 export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
     .default(LlamaLogLevel.debug)

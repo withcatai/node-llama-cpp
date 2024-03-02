@@ -369,17 +369,38 @@ async function loadExistingLlamaBinary({
     await waitForLockfileRelease({resourcePath: localBuildFolder});
     if (localBuildBinPath != null) {
         try {
-            const binding = loadBindingModule(localBuildBinPath);
             const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
-
-            return await Llama._create({
-                bindings: binding,
-                buildType: "localBuild",
-                buildMetadata,
-                logLevel,
-                logger,
-                skipLlamaInit
+            const shouldTestBinaryBeforeLoading = getShouldTestBinaryBeforeLoading({
+                isPrebuiltBinary: false,
+                platform,
+                platformInfo,
+                buildMetadata
             });
+            const binaryCompatible = shouldTestBinaryBeforeLoading
+                ? await testBindingBinary(localBuildBinPath)
+                : true;
+
+            if (binaryCompatible) {
+                const binding = loadBindingModule(localBuildBinPath);
+
+                return await Llama._create({
+                    bindings: binding,
+                    buildType: "localBuild",
+                    buildMetadata,
+                    logLevel,
+                    logger,
+                    skipLlamaInit
+                });
+            } else if (progressLogs) {
+                console.warn(
+                    getConsoleLogPrefix() + "The local build binary was not built in the current system and is incompatible with it"
+                );
+
+                if (canUsePrebuiltBinaries)
+                    console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+                else if (fallbackMessage != null)
+                    console.info(getConsoleLogPrefix() + fallbackMessage);
+            }
         } catch (err) {
             const binaryDescription = describeBinary(buildOptions);
             console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);

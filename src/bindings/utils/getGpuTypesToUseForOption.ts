@@ -15,8 +15,12 @@ export async function getGpuTypesToUseForOption(gpu: BuildGpu | "auto", {
         arch
     });
 
-    if (resolvedGpu === "auto")
-        return await getBestComputeLayersAvailable();
+    if (resolvedGpu === "auto") {
+        if (arch === process.arch)
+            return await getBestComputeLayersAvailable();
+
+        return [false];
+    }
 
     return [resolvedGpu];
 }
