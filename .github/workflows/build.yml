@@ -198,16 +198,16 @@ jobs:
           
           // build binaries
           if (process.env.ARTIFACT_NAME === "win") {
-            await buildBinary("x64");
+            await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
-            // await buildBinary("arm64", [], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
+            // await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
           } else if (process.env.ARTIFACT_NAME === "linux") {
-            await buildBinary("x64");
+            await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
-            await buildBinary("arm64");
-            await buildBinary("armv7l");
+            await buildBinary("arm64", ["--gpu", "false"]);
+            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac") {
             await buildBinary("arm64", ["--gpu", "metal"]);
             await buildBinary("x64", ["--gpu", "false"]);
