@@ -38,6 +38,7 @@ import {ChatMLChatWrapper} from "./chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
 import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
+import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "./chatWrappers/resolveChatWrapperBasedOnModel.js";
 import {
     resolveChatWrapperBasedOnWrapperTypeName, chatWrapperTypeNames, type ChatWrapperTypeName
@@ -120,6 +121,7 @@ export {
     FalconChatWrapper,
     AlpacaChatWrapper,
     FunctionaryChatWrapper,
+    GemmaChatWrapper,
     resolveChatWrapperBasedOnModel,
     resolveChatWrapperBasedOnWrapperTypeName,
     chatWrapperTypeNames,

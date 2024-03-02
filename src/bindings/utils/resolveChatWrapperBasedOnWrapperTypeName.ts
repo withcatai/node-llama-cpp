@@ -6,9 +6,10 @@ import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.
 import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
+import {GemmaChatWrapper} from "../../chatWrappers/GemmaChatWrapper.js";
 
 export const chatWrapperTypeNames = Object.freeze([
-    "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"
+    "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type ChatWrapperTypeName = (typeof chatWrapperTypeNames)[number];
 
@@ -18,7 +19,8 @@ const chatWrappers = {
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
-    "falconChat": FalconChatWrapper
+    "falconChat": FalconChatWrapper,
+    "gemma": GemmaChatWrapper
 } as const satisfies Record<Exclude<ChatWrapperTypeName, "auto">, any>;
 const chatWrapperToConfigType = new Map(
     Object.entries(chatWrappers).map(([configType, Wrapper]) => [Wrapper, configType])

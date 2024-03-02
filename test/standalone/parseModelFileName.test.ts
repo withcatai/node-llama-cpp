@@ -81,4 +81,15 @@ describe("parseModelFileName", () => {
                 parameters: "7B"
             });
     });
+
+    test("gemma-7b-it-Q5_K_M.gguf", () => {
+        expect(parseModelFileName("gemma-7b-it-Q5_K_M.gguf"))
+            .toEqual({
+                name: "gemma",
+                subType: "",
+                quantization: "Q5_K_M",
+                fileType: "gguf",
+                parameters: "7B"
+            });
+    });
 });
