@@ -40,6 +40,7 @@ describe("utils", () => {
                 }]
             );
             expect(res2).to.eql({
+                name: undefined,
                 thing: {
                     prefix: "What is the ",
                     suffix: "?"
