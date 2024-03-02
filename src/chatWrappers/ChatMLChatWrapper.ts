@@ -93,7 +93,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialToken("<|im_start|>assistant\n"),
-                            user,
+                            model,
 
                             isLastItem
                                 ? LlamaText([])

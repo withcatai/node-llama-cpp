@@ -246,7 +246,7 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
     values: LlamaTextInputValue<V>[]
 ): Array<LlamaTextValue> {
     function addItemToRes(res: Array<LlamaTextValue>, item: LlamaTextInputValue) {
-        if (item === undefined || item === "")
+        if (item === undefined || item === "" || (item instanceof SpecialToken && item.value === ""))
             return res;
         else if (typeof item === "string" || item instanceof SpecialToken)
             return res.concat([item]);
@@ -257,7 +257,7 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
                 item.reduce((res, value) => {
                     if (isLlamaText(value))
                         return res.concat(value.values);
-                    else if (value === "")
+                    else if (value === "" || (value instanceof SpecialToken && value.value === ""))
                         return res;
 
                     return res.concat([value]);
