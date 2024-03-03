@@ -4,13 +4,12 @@ import {DisposedError, EventRelay} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
 import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
-import {Llama} from "../bindings/Llama.js";
+import {DisposeGuard} from "../utils/DisposeGuard.js";
+import type {Llama} from "../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
 
 export type LlamaModelOptions = {
-    llama: Llama,
-
     /** path to the model on the filesystem */
     modelPath: string,
 
@@ -27,12 +26,22 @@ export type LlamaModelOptions = {
      * Force the system to keep the model in the RAM/VRAM.
      * Use with caution as this can crash your system if the available resources are insufficient.
      */
-    useMlock?: boolean
+    useMlock?: boolean,
+
+    /**
+     * Called with the load percentage when the model is being loaded.
+     * @param loadPercentage - a number between 0 (exclusive) and 1 (inclusive).
+     */
+    onLoadProgress?(loadPercentage: number): void,
+
+    /** An abort signal to abort the model load */
+    loadSignal?: AbortSignal
 };
 
 export class LlamaModel {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _model: AddonModel;
+    /** @internal */ public readonly _backendModelDisposeGuard: DisposeGuard;
     /** @internal */ private readonly _tokens: LlamaModelTokens;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
@@ -42,26 +51,31 @@ export class LlamaModel {
 
     public readonly onDispose = new EventRelay<void>();
 
-    /**
-     * > options source:
-     * > [github:ggerganov/llama.cpp/llama.h](
-     * > https://github.com/ggerganov/llama.cpp/blob/05816027d649f977468fc804cdb54e99eac246d1/llama.h#L161) (`struct llama_model_params`)
-     * @param options
-     * @param options.modelPath - path to the model on the filesystem
-     * @param [options.gpuLayers] - number of layers to store in VRAM
-     * @param [options.vocabOnly] - only load the vocabulary, no weights
-     * @param [options.useMmap] - use mmap if possible
-     * @param [options.useMlock] - force system to keep model in RAM
-     */
-    public constructor({
-        llama, modelPath, gpuLayers, vocabOnly, useMmap, useMlock
-    }: LlamaModelOptions) {
-        this._llama = llama;
+    private constructor({
+        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, onLoadProgress, loadSignal
+    }: LlamaModelOptions, {
+        _llama
+    }: {
+        _llama: Llama
+    }) {
+        this._llama = _llama;
+        this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._model = new this._llama._bindings.AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
             gpuLayers,
             vocabOnly,
             useMmap,
-            useMlock
+            useMlock,
+            onLoadProgress: onLoadProgress == null
+                ? undefined
+                : (loadPercentage: number) => {
+                    try {
+                        onLoadProgress(loadPercentage);
+                    } catch (err) {
+                        // the native addon code calls this function, so there's no use to throw an error here
+                        console.error(err);
+                    }
+                },
+            hasLoadAbortSignal: loadSignal != null
         }));
         this._tokens = LlamaModelTokens._create(this._model, this._disposedState);
         this._filename = path.basename(modelPath);
@@ -70,18 +84,19 @@ export class LlamaModel {
         this.detokenize = this.detokenize.bind(this);
     }
 
-    public dispose() {
+    public async dispose() {
         if (this._disposedState.disposed)
             return;
 
         this.onDispose.dispatchEvent();
-        this._model.dispose();
+        await this._backendModelDisposeGuard.acquireDisposeLock();
+        await this._model.dispose();
         this._disposedState.disposed = true;
     }
 
     /** @hidden */
-    public [Symbol.dispose]() {
-        this.dispose();
+    public async [Symbol.asyncDispose]() {
+        await this.dispose();
     }
 
     public get disposed() {
@@ -171,6 +186,44 @@ export class LlamaModel {
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
             throw new DisposedError();
+    }
+
+    /** @internal */
+    public static async _create(modelOptions: LlamaModelOptions, {
+        _llama
+    }: {
+        _llama: Llama
+    }) {
+        const model = new LlamaModel(modelOptions, {_llama});
+        const {loadSignal} = modelOptions;
+
+        function onAbort() {
+            model._model.abortActiveModelLoad();
+            loadSignal?.removeEventListener("abort", onAbort);
+        }
+
+        if (loadSignal != null) {
+            if (loadSignal.aborted)
+                throw loadSignal.reason;
+
+            loadSignal.addEventListener("abort", onAbort);
+        }
+
+        try {
+            const modelLoaded = await model._model.init();
+
+            if (loadSignal?.aborted) {
+                if (modelLoaded)
+                    await model._model.dispose();
+
+                throw loadSignal.reason;
+            } else if (!modelLoaded)
+                throw new Error("Failed to load model");
+
+            return model;
+        } finally {
+            loadSignal?.removeEventListener("abort", onAbort);
+        }
     }
 }
 

@@ -7,7 +7,9 @@ export type BindingModule = {
             gpuLayers?: number,
             vocabOnly?: boolean,
             useMmap?: boolean,
-            useMlock?: boolean
+            useMlock?: boolean,
+            onLoadProgress?(loadPercentage: number): void,
+            hasLoadAbortSignal?: boolean
         }): AddonModel
     },
     AddonContext: {
@@ -40,7 +42,9 @@ export type BindingModule = {
 };
 
 export type AddonModel = {
-    dispose(): void,
+    init(): Promise<boolean>,
+    abortActiveModelLoad(): void,
+    dispose(): Promise<void>,
     tokenize(text: string, specialTokens: boolean): Uint32Array,
     detokenize(tokens: Uint32Array): string,
     getTrainContextSize(): number,

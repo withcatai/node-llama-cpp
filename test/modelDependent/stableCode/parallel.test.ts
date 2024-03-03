@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 import {
-    LlamaCompletion, LlamaContext, LlamaModel
+    LlamaCompletion, LlamaContext
 } from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
@@ -11,12 +11,10 @@ describe("stableCode", () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
-            const model = new LlamaModel({
-                llama,
+            const model = await llama.loadModel({
                 modelPath
             });
-            const model2 = new LlamaModel({
-                llama,
+            const model2 = await llama.loadModel({
                 modelPath
             });
             const context = new LlamaContext({
@@ -61,8 +59,7 @@ describe("stableCode", () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
-            const model = new LlamaModel({
-                llama,
+            const model = await llama.loadModel({
                 modelPath
             });
             const context = new LlamaContext({
@@ -107,8 +104,7 @@ describe("stableCode", () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
-            const model = new LlamaModel({
-                llama,
+            const model = await llama.loadModel({
                 modelPath
             });
             const context = new LlamaContext({

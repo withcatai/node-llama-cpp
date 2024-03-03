@@ -1,5 +1,8 @@
 import chalk from "chalk";
+import {withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
+import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
+import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaLogLevel} from "./types.js";
 
@@ -18,6 +21,7 @@ const defaultLogLevel = 5;
 
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
+    /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
     /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
@@ -33,6 +37,7 @@ export class Llama {
     /** @internal */ private _previousLog: string | null = null;
     /** @internal */ private _previousLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
+    /** @internal */ private _lock = {};
 
     private constructor({
         bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, _skipLlamaInit = false
@@ -120,6 +125,17 @@ export class Llama {
             used,
             free: Math.max(0, total - used)
         };
+    }
+
+    public async loadModel(options: LlamaModelOptions) {
+        const preventDisposalHandle = this._backendDisposeGuard.createPreventDisposalHandle();
+        try {
+            return await withLock(this._lock, "loadToMemory", options.loadSignal, async () => {
+                return await LlamaModel._create(options, {_llama: this});
+            });
+        } finally {
+            preventDisposalHandle.dispose();
+        }
     }
 
     /** @internal */

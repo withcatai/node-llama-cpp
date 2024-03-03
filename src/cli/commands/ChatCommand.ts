@@ -12,12 +12,11 @@ import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/
 import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
-import {LlamaModel} from "../../evaluator/LlamaModel.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {
-    resolveChatWrapperBasedOnWrapperTypeName, chatWrapperTypeNames, ChatWrapperTypeName
+    ChatWrapperTypeName, chatWrapperTypeNames, resolveChatWrapperBasedOnWrapperTypeName
 } from "../../bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
 
 type ChatCommand = {
@@ -308,11 +307,17 @@ async function RunChat({
         loading: chalk.blue("Loading model"),
         success: chalk.blue("Model loaded"),
         fail: chalk.blue("Failed to load model")
-    }, async () => new LlamaModel({
-        llama,
-        modelPath: path.resolve(process.cwd(), modelArg),
-        gpuLayers: gpuLayers != null ? gpuLayers : undefined
-    }));
+    }, async () => {
+        try {
+            return await llama.loadModel({
+                modelPath: path.resolve(process.cwd(), modelArg),
+                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+            });
+        } finally {
+            if (llama.logLevel === LlamaLogLevel.debug)
+                console.info();
+        }
+    });
     const context = await withStatusLogs({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),

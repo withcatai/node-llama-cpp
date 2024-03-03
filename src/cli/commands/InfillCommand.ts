@@ -6,7 +6,6 @@ import chalk from "chalk";
 import fs from "fs-extra";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getLlama} from "../../bindings/getLlama.js";
-import {LlamaModel} from "../../evaluator/LlamaModel.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
@@ -257,11 +256,17 @@ async function RunInfill({
         loading: chalk.blue("Loading model"),
         success: chalk.blue("Model loaded"),
         fail: chalk.blue("Failed to load model")
-    }, async () => new LlamaModel({
-        llama,
-        modelPath: path.resolve(process.cwd(), modelArg),
-        gpuLayers: gpuLayers != null ? gpuLayers : undefined
-    }));
+    }, async () => {
+        try {
+            return await llama.loadModel({
+                modelPath: path.resolve(process.cwd(), modelArg),
+                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+            });
+        } finally {
+            if (llama.logLevel === LlamaLogLevel.debug)
+                console.info();
+        }
+    });
     const context = await withStatusLogs({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),

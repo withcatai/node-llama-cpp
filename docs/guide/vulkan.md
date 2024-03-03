@@ -88,8 +88,7 @@ const llama = await getLlama({
 ```
 To configure how much layers of the model are run on the GPU, configure `gpuLayers` on `LlamaModel` in your code:
 ```typescript
-const model = new LlamaModel({
-    llama,
+const model = await llama.loadModel({
     modelPath,
     gpuLayers: 64 // or any other number of layers you want
 });
