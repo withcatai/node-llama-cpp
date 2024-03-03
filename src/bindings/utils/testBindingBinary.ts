@@ -1,12 +1,30 @@
 import {fork} from "node:child_process";
 import {fileURLToPath} from "url";
 import {createRequire} from "module";
+import path from "path";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import type {BindingModule} from "../AddonTypes.js";
 
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
+const detectedFileName = path.basename(__filename);
+const expectedFileName = "testBindingBinary";
 
-export function testBindingBinary(bindingBinaryPath: string, testTimeout: number = 1000 * 60 * 5) {
+export function testBindingBinary(bindingBinaryPath: string, testTimeout: number = 1000 * 60 * 5): Promise<boolean> {
+    if (!detectedFileName.startsWith(expectedFileName)) {
+        console.warn(
+            getConsoleLogPrefix() +
+            `"${expectedFileName}.js" file is not independent, so testing a binding binary with the current system` +
+            "prior to importing it cannot be done.\n" +
+            getConsoleLogPrefix() +
+            "Assuming the test passed with the risk that the process may crash due to an incompatible binary.\n" +
+            getConsoleLogPrefix() +
+            'To resolve this issue, make sure that "node-llama-cpp" is not bundled together with other code and is imported as an external module with its original file structure.'
+        );
+
+        return Promise.resolve(true);
+    }
+
     const subProcess = fork(__filename, [], {
         detached: false,
         env: {
@@ -31,13 +49,13 @@ export function testBindingBinary(bindingBinaryPath: string, testTimeout: number
     process.on("exit", cleanup);
 
     return Promise.race([
-        new Promise((_, reject) => {
+        new Promise<boolean>((_, reject) => {
             timeoutHandle = setTimeout(() => {
                 reject(new Error("Binding binary load test timed out"));
                 cleanup();
             }, testTimeout);
         }),
-        new Promise((resolve, reject) => {
+        new Promise<boolean>((resolve, reject) => {
             function done() {
                 if (!forkSucceeded)
                     reject(new Error(`Binding binary test failed to run a test process via file "${__filename}"`));
