@@ -6,10 +6,11 @@ import {FunctionaryChatWrapper} from "../../chatWrappers/FunctionaryChatWrapper.
 import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
+import {GemmaChatWrapper} from "../../chatWrappers/GemmaChatWrapper.js";
 
-export const chatWrapperTypeNames = [
-    "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat"
-] as const;
+export const chatWrapperTypeNames = Object.freeze([
+    "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+] as const);
 export type ChatWrapperTypeName = (typeof chatWrapperTypeNames)[number];
 
 const chatWrappers = {
@@ -18,12 +19,17 @@ const chatWrappers = {
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
-    "falconChat": FalconChatWrapper
+    "falconChat": FalconChatWrapper,
+    "gemma": GemmaChatWrapper
 } as const satisfies Record<Exclude<ChatWrapperTypeName, "auto">, any>;
 const chatWrapperToConfigType = new Map(
     Object.entries(chatWrappers).map(([configType, Wrapper]) => [Wrapper, configType])
 );
 
+/**
+ * @param configType
+ * @param options
+ */
 export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapperTypeName, {
     bosString,
     filename,
@@ -32,7 +38,10 @@ export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapper
 }: {
     bosString?: string | null,
     filename?: string,
+
+    /** @hidden this type alias is too long in the documentation */
     typeDescription?: ModelTypeDescription,
+
     customWrapperSettings?: {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     }

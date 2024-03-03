@@ -3,8 +3,8 @@ import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppVulkanSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport,
-    defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath
+    defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath,
+    defaultLlamaCppGpuSupport
 } from "../../config.js";
 import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -19,17 +19,19 @@ import {getPlatform} from "../../bindings/utils/getPlatform.js";
 import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
 import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
 import {resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
-import {BuildOptions} from "../../bindings/types.js";
-import {logEnabledComputeLayers} from "../utils/logEnabledComputeLayers.js";
+import {BuildGpu, BuildOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../bindings/types.js";
+import {logUsedGpuTypeOption} from "../utils/logUsedGpuTypeOption.js";
+import {getGpuTypesToUseForOption} from "../../bindings/utils/getGpuTypesToUseForOption.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {getPlatformInfo} from "../../bindings/utils/getPlatformInfo.js";
 
 type DownloadCommandArgs = {
     repo?: string,
     release?: "latest" | string,
-    arch?: string,
+    arch?: typeof process.arch,
     nodeTarget?: string,
-    metal?: boolean,
-    cuda?: boolean,
-    vulkan?: boolean,
+    gpu?: BuildGpu | "auto",
     skipBuild?: boolean,
     noBundle?: boolean,
     noUsageExample?: boolean,
@@ -58,6 +60,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             .option("arch", {
                 alias: "a",
                 type: "string",
+                coerce: (value) => value,
                 description: "The architecture to compile llama.cpp for"
             })
             .option("nodeTarget", {
@@ -65,21 +68,14 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
                 type: "string",
                 description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
             })
-            .option("metal", {
-                type: "boolean",
-                default: defaultLlamaCppMetalSupport || isInDocumentationMode,
-                hidden: process.platform !== "darwin" && !isInDocumentationMode,
-                description: "Compile llama.cpp with Metal support. Enabled by default on macOS. Can be disabled with \"--no-metal\". Can also be set via the NODE_LLAMA_CPP_METAL environment variable"
-            })
-            .option("cuda", {
-                type: "boolean",
-                default: defaultLlamaCppCudaSupport,
-                description: "Compile llama.cpp with CUDA support. Can also be set via the NODE_LLAMA_CPP_CUDA environment variable"
-            })
-            .option("vulkan", {
-                type: "boolean",
-                default: defaultLlamaCppVulkanSupport,
-                description: "Compile llama.cpp with Vulkan support. Can also be set via the NODE_LLAMA_CPP_VULKAN environment variable"
+            .option("gpu", {
+                type: "string",
+                default: defaultLlamaCppGpuSupport,
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: nodeLlamaCppGpuOptions as any as Exclude<typeof nodeLlamaCppGpuOptions[number], false>[],
+                coerce: parseNodeLlamaCppGpuOption,
+                description: "Compute layer implementation type to use for llama.cpp"
             })
             .option("skipBuild", {
                 alias: "sb",
@@ -109,15 +105,13 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     handler: DownloadLlamaCppCommand
 };
 
-// TODO: clear the builds folder
+
 export async function DownloadLlamaCppCommand({
     repo = defaultLlamaCppGitHubRepo,
     release = defaultLlamaCppRelease,
     arch = undefined,
     nodeTarget = undefined,
-    metal = defaultLlamaCppMetalSupport,
-    cuda = defaultLlamaCppCudaSupport,
-    vulkan = defaultLlamaCppVulkanSupport,
+    gpu = defaultLlamaCppGpuSupport,
     skipBuild = false,
     noBundle = false,
     noUsageExample = false,
@@ -125,13 +119,19 @@ export async function DownloadLlamaCppCommand({
 }: DownloadCommandArgs) {
     const useBundle = noBundle != true;
     const platform = getPlatform();
+    const platformInfo = await getPlatformInfo();
     const customCmakeOptions = resolveCustomCmakeOptions();
+    const buildGpusToTry: BuildGpu[] = skipBuild
+        ? []
+        : await getGpuTypesToUseForOption(gpu, {platform, arch});
     const [githubOwner, githubRepo] = repo.split("/");
+
+    let downloadedCmake = false;
 
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
     if (!skipBuild) {
-        logEnabledComputeLayers({metal, cuda, vulkan}, {platform});
+        logUsedGpuTypeOption(buildGpusToTry[0]);
     }
     console.log();
 
@@ -162,51 +162,99 @@ export async function DownloadLlamaCppCommand({
     console.log(chalk.blue("Cloning llama.cpp"));
     await cloneLlamaCppRepo(githubOwner, githubRepo, githubReleaseTag!, useBundle);
 
-    const buildOptions: BuildOptions = {
-        customCmakeOptions,
-        progressLogs: true,
-        platform,
-        arch: arch
-            ? arch as typeof process.arch
-            : process.arch,
-        computeLayers: {
-            metal,
-            cuda,
-            vulkan
-        },
-        llamaCpp: {
-            repo,
-            release: githubReleaseTag!
-        }
-    };
-
     if (!skipBuild) {
-        await downloadCmakeIfNeeded(true);
+        for (let i = 0; i < buildGpusToTry.length; i++) {
+            const gpuToTry = buildGpusToTry[i];
+            const isLastItem = i === buildGpusToTry.length - 1;
 
-        await withStatusLogs({
-            loading: chalk.blue("Compiling llama.cpp"),
-            success: chalk.blue("Compiled llama.cpp"),
-            fail: chalk.blue("Failed to compile llama.cpp")
-        }, async () => {
-            await compileLlamaCpp(buildOptions, {
-                nodeTarget: nodeTarget ? nodeTarget : undefined,
-                updateLastBuildInfo: true,
-                downloadCmakeIfNeeded: false,
-                ensureLlamaCppRepoIsCloned: false,
-                includeBuildOptionsInBinaryFolderName: true
-            });
-        });
+            if (i > 0) // we already logged the first gpu before
+                logUsedGpuTypeOption(gpuToTry);
+
+            if (!downloadedCmake) {
+                await downloadCmakeIfNeeded(true);
+                downloadedCmake = true;
+            }
+
+            const buildOptions: BuildOptions = {
+                customCmakeOptions,
+                progressLogs: true,
+                platform,
+                platformInfo,
+                arch: arch
+                    ? arch as typeof process.arch
+                    : process.arch,
+                gpu: gpuToTry,
+                llamaCpp: {
+                    repo,
+                    release: githubReleaseTag!
+                }
+            };
+
+            try {
+                await withStatusLogs({
+                    loading: chalk.blue("Compiling llama.cpp"),
+                    success: chalk.blue("Compiled llama.cpp"),
+                    fail: chalk.blue("Failed to compile llama.cpp")
+                }, async () => {
+                    await compileLlamaCpp(buildOptions, {
+                        nodeTarget: nodeTarget ? nodeTarget : undefined,
+                        updateLastBuildInfo: true,
+                        downloadCmakeIfNeeded: false,
+                        ensureLlamaCppRepoIsCloned: false,
+                        includeBuildOptionsInBinaryFolderName: true
+                    });
+                });
+            } catch (err) {
+                console.error(
+                    getConsoleLogPrefix() +
+                    `Failed to build llama.cpp with ${getPrettyBuildGpuName(gpuToTry)} support. ` +
+                    (
+                        !isLastItem
+                            ? `falling back to building llama.cpp with ${getPrettyBuildGpuName(buildGpusToTry[i + 1])} support. `
+                            : ""
+                    ) +
+                    "Error:",
+                    err
+                );
+
+                if (isLastItem)
+                    throw err;
+
+                continue;
+            }
+
+            if (!noUsageExample) {
+                console.log();
+                console.log();
+                logBinaryUsageExampleToConsole(buildOptions, gpu !== "auto", true);
+            }
+
+            break;
+        }
+    } else if (!noUsageExample) {
+        const buildOptions: BuildOptions = {
+            customCmakeOptions,
+            progressLogs: true,
+            platform,
+            platformInfo,
+            arch: arch
+                ? arch as typeof process.arch
+                : process.arch,
+            gpu: buildGpusToTry[0],
+            llamaCpp: {
+                repo,
+                release: githubReleaseTag!
+            }
+        };
+
+        console.log();
+        console.log();
+        logBinaryUsageExampleToConsole(buildOptions, gpu !== "auto", true);
     }
 
     if (isCI && updateBinariesReleaseMetadataAndSaveGitBundle) {
         await setBinariesGithubRelease(githubReleaseTag!);
         await unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle();
-    }
-
-    if (!noUsageExample) {
-        console.log();
-        console.log();
-        logBinaryUsageExampleToConsole(buildOptions, true);
     }
 
     console.log();

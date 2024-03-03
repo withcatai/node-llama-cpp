@@ -1,19 +1,15 @@
-import process from "process";
 import {BuildOptions} from "../types.js";
 import {removeUndefinedFields} from "../../utils/removeNullFields.js";
 import {LlamaOptions} from "../getLlama.js";
 import {getExampleUsageCodeOfGetLlama} from "./getExampleUsageCodeOfGetLlama.js";
 
-export function logBinaryUsageExampleToConsole(buildOptions: BuildOptions, showLatestBuildUsageExample: boolean = true) {
+export function logBinaryUsageExampleToConsole(
+    buildOptions: BuildOptions, specifyGpuType: boolean, showLatestBuildUsageExample: boolean = true
+) {
     console.log("To use the binary you've just built, use this code:");
     const llamaOptions: LlamaOptions = removeUndefinedFields({
-        metal: buildOptions.platform !== "mac"
-            ? undefined
-            : ((process.arch === "arm64" && buildOptions.computeLayers.metal) || (process.arch === "x64" && !buildOptions.computeLayers.metal))
-                ? undefined
-                : buildOptions.computeLayers.metal,
-        cuda: buildOptions.computeLayers.cuda
-            ? true
+        gpu: specifyGpuType
+            ? buildOptions.gpu
             : undefined,
         cmakeOptions: buildOptions.customCmakeOptions.size === 0
             ? undefined

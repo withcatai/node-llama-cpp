@@ -198,19 +198,19 @@ jobs:
           
           // build binaries
           if (process.env.ARTIFACT_NAME === "win") {
-            await buildBinary("x64");
-            await buildBinary("x64", ["--cuda"]);
-            await buildBinary("x64", ["--vulkan"]);
-            // await buildBinary("arm64", [], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
+            await buildBinary("x64", ["--gpu", "false"]);
+            await buildBinary("x64", ["--gpu", "cuda"]);
+            await buildBinary("x64", ["--gpu", "vulkan"]);
+            // await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion); // disabled arm64 for now as compilation doesn't work
           } else if (process.env.ARTIFACT_NAME === "linux") {
-            await buildBinary("x64");
-            await buildBinary("x64", ["--cuda"]);
-            await buildBinary("x64", ["--vulkan"]);
-            await buildBinary("arm64");
-            await buildBinary("armv7l");
+            await buildBinary("x64", ["--gpu", "false"]);
+            await buildBinary("x64", ["--gpu", "cuda"]);
+            await buildBinary("x64", ["--gpu", "vulkan"]);
+            await buildBinary("arm64", ["--gpu", "false"]);
+            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac") {
-            await buildBinary("arm64", ["--metal"]);
-            await buildBinary("x64", ["--no-metal"]);
+            await buildBinary("arm64", ["--gpu", "metal"]);
+            await buildBinary("x64", ["--gpu", "false"]);
           }
           
           // move binaries to llamaBins
@@ -275,7 +275,7 @@ jobs:
     name: Model dependent tests
     runs-on: macos-14
     env:
-      NODE_LLAMA_CPP_METAL: false
+      NODE_LLAMA_CPP_GPU: false
     needs:
       - build
     steps:

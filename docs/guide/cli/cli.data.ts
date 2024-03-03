@@ -4,6 +4,7 @@ import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
 import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
 import {CompleteCommand} from "../../../src/cli/commands/CompleteCommand.js";
 import {InfillCommand} from "../../../src/cli/commands/InfillCommand.js";
+import {InspectCommand} from "../../../src/cli/commands/InspectCommand.js";
 import {DownloadCommand} from "../../../src/cli/commands/DownloadCommand.js";
 import {ClearCommand} from "../../../src/cli/commands/ClearCommand.js";
 import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
@@ -21,6 +22,7 @@ export default {
                 ["chat", ChatCommand],
                 ["complete", CompleteCommand],
                 ["infill", InfillCommand],
+                ["inspect", InspectCommand],
                 ["download", DownloadCommand],
                 ["build", BuildCommand],
                 ["clear", ClearCommand]
@@ -29,6 +31,7 @@ export default {
             chat: await getCommandHtmlDoc(ChatCommand),
             complete: await getCommandHtmlDoc(CompleteCommand),
             infill: await getCommandHtmlDoc(InfillCommand),
+            inspect: await getCommandHtmlDoc(InspectCommand),
             download: await getCommandHtmlDoc(DownloadCommand),
             build: await getCommandHtmlDoc(BuildCommand),
             clear: await getCommandHtmlDoc(ClearCommand)

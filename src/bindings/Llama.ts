@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildMetadataFile, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaLogLevel} from "./types.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -18,9 +18,7 @@ const defaultLogLevel = 5;
 
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
-    /** @internal */ private readonly _metal: boolean;
-    /** @internal */ private readonly _cuda: boolean;
-    /** @internal */ private readonly _vulkan: boolean;
+    /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _llamaCppRelease: {
@@ -37,12 +35,9 @@ export class Llama {
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
 
     private constructor({
-        bindings, metal, cuda, vulkan, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, _skipLlamaInit = false
     }: {
         bindings: BindingModule,
-        metal: boolean,
-        cuda: boolean,
-        vulkan: boolean,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
         buildType: "localBuild" | "prebuilt",
@@ -50,12 +45,11 @@ export class Llama {
         llamaCppRelease: {
             repo: string,
             release: string
-        }
+        },
+        _skipLlamaInit?: boolean
     }) {
         this._bindings = bindings;
-        this._metal = metal;
-        this._cuda = cuda;
-        this._vulkan = vulkan;
+        this._gpu = bindings.getGpuType() ?? false;
         this._logLevel = logLevel ?? LlamaLogLevel.debug;
         this._logger = logger;
         this._buildType = buildType;
@@ -68,20 +62,15 @@ export class Llama {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
 
+        if (!_skipLlamaInit)
+            this._bindings.init();
+
         this._bindings.setLogger(this._onAddonLog);
         this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
     }
 
-    public get metal() {
-        return this._metal;
-    }
-
-    public get cuda() {
-        return this._cuda;
-    }
-
-    public get vulkan() {
-        return this._vulkan;
+    public get gpu() {
+        return this._gpu;
     }
 
     public get logLevel() {
@@ -207,27 +196,26 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger
+        bindings, buildType, buildMetadata, logLevel, logger, skipLlamaInit = false
     }: {
         bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
-        logger: (level: LlamaLogLevel, message: string) => void
+        logger: (level: LlamaLogLevel, message: string) => void,
+        skipLlamaInit?: boolean
     }) {
         return new Llama({
             bindings,
             buildType,
-            metal: buildMetadata.buildOptions.computeLayers.metal,
-            cuda: buildMetadata.buildOptions.computeLayers.cuda,
-            vulkan: buildMetadata.buildOptions.computeLayers.vulkan,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
             llamaCppRelease: {
                 repo: buildMetadata.buildOptions.llamaCpp.repo,
                 release: buildMetadata.buildOptions.llamaCpp.release
             },
             logLevel,
-            logger
+            logger,
+            _skipLlamaInit: skipLlamaInit
         });
     }
 

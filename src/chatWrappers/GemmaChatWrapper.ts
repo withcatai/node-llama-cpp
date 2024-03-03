@@ -2,9 +2,10 @@ import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
 import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.js";
 
-// source: https://github.com/openai/openai-python/blob/120d225b91a8453e15240a49fb1c6794d8119326/chatml.md
-export class ChatMLChatWrapper extends ChatWrapper {
-    public readonly wrapperName: string = "ChatML";
+// source: https://ai.google.dev/gemma/docs/formatting
+// source: https://www.promptingguide.ai/models/gemma
+export class GemmaChatWrapper extends ChatWrapper {
+    public readonly wrapperName: string = "Gemma";
 
     public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
         availableFunctions?: ChatModelFunctions,
@@ -23,7 +24,6 @@ export class ChatMLChatWrapper extends ChatWrapper {
         });
 
         const resultItems: Array<{
-            system: string,
             user: string,
             model: string
         }> = [];
@@ -31,15 +31,26 @@ export class ChatMLChatWrapper extends ChatWrapper {
         let systemTexts: string[] = [];
         let userTexts: string[] = [];
         let modelTexts: string[] = [];
-        let currentAggregateFocus: "system" | null = null;
+        let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
-            if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
+            if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0) {
+                const systemText = systemTexts.join("\n\n");
+                let userText = userTexts.join("\n\n");
+
+                // there's no system prompt support in Gemma, so we'll prepend the system text to the user message
+                if (systemText.length > 0) {
+                    if (userText.length === 0)
+                        userText = systemText;
+                    else
+                        userText = systemText + "\n\n---\n\n" + userText;
+
+                }
                 resultItems.push({
-                    system: systemTexts.join("\n\n"),
-                    user: userTexts.join("\n\n"),
+                    user: userText,
                     model: modelTexts.join("\n\n")
                 });
+            }
 
             systemTexts = [];
             userTexts = [];
@@ -54,14 +65,13 @@ export class ChatMLChatWrapper extends ChatWrapper {
                 currentAggregateFocus = "system";
                 systemTexts.push(item.text);
             } else if (item.type === "user") {
-                flush();
+                if (currentAggregateFocus !== "system" && currentAggregateFocus !== "user")
+                    flush();
 
-                currentAggregateFocus = null;
+                currentAggregateFocus = "user";
                 userTexts.push(item.text);
             } else if (item.type === "model") {
-                flush();
-
-                currentAggregateFocus = null;
+                currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
             }
         }
@@ -69,35 +79,27 @@ export class ChatMLChatWrapper extends ChatWrapper {
         flush();
 
         const contextText = LlamaText(
-            resultItems.map(({system, user, model}, index) => {
+            resultItems.map(({user, model}, index) => {
                 const isLastItem = index === resultItems.length - 1;
 
                 return LlamaText([
-                    (system.length === 0)
-                        ? LlamaText([])
-                        : LlamaText([
-                            new SpecialToken("<|im_start|>system\n"),
-                            system,
-                            new SpecialToken("<|im_end|>\n")
-                        ]),
-
                     (user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("<|im_start|>user\n"),
+                            new SpecialToken("<start_of_turn>user\n"),
                             user,
-                            new SpecialToken("<|im_end|>\n")
+                            new SpecialToken("<end_of_turn>\n")
                         ]),
 
                     (model.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("<|im_start|>assistant\n"),
+                            new SpecialToken("<start_of_turn>model\n"),
                             model,
 
                             isLastItem
                                 ? LlamaText([])
-                                : new SpecialToken("<|im_end|>\n")
+                                : new SpecialToken("<end_of_turn>\n")
                         ])
                 ]);
             })
@@ -107,8 +109,8 @@ export class ChatMLChatWrapper extends ChatWrapper {
             contextText,
             stopGenerationTriggers: [
                 LlamaText(new BuiltinSpecialToken("EOS")),
-                LlamaText(new SpecialToken("<|im_end|>")),
-                LlamaText("<|im_end|>")
+                LlamaText(new SpecialToken("<end_of_turn>\n")),
+                LlamaText("<end_of_turn>")
             ]
         };
     }

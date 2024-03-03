@@ -18,9 +18,7 @@ export type ChatWrapperSettings = {
 };
 
 export abstract class ChatWrapper {
-    public abstract readonly wrapperName: string;
-
-    public readonly settings: ChatWrapperSettings = {
+    public static defaultSetting: ChatWrapperSettings = {
         functions: {
             call: {
                 optionalPrefixSpace: true,
@@ -34,6 +32,9 @@ export abstract class ChatWrapper {
             }
         }
     };
+
+    public abstract readonly wrapperName: string;
+    public readonly settings: ChatWrapperSettings = ChatWrapper.defaultSetting;
 
     public generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
         availableFunctions?: ChatModelFunctions,

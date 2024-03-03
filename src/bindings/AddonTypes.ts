@@ -34,7 +34,9 @@ export type BindingModule = {
     getGpuVramInfo(): {
         total: number,
         used: number
-    }
+    },
+    getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
+    init(): void
 };
 
 export type AddonModel = {

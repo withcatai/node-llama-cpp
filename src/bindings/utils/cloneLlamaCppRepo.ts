@@ -3,6 +3,7 @@ import simpleGit, {SimpleGit} from "simple-git";
 import cliProgress from "cli-progress";
 import chalk from "chalk";
 import fs from "fs-extra";
+import which from "which";
 import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
 import {getGitBundlePathForRelease} from "../../utils/gitReleaseBundles.js";
 import {withLockfile} from "../../utils/withLockfile.js";
@@ -11,6 +12,7 @@ import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {isLockfileActive} from "../../utils/isLockfileActive.js";
 import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
+import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 
 type ClonedLlamaCppRepoTagFile = {
     tag: string,
@@ -85,7 +87,7 @@ export async function cloneLlamaCppRepo(
                 if (progressLogs)
                     console.error(getConsoleLogPrefix() + "Failed to clone git bundle, cloning from GitHub instead", err);
 
-                printCloneErrorHelp(String(err));
+                await printCloneErrorHelp(String(err));
             }
         }
 
@@ -100,14 +102,14 @@ export async function cloneLlamaCppRepo(
 
             await updateClonedLlamaCppRepoTagFile(githubOwner, githubRepo, tag);
         } catch (err) {
-            printCloneErrorHelp(String(err));
+            await printCloneErrorHelp(String(err));
 
             throw err;
         }
     });
 }
 
-function printCloneErrorHelp(error: string) {
+async function printCloneErrorHelp(error: string) {
     // This error happens with some docker images where the current user is different
     // from the owner of the files due to mounting a volume.
     // In such cases, print a helpful message to help the user resolve the issue.
@@ -118,6 +120,15 @@ function printCloneErrorHelp(error: string) {
             chalk.yellow("Or run this command to fix it everywhere:") + "\n" +
             'git config --global --add safe.directory "*"'
         );
+    else if (await which("git", {nothrow: true}) == null) {
+        console.info("\n" +
+            getConsoleLogPrefix(true) + chalk.yellow("Git is not installed, please install it first to build llama.cpp")
+        );
+        await logDistroInstallInstruction("To install git, ", {
+            linuxPackages: {apt: ["git"]},
+            macOsPackages: {brew: ["git", "git-lfs"]}
+        });
+    }
 }
 
 export async function getClonedLlamaCppRepoReleaseInfo() {

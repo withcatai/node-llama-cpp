@@ -65,6 +65,7 @@ describe("ChatMLChatWrapper", () => {
               "value": "<|im_start|>assistant
           ",
             },
+            "Hello!",
           ]
         `);
 
@@ -101,6 +102,7 @@ describe("ChatMLChatWrapper", () => {
               "value": "<|im_start|>assistant
           ",
             },
+            "Hello!",
             {
               "type": "specialToken",
               "value": "<|im_end|>
@@ -122,6 +124,7 @@ describe("ChatMLChatWrapper", () => {
               "value": "<|im_start|>assistant
           ",
             },
+            "I'm good, how are you?",
           ]
         `);
 
@@ -165,6 +168,7 @@ describe("ChatMLChatWrapper", () => {
               "value": "<|im_start|>assistant
           ",
             },
+            "Hello!",
           ]
         `);
 
@@ -198,6 +202,7 @@ describe("ChatMLChatWrapper", () => {
               "value": "<|im_start|>assistant
           ",
             },
+            "Hello!",
             {
               "type": "specialToken",
               "value": "<|im_end|>

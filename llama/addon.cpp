@@ -107,6 +107,22 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     return result;
 }
 
+Napi::Value getGpuType(const Napi::CallbackInfo& info) {
+#ifdef GPU_INFO_USE_CUBLAS
+    return Napi::String::New(info.Env(), "cuda");
+#endif
+
+#ifdef GPU_INFO_USE_VULKAN
+    return Napi::String::New(info.Env(), "vulkan");
+#endif
+
+#ifdef GPU_INFO_USE_METAL
+    return Napi::String::New(info.Env(), "metal");
+#endif
+
+    return info.Env().Undefined();
+}
+
 static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
     auto tokenType = llama_token_get_type(model, token);
 
@@ -120,7 +136,7 @@ static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* mod
 static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
     auto tokenType = llama_token_get_type(model, token);
 
-    if (tokenType != LLAMA_TOKEN_TYPE_CONTROL) {
+    if (tokenType != LLAMA_TOKEN_TYPE_CONTROL && tokenType != LLAMA_TOKEN_TYPE_USER_DEFINED) {
         return Napi::Number::From(info.Env(), -1);
     }
 
@@ -661,7 +677,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             int32_t endPos = info[2].As<Napi::Number>().Int32Value();
             int32_t shiftDelta = info[3].As<Napi::Number>().Int32Value();
 
-            llama_kv_cache_seq_shift(ctx, sequenceId, startPos, endPos, shiftDelta);
+            llama_kv_cache_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
 
             return info.Env().Undefined();
         }
@@ -1066,6 +1082,17 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+Napi::Value addonInit(const Napi::CallbackInfo& info) {
+    if (!backendInitialized) {
+        llama_backend_init();
+        backendInitialized = true;
+    }
+
+    llama_log_set(addonLlamaCppLogCallback, nullptr);
+
+    return info.Env().Undefined();
+}
+
 static void addonFreeLlamaBackend(Napi::Env env, int* data) {
     if (backendInitialized) {
         llama_backend_free();
@@ -1074,21 +1101,18 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
 }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
-    llama_backend_init();
-    backendInitialized = true;
-
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
+        Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
+        Napi::PropertyDescriptor::Function("init", addonInit),
     });
     AddonModel::init(exports);
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
-
-    llama_log_set(addonLlamaCppLogCallback, nullptr);
 
     exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
 

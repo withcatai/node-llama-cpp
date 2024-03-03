@@ -7,6 +7,7 @@ import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
 import {FalconChatWrapper} from "./FalconChatWrapper.js";
 import {FunctionaryChatWrapper} from "./FunctionaryChatWrapper.js";
 import {AlpacaChatWrapper} from "./AlpacaChatWrapper.js";
+import {GemmaChatWrapper} from "./GemmaChatWrapper.js";
 
 
 /**
@@ -53,6 +54,8 @@ export function resolveChatWrapperBasedOnModel({
                 return FunctionaryChatWrapper;
             else if (lowercaseName === "dolphin" && splitLowercaseSubType.includes("mistral"))
                 return ChatMLChatWrapper;
+            else if (lowercaseName === "gemma")
+                return GemmaChatWrapper;
         }
     }
 
