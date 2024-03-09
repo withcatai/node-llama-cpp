@@ -125,7 +125,7 @@ async function printCloneErrorHelp(error: string) {
             getConsoleLogPrefix(true) + chalk.yellow("Git is not installed, please install it first to build llama.cpp")
         );
         await logDistroInstallInstruction("To install git, ", {
-            linuxPackages: {apt: ["git"]},
+            linuxPackages: {apt: ["git"], apk: ["git"]},
             macOsPackages: {brew: ["git", "git-lfs"]}
         });
     }

@@ -151,7 +151,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                     chalk.yellow('It seems that "make" is not installed in your system. Install it to resolve build issues')
                 );
                 await logDistroInstallInstruction('To install "make", ', {
-                    linuxPackages: {apt: ["make"]},
+                    linuxPackages: {apt: ["make"], apk: ["make"]},
                     macOsPackages: {brew: ["make"]}
                 });
             } else if (platform === "mac" && await which("clang", {nothrow: true}) == null)

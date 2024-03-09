@@ -5,7 +5,8 @@ import {getPlatform} from "./getPlatform.js";
 
 type DistroPackages = {
     linuxPackages?: {
-        apt?: string[]
+        apt?: string[],
+        apk?: string[]
     },
     macOsPackages?: {
         brew?: string[]
@@ -44,11 +45,27 @@ export async function getDistroInstallInstruction({
                 which("apt", {nothrow: true})
             ]);
 
-            if (aptPath == null)
-                return null;
+            if (aptPath != null) {
+                const aptCommand = (sudoPath != null ? "sudo " : "") + "apt";
 
-            return 'you can run "' + (sudoPath != null ? "sudo " : "") + "apt install " + linuxPackages.apt.join(" ") + '"';
+                return 'you can run "' + aptCommand + " update && " + aptCommand + " install -y " + linuxPackages.apt.join(" ") + '"';
+            }
         }
+
+        if (linuxPackages.apk != null && linuxPackages.apk.length > 0) {
+            const [
+                sudoPath,
+                apkPath
+            ] = await Promise.all([
+                which("sudo", {nothrow: true}),
+                which("apk", {nothrow: true})
+            ]);
+
+            if (apkPath != null)
+                return 'you can run "' + (sudoPath != null ? "sudo " : "") + "apk add " + linuxPackages.apk.join(" ") + '"';
+        }
+
+        return null;
     } else if (platform === "mac") {
         if (macOsPackages == null)
             return null;
@@ -56,11 +73,11 @@ export async function getDistroInstallInstruction({
         if (macOsPackages.brew != null && macOsPackages.brew.length > 0) {
             const brewPath = await which("brew", {nothrow: true});
 
-            if (brewPath == null)
-                return null;
-
-            return 'you can run "brew install ' + macOsPackages.brew.join(" ") + '"';
+            if (brewPath != null)
+                return 'you can run "brew install ' + macOsPackages.brew.join(" ") + '"';
         }
+
+        return null;
     }
 
     return null;
