@@ -34,9 +34,9 @@ export type LlamaModelOptions = {
 
     /**
      * Called with the load percentage when the model is being loaded.
-     * @param loadPercentage - a number between 0 (exclusive) and 1 (inclusive).
+     * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
      */
-    onLoadProgress?(loadPercentage: number): void,
+    onLoadProgress?(loadProgress: number): void,
 
     /** An abort signal to abort the model load */
     loadSignal?: AbortSignal
