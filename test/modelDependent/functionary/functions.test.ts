@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {defineChatSessionFunction, LlamaChatSession, LlamaContext, LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {defineChatSessionFunction, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -12,8 +12,7 @@ describe("functionary", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const context = new LlamaContext({
-                model,
+            const context = await model.createContext({
                 contextSize: 4096
             });
             const chatSession = new LlamaChatSession({
@@ -53,8 +52,7 @@ describe("functionary", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const context = new LlamaContext({
-                model,
+            const context = await model.createContext({
                 contextSize: 4096
             });
             const chatSession = new LlamaChatSession({

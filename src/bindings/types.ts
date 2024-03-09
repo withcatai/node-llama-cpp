@@ -77,3 +77,7 @@ export const LlamaLogLevelValues = [
     LlamaLogLevel.info,
     LlamaLogLevel.debug
 ] as const;
+
+export const enum LlamaLocks {
+    loadToMemory = "loadToMemory"
+}

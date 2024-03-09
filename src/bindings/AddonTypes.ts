@@ -65,7 +65,8 @@ export type AddonModel = {
 };
 
 export type AddonContext = {
-    dispose(): void,
+    init(): Promise<boolean>,
+    dispose(): Promise<void>,
     getContextSize(): number,
     initBatch(size: number): void, // size must be less or equal to batchSize
     addToBatch(

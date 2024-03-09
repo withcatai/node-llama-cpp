@@ -17,12 +17,10 @@ describe("stableCode", () => {
             const model2 = await llama.loadModel({
                 modelPath
             });
-            const context = new LlamaContext({
-                model,
+            const context = await model.createContext({
                 contextSize: 4096
             });
-            const context2 = new LlamaContext({
-                model: model2,
+            const context2 = await model2.createContext({
                 contextSize: 4096
             });
             const completion = new LlamaCompletion({
@@ -62,12 +60,10 @@ describe("stableCode", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const context = new LlamaContext({
-                model,
+            const context = await model.createContext({
                 contextSize: 4096
             });
-            const context2 = new LlamaContext({
-                model: model,
+            const context2 = await model.createContext({
                 contextSize: 4096
             });
             const completion = new LlamaCompletion({
@@ -107,8 +103,7 @@ describe("stableCode", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const context = new LlamaContext({
-                model,
+            const context = await model.createContext({
                 contextSize: 4096,
                 sequences: 2
             });

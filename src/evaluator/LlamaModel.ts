@@ -1,10 +1,14 @@
 import process from "process";
 import path from "path";
-import {DisposedError, EventRelay} from "lifecycle-utils";
+import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
 import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
+import {LlamaLocks} from "../bindings/types.js";
+import {LlamaContextOptions} from "./LlamaContext/types.js";
+import {LlamaContext} from "./LlamaContext/LlamaContext.js";
+import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
 import type {Llama} from "../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
@@ -150,6 +154,28 @@ export class LlamaModel {
             return "";
 
         return this._model.detokenize(Uint32Array.from(tokens));
+    }
+
+    public async createContext(options: LlamaContextOptions) {
+        return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
+            const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
+            try {
+                return await LlamaContext._create(options, {_model: this});
+            } finally {
+                preventDisposalHandle.dispose();
+            }
+        });
+    }
+
+    public async createEmbeddingContext(options: LlamaEmbeddingContextOptions) {
+        return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
+            const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
+            try {
+                return await LlamaEmbeddingContext._create({_model: this}, options);
+            } finally {
+                preventDisposalHandle.dispose();
+            }
+        });
     }
 
     /** @hidden `ModelTypeDescription` type alias is too long in the documentation */

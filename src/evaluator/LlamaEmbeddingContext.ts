@@ -1,13 +1,11 @@
-import {DisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
+import {AsyncDisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
 import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
-import {LlamaModel} from "./LlamaModel.js";
-import {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
+import type {LlamaModel} from "./LlamaModel.js";
+import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
 export type LlamaEmbeddingContextOptions = {
-    model: LlamaModel,
-
     /** text context size */
     contextSize?: number,
 
@@ -18,43 +16,35 @@ export type LlamaEmbeddingContextOptions = {
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware
      */
-    threads?: number
+    threads?: number,
+
+    /** An abort signal to abort the context creation */
+    createSignal?: AbortSignal
 };
 
 export class LlamaEmbeddingContext {
     /** @internal */ private readonly _llamaContext: LlamaContext;
     /** @internal */ private readonly _sequence: LlamaContextSequence;
-    /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
+    /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
 
     public readonly onDispose = new EventRelay<void>();
 
-    public constructor({
-        model,
-        contextSize = model.trainContextSize,
-        batchSize = contextSize,
-        threads = 6
-    }: LlamaEmbeddingContextOptions) {
-        const resolvedContextSize = Math.min(contextSize, model.trainContextSize);
-        const resolvedBatchSize = Math.min(batchSize, resolvedContextSize);
-
-        this._llamaContext = new LlamaContext({
-            model,
-            contextSize: resolvedContextSize,
-            batchSize: resolvedBatchSize,
-            threads,
-            _embeddings: true,
-            _noSeed: true
-        });
+    private constructor({
+        _llamaContext
+    }: {
+        _llamaContext: LlamaContext
+    }) {
+        this._llamaContext = _llamaContext;
         this._sequence = this._llamaContext.getSequence();
 
         this._disposeAggregator.add(
             this._llamaContext.onDispose.createListener(() => {
-                this._disposeAggregator.dispose();
+                void this._disposeAggregator.dispose();
             })
         );
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
-        this._disposeAggregator.add(() => {
-            this._llamaContext.dispose();
+        this._disposeAggregator.add(async () => {
+            await this._llamaContext.dispose();
         });
     }
 
@@ -88,17 +78,45 @@ export class LlamaEmbeddingContext {
         });
     }
 
-    public dispose() {
-        this._disposeAggregator.dispose();
+    public async dispose() {
+        await this._disposeAggregator.dispose();
     }
 
     /** @hidden */
-    public [Symbol.dispose]() {
+    public [Symbol.asyncDispose]() {
         return this.dispose();
     }
 
     public get disposed() {
         return this._llamaContext.disposed;
+    }
+
+    /** @internal */
+    public static async _create({
+        _model
+    }: {
+        _model: LlamaModel
+    }, {
+        contextSize = _model.trainContextSize,
+        batchSize = contextSize,
+        threads = 6,
+        createSignal
+    }: LlamaEmbeddingContextOptions) {
+        const resolvedContextSize = Math.min(contextSize, _model.trainContextSize);
+        const resolvedBatchSize = Math.min(batchSize, resolvedContextSize);
+
+        const llamaContext = await _model.createContext({
+            contextSize: resolvedContextSize,
+            batchSize: resolvedBatchSize,
+            threads,
+            createSignal,
+            _embeddings: true,
+            _noSeed: true
+        });
+
+        return new LlamaEmbeddingContext({
+            _llamaContext: llamaContext
+        });
     }
 }
 

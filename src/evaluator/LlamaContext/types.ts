@@ -1,11 +1,8 @@
-import {Token} from "../../types.js";
-import {LlamaModel} from "../LlamaModel.js";
-import {LlamaContextSequence} from "./LlamaContext.js";
+import type {Token} from "../../types.js";
+import type {LlamaContextSequence} from "./LlamaContext.js";
 
 
 export type LlamaContextOptions = {
-    model: LlamaModel,
-
     /**
      * number of sequences for the context.
      * Each sequence is a different "text generation process" that can run in parallel to other sequences in the same context.
@@ -31,6 +28,9 @@ export type LlamaContextOptions = {
 
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions,
+
+    /** An abort signal to abort the context creation */
+    createSignal?: AbortSignal,
 
     /**
      * embedding mode only

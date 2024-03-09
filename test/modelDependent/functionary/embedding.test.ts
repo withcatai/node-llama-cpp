@@ -12,8 +12,7 @@ describe("functionary", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const embeddingContext = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 
@@ -38,8 +37,7 @@ describe("functionary", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const embeddingContext = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 
@@ -50,8 +48,7 @@ describe("functionary", () => {
 
             embeddingContext.dispose();
 
-            const embeddingContext2 = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext2 = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 

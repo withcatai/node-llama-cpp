@@ -4,7 +4,7 @@ import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaLocks, LlamaLogLevel} from "./types.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -22,6 +22,7 @@ const defaultLogLevel = 5;
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
     /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
+    /** @internal */ public readonly _memoryLock = {};
     /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
@@ -37,7 +38,6 @@ export class Llama {
     /** @internal */ private _previousLog: string | null = null;
     /** @internal */ private _previousLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
-    /** @internal */ private _lock = {};
 
     private constructor({
         bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, _skipLlamaInit = false
@@ -128,14 +128,14 @@ export class Llama {
     }
 
     public async loadModel(options: LlamaModelOptions) {
-        const preventDisposalHandle = this._backendDisposeGuard.createPreventDisposalHandle();
-        try {
-            return await withLock(this._lock, "loadToMemory", options.loadSignal, async () => {
+        return await withLock(this._memoryLock, LlamaLocks.loadToMemory, options.loadSignal, async () => {
+            const preventDisposalHandle = this._backendDisposeGuard.createPreventDisposalHandle();
+            try {
                 return await LlamaModel._create(options, {_llama: this});
-            });
-        } finally {
-            preventDisposalHandle.dispose();
-        }
+            } finally {
+                preventDisposalHandle.dispose();
+            }
+        });
     }
 
     /** @internal */

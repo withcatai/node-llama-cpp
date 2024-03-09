@@ -271,12 +271,18 @@ async function RunInfill({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
         fail: chalk.blue("Failed to create context")
-    }, async () => new LlamaContext({
-        model,
-        contextSize,
-        batchSize,
-        threads
-    }));
+    }, async () => {
+        try {
+            return await model.createContext({
+                contextSize,
+                batchSize,
+                threads
+            });
+        } finally {
+            if (llama.logLevel === LlamaLogLevel.debug)
+                console.info();
+        }
+    });
 
     const completion = new LlamaCompletion({
         contextSequence: context.getSequence()
