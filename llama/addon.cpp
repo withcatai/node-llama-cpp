@@ -638,7 +638,7 @@ Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    AddonModelLoadModelWorker* worker = new AddonModelLoadModelWorker(info.Env(), this);
+    AddonModelLoadModelWorker* worker = new AddonModelLoadModelWorker(this->Env(), this);
     worker->Queue();
     return worker->GetPromise();
 }
@@ -650,7 +650,7 @@ Napi::Value AddonModel::Dispose(const Napi::CallbackInfo& info) {
     if (modelLoaded) {
         modelLoaded = false;
 
-        AddonModelUnloadModelWorker* worker = new AddonModelUnloadModelWorker(info.Env(), this);
+        AddonModelUnloadModelWorker* worker = new AddonModelUnloadModelWorker(this->Env(), this);
         worker->Queue();
         return worker->GetPromise();
     } else {
