@@ -178,7 +178,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         llama_model_params model_params;
         llama_model* model;
         uint64_t loadedModelSize = 0;
-        
+
         std::string modelPath;
         bool modelLoaded = false;
         bool abortModelLoad = false;
@@ -530,7 +530,7 @@ static bool llamaModelParamsProgressCallback(float progress, void * user_data) {
             }
         }
     }
-    
+
     return !(addonModel->abortModelLoad);
 }
 
@@ -761,8 +761,8 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                     context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value();
                 }
 
-                if (options.Has("embedding")) {
-                    context_params.embedding = options.Get("embedding").As<Napi::Boolean>().Value();
+                if (options.Has("embeddings")) {
+                    context_params.embeddings = options.Get("embeddings").As<Napi::Boolean>().Value();
                 }
 
                 if (options.Has("threads")) {
@@ -938,8 +938,23 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                 return info.Env().Undefined();
             }
 
+            int32_t inputTokensLength = info[0].As<Napi::Number>().Int32Value();
+
+            if (inputTokensLength <= 0) {
+                Napi::Error::New(info.Env(), "Invalid input tokens length").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
             const int n_embd = llama_n_embd(model->model);
-            const auto* embeddings = llama_get_embeddings(ctx);
+            const auto* embeddings = llama_get_embeddings_seq(ctx, 0);
+            if (embeddings == NULL) {
+                embeddings = llama_get_embeddings_ith(ctx, inputTokensLength - 1);
+
+                if (embeddings == NULL) {
+                    Napi::Error::New(info.Env(), std::string("Failed to get embeddings for token ") + std::to_string(inputTokensLength - 1)).ThrowAsJavaScriptException();
+                    return info.Env().Undefined();
+                }
+            }
 
             Napi::Float64Array result = Napi::Float64Array::New(info.Env(), n_embd);
             for (size_t i = 0; i < n_embd; ++i) {

@@ -36,7 +36,7 @@ export type LlamaContextOptions = {
      * embedding mode only
      * @internal
      */
-    _embedding?: boolean,
+    _embeddings?: boolean,
 
     /**
      * disable the seed generation

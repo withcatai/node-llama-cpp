@@ -42,7 +42,7 @@ export class LlamaEmbeddingContext {
             contextSize: resolvedContextSize,
             batchSize: resolvedBatchSize,
             threads,
-            _embedding: true,
+            _embeddings: true,
             _noSeed: true
         });
         this._sequence = this._llamaContext.getSequence();
@@ -75,9 +75,13 @@ export class LlamaEmbeddingContext {
                 end: this._sequence.nextTokenIndex
             }]);
 
-            await this._sequence.evaluateWithoutGeneratingNewTokens(resolvedInput);
+            const iterator = this._sequence.evaluate(resolvedInput);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            for await (const token of iterator) {
+                break; // only generate one token to get embeddings
+            }
 
-            const embedding = this._llamaContext._ctx.getEmbedding();
+            const embedding = this._llamaContext._ctx.getEmbedding(resolvedInput.length);
             const embeddingVector = Array.from(embedding);
 
             return new LlamaEmbedding({vector: embeddingVector});

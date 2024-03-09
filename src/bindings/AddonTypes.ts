@@ -18,7 +18,7 @@ export type BindingModule = {
             contextSize?: number,
             batchSize?: number,
             logitsAll?: boolean,
-            embedding?: boolean,
+            embeddings?: boolean,
             threads?: number
         }): AddonContext
     },
@@ -95,7 +95,7 @@ export type AddonContext = {
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
-    getEmbedding(): Float64Array,
+    getEmbedding(inputTokensLength: number): Float64Array,
     printTimings(): void
 };
 

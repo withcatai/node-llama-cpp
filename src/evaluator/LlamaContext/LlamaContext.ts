@@ -50,7 +50,7 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemsPrioritizingStrategy: batchingItemsPrioritizingStrategy = "maximumParallelism"
         } = {},
-        _embedding,
+        _embeddings,
         _noSeed
     }: LlamaContextOptions) {
         if (model.disposed)
@@ -66,7 +66,7 @@ export class LlamaContext {
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             threads: Math.max(0, Math.floor(threads)),
-            embedding: _embedding,
+            embeddings: _embeddings,
             noSeed: _noSeed
         }));
         this._batchingOptions = {
