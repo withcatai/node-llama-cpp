@@ -18,6 +18,7 @@ import {getBuildFolderNameForBuildOptions} from "./getBuildFolderNameForBuildOpt
 import {setLastBuildInfo} from "./lastBuildInfo.js";
 import {getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
+import {testCmakeBinary} from "./testCmakeBinary.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -153,6 +154,15 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                 await logDistroInstallInstruction('To install "make", ', {
                     linuxPackages: {apt: ["make"], apk: ["make"]},
                     macOsPackages: {brew: ["make"]}
+                });
+            } else if (platform === "linux" && !(await testCmakeBinary(await getCmakePath()))) {
+                console.info("\n" +
+                    getConsoleLogPrefix(true) +
+                    chalk.yellow('It seems that the used "cmake" doesn\'t work properly. Install it on your system to resolve build issues')
+                );
+                await logDistroInstallInstruction('To install "cmake", ', {
+                    linuxPackages: {apt: ["cmake"], apk: ["cmake"]},
+                    macOsPackages: {brew: ["cmake"]}
                 });
             } else if (platform === "mac" && await which("clang", {nothrow: true}) == null)
                 console.info("\n" +
