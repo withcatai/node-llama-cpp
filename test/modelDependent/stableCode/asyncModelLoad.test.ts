@@ -27,7 +27,7 @@ describe("stableCode", () => {
                 await new Promise((resolve) => setTimeout(resolve, 0));
             }
 
-            expect(loopIterationsBeforeLoad).toBeGreaterThan(1);
+            expect(loopIterationsBeforeLoad).toBeGreaterThan(2);
 
             const model = await modelPromise;
             let loopIterationsBeforeUnload = 0;
@@ -47,7 +47,7 @@ describe("stableCode", () => {
                 await new Promise((resolve) => setTimeout(resolve, 0));
             }
 
-            expect(loopIterationsBeforeUnload).toBeGreaterThan(1);
+            expect(loopIterationsBeforeUnload).toBeGreaterThan(2);
             expect(disposePromise).resolves.toBeUndefined();
         }, {
             timeout: 1000 * 60 * 60 * 2
@@ -82,7 +82,7 @@ describe("stableCode", () => {
             }
 
             await expect(modelPromise).resolves.not.toBeNull();
-            expect(loopIterationsBeforeLoad).toBeGreaterThan(1);
+            expect(loopIterationsBeforeLoad).toBeGreaterThan(2);
             expect(logProgresses.length).toBeGreaterThan(8);
             expect(logProgresses[logProgresses.length - 1]).toBe(1);
 
@@ -142,7 +142,7 @@ describe("stableCode", () => {
             const maxTimeToAllowToNotAbortBeforeFinishLoading = 1000;
 
             await expect(modelPromise).rejects.toThrow(CustomError);
-            expect(loopIterationsBeforeLoad).toBeGreaterThan(1);
+            expect(loopIterationsBeforeLoad).toBeGreaterThan(2);
             expect(logProgresses.length).toBeGreaterThan(0);
 
             // only test in cases that the machine is not too fast to finish loading before the stop event is propagated
