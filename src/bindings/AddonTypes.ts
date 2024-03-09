@@ -90,7 +90,7 @@ export type AddonContext = {
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive
-    removeTokenCellsFromSequence(sequenceId: number, startPos: number, endPos: number): void,
+    removeTokenCellsFromSequence(sequenceId: number, startPos: number, endPos: number): boolean,
 
     // startPos in inclusive, endPos is exclusive
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,

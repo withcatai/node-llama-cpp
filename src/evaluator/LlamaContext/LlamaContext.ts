@@ -597,6 +597,9 @@ export class LlamaContextSequence {
             if (ranges.length === 0)
                 return;
 
+            // if the deletion fails, we'll have to dispose the sequence and fill it up again
+            let deletionSuccessful = true;
+
             const resolvedRanges = ranges
                 .map(({start, end}) => {
                     if (start === end)
@@ -633,19 +636,29 @@ export class LlamaContextSequence {
             let lastDeleteRangeEndPos: number | null = null;
             for (const range of resolvedRanges) {
                 this._contextTokens.splice(range.start - removedTokens, range.end - range.start);
-                this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
+                if (deletionSuccessful)
+                    deletionSuccessful &&= this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
 
-                if (lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
+                if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
                     this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, range.start, -removedTokens);
 
                 removedTokens += range.end - range.start;
                 lastDeleteRangeEndPos = range.end;
             }
 
-            if (lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== this._nextTokenIndex)
+            if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== this._nextTokenIndex)
                 this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, this._nextTokenIndex, -removedTokens);
 
             this._nextTokenIndex -= removedTokens;
+
+            if (deletionSuccessful)
+                return;
+
+            const newSequenceTokens = this._contextTokens.slice();
+            this._nextTokenIndex = 0;
+            this._context._ctx.disposeSequence(this._sequenceId);
+
+            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens);
         });
     }
 

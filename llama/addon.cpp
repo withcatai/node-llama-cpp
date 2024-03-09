@@ -926,7 +926,12 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
             int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
 
-            llama_kv_cache_seq_rm(ctx, sequenceId, -1, -1);
+            bool result = llama_kv_cache_seq_rm(ctx, sequenceId, -1, -1);
+
+            if (!result) {
+                Napi::Error::New(info.Env(), "Failed to dispose sequence").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
 
             return info.Env().Undefined();
         }
@@ -940,9 +945,9 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             int32_t startPos = info[1].As<Napi::Number>().Int32Value();
             int32_t endPos = info[2].As<Napi::Number>().Int32Value();
 
-            llama_kv_cache_seq_rm(ctx, sequenceId, startPos, endPos);
+            bool result = llama_kv_cache_seq_rm(ctx, sequenceId, startPos, endPos);
 
-            return info.Env().Undefined();
+            return Napi::Boolean::New(info.Env(), result);
         }
         Napi::Value ShiftSequenceTokenCells(const Napi::CallbackInfo& info) {
             if (disposed) {
