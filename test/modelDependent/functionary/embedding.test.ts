@@ -1,5 +1,4 @@
 import {describe, expect, test} from "vitest";
-import {LlamaEmbeddingContext} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 

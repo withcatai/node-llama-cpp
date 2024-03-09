@@ -12,7 +12,6 @@ import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/
 import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
-import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {

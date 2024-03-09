@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {LlamaChatSession, LlamaContext} from "../../../src/index.js";
+import {LlamaChatSession} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 

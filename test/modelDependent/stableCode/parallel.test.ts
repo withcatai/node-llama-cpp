@@ -1,7 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {
-    LlamaCompletion, LlamaContext
-} from "../../../src/index.js";
+import {LlamaCompletion} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 

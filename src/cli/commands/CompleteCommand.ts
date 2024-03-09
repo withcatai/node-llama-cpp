@@ -6,7 +6,6 @@ import chalk from "chalk";
 import fs from "fs-extra";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getLlama} from "../../bindings/getLlama.js";
-import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
 
