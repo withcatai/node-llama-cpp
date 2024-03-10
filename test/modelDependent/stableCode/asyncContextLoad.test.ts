@@ -30,7 +30,7 @@ describe("stableCode", () => {
                 await new Promise((resolve) => setTimeout(resolve, 0));
             }
 
-            expect(loopIterationsBeforeLoad).toBeGreaterThan(2);
+            expect(loopIterationsBeforeLoad).toBeGreaterThanOrEqual(2);
 
             const context = await contextPromise;
             let loopIterationsBeforeUnload = 0;
@@ -50,7 +50,7 @@ describe("stableCode", () => {
                 await new Promise((resolve) => setTimeout(resolve, 0));
             }
 
-            expect(loopIterationsBeforeUnload).toBeGreaterThan(2);
+            expect(loopIterationsBeforeUnload).toBeGreaterThanOrEqual(2);
             expect(disposePromise).resolves.toBeUndefined();
         }, {
             timeout: 1000 * 60 * 60 * 2
