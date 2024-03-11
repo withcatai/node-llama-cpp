@@ -42,7 +42,7 @@ async function InspectGpuFunction() {
     if (platform === "mac" && arch === "arm64") {
         console.info(`${chalk.yellow("Metal:")} ${chalk.green("available")}`);
         gpusToLogVramUsageOf.push("metal");
-    } else {
+    } else if (platform === "mac") {
         console.info(`${chalk.yellow("Metal:")} ${chalk.red("not supported by llama.cpp on Intel Macs")}`);
     }
 
