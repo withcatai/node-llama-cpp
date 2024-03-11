@@ -72,6 +72,10 @@ export class Llama {
 
         this._bindings.setLogger(this._onAddonLog);
         this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
+
+        this._onExit = this._onExit.bind(this);
+
+        process.on("exit", this._onExit);
     }
 
     public get gpu() {
@@ -208,6 +212,14 @@ export class Llama {
 
         this._previousLog = message;
         this._previousLogLevel = level;
+    }
+
+    /** @internal */
+    private _onExit() {
+        if (this._pendingLog != null && this._pendingLogLevel != null) {
+            this._callLogger(this._pendingLogLevel, this._pendingLog);
+            this._pendingLog = null;
+        }
     }
 
     /** @internal */
