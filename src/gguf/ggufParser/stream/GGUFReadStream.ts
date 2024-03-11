@@ -1,4 +1,4 @@
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import GgufBaseStream, {ALLOCATION_SIZE} from "./GGUFBaseStream.js";
