@@ -1,4 +1,5 @@
 import process from "process";
+import path from "path";
 import fs from "fs-extra";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {BinaryPlatform, getPlatform} from "./getPlatform.js";
@@ -38,6 +39,7 @@ async function detectCudaSupport({
         const librarySearchPaths = [
             process.env.CUDA_PATH
         ];
+        const windir = getWindir();
 
         const [
             hasNvidiaDriver,
@@ -45,7 +47,7 @@ async function detectCudaSupport({
         ] = await Promise.all([
             asyncSome([
                 hasFileInPath("nvml.dll"),
-                fs.pathExists("c:\\Windows\\System32\\nvml.dll")
+                fs.pathExists(path.join(windir, "System32", "nvml.dll"))
             ]),
             asyncEvery([
                 asyncSome([
@@ -134,10 +136,12 @@ async function detectVulkanSupport({
     platform: BinaryPlatform
 }) {
     if (platform === "win") {
+        const windir = getWindir();
+
         return await asyncSome([
             hasFileInPath("vulkan-1.dll"),
-            fs.pathExists("c:\\Windows\\System32\\vulkan-1.dll"),
-            fs.pathExists("c:\\Windows\\SysWOW64\\vulkan-1.dll")
+            fs.pathExists(path.join(windir, "System32", "vulkan-1.dll")),
+            fs.pathExists(path.join(windir, "SysWOW64", "vulkan-1.dll"))
         ]);
     } else if (platform === "linux") {
         const librarySearchPaths = [
@@ -197,4 +201,9 @@ async function getLinuxCudaLibraryPaths() {
     }
 
     return res;
+}
+
+function getWindir() {
+    return process.env.windir || process.env.WINDIR || process.env.SystemRoot || process.env.systemroot || process.env.SYSTEMROOT ||
+        "C:\\Windows";
 }
