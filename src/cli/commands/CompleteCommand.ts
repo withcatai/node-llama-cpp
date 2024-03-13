@@ -184,6 +184,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 noInfoLog, printTimings
             });
         } catch (err) {
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
             console.error(err);
             process.exit(1);
         }
@@ -236,8 +237,10 @@ async function RunCompletion({
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
     const context = await withStatusLogs({
@@ -252,8 +255,10 @@ async function RunCompletion({
                 threads
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
 

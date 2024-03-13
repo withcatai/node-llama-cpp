@@ -196,6 +196,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 noInfoLog, printTimings
             });
         } catch (err) {
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
             console.error(err);
             process.exit(1);
         }
@@ -262,8 +263,10 @@ async function RunInfill({
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
     const context = await withStatusLogs({
@@ -278,8 +281,10 @@ async function RunInfill({
                 threads
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
 

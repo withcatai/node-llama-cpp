@@ -254,6 +254,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 noHistory, environmentFunctions, noInfoLog, printTimings
             });
         } catch (err) {
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
             console.error(err);
             process.exit(1);
         }
@@ -313,8 +314,10 @@ async function RunChat({
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
     const context = await withStatusLogs({
@@ -329,8 +332,10 @@ async function RunChat({
                 threads
             });
         } finally {
-            if (llama.logLevel === LlamaLogLevel.debug)
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
                 console.info();
+            }
         }
     });
     const grammar = jsonSchemaGrammarFilePath != null
