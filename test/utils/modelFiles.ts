@@ -61,8 +61,7 @@ export async function downloadAllModels() {
             downloadFile({
                 url: modelUrl,
                 directory: path.dirname(modelFilePath),
-                fileName: path.basename(modelFilePath),
-                cliProgress: true
+                fileName: path.basename(modelFilePath)
             })
         );
     }
