@@ -134,9 +134,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                 }
             }
 
-            if (cmakeCustomOptions.get("LLAMA_METAL") === "1" || cmakeCustomOptions.get("LLAMA_METAL") === "ON")
-                await compileMetalShaderIfNeeded(compiledResultDirPath, buildOptions.progressLogs);
-
             await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
                 buildOptions: convertBuildOptionsToBuildOptionsJSON(buildOptions)
             } satisfies BuildMetadataFile), "utf8");
@@ -281,58 +278,4 @@ async function getToolchainFileForArch(targetArch: string) {
         return filePath;
 
     return null;
-}
-
-async function compileMetalShaderIfNeeded(binsFolderPath: string, progressLogs: boolean = true) {
-    const sourceMetalFilename = "ggml-metal.metal";
-    const airFilename = "ggml-metal.air";
-    const metallibFilename = "default.metallib";
-    const filesToDeleteAfterCompilation: string[] = [
-        sourceMetalFilename,
-        airFilename,
-        "ggml-common.h"
-    ];
-
-    const platform = getPlatform();
-    if (platform !== "mac")
-        return;
-
-    if (!(await fs.pathExists(path.join(binsFolderPath, sourceMetalFilename))) ||
-        await fs.pathExists(path.join(binsFolderPath, metallibFilename))
-    )
-        return;
-
-    const xcrunPath = await which("xcrun", {nothrow: true});
-
-    if (xcrunPath == null)
-        throw new Error("Cannot compile Metal shaders due to missing xcrun");
-
-    await Promise.all([
-        fs.remove(path.join(binsFolderPath, airFilename)),
-        fs.remove(path.join(binsFolderPath, metallibFilename))
-    ]);
-
-    await spawnCommand(
-        "xcrun",
-        [
-            "-sdk", "macosx", "metal", "-O3", "-c", sourceMetalFilename, "-o", airFilename
-        ],
-        binsFolderPath,
-        process.env,
-        progressLogs
-    );
-
-    await spawnCommand(
-        "xcrun",
-        [
-            "-sdk", "macosx", "metallib", airFilename, "-o", metallibFilename
-        ],
-        binsFolderPath,
-        process.env,
-        progressLogs
-    );
-
-    await Promise.all(
-        filesToDeleteAfterCompilation.map((filename) => fs.remove(path.join(binsFolderPath, filename)))
-    );
 }
