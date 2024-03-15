@@ -47,7 +47,7 @@ export class LlamaContext {
         sequences = 1,
         seed = null,
         contextSize = _model.trainContextSize,
-        batchSize = contextSize,
+        batchSize = Math.min(contextSize * sequences, 512),
         threads = 6,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",

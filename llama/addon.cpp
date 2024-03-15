@@ -792,6 +792,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
                 if (options.Has("batchSize")) {
                     context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value();
+                    context_params.n_ubatch = context_params.n_batch; // the batch queue is managed in the JS side, so there's no need for managing it on the C++ side
                 }
 
                 if (options.Has("embeddings")) {
@@ -1079,6 +1080,8 @@ class AddonContextDecodeBatchWorker : public Napi::AsyncWorker {
 
                     return;
                 }
+
+                llama_synchronize(ctx->ctx);
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
