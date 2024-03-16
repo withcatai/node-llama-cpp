@@ -19,7 +19,7 @@ import {setLastBuildInfo} from "./lastBuildInfo.js";
 import {getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
-import {getLinuxCudaLibraryPaths} from "./detectAvailableComputeLayers.js";
+import {getLinuxCudaInstallationPaths} from "./detectAvailableComputeLayers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -183,9 +183,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (!ignoreWorkarounds.includes("cudaArchitecture") && platform === "linux" && err instanceof SpawnError &&
                     err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase())
                 ) {
-                    const cudaLibraryPaths = await getLinuxCudaLibraryPaths();
+                    const cudaInstallationPaths = await getLinuxCudaInstallationPaths();
 
-                    for (const cudaLibraryPath of cudaLibraryPaths) {
+                    for (const cudaLibraryPath of cudaInstallationPaths) {
                         const nvccPath = path.join(cudaLibraryPath, "bin", "nvcc");
                         if (!(await fs.pathExists(nvccPath)))
                             continue;

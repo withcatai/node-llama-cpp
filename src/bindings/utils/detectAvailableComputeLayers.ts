@@ -177,7 +177,29 @@ async function detectMetalSupport({
     return platform === "mac";
 }
 
-export async function getLinuxCudaLibraryPaths() {
+async function getLinuxCudaLibraryPaths() {
+    const res: string[] = [];
+
+    try {
+        for (const cudaInstallationPath of await getLinuxCudaInstallationPaths()) {
+            const cudaTargetsFolder = `${cudaInstallationPath}/targets`;
+
+            for (const cudaTargetFolderName of await fs.readdir(cudaTargetsFolder)) {
+                res.push(
+                    `${cudaTargetsFolder}/${cudaTargetFolderName}/lib`,
+                    `${cudaTargetsFolder}/${cudaTargetFolderName}/lib/stubs`
+                );
+            }
+
+        }
+    } catch (err) {
+        console.error(getConsoleLogPrefix() + 'Failed to search "/usr/local/" for CUDA library paths', err);
+    }
+
+    return res;
+}
+
+export async function getLinuxCudaInstallationPaths() {
     if (!(await fs.pathExists("/usr/local/")))
         return [];
 
@@ -209,18 +231,15 @@ export async function getLinuxCudaLibraryPaths() {
             })
             .reverse();
 
-        for (const usrLocalFolderName in cudaFolders) {
+        for (const usrLocalFolderName of cudaFolders) {
             const cudaTargetsFolder = `${usrLocal}/${usrLocalFolderName}/targets`;
-            for (const cudaTargetFolderName in await fs.readdir(cudaTargetsFolder)) {
-                res.push(
-                    `${cudaTargetsFolder}/${cudaTargetFolderName}/lib`,
-                    `${cudaTargetsFolder}/${cudaTargetFolderName}/lib/stubs`
-                );
-            }
+            if (!(await fs.pathExists(cudaTargetsFolder)))
+                continue;
 
+            res.push(`${usrLocal}/${usrLocalFolderName}`);
         }
     } catch (err) {
-        console.error(getConsoleLogPrefix() + 'Failed to search "/usr/local/" for CUDA library paths', err);
+        console.error(getConsoleLogPrefix() + 'Failed to search "/usr/local/" for CUDA installations', err);
     }
 
     return res;
