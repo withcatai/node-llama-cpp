@@ -17,6 +17,7 @@ nodejsVersion="21"
 colorYellow=$'\e[33m'
 colorBlue=$'\e[34m'
 colorGrey=$'\e[90m'
+colorMagenta=$'\e[35m'
 colorRed=$'\e[31m'
 colorEnd=$'\e[0m'
 
@@ -155,7 +156,13 @@ fi
 pushd "$targetFolder" || exit 1
 
 # Run tests and start a loop of running tests and pulling from git
-echo "Starting a loop of running ${colorBlue}npm install && npm run dev:setup:downloadAllTestModels${colorEnd}, then building for CUDA and Vulkan, and then pulling from git when pressing Enter..."
+echo "Starting a loop of: "
+echo "${colorMagenta}1.${colorEnd} Running ${colorBlue}npm install && npm run dev:setup:downloadAllTestModels${colorEnd}"
+echo "${colorMagenta}2.${colorEnd} Running ${colorBlue}npm run dev:build${colorEnd} for CUDA and Vulkan"
+echo "${colorMagenta}3.${colorEnd} Running ${colorBlue}npm test${colorEnd} for CUDA and Vulkan"
+echo "${colorMagenta}4.${colorEnd} Pulling from git when pressing Enter..."
+echo ""
+
 while true; do
     npm install
     npm run dev:setup:downloadAllTestModels
@@ -174,6 +181,6 @@ while true; do
 
     echo ""
     echo "Done running tests"
-    read -r -s -p "Press Enter to pull from git and rerun the tests, or Ctrl+C to exit"
+    read -r -s -p "${colorYellow}Press Enter to pull from git and rerun the tests, or Ctrl+C to exit${colorEnd}"
     git pull
 done
