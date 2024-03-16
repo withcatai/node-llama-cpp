@@ -175,14 +175,19 @@ while true; do
     echo "Building for Vulkan..."
     NODE_LLAMA_CPP_GPU=vulkan npm run dev:build
 
+    node ./dist/cli/cli.js inspect gpu
+
     echo "Running tests using CUDA..."
-    NODE_LLAMA_CPP_GPU=cuda npm test
+    NODE_LLAMA_CPP_GPU=cuda NODE_LLAMA_CPP_LOG_LEVEL=info npm test
 
     echo "Running tests using Vulkan..."
-    NODE_LLAMA_CPP_GPU=vulkan npm test
+    NODE_LLAMA_CPP_GPU=vulkan NODE_LLAMA_CPP_LOG_LEVEL=info npm test
 
     echo ""
     echo "Done running tests"
+
+    node ./dist/cli/cli.js inspect gpu
+
     read -r -s -p "${colorYellow}Press Enter to ${colorBlue}git pull${colorEnd} and rerun the tests, or Ctrl+C to exit${colorEnd}"
     git pull
 done
