@@ -5,7 +5,7 @@
 # Intended to run on Ubuntu 22.04.
 #
 # Run this script with this command:
-# curl -fsSL https://raw.githubusercontent.com/withcata/llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh | bash -
 
 
 defaultRepo="withcatai/node-llama-cpp"
@@ -40,7 +40,7 @@ if [ "$USER" != "paperspace" ]; then
 fi
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
-sudo apt remove -y unattended-upgrades
+sudo apt remove -y -qq unattended-upgrades
 
 # Install dependencies
 sudo apt update -qq
@@ -55,9 +55,14 @@ githubRepoAvailableBranches=$(git ls-remote --heads https://github.com/$githubRe
 githubRepoBranch=$(echo "$githubRepoAvailableBranches" | fzf --prompt="${colorYellow}Branch to checkout:${colorEnd} ")
 echo "${colorYellow}Branch to checkout:${colorEnd} $githubRepoBranch"
 
+if [ -z "$githubRepoBranch" ]; then
+    echo "No branch selected. Aborting script..."
+    exit 1
+fi
+
 
 # Clone the repo and checkout the branch
-echo "Cloning ${colorBlue}$githubRepo${colorEnd} and checking out ${colorBlue}$githubRepoBranch${colorEnd}..."
+echo "Cloning ${colorBlue}${githubRepo}${colorEnd} and checking out ${colorBlue}${githubRepoBranch}${colorEnd}..."
 rm -rf "$targetForlder"
 mkdir -p "$(dirname "$targetForlder")"
 git clone "$githubRepo" "$targetForlder"
