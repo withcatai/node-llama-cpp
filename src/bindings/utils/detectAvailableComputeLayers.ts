@@ -1,6 +1,7 @@
 import process from "process";
 import path from "path";
 import fs from "fs-extra";
+import semver from "semver";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {BinaryPlatform, getPlatform} from "./getPlatform.js";
 import {hasFileInPath} from "./hasFileInPath.js";
@@ -176,17 +177,39 @@ async function detectMetalSupport({
     return platform === "mac";
 }
 
-async function getLinuxCudaLibraryPaths() {
+export async function getLinuxCudaLibraryPaths() {
     if (!(await fs.pathExists("/usr/local/")))
         return [];
 
     const res: string[] = [];
     try {
         const usrLocal = "/usr/local";
-        for (const usrLocalFolderName in await fs.readdir(usrLocal)) {
-            if (!usrLocalFolderName.toLowerCase().startsWith("cuda-"))
-                continue;
+        const cudaFolderPrefix = "cuda-";
+        const cudaFolders = (await fs.readdir(usrLocal))
+            .filter((folderName) => folderName.toLowerCase().startsWith(cudaFolderPrefix))
+            .sort((a, b) => {
+                const aVersion = a.slice(cudaFolderPrefix.length);
+                const bVersion = b.slice(cudaFolderPrefix.length);
 
+                try {
+                    const aVersionValid = semver.valid(semver.coerce(aVersion));
+                    const bVersionValid = semver.valid(semver.coerce(bVersion));
+
+                    if (aVersionValid && bVersionValid)
+                        return semver.compare(aVersionValid, bVersionValid);
+                    else if (aVersionValid)
+                        return -1;
+                    else if (bVersionValid)
+                        return 1;
+                    else
+                        return 0;
+                } catch (err) {
+                    return 0;
+                }
+            })
+            .reverse();
+
+        for (const usrLocalFolderName in cudaFolders) {
             const cudaTargetsFolder = `${usrLocal}/${usrLocalFolderName}/targets`;
             for (const cudaTargetFolderName in await fs.readdir(cudaTargetsFolder)) {
                 res.push(

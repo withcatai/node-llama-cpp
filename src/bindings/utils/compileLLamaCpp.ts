@@ -9,7 +9,7 @@ import {
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
 } from "../../config.js";
 import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
-import {spawnCommand} from "../../utils/spawnCommand.js";
+import {spawnCommand, SpawnError} from "../../utils/spawnCommand.js";
 import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "../../utils/cmake.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {withLockfile} from "../../utils/withLockfile.js";
@@ -19,22 +19,29 @@ import {setLastBuildInfo} from "./lastBuildInfo.js";
 import {getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
+import {getLinuxCudaLibraryPaths} from "./detectAvailableComputeLayers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function compileLlamaCpp(buildOptions: BuildOptions, {
-    nodeTarget = process.version,
-    updateLastBuildInfo: updateLastBuildInfoArg = true,
-    includeBuildOptionsInBinaryFolderName = true,
-    ensureLlamaCppRepoIsCloned: ensureLlamaCppRepoIsClonedArg = false,
-    downloadCmakeIfNeeded: downloadCmakeIfNeededArg = false
-}: {
+export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions: {
     nodeTarget?: string,
     updateLastBuildInfo?: boolean,
     includeBuildOptionsInBinaryFolderName?: boolean,
     ensureLlamaCppRepoIsCloned?: boolean,
-    downloadCmakeIfNeeded?: boolean
+    downloadCmakeIfNeeded?: boolean,
+    ignoreWorkarounds?: ("cudaArchitecture")[],
+    envVars?: typeof process.env
 }) {
+    const {
+        nodeTarget = process.version,
+        updateLastBuildInfo: updateLastBuildInfoArg = true,
+        includeBuildOptionsInBinaryFolderName = true,
+        ensureLlamaCppRepoIsCloned: ensureLlamaCppRepoIsClonedArg = false,
+        downloadCmakeIfNeeded: downloadCmakeIfNeededArg = false,
+        ignoreWorkarounds = [],
+        envVars = process.env
+    } = compileOptions;
+
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
     const finalBuildFolderName = includeBuildOptionsInBinaryFolderName
         ? buildFolderName.withCustomCmakeOptions
@@ -88,7 +95,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                     ...cmakePathArgs
                 ],
                 __dirname,
-                process.env,
+                envVars,
                 buildOptions.progressLogs
             );
 
@@ -107,7 +114,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                     )
                 ],
                 __dirname,
-                process.env,
+                envVars,
                 buildOptions.progressLogs
             );
 
@@ -172,13 +179,42 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, {
                     getConsoleLogPrefix(true) +
                     chalk.yellow('To install Xcode command line tools, run "xcode-select --install"')
                 );
-            else if (buildOptions.gpu === "cuda")
+            else if (buildOptions.gpu === "cuda") {
+                if (!ignoreWorkarounds.includes("cudaArchitecture") && platform === "linux" && err instanceof SpawnError &&
+                    err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture")
+                ) {
+                    const cudaLibraryPaths = await getLinuxCudaLibraryPaths();
+
+                    for (const cudaLibraryPath of cudaLibraryPaths) {
+                        const nvccPath = path.join(cudaLibraryPath, "bin", "nvcc");
+                        if (!(await fs.pathExists(nvccPath)))
+                            continue;
+
+                        if (buildOptions.progressLogs)
+                            console.info(getConsoleLogPrefix(true) + `Trying to compile again with "CUDACXX=${nvccPath}"`);
+
+                        try {
+                            return await compileLlamaCpp(buildOptions, {
+                                ...compileOptions,
+                                envVars: {
+                                    ...envVars,
+                                    CUDACXX: nvccPath
+                                },
+                                ignoreWorkarounds: [...ignoreWorkarounds, "cudaArchitecture"]
+                            });
+                        } catch (err) {
+                            if (buildOptions.progressLogs)
+                                console.error(getConsoleLogPrefix(true, false), err);
+                        }
+                    }
+                }
+
                 console.info("\n" +
                     getConsoleLogPrefix(true) +
                     chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
                     documentationPageUrls.CUDA
                 );
-            else if (buildOptions.gpu === "vulkan")
+            } else if (buildOptions.gpu === "vulkan")
                 console.info("\n" +
                     getConsoleLogPrefix(true) +
                     chalk.yellow("To resolve errors related to Vulkan compilation, see the Vulkan guide: ") +
