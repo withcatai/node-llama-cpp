@@ -148,7 +148,7 @@ vulkaninfo | grep -i "device id" | head -n 1
 pushd "$targetFolder" || exit 1
 
 # Run tests and start a loop of running tests and pulling from git
-echo "Starting a loop of running ${colorBlue}npm test${colorEnd} and then pulling from git when the user presses Enter..."
+echo "Starting a loop of running ${colorBlue}npm install && npm run dev:setup${colorEnd}, then building for CUDA and Vulkan, and then pulling from git when pressing Enter..."
 while true; do
     npm install
     npm run dev:setup
