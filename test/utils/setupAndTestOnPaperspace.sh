@@ -65,7 +65,7 @@ fi
 echo "Cloning ${colorBlue}$githubRepo${colorEnd} and checking out ${colorBlue}$githubRepoBranch${colorEnd}..."
 rm -rf "$targetForlder"
 mkdir -p "$(dirname "$targetForlder")"
-git clone "$githubRepo" "$targetForlder"
+git clone "https://github.com/$githubRepo" "$targetForlder"
 pushd "$targetForlder" || exit 1
 git checkout "$githubRepoBranch"
 popd || exit 1
