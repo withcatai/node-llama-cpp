@@ -154,13 +154,15 @@ if [ -z "$(vulkaninfo 2>&1 | grep -i "deviceName")" ]; then
 fi
 
 pushd "$targetFolder" || exit 1
+git pull
 
 # Run tests and start a loop of running tests and pulling from git
 echo "Starting a loop of: "
 echo "${colorMagenta}1.${colorEnd} Running ${colorBlue}npm install && npm run dev:setup:downloadAllTestModels${colorEnd}"
 echo "${colorMagenta}2.${colorEnd} Running ${colorBlue}npm run dev:build${colorEnd} for CUDA and Vulkan"
 echo "${colorMagenta}3.${colorEnd} Running ${colorBlue}npm test${colorEnd} for CUDA and Vulkan"
-echo "${colorMagenta}4.${colorEnd} Pulling from git when pressing Enter..."
+echo "${colorMagenta}4.${colorEnd} Waiting for the user to press Enter..."
+echo "${colorMagenta}5.${colorEnd} Running ${colorBlue}git pull${colorEnd}"
 echo ""
 
 while true; do
@@ -181,6 +183,6 @@ while true; do
 
     echo ""
     echo "Done running tests"
-    read -r -s -p "${colorYellow}Press Enter to pull from git and rerun the tests, or Ctrl+C to exit${colorEnd}"
+    read -r -s -p "${colorYellow}Press Enter to ${colorBlue}git pull${colorEnd} and rerun the tests, or Ctrl+C to exit${colorEnd}"
     git pull
 done
