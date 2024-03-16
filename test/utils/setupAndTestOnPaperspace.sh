@@ -7,6 +7,7 @@
 # Run this script with this command:
 # bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"
 
+installationCommand='bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"'
 
 defaultRepo="withcatai/node-llama-cpp"
 targetFolder=$HOME/workspace/test-node-llama-cpp
@@ -96,6 +97,10 @@ if [ -d "$targetFolder" ]; then
     sudo chsh -s "$(which zsh)"
     sudo chsh -s "$(which zsh)" "$USER"
 
+    if [ ! -f "$HOME/.zsh_history" ]; then
+        echo "$installationCommand" > "$HOME/.zsh_history"
+    fi
+
     # Add Node.js repository
     mkdir -p /etc/apt/keyrings
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
@@ -129,6 +134,7 @@ if [ -d "$targetFolder" ]; then
     if ! nvidia-smi>/dev/null; then
         echo "Reboot is needed to use the Nvidia driver after installation"
         echo "After reboot, run this script again to continue from where it left off"
+        echo "It should take about 2 minutes to reboot"
         echo "Rebooting in 5 seconds..."
         sleep 5s
         sudo reboot
