@@ -41,6 +41,7 @@ export class LlamaGrammar {
     }: LlamaGrammarOptions) {
         this._llama = llama;
         this._grammar = new this._llama._bindings.AddonGrammar(grammar, {
+            addonExports: this._llama._bindings,
             printGrammar
         });
         this._stopGenerationTriggers = stopGenerationTriggers ?? [];

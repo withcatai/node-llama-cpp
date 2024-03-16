@@ -53,6 +53,7 @@ AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
 int addonLoggerLogLevel = 5;
 bool backendInitialized = false;
+bool backendDisposed = false;
 
 void addonCallJsProgressCallback(
     Napi::Env env, Napi::Function callback, AddonThreadSafeProgressCallbackFunctionContext* context, addon_progress_event* data
@@ -216,6 +217,8 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         llama_model_params model_params;
         llama_model* model;
         uint64_t loadedModelSize = 0;
+        Napi::Reference<Napi::Object> addonExportsRef;
+        bool hasAddonExportsRef = false;
 
         std::string modelPath;
         bool modelLoaded = false;
@@ -237,6 +240,11 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
 
             if (info.Length() > 1 && info[1].IsObject()) {
                 Napi::Object options = info[1].As<Napi::Object>();
+
+                if (options.Has("addonExports")) {
+                    addonExportsRef = Napi::Persistent(options.Get("addonExports").As<Napi::Object>());
+                    hasAddonExportsRef = true;
+                }
 
                 if (options.Has("gpuLayers")) {
                     model_params.n_gpu_layers = options.Get("gpuLayers").As<Napi::Number>().Int32Value();
@@ -303,6 +311,11 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
 
                 adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
                 loadedModelSize = 0;
+            }
+
+            if (hasAddonExportsRef) {
+                addonExportsRef.Unref();
+                hasAddonExportsRef = false;
             }
         }
 
@@ -693,6 +706,8 @@ Napi::Value AddonModel::Dispose(const Napi::CallbackInfo& info) {
 class AddonGrammar : public Napi::ObjectWrap<AddonGrammar> {
     public:
         grammar_parser::parse_state parsed_grammar;
+        Napi::Reference<Napi::Object> addonExportsRef;
+        bool hasAddonExportsRef = false;
 
         AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammar>(info) {
             // Get the model path
@@ -701,6 +716,11 @@ class AddonGrammar : public Napi::ObjectWrap<AddonGrammar> {
 
             if (info.Length() > 1 && info[1].IsObject()) {
                 Napi::Object options = info[1].As<Napi::Object>();
+
+                if (options.Has("addonExports")) {
+                    addonExportsRef = Napi::Persistent(options.Get("addonExports").As<Napi::Object>());
+                    hasAddonExportsRef = true;
+                }
 
                 if (options.Has("printGrammar")) {
                     should_print_grammar = options.Get("printGrammar").As<Napi::Boolean>().Value();
@@ -716,6 +736,13 @@ class AddonGrammar : public Napi::ObjectWrap<AddonGrammar> {
 
             if (should_print_grammar) {
                 grammar_parser::print_grammar(stderr, parsed_grammar);
+            }
+        }
+
+        ~AddonGrammar() {
+            if (hasAddonExportsRef) {
+                addonExportsRef.Unref();
+                hasAddonExportsRef = false;
             }
         }
 
@@ -845,7 +872,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
         Napi::Value Init(const Napi::CallbackInfo& info);
         Napi::Value Dispose(const Napi::CallbackInfo& info);
-        
+
         Napi::Value GetContextSize(const Napi::CallbackInfo& info) {
             if (disposed) {
                 Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
@@ -1543,21 +1570,123 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+class AddonBackendLoadWorker : public Napi::AsyncWorker {
+    public:
+        AddonBackendLoadWorker(const Napi::Env& env)
+            : Napi::AsyncWorker(env, "AddonBackendLoadWorker"),
+              deferred(Napi::Promise::Deferred::New(env)) {
+        }
+        ~AddonBackendLoadWorker() {
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                llama_backend_init();
+
+                try {
+                    if (backendDisposed) {
+                        llama_backend_free();
+                    } else {
+                        backendInitialized = true;
+                    }
+                } catch (const std::exception& e) {
+                    SetError(e.what());
+                } catch(...) {
+                    SetError("Unknown error when calling \"llama_backend_free\"");
+                }
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_backend_init\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Env().Undefined());
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+
+
+class AddonBackendUnloadWorker : public Napi::AsyncWorker {
+    public:
+        AddonBackendUnloadWorker(const Napi::Env& env)
+            : Napi::AsyncWorker(env, "AddonBackendUnloadWorker"),
+              deferred(Napi::Promise::Deferred::New(env)) {
+        }
+        ~AddonBackendUnloadWorker() {
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                if (backendInitialized) {
+                    backendInitialized = false;
+                    llama_backend_free();
+                }
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_backend_free\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Env().Undefined());
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+
 Napi::Value addonInit(const Napi::CallbackInfo& info) {
-    if (!backendInitialized) {
-        llama_backend_init();
-        backendInitialized = true;
+    if (backendInitialized) {
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+        deferred.Resolve(info.Env().Undefined());
+        return deferred.Promise();
     }
 
-    llama_log_set(addonLlamaCppLogCallback, nullptr);
+    AddonBackendLoadWorker* worker = new AddonBackendLoadWorker(info.Env());
+    worker->Queue();
+    return worker->GetPromise();
+}
 
-    return info.Env().Undefined();
+Napi::Value addonDispose(const Napi::CallbackInfo& info) {
+    if (backendDisposed) {
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+        deferred.Resolve(info.Env().Undefined());
+        return deferred.Promise();
+    }
+
+    backendDisposed = true;
+
+    AddonBackendUnloadWorker* worker = new AddonBackendUnloadWorker(info.Env());
+    worker->Queue();
+    return worker->GetPromise();
 }
 
 static void addonFreeLlamaBackend(Napi::Env env, int* data) {
+    if (backendDisposed) {
+        return;
+    }
+
+    backendDisposed = true;
     if (backendInitialized) {
-        llama_backend_free();
         backendInitialized = false;
+        llama_backend_free();
     }
 }
 
@@ -1569,11 +1698,14 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("init", addonInit),
+        Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });
     AddonModel::init(exports);
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
+
+    llama_log_set(addonLlamaCppLogCallback, nullptr);
 
     exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
 

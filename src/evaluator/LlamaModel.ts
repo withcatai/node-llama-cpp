@@ -1,10 +1,10 @@
 import process from "process";
 import path from "path";
-import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
 import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
-import {DisposeGuard} from "../utils/DisposeGuard.js";
+import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
 import {LlamaLocks} from "../bindings/types.js";
 import {LlamaContextOptions} from "./LlamaContext/types.js";
 import {LlamaContext} from "./LlamaContext/LlamaContext.js";
@@ -49,6 +49,8 @@ export class LlamaModel {
     /** @internal */ private readonly _tokens: LlamaModelTokens;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
+    /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
+    /** @internal */ private readonly _llamaPreventDisposalHandle: DisposalPreventionHandle;
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
@@ -64,7 +66,9 @@ export class LlamaModel {
     }) {
         this._llama = _llama;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
+        this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
         this._model = new this._llama._bindings.AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
+            addonExports: this._llama._bindings,
             gpuLayers,
             vocabOnly,
             useMmap,
@@ -84,6 +88,22 @@ export class LlamaModel {
         this._tokens = LlamaModelTokens._create(this._model, this._disposedState);
         this._filename = path.basename(modelPath);
 
+        this._disposeAggregator.add(() => {
+            this._disposedState.disposed = true;
+        });
+        this._disposeAggregator.add(this.onDispose.dispatchEvent);
+        this._disposeAggregator.add(
+            this._llama.onDispose.createListener(
+                disposeModelIfReferenced.bind(null, new WeakRef(this))
+            )
+        );
+
+        this._disposeAggregator.add(async () => {
+            await this._backendModelDisposeGuard.acquireDisposeLock();
+            await this._model.dispose();
+            this._llamaPreventDisposalHandle.dispose();
+        });
+
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
     }
@@ -92,10 +112,9 @@ export class LlamaModel {
         if (this._disposedState.disposed)
             return;
 
-        this.onDispose.dispatchEvent();
-        await this._backendModelDisposeGuard.acquireDisposeLock();
-        await this._model.dispose();
         this._disposedState.disposed = true;
+
+        await this._disposeAggregator.dispose();
     }
 
     /** @hidden */
@@ -574,6 +593,14 @@ export class LlamaModelInfillTokens {
         return new LlamaModelInfillTokens(model, disposedState);
     }
 }
+
+function disposeModelIfReferenced(modelRef: WeakRef<LlamaModel>) {
+    const model = modelRef.deref();
+
+    if (model != null)
+        void model.dispose();
+}
+
 
 type DisposedState = {
     disposed: boolean

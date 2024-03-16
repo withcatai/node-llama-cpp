@@ -4,6 +4,7 @@ import {Token} from "../types.js";
 export type BindingModule = {
     AddonModel: {
         new (modelPath: string, params: {
+            addonExports?: BindingModule,
             gpuLayers?: number,
             vocabOnly?: boolean,
             useMmap?: boolean,
@@ -24,6 +25,7 @@ export type BindingModule = {
     },
     AddonGrammar: {
         new (grammarPath: string, params?: {
+            addonExports?: BindingModule,
             printGrammar?: boolean
         }): AddonGrammar
     },
@@ -38,7 +40,8 @@ export type BindingModule = {
         used: number
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
-    init(): void
+    init(): Promise<void>,
+    dispose(): Promise<void>
 };
 
 export type AddonModel = {

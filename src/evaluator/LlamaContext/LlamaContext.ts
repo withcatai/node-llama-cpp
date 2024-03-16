@@ -81,6 +81,9 @@ export class LlamaContext {
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
 
+        this._disposeAggregator.add(() => {
+            this._disposed = true;
+        });
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
         this._disposeAggregator.add(
@@ -977,7 +980,7 @@ function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {
     const context = contextRef.deref();
 
     if (context != null)
-        context.dispose();
+        void context.dispose();
 }
 
 function disposeContextSequenceIfReferenced(contextRef: WeakRef<LlamaContextSequence>) {

@@ -93,14 +93,14 @@ export function testBindingBinary(bindingBinaryPath: string, testTimeout: number
 }
 
 if (process.env.TEST_BINDING_CP === "true" && process.send != null) {
-    process.on("message", (message: ParentToChildMessage) => {
+    process.on("message", async (message: ParentToChildMessage) => {
         if (message.type === "start") {
             if (process.send == null)
                 process.exit(1);
 
             try {
                 const binding: BindingModule = require(message.bindingBinaryPath);
-                binding.init();
+                await binding.init();
                 process.send({type: "done"} satisfies ChildToParentMessage);
             } catch (err) {
                 console.error(err);
