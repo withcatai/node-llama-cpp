@@ -19,7 +19,7 @@ import {setLastBuildInfo} from "./lastBuildInfo.js";
 import {getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
-import {getLinuxCudaInstallationPaths} from "./detectAvailableComputeLayers.js";
+import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -185,16 +185,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 chalk.yellow('To install Xcode command line tools, run "xcode-select --install"')
             );
         else if (buildOptions.gpu === "cuda") {
-            if (!ignoreWorkarounds.includes("cudaArchitecture") && platform === "linux" && err instanceof SpawnError &&
+            if (!ignoreWorkarounds.includes("cudaArchitecture") && (platform === "win" || platform === "linux") && err instanceof SpawnError &&
                 err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase())
             ) {
-                const cudaInstallationPaths = await getLinuxCudaInstallationPaths();
-
-                for (const cudaLibraryPath of cudaInstallationPaths) {
-                    const nvccPath = path.join(cudaLibraryPath, "bin", "nvcc");
-                    if (!(await fs.pathExists(nvccPath)))
-                        continue;
-
+                for (const nvccPath of await getCudaNvccPaths()) {
                     if (buildOptions.progressLogs)
                         console.info(
                             getConsoleLogPrefix(true) + `Trying to compile again with "CUDACXX=${nvccPath}" environment variable`
