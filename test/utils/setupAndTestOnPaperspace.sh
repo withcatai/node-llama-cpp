@@ -22,7 +22,7 @@ colorEnd=$'\e[0m'
 
 
 # Only setup the machine if the target folder doesn't exist
-if [ -d "$targetFolder" ]; then
+if [ ! -d "$targetFolder" ]; then
     # Ensure that running on Ubuntu 22.04
     if [ ! -f /etc/os-release ] || ! grep -q 'NAME="Ubuntu"' /etc/os-release || ! grep -q 'VERSION_ID="22.04"' /etc/os-release || ! which apt>/dev/null; then
         echo "This script is intended to run on Ubuntu 22.04"
