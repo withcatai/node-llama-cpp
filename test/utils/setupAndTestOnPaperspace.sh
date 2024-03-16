@@ -43,12 +43,16 @@ fi
 
 echo "Setting things up..."
 
+# Prevent the annoying restart services prompt from appearing
+sudo mkdir -p /etc/needrestart/conf.d
+echo '$nrconf{restart} = '\''a'\'';' | sudo tee /etc/needrestart/conf.d/no-restart-services-prompt.conf
+
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
-NEEDRESTART_MODE=a sudo apt remove -y -qq unattended-upgrades>/dev/null 2>&1
+sudo apt remove -y -qq unattended-upgrades>/dev/null 2>&1
 
 # Install dependencies
-NEEDRESTART_MODE=a sudo apt update -qq>/dev/null 2>&1
-NEEDRESTART_MODE=a sudo apt install -y -qq git git-lfs fzf>/dev/null 2>&1
+sudo apt update -qq>/dev/null 2>&1
+sudo apt install -y -qq git git-lfs fzf>/dev/null 2>&1
 
 
 # Receive input from the user regarding the repo and branch to clone and checkout
@@ -79,7 +83,7 @@ echo ""
 
 # Setup the machine
 echo "Setting up the machine..."
-NEEDRESTART_MODE=a sudo apt install -y -qq ca-certificates curl gnupg libvulkan-dev zsh
+sudo apt install -y -qq ca-certificates curl gnupg libvulkan-dev zsh
 
 # Install zsh
 CHSH=no RUNZSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)">/dev/null
@@ -104,11 +108,11 @@ popd || exit 1
 rm -rf "$targetFolder/.tempMachineSetup"
 
 # Install dependencies
-NEEDRESTART_MODE=a sudo apt update -qq
-NEEDRESTART_MODE=a sudo apt install -y -qq nodejs
-NEEDRESTART_MODE=a sudo apt install -y -qq vulkan-sdk
-NEEDRESTART_MODE=a sudo apt install -y -qq cuda-toolkit-12-3
-NEEDRESTART_MODE=a sudo apt install -y -qq cuda-drivers
+sudo apt update -qq
+sudo apt install -y -qq nodejs
+sudo apt install -y -qq vulkan-sdk
+sudo apt install -y -qq cuda-toolkit-12-3
+sudo apt install -y -qq cuda-drivers
 
 nvidia-smi>/dev/null # make sure that the Nvidia driver is installed and working
 vulkaninfo | grep -i "device id" | head -n 1
