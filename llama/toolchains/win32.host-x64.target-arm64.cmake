@@ -6,13 +6,19 @@ set(PROGRAMFILES "$ENV{ProgramFiles}")
 set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
 
 set(VS_INSTALL_PATHS
-    "${PROGRAMFILES_X86}/Microsoft Visual Studio/"
-    "${PROGRAMFILES}/Microsoft Visual Studio/"
-    "C:/Program Files (x86)/Microsoft Visual Studio/"
-    "C:/Program Files/Microsoft Visual Studio/"
+    "${PROGRAMFILES_X86}/Microsoft Visual Studio"
+    "${PROGRAMFILES}/Microsoft Visual Studio"
+    "C:/Program Files (x86)/Microsoft Visual Studio"
+    "C:/Program Files/Microsoft Visual Studio"
 )
 foreach(PATH IN LISTS VS_INSTALL_PATHS)
     file(GLOB_RECURSE FOUND_CL_EXE "${PATH}/*/VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe")
+    if(FOUND_CL_EXE)
+        list(GET FOUND_CL_EXE 0 CL_EXE_PATH)
+        break()
+    endif()
+
+    file(GLOB_RECURSE FOUND_CL_EXE "${PATH}/**/*/VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe")
     if(FOUND_CL_EXE)
         list(GET FOUND_CL_EXE 0 CL_EXE_PATH)
         break()
