@@ -4,10 +4,13 @@ import {Token} from "../types.js";
 export type BindingModule = {
     AddonModel: {
         new (modelPath: string, params: {
+            addonExports?: BindingModule,
             gpuLayers?: number,
             vocabOnly?: boolean,
             useMmap?: boolean,
-            useMlock?: boolean
+            useMlock?: boolean,
+            onLoadProgress?(loadPercentage: number): void,
+            hasLoadAbortSignal?: boolean
         }): AddonModel
     },
     AddonContext: {
@@ -16,12 +19,13 @@ export type BindingModule = {
             contextSize?: number,
             batchSize?: number,
             logitsAll?: boolean,
-            embedding?: boolean,
+            embeddings?: boolean,
             threads?: number
         }): AddonContext
     },
     AddonGrammar: {
         new (grammarPath: string, params?: {
+            addonExports?: BindingModule,
             printGrammar?: boolean
         }): AddonGrammar
     },
@@ -36,11 +40,14 @@ export type BindingModule = {
         used: number
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
-    init(): void
+    init(): Promise<void>,
+    dispose(): Promise<void>
 };
 
 export type AddonModel = {
-    dispose(): void,
+    init(): Promise<boolean>,
+    abortActiveModelLoad(): void,
+    dispose(): Promise<void>,
     tokenize(text: string, specialTokens: boolean): Uint32Array,
     detokenize(tokens: Uint32Array): string,
     getTrainContextSize(): number,
@@ -61,7 +68,8 @@ export type AddonModel = {
 };
 
 export type AddonContext = {
-    dispose(): void,
+    init(): Promise<boolean>,
+    dispose(): Promise<void>,
     getContextSize(): number,
     initBatch(size: number): void, // size must be less or equal to batchSize
     addToBatch(
@@ -85,13 +93,13 @@ export type AddonContext = {
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive
-    removeTokenCellsFromSequence(sequenceId: number, startPos: number, endPos: number): void,
+    removeTokenCellsFromSequence(sequenceId: number, startPos: number, endPos: number): boolean,
 
     // startPos in inclusive, endPos is exclusive
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
-    getEmbedding(): Float64Array,
+    getEmbedding(inputTokensLength: number): Float64Array,
     printTimings(): void
 };
 

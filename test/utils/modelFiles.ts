@@ -1,6 +1,6 @@
 import path from "path";
 import {fileURLToPath} from "url";
-import {CLIPullProgress, FastDownload} from "ipull";
+import {downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import chalk from "chalk";
 import withStatusLogs from "../../src/utils/withStatusLogs.js";
@@ -27,26 +27,57 @@ export async function getModelFile(modelName: keyof typeof supportedModels) {
         success: chalk.blue(`Downloaded model "${modelName}"`),
         fail: chalk.blue(`Failed to download model "${modelName}"`)
     }, async () => {
-        const temporaryModelFilePath = `${modelFilePath}.tmp`;
         const modelUrl = supportedModels[modelName];
 
-        const download = new FastDownload(modelUrl, temporaryModelFilePath);
-        await download.init();
-
-        const cliPullProgress = new CLIPullProgress(download, modelName);
-        await cliPullProgress.startPull();
-
-        if (await fs.pathExists(modelFilePath))
-            await fs.remove(modelFilePath);
-
-        await fs.move(temporaryModelFilePath, modelFilePath);
+        const downloader = await downloadFile({
+            url: modelUrl,
+            directory: path.dirname(modelFilePath),
+            fileName: path.basename(modelFilePath),
+            cliProgress: true
+        });
+        await downloader.download();
 
         return modelFilePath;
     });
 }
 
 export async function downloadAllModels() {
+    const existingModels = new Set<string>();
+    const pendingDownloads: ReturnType<typeof downloadFile>[] = [];
+
     for (const modelName of Object.keys(supportedModels)) {
-        await getModelFile(modelName as keyof typeof supportedModels);
+        if (supportedModels[modelName as keyof typeof supportedModels] == null)
+            continue;
+
+        const modelFilePath = path.join(modelsFolder, modelName);
+
+        if (await fs.pathExists(modelFilePath)) {
+            existingModels.add(modelName);
+            continue;
+        }
+
+        const modelUrl = supportedModels[modelName as keyof typeof supportedModels];
+        pendingDownloads.push(
+            downloadFile({
+                url: modelUrl,
+                directory: path.dirname(modelFilePath),
+                fileName: path.basename(modelFilePath)
+            })
+        );
+    }
+
+    if (existingModels.size > 0) {
+        if (pendingDownloads.length === 0)
+            console.info("All models are already downloaded");
+        else
+            console.info(`Already downloaded ${existingModels.size} model${existingModels.size === 1 ? "" : "s"}\n`);
+    }
+
+    if (pendingDownloads.length > 0) {
+        console.info(`Downloading ${pendingDownloads.length} model${pendingDownloads.length === 1 ? "" : "s"}`);
+        const downloader = await downloadSequence({
+            cliProgress: true
+        }, ...pendingDownloads);
+        await downloader.download();
     }
 }

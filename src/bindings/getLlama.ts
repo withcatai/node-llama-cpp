@@ -538,7 +538,7 @@ async function logNoGlibcWarning() {
             "Using Alpine Linux is not recommended for running LLMs, " +
             "as using GPU drivers is complicated and suboptimal in this distro at the moment.\n" +
             getConsoleLogPrefix() +
-            "Consider using a different Linux distro, such as Debian or Ubuntu." +
+            "Consider using a different Linux distro, such as Debian or Ubuntu.\n" +
             getConsoleLogPrefix() +
             `If you're trying to run this inside of a Docker container, consider using "${recommendedBaseDockerImage}" image`
         );

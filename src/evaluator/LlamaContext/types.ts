@@ -1,11 +1,8 @@
-import {Token} from "../../types.js";
-import {LlamaModel} from "../LlamaModel.js";
-import {LlamaContextSequence} from "./LlamaContext.js";
+import type {Token} from "../../types.js";
+import type {LlamaContextSequence} from "./LlamaContext.js";
 
 
 export type LlamaContextOptions = {
-    model: LlamaModel,
-
     /**
      * number of sequences for the context.
      * Each sequence is a different "text generation process" that can run in parallel to other sequences in the same context.
@@ -17,10 +14,16 @@ export type LlamaContextOptions = {
     /** If null, a random seed will be used */
     seed?: number | null,
 
-    /** text context size */
+    /**
+     * The number of tokens can the model see at once.
+     * Defaults to the context size the model was trained on.
+     */
     contextSize?: number,
 
-    /** prompt processing batch size */
+    /**
+     * The number of tokens that can be processed at once by the GPU.
+     * Defaults to `512` or `contextSize` if `contextSize` is less than `512`.
+     */
     batchSize?: number,
 
     /**
@@ -32,11 +35,14 @@ export type LlamaContextOptions = {
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions,
 
+    /** An abort signal to abort the context creation */
+    createSignal?: AbortSignal,
+
     /**
      * embedding mode only
      * @internal
      */
-    _embedding?: boolean,
+    _embeddings?: boolean,
 
     /**
      * disable the seed generation

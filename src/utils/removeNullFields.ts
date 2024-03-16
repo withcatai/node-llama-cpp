@@ -1,4 +1,4 @@
-export function removeNullFields<T extends object>(obj: T): T {
+export function removeNullFields<const T extends object>(obj: T): T {
     const newObj: T = Object.assign({}, obj);
 
     for (const key in obj) {
@@ -9,7 +9,7 @@ export function removeNullFields<T extends object>(obj: T): T {
     return newObj;
 }
 
-export function removeUndefinedFields<T extends object>(obj: T): T {
+export function removeUndefinedFields<const T extends object>(obj: T): T {
     const newObj: T = Object.assign({}, obj);
 
     for (const key in obj) {

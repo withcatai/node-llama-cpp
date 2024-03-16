@@ -6,8 +6,6 @@ import chalk from "chalk";
 import fs from "fs-extra";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getLlama} from "../../bindings/getLlama.js";
-import {LlamaModel} from "../../evaluator/LlamaModel.js";
-import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
 
@@ -198,6 +196,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 noInfoLog, printTimings
             });
         } catch (err) {
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
             console.error(err);
             process.exit(1);
         }
@@ -257,21 +256,37 @@ async function RunInfill({
         loading: chalk.blue("Loading model"),
         success: chalk.blue("Model loaded"),
         fail: chalk.blue("Failed to load model")
-    }, async () => new LlamaModel({
-        llama,
-        modelPath: path.resolve(process.cwd(), modelArg),
-        gpuLayers: gpuLayers != null ? gpuLayers : undefined
-    }));
+    }, async () => {
+        try {
+            return await llama.loadModel({
+                modelPath: path.resolve(process.cwd(), modelArg),
+                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+            });
+        } finally {
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                console.info();
+            }
+        }
+    });
     const context = await withStatusLogs({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
         fail: chalk.blue("Failed to create context")
-    }, async () => new LlamaContext({
-        model,
-        contextSize,
-        batchSize,
-        threads
-    }));
+    }, async () => {
+        try {
+            return await model.createContext({
+                contextSize,
+                batchSize,
+                threads
+            });
+        } finally {
+            if (llama.logLevel === LlamaLogLevel.debug) {
+                await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                console.info();
+            }
+        }
+    });
 
     const completion = new LlamaCompletion({
         contextSequence: context.getSequence()

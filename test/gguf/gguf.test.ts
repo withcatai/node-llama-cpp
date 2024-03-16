@@ -5,7 +5,6 @@ import GGUFFetchStream from "../../src/gguf/ggufParser/stream/GGUFFetchStream.js
 import {getModelFile} from "../utils/modelFiles.js";
 import GGUFInsights from "../../src/gguf/GGUFInsights.js";
 import {getTestLlama} from "../utils/getTestLlama.js";
-import {LlamaModel} from "../../src/index.js";
 import GGUFMetadata from "../../src/gguf/GGUFMetadata.js";
 
 const remoteGGUFModel = "https://huggingface.co/TheBloke/Falcon-180B-Chat-GGUF/resolve/main/falcon-180b-chat.Q6_K.gguf-split-a?download=true";
@@ -57,9 +56,8 @@ describe("GGUF Parser", async () => {
         const ggufInsights = new GGUFInsights(metadata);
 
         const llama = await getTestLlama();
-        new LlamaModel({
-            modelPath: modelPath,
-            llama
+        const model = await llama.loadModel({
+            modelPath: modelPath
         });
 
         const usedRam = llama.getVramState().used;
@@ -67,6 +65,7 @@ describe("GGUF Parser", async () => {
         expect(ggufInsights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");
         expect(usedRam).to.be.gte(3.5 * Math.pow(1024, 3));
         expect(usedRam).to.be.lte(4.5 * Math.pow(1024, 3));
+        await model.dispose();
     });
 
     it("should fetch GGUF metadata", async () => {

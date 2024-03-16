@@ -3,6 +3,16 @@ import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialToken} from "./ut
 import {ChatWrapper, ChatWrapperSettings} from "./ChatWrapper.js";
 import {parseTextTemplate} from "./utils/parseTextTemplate.js";
 
+export type TemplateChatWrapperOptions = {
+    template: ChatTemplate,
+    historyTemplate: ChatHistoryTemplate,
+    modelRoleName: string,
+    userRoleName: string,
+    systemRoleName?: string,
+    functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
+    joinAdjacentMessagesOfTheSameType?: boolean
+};
+
 /**
  * A chat wrapper based on a simple template.
  *
@@ -56,15 +66,7 @@ export class TemplateChatWrapper extends ChatWrapper {
         systemRoleName = "System",
         functionCallMessageTemplate,
         joinAdjacentMessagesOfTheSameType = true
-    }: {
-        template: ChatTemplate,
-        historyTemplate: ChatHistoryTemplate,
-        modelRoleName: string,
-        userRoleName: string,
-        systemRoleName?: string,
-        functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
-        joinAdjacentMessagesOfTheSameType?: boolean
-    }) {
+    }: TemplateChatWrapperOptions) {
         super();
 
         this.template = template;

@@ -1,5 +1,4 @@
 import {describe, expect, test} from "vitest";
-import {LlamaEmbeddingContext, LlamaModel} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -9,12 +8,10 @@ describe("functionary", () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
-            const model = new LlamaModel({
-                llama,
+            const model = await llama.loadModel({
                 modelPath
             });
-            const embeddingContext = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 
@@ -36,12 +33,10 @@ describe("functionary", () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
-            const model = new LlamaModel({
-                llama,
+            const model = await llama.loadModel({
                 modelPath
             });
-            const embeddingContext = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 
@@ -52,8 +47,7 @@ describe("functionary", () => {
 
             embeddingContext.dispose();
 
-            const embeddingContext2 = new LlamaEmbeddingContext({
-                model,
+            const embeddingContext2 = await model.createEmbeddingContext({
                 contextSize: 4096
             });
 

@@ -1,22 +1,24 @@
-import {DisposeAggregator, EventRelay, withLock, DisposedError} from "lifecycle-utils";
+import {DisposeAggregator, EventRelay, withLock, DisposedError, AsyncDisposeAggregator} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
 import {BatchLogitIndex, AddonContext} from "../../bindings/AddonTypes.js";
-import {LlamaModel} from "../LlamaModel.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
-import {Llama} from "../../bindings/Llama.js";
+import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
 import {resolveBatchItemsPrioritizingStrategy} from "./utils/resolveBatchItemsPrioritizingStrategy.js";
+import type {Llama} from "../../bindings/Llama.js";
+import type {LlamaModel} from "../LlamaModel.js";
 
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _ctx: AddonContext;
     /** @internal */ public readonly _onReclaimUnusedSequenceId = new EventRelay<void>();
+    /** @internal */ public readonly _backendContextDisposeGuard: DisposeGuard;
 
     /** @internal */ private readonly _model: LlamaModel;
     /** @internal */ private readonly _contextSize: number;
@@ -26,7 +28,8 @@ export class LlamaContext {
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
     /** @internal */ private readonly _queuedDecodeSequenceIds = new Set<number>();
     /** @internal */ private readonly _queuedDecodes: InternalQueuedDecode[] = [];
-    /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
+    /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
+    /** @internal */ private readonly _modelPreventDisposalHandle: DisposalPreventionHandle;
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
@@ -36,28 +39,30 @@ export class LlamaContext {
 
     public readonly onDispose = new EventRelay<void>();
 
-    /**
-     * @param options
-     */
-    public constructor({
-        model,
+    private constructor({
+        _model
+    }: {
+        _model: LlamaModel
+    }, {
         sequences = 1,
         seed = null,
-        contextSize = model.trainContextSize,
-        batchSize = contextSize,
+        contextSize = _model.trainContextSize,
+        batchSize = Math.min(contextSize * sequences, 512),
         threads = 6,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemsPrioritizingStrategy: batchingItemsPrioritizingStrategy = "maximumParallelism"
         } = {},
-        _embedding,
+        _embeddings,
         _noSeed
     }: LlamaContextOptions) {
-        if (model.disposed)
+        if (_model.disposed)
             throw new DisposedError();
 
-        this._llama = model._llama;
-        this._model = model;
+        this._llama = _model._llama;
+        this._model = _model;
+        this._backendContextDisposeGuard = new DisposeGuard([this._model._backendModelDisposeGuard]);
+        this._modelPreventDisposalHandle = this._model._backendModelDisposeGuard.createPreventDisposalHandle();
         this._totalSequences = Math.max(1, Math.floor(sequences));
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
@@ -66,7 +71,7 @@ export class LlamaContext {
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             threads: Math.max(0, Math.floor(threads)),
-            embedding: _embedding,
+            embeddings: _embeddings,
             noSeed: _noSeed
         }));
         this._batchingOptions = {
@@ -76,30 +81,35 @@ export class LlamaContext {
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
 
+        this._disposeAggregator.add(() => {
+            this._disposed = true;
+        });
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
-        this._disposeAggregator.add(() => {
-            this._ctx.dispose();
-        });
-
         this._disposeAggregator.add(
             this.model.onDispose.createListener(
                 disposeContextIfReferenced.bind(null, new WeakRef(this))
             )
         );
+
+        this._disposeAggregator.add(async () => {
+            await this._backendContextDisposeGuard.acquireDisposeLock();
+            await this._ctx.dispose();
+            this._modelPreventDisposalHandle.dispose();
+        });
     }
 
-    public dispose() {
+    public async dispose() {
         if (this._disposed)
             return;
 
         this._disposed = true;
 
-        this._disposeAggregator.dispose();
+        await this._disposeAggregator.dispose();
     }
 
     /** @hidden */
-    public [Symbol.dispose]() {
+    public [Symbol.asyncDispose]() {
         return this.dispose();
     }
 
@@ -253,76 +263,91 @@ export class LlamaContext {
                     currentBatchSize += processAmount;
                 }
 
-                if (currentBatchSize !== 0)
-                    this._ctx.initBatch(currentBatchSize);
-
-                for (const {queuedDecode, processAmount} of currentBatchItems) {
-                    let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
-                    try {
-                        batchLogitIndex = this._ctx.addToBatch(
-                            queuedDecode.sequenceId,
-                            queuedDecode.firstTokenSequenceIndex,
-                            Uint32Array.from(queuedDecode.tokens.slice(0, processAmount)),
-                            queuedDecode.generateLogitAtTheEnd && processAmount === queuedDecode.tokens.length
-                        );
-                    } catch (err) {
-                        this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
-                        continue;
-                    }
-                    currentQueuedDecodeItems.add(queuedDecode);
-
-                    if (queuedDecode.tokens.length === processAmount) {
-                        queuedDecodesToDelete.add(queuedDecode);
-                        afterDecodeActions.push({
-                            batchLogitIndex,
-                            response: queuedDecode.response,
-                            onDone: queuedDecode.onDone
-                        });
-                    } else {
-                        queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
-                        queuedDecode.firstTokenSequenceIndex += processAmount;
-                    }
-
-                    if (batchTokenSlotsLeft === 0)
-                        break;
-                }
-
-                for (let i = 0; i < this._queuedDecodes.length; i++) {
-                    const queuedDecode = this._queuedDecodes[i];
-                    if (queuedDecodesToDelete.has(queuedDecode)) {
-                        this._queuedDecodes.splice(i, 1);
-                        this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
-                        i--;
-                    }
-                }
-
-                shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
+                let preventDisposalHandle: DisposalPreventionHandle;
 
                 try {
-                    if (currentBatchSize !== 0)
-                        await this._ctx.decodeBatch();
+                    preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
                 } catch (err) {
-                    this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                    this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
                     return;
                 }
 
-                for (const action of afterDecodeActions) {
-                    const [accept, reject] = action.response;
-                    if (action.onDone != null && action.batchLogitIndex != null) {
+                try {
+                    if (currentBatchSize !== 0)
+                        this._ctx.initBatch(currentBatchSize);
+
+                    for (const {queuedDecode, processAmount} of currentBatchItems) {
+                        let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
                         try {
-                            accept(action.onDone(action.batchLogitIndex ?? null));
+                            batchLogitIndex = this._ctx.addToBatch(
+                                queuedDecode.sequenceId,
+                                queuedDecode.firstTokenSequenceIndex,
+                                Uint32Array.from(queuedDecode.tokens.slice(0, processAmount)),
+                                queuedDecode.generateLogitAtTheEnd && processAmount === queuedDecode.tokens.length
+                            );
                         } catch (err) {
-                            reject(err);
+                            this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
+                            continue;
+                        }
+                        currentQueuedDecodeItems.add(queuedDecode);
+
+                        if (queuedDecode.tokens.length === processAmount) {
+                            queuedDecodesToDelete.add(queuedDecode);
+                            afterDecodeActions.push({
+                                batchLogitIndex,
+                                response: queuedDecode.response,
+                                onDone: queuedDecode.onDone
+                            });
+                        } else {
+                            queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
+                            queuedDecode.firstTokenSequenceIndex += processAmount;
+                        }
+
+                        if (batchTokenSlotsLeft === 0)
+                            break;
+                    }
+
+                    for (let i = 0; i < this._queuedDecodes.length; i++) {
+                        const queuedDecode = this._queuedDecodes[i];
+                        if (queuedDecodesToDelete.has(queuedDecode)) {
+                            this._queuedDecodes.splice(i, 1);
+                            this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
+                            i--;
                         }
                     }
 
-                    accept(undefined);
+                    shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
+
+                    try {
+                        if (currentBatchSize !== 0)
+                            await this._ctx.decodeBatch();
+                    } catch (err) {
+                        this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                        return;
+                    }
+
+                    for (const action of afterDecodeActions) {
+                        const [accept, reject] = action.response;
+                        if (action.onDone != null && action.batchLogitIndex != null) {
+                            try {
+                                accept(action.onDone(action.batchLogitIndex ?? null));
+                            } catch (err) {
+                                reject(err);
+                            }
+                        }
+
+                        accept(undefined);
+                    }
+                } finally {
+                    preventDisposalHandle.dispose();
                 }
             }
         });
     }
 
     public async printTimings() {
+        this._ensureNotDisposed();
+
         this._ctx.printTimings();
         await new Promise((accept) => setTimeout(accept, 0)); // wait for the logs to finish printing
     }
@@ -356,6 +381,9 @@ export class LlamaContext {
             return;
 
         void withLock(this, "context", async () => {
+            if (this._disposed)
+                return;
+
             this._ctx.disposeSequence(sequenceId);
             this._unusedSequenceIds.push(sequenceId);
             this._onReclaimUnusedSequenceId.dispatchEvent();
@@ -429,6 +457,26 @@ export class LlamaContext {
     private _ensureNotDisposed() {
         if (this._disposed)
             throw new DisposedError();
+    }
+
+    /** @internal */
+    public static async _create(options: LlamaContextOptions, {_model}: {
+        _model: LlamaModel
+    }): Promise<LlamaContext> {
+        const context = new LlamaContext({_model}, options);
+        const {createSignal} = options;
+
+        const contextLoaded = await context._ctx.init();
+
+        if (createSignal?.aborted) {
+            if (contextLoaded)
+                await context._ctx.dispose();
+
+            throw createSignal.reason;
+        } else if (!contextLoaded)
+            throw new Error("Failed to create context");
+
+        return context;
     }
 }
 
@@ -552,6 +600,9 @@ export class LlamaContextSequence {
             if (ranges.length === 0)
                 return;
 
+            // if the deletion fails, we'll have to dispose the sequence and fill it up again
+            let deletionSuccessful = true;
+
             const resolvedRanges = ranges
                 .map(({start, end}) => {
                     if (start === end)
@@ -588,19 +639,29 @@ export class LlamaContextSequence {
             let lastDeleteRangeEndPos: number | null = null;
             for (const range of resolvedRanges) {
                 this._contextTokens.splice(range.start - removedTokens, range.end - range.start);
-                this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
+                if (deletionSuccessful)
+                    deletionSuccessful &&= this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
 
-                if (lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
+                if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
                     this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, range.start, -removedTokens);
 
                 removedTokens += range.end - range.start;
                 lastDeleteRangeEndPos = range.end;
             }
 
-            if (lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== this._nextTokenIndex)
+            if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== this._nextTokenIndex)
                 this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, this._nextTokenIndex, -removedTokens);
 
             this._nextTokenIndex -= removedTokens;
+
+            if (deletionSuccessful)
+                return;
+
+            const newSequenceTokens = this._contextTokens.slice();
+            this._nextTokenIndex = 0;
+            this._context._ctx.disposeSequence(this._sequenceId);
+
+            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens);
         });
     }
 
@@ -919,7 +980,7 @@ function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {
     const context = contextRef.deref();
 
     if (context != null)
-        context.dispose();
+        void context.dispose();
 }
 
 function disposeContextSequenceIfReferenced(contextRef: WeakRef<LlamaContextSequence>) {

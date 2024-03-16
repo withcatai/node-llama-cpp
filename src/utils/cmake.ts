@@ -72,7 +72,7 @@ export async function downloadCmakeIfNeeded(wrapWithStatusLogs: boolean = false)
             });
         } catch (err) {
             await logDistroInstallInstruction('To install "cmake", ', {
-                linuxPackages: {apt: ["cmake"]},
+                linuxPackages: {apt: ["cmake"], apk: ["cmake"]},
                 macOsPackages: {brew: ["cmake"]}
             });
             throw err;

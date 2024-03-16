@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import {getIsRunningFromCLI} from "../state.js";
+import {getForceShowConsoleLogPrefix, getIsRunningFromCLI} from "../state.js";
 
 export function getConsoleLogPrefix(forcePrefix: boolean = false, padEnd: boolean = true) {
     const isInCLI = getIsRunningFromCLI();
+    const forceShowLogPrefix = getForceShowConsoleLogPrefix();
 
-    if (!isInCLI || forcePrefix)
+    if (!isInCLI || forceShowLogPrefix || forcePrefix)
         return chalk.grey("[node-llama-cpp]") + (padEnd ? " " : "");
 
     return "";

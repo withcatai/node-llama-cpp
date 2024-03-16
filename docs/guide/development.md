@@ -60,7 +60,7 @@ npm run dev:build; node ./dist/cli/cli.js chat --wrapper llamaChat --model <path
 ### Debugging
 To run a chat session with a debugger, configure your IDE to run the following command with a debugger:
 ```bash
-node --loader ts-node/esm ./src/cli/cli.ts chat --model <path-to-a-model-file-on-your-computer>
+npx vite-node ./src/cli/cli.ts chat --model <path-to-a-model-file-on-your-computer>
 ```
 
 ## Opening a pull request

@@ -1,7 +1,10 @@
 import chalk from "chalk";
+import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
+import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
+import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaLocks, LlamaLogLevel} from "./types.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -18,6 +21,8 @@ const defaultLogLevel = 5;
 
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
+    /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
+    /** @internal */ public readonly _memoryLock = {};
     /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
@@ -33,9 +38,12 @@ export class Llama {
     /** @internal */ private _previousLog: string | null = null;
     /** @internal */ private _previousLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
+    /** @internal */ private _disposed: boolean = false;
+
+    public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, _skipLlamaInit = false
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
     }: {
         bindings: BindingModule,
         logLevel: LlamaLogLevel,
@@ -45,8 +53,7 @@ export class Llama {
         llamaCppRelease: {
             repo: string,
             release: string
-        },
-        _skipLlamaInit?: boolean
+        }
     }) {
         this._bindings = bindings;
         this._gpu = bindings.getGpuType() ?? false;
@@ -62,11 +69,31 @@ export class Llama {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
 
-        if (!_skipLlamaInit)
-            this._bindings.init();
-
         this._bindings.setLogger(this._onAddonLog);
         this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
+
+        this._onExit = this._onExit.bind(this);
+
+        process.on("exit", this._onExit);
+    }
+
+    public async dispose() {
+        if (this._disposed)
+            return;
+
+        this._disposed = true;
+        this.onDispose.dispatchEvent();
+        await this._backendDisposeGuard.acquireDisposeLock();
+        await this._bindings.dispose();
+    }
+
+    /** @hidden */
+    public async [Symbol.asyncDispose]() {
+        await this.dispose();
+    }
+
+    public get disposed() {
+        return this._disposed;
     }
 
     public get gpu() {
@@ -78,6 +105,8 @@ export class Llama {
     }
 
     public set logLevel(value: LlamaLogLevel) {
+        this._ensureNotDisposed();
+
         if (value === this._logLevel)
             return;
 
@@ -109,10 +138,14 @@ export class Llama {
     }
 
     public get systemInfo() {
+        this._ensureNotDisposed();
+
         return this._bindings.systemInfo();
     }
 
     public getVramState() {
+        this._ensureNotDisposed();
+
         const {total, used} = this._bindings.getGpuVramInfo();
 
         return {
@@ -120,6 +153,21 @@ export class Llama {
             used,
             free: Math.max(0, total - used)
         };
+    }
+
+    public async loadModel(options: LlamaModelOptions) {
+        this._ensureNotDisposed();
+
+        return await withLock(this._memoryLock, LlamaLocks.loadToMemory, options.loadSignal, async () => {
+            this._ensureNotDisposed();
+
+            const preventDisposalHandle = this._backendDisposeGuard.createPreventDisposalHandle();
+            try {
+                return await LlamaModel._create(options, {_llama: this});
+            } finally {
+                preventDisposalHandle.dispose();
+            }
+        });
     }
 
     /** @internal */
@@ -195,6 +243,20 @@ export class Llama {
     }
 
     /** @internal */
+    private _onExit() {
+        if (this._pendingLog != null && this._pendingLogLevel != null) {
+            this._callLogger(this._pendingLogLevel, this._pendingLog);
+            this._pendingLog = null;
+        }
+    }
+
+    /** @internal */
+    private _ensureNotDisposed() {
+        if (this._disposed)
+            throw new DisposedError();
+    }
+
+    /** @internal */
     public static async _create({
         bindings, buildType, buildMetadata, logLevel, logger, skipLlamaInit = false
     }: {
@@ -205,7 +267,7 @@ export class Llama {
         logger: (level: LlamaLogLevel, message: string) => void,
         skipLlamaInit?: boolean
     }) {
-        return new Llama({
+        const llama =  new Llama({
             bindings,
             buildType,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
@@ -214,9 +276,13 @@ export class Llama {
                 release: buildMetadata.buildOptions.llamaCpp.release
             },
             logLevel,
-            logger,
-            _skipLlamaInit: skipLlamaInit
+            logger
         });
+
+        if (!skipLlamaInit)
+            await llama._bindings.init();
+
+        return llama;
     }
 
     public static defaultConsoleLogger(level: LlamaLogLevel, message: string) {
