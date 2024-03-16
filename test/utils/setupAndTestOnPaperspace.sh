@@ -186,8 +186,10 @@ while true; do
     echo ""
     echo "Done running tests"
 
+    echo ""
     node ./dist/cli/cli.js inspect gpu
+    echo ""
 
-    read -r -s -p "${colorYellow}Press Enter to ${colorBlue}git pull${colorEnd} and rerun the tests, or Ctrl+C to exit${colorEnd}"
+    read -r -s -p "${colorYellow}Press Enter to ${colorBlue}git pull${colorYellow} and rerun the tests, or Ctrl+C to exit${colorEnd}"
     git pull
 done
