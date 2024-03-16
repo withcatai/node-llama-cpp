@@ -5,7 +5,7 @@
 # Intended to run on Ubuntu 22.04.
 #
 # Run this script with this command:
-# bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"
+# bash -c $"$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"
 
 
 defaultRepo="withcatai/node-llama-cpp"
@@ -38,6 +38,8 @@ if [ "$USER" != "paperspace" ]; then
         exit 1
     fi
 fi
+
+echo "Setting things up..."
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
 sudo apt remove -y -qq unattended-upgrades>/dev/null 2>&1
