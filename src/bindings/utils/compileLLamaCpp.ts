@@ -181,7 +181,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 );
             else if (buildOptions.gpu === "cuda") {
                 if (!ignoreWorkarounds.includes("cudaArchitecture") && platform === "linux" && err instanceof SpawnError &&
-                    err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture")
+                    err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase())
                 ) {
                     const cudaLibraryPaths = await getLinuxCudaLibraryPaths();
 
