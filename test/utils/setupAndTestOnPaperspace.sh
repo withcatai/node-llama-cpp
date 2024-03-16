@@ -16,6 +16,7 @@ nodejsVersion=21
 colorYellow=$'\e[33m'
 colorBlue=$'\e[34m'
 colorGrey=$'\e[90m'
+colorRed=$'\e[31m'
 colorEnd=$'\e[0m'
 
 
@@ -32,6 +33,7 @@ fi
 # Ensure that running on Paperspace
 if [ "$USER" != "paperspace" ]; then
     echo "This script is intended to run on Paperspace"
+    echo "${colorRed}It's not recommended to run it on your local machine as it will install and remove packages and change settings. It may ruin your machine.${colorEnd}"
     read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGrey}(y/n)${colorEnd} " continueScript
     if [[ ! $continueScript =~ ^[Yy]$ ]]; then
         echo "Aborting script..."
