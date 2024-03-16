@@ -92,6 +92,11 @@ export class SpawnError extends Error {
 
     public constructor(message: string, stdout: string, stderr: string, combinedStd: string) {
         super(message);
+
+        Object.defineProperty(this, "stdout", {enumerable: false});
+        Object.defineProperty(this, "stderr", {enumerable: false});
+        Object.defineProperty(this, "combinedStd", {enumerable: false});
+
         this.stdout = stdout;
         this.stderr = stderr;
         this.combinedStd = combinedStd;
