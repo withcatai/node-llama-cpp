@@ -10,8 +10,8 @@
 installationCommand='bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"'
 
 defaultRepo="withcatai/node-llama-cpp"
-targetFolder=$HOME/workspace/test-node-llama-cpp
-nodejsVersion=21
+targetFolder="$HOME/workspace/test-node-llama-cpp"
+nodejsVersion="21"
 
 
 colorYellow=$'\e[33m'
@@ -130,6 +130,7 @@ if [ ! -d "$targetFolder" ]; then
     pushd "$targetFolder" || exit 1
     npm install
     npm run dev:setup
+    popd || exit 1
 
     if ! nvidia-smi>/dev/null; then
         echo "Reboot is needed to use the Nvidia driver after installation"
@@ -143,6 +144,8 @@ fi
 
 nvidia-smi>/dev/null # ensure the Nvidia driver is installed and working
 vulkaninfo | grep -i "device id" | head -n 1
+
+pushd "$targetFolder" || exit 1
 
 # Run tests and start a loop of running tests and pulling from git
 echo "Starting a loop of running ${colorBlue}npm test${colorEnd} and then pulling from git when the user presses Enter..."
