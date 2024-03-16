@@ -130,7 +130,7 @@ if [ ! -d "$targetFolder" ]; then
     echo "Preparing the repo..."
     pushd "$targetFolder" || exit 1
     npm install
-    npm run dev:setup
+    npm run --silent dev:setup
     popd || exit 1
 
     if ! nvidia-smi>/dev/null; then
@@ -167,21 +167,21 @@ echo ""
 
 while true; do
     npm install
-    npm run dev:setup:downloadAllTestModels
+    npm run --silent dev:setup:downloadAllTestModels
 
     echo "Building for CUDA..."
-    NODE_LLAMA_CPP_GPU=cuda npm run dev:build
+    NODE_LLAMA_CPP_GPU=cuda npm run --silent dev:build
 
     echo "Building for Vulkan..."
-    NODE_LLAMA_CPP_GPU=vulkan npm run dev:build
+    NODE_LLAMA_CPP_GPU=vulkan npm run --silent dev:build
 
     node ./dist/cli/cli.js inspect gpu
 
     echo "Running tests using CUDA..."
-    NODE_LLAMA_CPP_GPU=cuda NODE_LLAMA_CPP_LOG_LEVEL=info npm test
+    NODE_LLAMA_CPP_GPU=cuda NODE_LLAMA_CPP_LOG_LEVEL=info npm run --silent test
 
     echo "Running tests using Vulkan..."
-    NODE_LLAMA_CPP_GPU=vulkan NODE_LLAMA_CPP_LOG_LEVEL=info npm test
+    NODE_LLAMA_CPP_GPU=vulkan NODE_LLAMA_CPP_LOG_LEVEL=info npm run --silent test
 
     echo ""
     echo "Done running tests"
