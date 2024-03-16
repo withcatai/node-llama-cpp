@@ -3,7 +3,7 @@ set(CMAKE_SYSTEM_PROCESSOR ARM64)
 
 # Look for cl.exe in the Visual Studio installation directories
 set(PROGRAMFILES "$ENV{ProgramFiles}")
-set(PROGRAMFILES_X86 "$ENV{ProgramFiles(x86)}")
+set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
 
 set(VS_INSTALL_PATHS
     "${PROGRAMFILES_X86}/Microsoft Visual Studio/"
