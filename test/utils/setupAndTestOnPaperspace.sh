@@ -5,7 +5,7 @@
 # Intended to run on Ubuntu 22.04.
 #
 # Run this script with this command:
-# curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh | bash -
+# bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"
 
 
 defaultRepo="withcatai/node-llama-cpp"
@@ -62,7 +62,7 @@ fi
 
 
 # Clone the repo and checkout the branch
-echo "Cloning ${colorBlue}${githubRepo}${colorEnd} and checking out ${colorBlue}${githubRepoBranch}${colorEnd}..."
+echo "Cloning ${colorBlue}$githubRepo${colorEnd} and checking out ${colorBlue}$githubRepoBranch${colorEnd}..."
 rm -rf "$targetForlder"
 mkdir -p "$(dirname "$targetForlder")"
 git clone "$githubRepo" "$targetForlder"
