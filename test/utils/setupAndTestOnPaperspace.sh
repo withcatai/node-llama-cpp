@@ -142,8 +142,15 @@ if [ ! -d "$targetFolder" ]; then
     fi
 fi
 
-nvidia-smi>/dev/null # ensure the Nvidia driver is installed and working
-vulkaninfo | grep -i "device id" | head -n 1
+if ! nvidia-smi>/dev/null; then
+    echo "Nvidia driver is not working. Aborting script..."
+    exit 1
+fi
+
+if [ -z "$(vulkaninfo 2>&1 | grep -i "deviceName")" ]; then
+    echo "Vulkan is not working. Aborting script..."
+    exit 1
+fi
 
 pushd "$targetFolder" || exit 1
 
