@@ -40,11 +40,11 @@ if [ "$USER" != "paperspace" ]; then
 fi
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
-sudo apt remove -y -qq unattended-upgrades>/dev/null
+sudo apt remove -y -qq unattended-upgrades>/dev/null 2>&1
 
 # Install dependencies
-sudo apt update -qq>/dev/null
-sudo apt install -y -qq git git-lfs fzf>/dev/null
+sudo apt update -qq>/dev/null 2>&1
+sudo apt install -y -qq git git-lfs fzf>/dev/null 2>&1
 
 
 # Receive input from the user regarding the repo and branch to clone and checkout
