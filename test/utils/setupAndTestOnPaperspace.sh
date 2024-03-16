@@ -40,10 +40,10 @@ if [ "$USER" != "paperspace" ]; then
 fi
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
-sudo apt remove -y -qq unattended-upgrades
+sudo apt remove -y -qq unattended-upgrades>/dev/null
 
 # Install dependencies
-sudo apt update -qq
+sudo apt update -qq>/dev/null
 sudo apt install -y -qq git git-lfs fzf
 
 
