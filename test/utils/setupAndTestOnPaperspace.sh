@@ -45,7 +45,7 @@ echo "Setting things up..."
 
 # Prevent the annoying restart services prompt from appearing
 sudo mkdir -p /etc/needrestart/conf.d
-echo '$nrconf{restart} = '\''a'\'';' | sudo tee /etc/needrestart/conf.d/no-restart-services-prompt.conf
+echo '$nrconf{restart} = '\''a'\'';' | sudo tee /etc/needrestart/conf.d/no-restart-services-prompt.conf >/dev/null
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
 sudo apt remove -y -qq unattended-upgrades>/dev/null 2>&1
