@@ -20,7 +20,7 @@ colorEnd=$'\e[0m'
 
 
 # Ensure that running on Ubuntu 22.04
-if [ ! -f /etc/os-release ] || ! grep -q 'NAME="Ubuntu"' /etc/os-release || ! grep -q 'VERSION_ID="22.04"' /etc/os-release || ! which apt-get>/dev/null; then
+if [ ! -f /etc/os-release ] || ! grep -q 'NAME="Ubuntu"' /etc/os-release || ! grep -q 'VERSION_ID="22.04"' /etc/os-release || ! which apt>/dev/null; then
     echo "This script is intended to run on Ubuntu 22.04"
     read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGrey}(y/n)${colorEnd} " continueScript
     if [[ ! $continueScript =~ ^[Yy]$ ]]; then
@@ -40,11 +40,11 @@ if [ "$USER" != "paperspace" ]; then
 fi
 
 # Prevent the machine from upgrading itself for the short time it lives for this script, as it's completely unnecessary and time wasting.
-sudo apt-get remove -y -qq unattended-upgrades>/dev/null
+sudo apt remove -y -qq unattended-upgrades>/dev/null
 
 # Install dependencies
-sudo apt-get update -qq>/dev/null
-sudo apt-get install -y -qq git git-lfs fzf
+sudo apt update -qq>/dev/null
+sudo apt install -y -qq git git-lfs fzf>/dev/null
 
 
 # Receive input from the user regarding the repo and branch to clone and checkout
@@ -89,11 +89,11 @@ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 
 # Install dependencies
-sudo apt-get update -qq
-sudo apt-get install -y -qq nodejs
-sudo apt-get install -y -qq vulkan-sdk
-sudo apt-get install -y -qq cuda-toolkit-12-3
-sudo apt-get install -y -qq cuda-drivers
+sudo apt update -qq
+sudo apt install -y -qq nodejs
+sudo apt install -y -qq vulkan-sdk
+sudo apt install -y -qq cuda-toolkit-12-3
+sudo apt install -y -qq cuda-drivers
 
 nvidia-smi>/dev/null # make sure that the Nvidia driver is installed and working
 vulkaninfo | grep -i "device id" | head -n 1
