@@ -10,7 +10,7 @@
 
 [![Build](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml/badge.svg)](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml)
 [![License](https://badgen.net/badge/color/MIT/green?label=license)](https://www.npmjs.com/package/node-llama-cpp)
-[![License](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/node-llama-cpp)
+[![Types](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/node-llama-cpp)
 [![Version](https://badgen.net/npm/v/node-llama-cpp)](https://www.npmjs.com/package/node-llama-cpp)
 
 </div>
@@ -19,7 +19,7 @@
 
 ## Features
 * Run a text generation model locally on your machine
-* Metal and CUDA support
+* Metal, CUDA and Vulkan support
 * Pre-built binaries are provided, with a fallback to building from source without `node-gyp` or Python
 * Chat with a model using a chat wrapper
 * Use the CLI to chat with a model without writing any code

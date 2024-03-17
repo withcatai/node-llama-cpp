@@ -1,7 +1,8 @@
 import fs from "fs-extra";
 import simpleGit from "simple-git";
-import {currentReleaseGitBundlePath, defaultLlamaCppGitHubRepo, llamaCppDirectory} from "../config.js";
-import {getBinariesGithubRelease} from "./binariesGithubRelease.js";
+import {currentReleaseGitBundlePath, builtinLlamaCppGitHubRepo, llamaCppDirectory} from "../config.js";
+import {getBinariesGithubRelease} from "../bindings/utils/binariesGithubRelease.js";
+import {isGithubReleaseNeedsResolving} from "./resolveGithubRelease.js";
 
 
 export async function unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle() {
@@ -52,13 +53,13 @@ export async function unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle() {
 }
 
 export async function getGitBundlePathForRelease(githubOwner: string, githubRepo: string, release: string) {
-    const [defaultGithubOwner, defaultGithubRepo] = defaultLlamaCppGitHubRepo.split("/");
-    if (githubOwner !== defaultGithubOwner || githubRepo !== defaultGithubRepo)
+    const [builtinGithubOwner, builtinGithubRepo] = builtinLlamaCppGitHubRepo.split("/");
+    if (githubOwner !== builtinGithubOwner || githubRepo !== builtinGithubRepo)
         return null;
 
     const currentBundleRelease = await getBinariesGithubRelease();
 
-    if (currentBundleRelease === "latest")
+    if (isGithubReleaseNeedsResolving(currentBundleRelease))
         return null;
 
     if (currentBundleRelease !== release)

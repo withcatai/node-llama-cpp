@@ -68,7 +68,7 @@ body:
       description: >-
         Add any other context about the bug report here.
   - type: checkboxes
-    id: drivers
+    id: features
     attributes:
       label: Relevant Features Used
       options:
@@ -76,7 +76,11 @@ body:
           required: false
         - label: CUDA support
           required: false
+        - label: Vulkan support
+          required: false
         - label: Grammar
+          required: false
+        - label: Function calling
           required: false
   - type: dropdown
     id: pr

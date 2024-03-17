@@ -5,7 +5,7 @@ import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, cliName: string = cliBinName) {
-    const title = cliName + " " + command.command ?? "";
+    const title = cliName + " " + (command.command ?? "");
     const description = command.describe ?? "";
     const optionGroups = await getOptionsGroupFromCommand(command);
 
@@ -161,11 +161,11 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
         }
 
         if (option.type != null) {
-            optionDescription.push(`(<code>${htmlEscape(option.type)}</code>)`);
+            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape(option.type)}<span style="opacity: 0.4">)</span></code>`);
         }
 
         if (option.demandOption) {
-            optionDescription.push(`(<code>${htmlEscape("required")}</code>)`);
+            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape("required")}<span style="opacity: 0.4">)</span></code>`);
         }
 
         if (option.choices != null) {

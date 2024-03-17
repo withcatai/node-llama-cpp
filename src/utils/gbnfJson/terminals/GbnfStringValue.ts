@@ -9,7 +9,7 @@ export class GbnfStringValue extends GbnfTerminal {
         this.value = value;
     }
 
-    override getGrammar(): string {
+    public override getGrammar(): string {
         return [
             '"',
             '\\"',

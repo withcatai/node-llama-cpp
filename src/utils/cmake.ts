@@ -7,8 +7,10 @@ import {
     defaultXpacksCacheDirectory, defaultXpacksStoreDirectory, llamaDirectory, localXpacksCacheDirectory, localXpacksStoreDirectory,
     xpackDirectory, xpmVersion
 } from "../config.js";
+import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
 import {spawnCommand} from "./spawnCommand.js";
 import withStatusLogs from "./withStatusLogs.js";
+import {withLockfile} from "./withLockfile.js";
 
 
 export async function hasBuiltinCmake() {
@@ -22,9 +24,11 @@ export async function hasBuiltinCmake() {
 
 export async function getCmakePath() {
     try {
-        const resolvedPath = await which("cmake");
+        const resolvedPath = await which("cmake", {
+            nothrow: true
+        });
 
-        if (resolvedPath !== "")
+        if (resolvedPath !== "" && resolvedPath != null)
             return resolvedPath;
     } catch (err) {}
 
@@ -56,15 +60,24 @@ export async function downloadCmakeIfNeeded(wrapWithStatusLogs: boolean = false)
     } catch (err) {}
 
     if (!wrapWithStatusLogs)
-        await downloadCmake();
-    else
-        await withStatusLogs({
-            loading: chalk.blue("Downloading cmake"),
-            success: chalk.blue("Downloaded cmake"),
-            fail: chalk.blue("Failed to download cmake")
-        }, async () => {
-            await downloadCmake();
-        });
+        await downloadCmake({progressLogs: wrapWithStatusLogs});
+    else {
+        try {
+            await withStatusLogs({
+                loading: chalk.blue("Downloading cmake"),
+                success: chalk.blue("Downloaded cmake"),
+                fail: chalk.blue("Failed to download cmake")
+            }, async () => {
+                await downloadCmake({progressLogs: wrapWithStatusLogs});
+            });
+        } catch (err) {
+            await logDistroInstallInstruction('To install "cmake", ', {
+                linuxPackages: {apt: ["cmake"], apk: ["cmake"]},
+                macOsPackages: {brew: ["cmake"]}
+            });
+            throw err;
+        }
+    }
 }
 
 export async function clearLocalCmake() {
@@ -86,17 +99,21 @@ export async function fixXpackPermissions() {
     } catch (err) {}
 }
 
-async function downloadCmake() {
-    const xpmEnv: NodeJS.ProcessEnv = {
-        ...process.env,
-        XPACKS_STORE_FOLDER: defaultXpacksStoreDirectory,
-        XPACKS_CACHE_FOLDER: defaultXpacksCacheDirectory
-    };
+async function downloadCmake({progressLogs = true}: {progressLogs?: boolean} = {}) {
+    await withLockfile({
+        resourcePath: path.join(xpackDirectory, "cmakeInstall")
+    }, async () => {
+        const xpmEnv: NodeJS.ProcessEnv = {
+            ...process.env,
+            XPACKS_STORE_FOLDER: defaultXpacksStoreDirectory,
+            XPACKS_CACHE_FOLDER: defaultXpacksCacheDirectory
+        };
 
-    await spawnCommand("npm", ["exec", "--yes", "--", `xpm@${xpmVersion}`, "install", "@xpack-dev-tools/cmake@latest", "--no-save"], xpackDirectory, xpmEnv);
+        await spawnCommand("npm", ["exec", "--yes", "--", `xpm@${xpmVersion}`, "install", "@xpack-dev-tools/cmake@latest", "--no-save"], xpackDirectory, xpmEnv, progressLogs);
 
-    await fs.remove(localXpacksCacheDirectory);
-    await fixXpackPermissions();
+        await fs.remove(localXpacksCacheDirectory);
+        await fixXpackPermissions();
+    });
 }
 
 async function getBinFromWindowCmd(cmdFilePath: string, binName: string) {

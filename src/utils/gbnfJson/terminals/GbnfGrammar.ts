@@ -9,7 +9,7 @@ export class GbnfGrammar extends GbnfTerminal {
         this.grammar = grammar;
     }
 
-    getGrammar(): string {
+    public getGrammar(): string {
         if (this.grammar instanceof Array)
             return this.grammar
                 .filter((item) => item !== "")

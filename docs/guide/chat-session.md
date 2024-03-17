@@ -39,14 +39,14 @@ To learn more about chat prompt wrappers, see the [chat prompt wrapper guide](./
 import {fileURLToPath} from "url";
 import path from "path";
 import {
-    LlamaModel, LlamaContext, LlamaChatSession, LlamaChatPromptWrapper
+    LlamaModel, LlamaContext, LlamaChatSession, LlamaChatWrapper
 } from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf"),
-    promptWrapper: new LlamaChatPromptWrapper()
+    chatWrapper: new LlamaChatWrapper()
 });
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({context});

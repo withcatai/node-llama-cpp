@@ -15,7 +15,7 @@ export class GbnfObjectMap extends GbnfTerminal {
         this.fields = fields;
     }
 
-    getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
+    public getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
         const whitespaceRuleName = new GbnfWhitespace().resolve(grammarGenerator);
 
         return new GbnfGrammar([

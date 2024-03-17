@@ -20,7 +20,7 @@ hero:
 
 features:
   - icon: 🚀
-    title: Metal and CUDA support
+    title: Metal, CUDA and Vulkan support
     details: Utilize the power of your GPU to run AI models faster
     link: /guide/#cuda-and-metal-support
     linkText: Learn more

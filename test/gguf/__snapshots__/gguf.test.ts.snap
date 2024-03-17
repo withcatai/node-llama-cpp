@@ -1,0 +1,179 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
+{
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": "MOSTLY_Q4_0",
+      "name": "workspace",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 32768,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 10000,
+      },
+    },
+    "tensorCount": 291,
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|from|>' + message['role'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% elif message['role'] == 'tool' %}
+{{ '<|from|>' + message['name'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% else %}
+{% set contain_content='no'%}
+{% if message['content'] is not none %}
+{{ '<|from|>assistant
+<|recipient|>all
+<|content|>' + message['content'] }}{% set contain_content='yes'%}
+{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{% set prompt='<|from|>assistant
+<|recipient|>' + tool_call['function']['name'] + '
+<|content|>' + tool_call['function']['arguments'] %}
+{% if loop.index == 1 and contain_content == "no" %}
+{{ prompt }}{% else %}
+{{ '
+' + prompt}}{% endif %}
+{% endfor %}
+{% endif %}
+{{ '<|stop|>
+' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|from|>assistant
+<|recipient|>' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "model": "llama",
+        "padding_token_id": 2,
+        "unknown_token_id": 0,
+      },
+    },
+    "version": 3,
+  },
+  "metadataSize": 718762,
+}
+`;
+
+exports[`GGUF Parser > should parse local gguf model 1`] = `
+{
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": "MOSTLY_Q4_0",
+      "name": "workspace",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 32768,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 10000,
+      },
+    },
+    "tensorCount": 291,
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|from|>' + message['role'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% elif message['role'] == 'tool' %}
+{{ '<|from|>' + message['name'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% else %}
+{% set contain_content='no'%}
+{% if message['content'] is not none %}
+{{ '<|from|>assistant
+<|recipient|>all
+<|content|>' + message['content'] }}{% set contain_content='yes'%}
+{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{% set prompt='<|from|>assistant
+<|recipient|>' + tool_call['function']['name'] + '
+<|content|>' + tool_call['function']['arguments'] %}
+{% if loop.index == 1 and contain_content == "no" %}
+{{ prompt }}{% else %}
+{{ '
+' + prompt}}{% endif %}
+{% endfor %}
+{% endif %}
+{{ '<|stop|>
+' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|from|>assistant
+<|recipient|>' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "model": "llama",
+        "padding_token_id": 2,
+        "unknown_token_id": 0,
+      },
+    },
+    "version": 3,
+  },
+  "metadataSize": 718762,
+}
+`;
+
+exports[`GGUF Parser > should parse remote gguf model 1`] = `
+{
+  "metadata": {
+    "falcon": {
+      "attention": {
+        "head_count": 232,
+        "head_count_kv": 8,
+        "layer_norm_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 80,
+      "context_length": 2048,
+      "embedding_length": 14848,
+      "feed_forward_length": 59392,
+      "tensor_data_layout": "jploski",
+    },
+    "general": {
+      "architecture": "falcon",
+      "file_type": "MOSTLY_Q6_K",
+      "name": "Falcon",
+      "quantization_version": 2,
+    },
+    "tensorCount": 644,
+    "tokenizer": {
+      "ggml": {
+        "eos_token_id": 11,
+        "model": "gpt2",
+      },
+    },
+    "version": 2,
+  },
+  "metadataSize": 2547826,
+}
+`;
