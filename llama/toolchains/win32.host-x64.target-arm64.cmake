@@ -12,9 +12,17 @@ set(VS_INSTALL_PATHS
     "C:/Program Files/Microsoft Visual Studio"
 )
 foreach(PATH IN LISTS VS_INSTALL_PATHS)
+    if(CL_EXE_PATH)
+        break()
+    endif()
+
     file(GLOB_RECURSE FOUND_CL_EXE "${PATH}/*/VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe")
     if(FOUND_CL_EXE)
         list(GET FOUND_CL_EXE 0 CL_EXE_PATH)
+        break()
+    endif()
+
+    if(CL_EXE_PATH)
         break()
     endif()
 
