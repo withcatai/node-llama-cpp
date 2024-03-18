@@ -190,18 +190,22 @@ export class LlamaContext {
             this._dispatchDecodeScheduled = false;
             this._batchDispatchPending = false;
 
-            let prioritizeStrategy: ReturnType<typeof resolveBatchItemsPrioritizingStrategy>;
-            try {
-                this._ensureNotDisposed();
-                prioritizeStrategy = resolveBatchItemsPrioritizingStrategy(this._batchingOptions.itemsPrioritizingStrategy);
-            } catch (err) {
-                this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                return;
-            }
+            let shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
 
-            let shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
+            const resolvePrioritizingStrategy = () => {
+                try {
+                    this._ensureNotDisposed();
+                    return resolveBatchItemsPrioritizingStrategy(this._batchingOptions.itemsPrioritizingStrategy);
+                } catch (err) {
+                    this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
+                }
 
-            while (shouldHaveAnotherBatch) {
+                return null;
+            };
+
+            const getOrderedQueuedDecodes = (
+                prioritizeStrategy: ReturnType<typeof resolveBatchItemsPrioritizingStrategy>
+            ): null | CurrentBatchItem[] => {
                 const batchItemToQueuedDecodeMap = new Map<BatchItem, InternalQueuedDecode>();
                 const batchItemsList: BatchItem[] = [];
 
@@ -222,25 +226,10 @@ export class LlamaContext {
                     });
                 } catch (err) {
                     this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                    return;
+                    return null;
                 }
 
-                let batchTokenSlotsLeft = this._batchSize;
-                const afterDecodeActions: Array<{
-                    batchLogitIndex: BatchLogitIndex | undefined,
-                    response: [accept: (res: any) => void, reject: (reason: unknown) => void],
-                    onDone?: (batchLogitIndex: BatchLogitIndex) => any
-                }> = [];
-                const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
-                const currentQueuedDecodeItems = new Set<InternalQueuedDecode>();
-
-                const currentBatchItems: Array<{
-                    queuedDecode: InternalQueuedDecode,
-                    processAmount: number
-                }> = [];
-                let currentBatchSize = 0;
-
-                for (const prioritizedItem of prioritizedItems) {
+                return prioritizedItems.map((prioritizedItem): CurrentBatchItem => {
                     const queuedDecode = batchItemToQueuedDecodeMap.get(prioritizedItem.item);
 
                     if (queuedDecode == null)
@@ -249,22 +238,129 @@ export class LlamaContext {
                             "of the batch item on `item` on `PrioritizedBatchItem` in your custom prioritization strategy"
                         );
 
-                    const processAmount = Math.min(queuedDecode.tokens.length, prioritizedItem.processAmount, batchTokenSlotsLeft);
+                    return {
+                        queuedDecode,
+                        processAmount: prioritizedItem.processAmount
+                    };
+                });
+            };
 
-                    if (processAmount <= 0)
+            const fitQueuedDecodesToABatch = (queuedDecodes: CurrentBatchItem[], batchSize: number) => {
+                const currentBatchItems: CurrentBatchItem[] = [];
+                let currentBatchSize = 0;
+                let batchTokenSlotsLeft = batchSize;
+
+                for (const {queuedDecode, processAmount} of queuedDecodes) {
+                    const resolvedProcessAmount = Math.min(
+                        processAmount <= 0 ? 1 : processAmount, queuedDecode.tokens.length, batchTokenSlotsLeft
+                    );
+
+                    if (resolvedProcessAmount <= 0) {
+                        if (batchTokenSlotsLeft === 0)
+                            break;
+
                         continue;
+                    }
 
-                    batchTokenSlotsLeft -= processAmount;
+                    batchTokenSlotsLeft -= resolvedProcessAmount;
+                    currentBatchSize += resolvedProcessAmount;
 
                     currentBatchItems.push({
                         queuedDecode,
-                        processAmount
+                        processAmount: resolvedProcessAmount
                     });
-                    currentBatchSize += processAmount;
                 }
 
-                let preventDisposalHandle: DisposalPreventionHandle;
+                return {
+                    currentBatchItems,
+                    currentBatchSize
+                };
+            };
 
+            const decodeTokenBatchItems = async (batchItems: CurrentBatchItem[], currentBatchSize: number) => {
+                const afterDecodeActions: Array<{
+                    batchLogitIndex: BatchLogitIndex | undefined,
+                    response: [accept: (res: any) => void, reject: (reason: unknown) => void],
+                    onDone?: (batchLogitIndex: BatchLogitIndex) => any
+                }> = [];
+                const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
+                const currentQueuedDecodeItems = new Set<InternalQueuedDecode>();
+
+                if (currentBatchSize !== 0)
+                    this._ctx.initBatch(currentBatchSize);
+
+                for (const {queuedDecode, processAmount} of batchItems) {
+                    let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
+                    try {
+                        batchLogitIndex = this._ctx.addToBatch(
+                            queuedDecode.sequenceId,
+                            queuedDecode.firstTokenSequenceIndex,
+                            Uint32Array.from(queuedDecode.tokens.slice(0, processAmount)),
+                            queuedDecode.generateLogitAtTheEnd && processAmount === queuedDecode.tokens.length
+                        );
+                    } catch (err) {
+                        this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
+                        continue;
+                    }
+                    currentQueuedDecodeItems.add(queuedDecode);
+
+                    if (queuedDecode.tokens.length === processAmount) {
+                        queuedDecodesToDelete.add(queuedDecode);
+                        afterDecodeActions.push({
+                            batchLogitIndex,
+                            response: queuedDecode.response,
+                            onDone: queuedDecode.onDone
+                        });
+                    } else {
+                        queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
+                        queuedDecode.firstTokenSequenceIndex += processAmount;
+                    }
+                }
+
+                for (let i = 0; i < this._queuedDecodes.length; i++) {
+                    const queuedDecode = this._queuedDecodes[i];
+                    if (queuedDecodesToDelete.has(queuedDecode)) {
+                        this._queuedDecodes.splice(i, 1);
+                        this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
+                        i--;
+                    }
+                }
+
+                try {
+                    if (currentBatchSize !== 0)
+                        await this._ctx.decodeBatch();
+                } catch (err) {
+                    this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                    return;
+                }
+
+                for (const action of afterDecodeActions) {
+                    const [accept, reject] = action.response;
+                    if (action.onDone != null && action.batchLogitIndex != null) {
+                        try {
+                            accept(action.onDone(action.batchLogitIndex ?? null));
+                        } catch (err) {
+                            reject(err);
+                        }
+                    }
+
+                    accept(undefined);
+                }
+            };
+
+            const prioritizeStrategy = resolvePrioritizingStrategy();
+            if (prioritizeStrategy == null) return; // all queued items are rejected and dequeued when we get here
+
+            while (shouldHaveAnotherLoop) {
+                const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizeStrategy);
+                if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
+
+                const {
+                    currentBatchItems,
+                    currentBatchSize
+                } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
+
+                let preventDisposalHandle: DisposalPreventionHandle;
                 try {
                     preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
                 } catch (err) {
@@ -273,71 +369,9 @@ export class LlamaContext {
                 }
 
                 try {
-                    if (currentBatchSize !== 0)
-                        this._ctx.initBatch(currentBatchSize);
+                    await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
 
-                    for (const {queuedDecode, processAmount} of currentBatchItems) {
-                        let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
-                        try {
-                            batchLogitIndex = this._ctx.addToBatch(
-                                queuedDecode.sequenceId,
-                                queuedDecode.firstTokenSequenceIndex,
-                                Uint32Array.from(queuedDecode.tokens.slice(0, processAmount)),
-                                queuedDecode.generateLogitAtTheEnd && processAmount === queuedDecode.tokens.length
-                            );
-                        } catch (err) {
-                            this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
-                            continue;
-                        }
-                        currentQueuedDecodeItems.add(queuedDecode);
-
-                        if (queuedDecode.tokens.length === processAmount) {
-                            queuedDecodesToDelete.add(queuedDecode);
-                            afterDecodeActions.push({
-                                batchLogitIndex,
-                                response: queuedDecode.response,
-                                onDone: queuedDecode.onDone
-                            });
-                        } else {
-                            queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
-                            queuedDecode.firstTokenSequenceIndex += processAmount;
-                        }
-
-                        if (batchTokenSlotsLeft === 0)
-                            break;
-                    }
-
-                    for (let i = 0; i < this._queuedDecodes.length; i++) {
-                        const queuedDecode = this._queuedDecodes[i];
-                        if (queuedDecodesToDelete.has(queuedDecode)) {
-                            this._queuedDecodes.splice(i, 1);
-                            this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
-                            i--;
-                        }
-                    }
-
-                    shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
-
-                    try {
-                        if (currentBatchSize !== 0)
-                            await this._ctx.decodeBatch();
-                    } catch (err) {
-                        this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
-                        return;
-                    }
-
-                    for (const action of afterDecodeActions) {
-                        const [accept, reject] = action.response;
-                        if (action.onDone != null && action.batchLogitIndex != null) {
-                            try {
-                                accept(action.onDone(action.batchLogitIndex ?? null));
-                            } catch (err) {
-                                reject(err);
-                            }
-                        }
-
-                        accept(undefined);
-                    }
+                    shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
                 } finally {
                     preventDisposalHandle.dispose();
                 }
@@ -588,7 +622,7 @@ export class LlamaContextSequence {
 
     /**
      * Erase context tokens in the provided ranges to free up space for new tokens to be generated.
-     * the start and end of each range are exclusive.
+     * The start of each range is inclusive, and the end of each range is exclusive.
      * For example, the range `{start: 0, end: 1}` will remove the token at the `0` index only.
      */
     public async eraseContextTokenRanges(ranges: ContextTokensDeleteRange[]) {
@@ -974,6 +1008,11 @@ type InternalQueuedDecode = {
     evaluationPriority: EvaluationPriority,
     response: [accept: (res: any) => void, reject: (reason: unknown) => void],
     onDone?: (batchLogitIndex: BatchLogitIndex) => any
+};
+
+type CurrentBatchItem = {
+    queuedDecode: InternalQueuedDecode,
+    processAmount: number
 };
 
 function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {
