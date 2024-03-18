@@ -143,37 +143,3 @@ exports[`GGUF Parser > should parse local gguf model 1`] = `
   "metadataSize": 718762,
 }
 `;
-
-exports[`GGUF Parser > should parse remote gguf model 1`] = `
-{
-  "metadata": {
-    "falcon": {
-      "attention": {
-        "head_count": 232,
-        "head_count_kv": 8,
-        "layer_norm_epsilon": 0.000009999999747378752,
-      },
-      "block_count": 80,
-      "context_length": 2048,
-      "embedding_length": 14848,
-      "feed_forward_length": 59392,
-      "tensor_data_layout": "jploski",
-    },
-    "general": {
-      "architecture": "falcon",
-      "file_type": "MOSTLY_Q6_K",
-      "name": "Falcon",
-      "quantization_version": 2,
-    },
-    "tensorCount": 644,
-    "tokenizer": {
-      "ggml": {
-        "eos_token_id": 11,
-        "model": "gpt2",
-      },
-    },
-    "version": 2,
-  },
-  "metadataSize": 2547826,
-}
-`;
