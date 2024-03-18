@@ -2,8 +2,8 @@ import retry from "async-retry";
 import MetadataNotParsedYetError from "./errors/MetadataNotParsedYetError.js";
 import GGUFInsights, {GGUFInsightsOptions} from "./GGUFInsights.js";
 import {GgufParser, GGUFMetadataResponse} from "./ggufParser/GgufParser.js";
-import {GgufFetchStream} from "./ggufParser/stream/GgufFetchStream.js";
-import {GgufFsReadStream} from "./ggufParser/stream/GgufFsReadStream.js";
+import {GgufFetchFileReader} from "./ggufParser/fileReaders/GgufFetchFileReader.js";
+import {GgufFsFileReader} from "./ggufParser/fileReaders/GgufFsFileReader.js";
 
 export type GGUFMetadataOptions = {
     source?: "network" | "local",
@@ -34,24 +34,24 @@ export default class GGUFMetadata {
     }
 
     public async parse() {
-        const stream = this._createStream();
+        const fileReader = this._createFileReader();
         const parser = new GgufParser({
-            stream,
+            fileReader,
             ignoreKeys: this.options.ignoreKeys
         });
         return this._metadata = await parser.parseMetadata();
     }
 
-    private _createStream() {
+    private _createFileReader() {
         switch (this.options.source) {
             case "network":
-                return new GgufFetchStream({
+                return new GgufFetchFileReader({
                     url: this.path,
                     retryOptions: this.options.retry
                 });
             case "local":
             default:
-                return new GgufFsReadStream({
+                return new GgufFsFileReader({
                     filePath: this.path,
                     retryOptions: this.options.retry
                 });

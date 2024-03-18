@@ -2,9 +2,9 @@ import fs from "node:fs/promises";
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {GgufBaseStream, ALLOCATION_SIZE} from "./GgufBaseStream.js";
+import {GgufBaseFileReader, ALLOCATION_SIZE} from "./GgufBaseFileReader.js";
 
-type GgufReadStreamOptions = {
+type GgufFsFileReaderOptions = {
     filePath: string,
     retryOptions?: retry.Options
 };
@@ -16,11 +16,11 @@ const defaultRetryOptions: retry.Options = {
     maxTimeout: 1000 * 16
 } as const;
 
-export class GgufFsReadStream extends GgufBaseStream {
+export class GgufFsFileReader extends GgufBaseFileReader {
     public readonly filePath: string;
     public readonly retryOptions: retry.Options;
 
-    public constructor({filePath, retryOptions = defaultRetryOptions}: GgufReadStreamOptions) {
+    public constructor({filePath, retryOptions = defaultRetryOptions}: GgufFsFileReaderOptions) {
         super();
         this.filePath = filePath;
         this.retryOptions = retryOptions;

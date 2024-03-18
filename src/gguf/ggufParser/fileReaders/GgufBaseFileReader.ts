@@ -16,7 +16,7 @@ export const METHOD_TO_BYTE_COUNT = {
 
 export const ALLOCATION_SIZE = 1024 * 1024 * 1.5; // 1.5MB
 
-export abstract class GgufBaseStream {
+export abstract class GgufBaseFileReader {
     protected _buffer = Buffer.alloc(0);
 
     public abstract readByteRange(offset: number | GgufReadOffset, length: number): Promise<Buffer>;

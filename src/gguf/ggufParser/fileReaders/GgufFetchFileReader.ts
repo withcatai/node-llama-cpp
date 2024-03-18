@@ -1,9 +1,9 @@
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {GgufBaseStream, ALLOCATION_SIZE} from "./GgufBaseStream.js";
+import {GgufBaseFileReader, ALLOCATION_SIZE} from "./GgufBaseFileReader.js";
 
-type GgufFetchStreamOptions = {
+type GgufFetchFileReaderOptions = {
     url: string,
     retryOptions?: retry.Options
 };
@@ -15,11 +15,11 @@ const defaultRetryOptions: retry.Options = {
     maxTimeout: 1000 * 16
 } as const;
 
-export class GgufFetchStream extends GgufBaseStream {
+export class GgufFetchFileReader extends GgufBaseFileReader {
     public readonly url: string;
     public readonly retryOptions: retry.Options;
 
-    public constructor({url, retryOptions = defaultRetryOptions}: GgufFetchStreamOptions) {
+    public constructor({url, retryOptions = defaultRetryOptions}: GgufFetchFileReaderOptions) {
         super();
         this.url = url;
         this.retryOptions = retryOptions;

@@ -4,7 +4,7 @@ import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {GgufReadOffset} from "./utils/GgufReadOffset.js";
 import {parseGgufFileTypeNumber} from "./utils/parseGgufFileTypeNumber.js";
 import {GgufMetadataAny} from "./GgufMetadataTypes.js";
-import {GgufBaseStream, METHOD_TO_BYTE_COUNT} from "./stream/GgufBaseStream.js";
+import {GgufBaseFileReader, METHOD_TO_BYTE_COUNT} from "./fileReaders/GgufBaseFileReader.js";
 
 const enum MetadataValueType {
     Uint8 = 0,
@@ -34,17 +34,17 @@ export type GGUFMetadataResponse = {
 };
 
 export type GgufParserOptions = {
-    stream: GgufBaseStream,
+    fileReader: GgufBaseFileReader,
     ignoreKeys?: string[]
 };
 
 export class GgufParser {
-    private readonly _stream: GgufBaseStream;
+    private readonly _fileReader: GgufBaseFileReader;
     public ignoreKeys = defaultIgnoreMetadataKeys;
 
-    public constructor({stream, ignoreKeys = defaultIgnoreMetadataKeys}: GgufParserOptions) {
+    public constructor({fileReader, ignoreKeys = defaultIgnoreMetadataKeys}: GgufParserOptions) {
         this.ignoreKeys = ignoreKeys;
-        this._stream = stream;
+        this._fileReader = fileReader;
     }
 
     public async parseMetadata({logWarnings = true}: {logWarnings?: boolean} = {}): Promise<GGUFMetadataResponse> {
@@ -76,20 +76,20 @@ export class GgufParser {
         const readOffset = GgufReadOffset.resolveReadOffset(offset);
 
         switch (type) {
-            case MetadataValueType.Uint8: return await this._stream.readUint8(readOffset);
-            case MetadataValueType.Int8: return await this._stream.readInt8(readOffset);
-            case MetadataValueType.Uint16: return await this._stream.readUint16(readOffset);
-            case MetadataValueType.Int16: return await this._stream.readInt16(readOffset);
-            case MetadataValueType.Uint32: return await this._stream.readUint32(readOffset);
-            case MetadataValueType.Int32: return await this._stream.readInt32(readOffset);
-            case MetadataValueType.Float32: return await this._stream.readFloat32(readOffset);
-            case MetadataValueType.Bool: return await this._stream.readBool(readOffset);
-            case MetadataValueType.String: return await this._stream.readString(readOffset);
+            case MetadataValueType.Uint8: return await this._fileReader.readUint8(readOffset);
+            case MetadataValueType.Int8: return await this._fileReader.readInt8(readOffset);
+            case MetadataValueType.Uint16: return await this._fileReader.readUint16(readOffset);
+            case MetadataValueType.Int16: return await this._fileReader.readInt16(readOffset);
+            case MetadataValueType.Uint32: return await this._fileReader.readUint32(readOffset);
+            case MetadataValueType.Int32: return await this._fileReader.readInt32(readOffset);
+            case MetadataValueType.Float32: return await this._fileReader.readFloat32(readOffset);
+            case MetadataValueType.Bool: return await this._fileReader.readBool(readOffset);
+            case MetadataValueType.String: return await this._fileReader.readString(readOffset);
         }
 
         if (type === MetadataValueType.Array) {
-            const arrayType = await this._stream.readUint32(readOffset);
-            const arrayLength = await this._stream.readUint64(readOffset);
+            const arrayType = await this._fileReader.readUint32(readOffset);
+            const arrayLength = await this._fileReader.readUint64(readOffset);
 
             const arrayValues: any[] = [];
             for (let i = 0; i < arrayLength; i++) {
@@ -105,24 +105,24 @@ export class GgufParser {
     private async _parseMetadataRaw(): Promise<{metadata: Record<string, any>, metadataSize: number}> {
         const readOffset = new GgufReadOffset(0);
 
-        const magicBytes = await this._stream.readByteRange(readOffset, METHOD_TO_BYTE_COUNT.readUint8 * ggufMagic.length);
+        const magicBytes = await this._fileReader.readByteRange(readOffset, METHOD_TO_BYTE_COUNT.readUint8 * ggufMagic.length);
         const magicText = String.fromCharCode(...magicBytes);
 
         if (magicText !== ggufMagic)
             throw new InvalidGgufMagicError();
 
-        const version = await this._stream.readUint32(readOffset);
-        const tensorCount = await this._stream.readUint64(readOffset);
-        const metadataKVCount = Number(await this._stream.readUint64(readOffset));
+        const version = await this._fileReader.readUint32(readOffset);
+        const tensorCount = await this._fileReader.readUint64(readOffset);
+        const metadataKVCount = Number(await this._fileReader.readUint64(readOffset));
 
         const metadata: { [key: string]: any } = {
             version,
-            tensorCount: GgufBaseStream.castNumber(tensorCount)
+            tensorCount: GgufBaseFileReader.castNumber(tensorCount)
         };
 
         for (let i = 0; i < metadataKVCount; i++) {
-            const keyResult = await this._stream.readString(readOffset);
-            const valueType = await this._stream.readUint32(readOffset);
+            const keyResult = await this._fileReader.readString(readOffset);
+            const valueType = await this._fileReader.readUint32(readOffset);
             metadata[keyResult] = await this._readMetadataValue(valueType, readOffset);
         }
 
