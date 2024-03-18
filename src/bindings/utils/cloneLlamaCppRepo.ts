@@ -4,7 +4,9 @@ import cliProgress from "cli-progress";
 import chalk from "chalk";
 import fs from "fs-extra";
 import which from "which";
-import {defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
+import {
+    defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, enableRecursiveClone, llamaCppDirectory, llamaCppDirectoryInfoFilePath
+} from "../../config.js";
 import {getGitBundlePathForRelease} from "../../utils/gitReleaseBundles.js";
 import {withLockfile} from "../../utils/withLockfile.js";
 import {waitForLockfileRelease} from "../../utils/waitForLockfileRelease.js";
@@ -21,7 +23,8 @@ type ClonedLlamaCppRepoTagFile = {
 
 
 export async function cloneLlamaCppRepo(
-    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean = true
+    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean = true,
+    recursive: boolean = enableRecursiveClone
 ) {
     const gitBundleForTag = !useBundles ? null : await getGitBundlePathForRelease(githubOwner, githubRepo, tag);
     const remoteGitUrl = `https://github.com/${githubOwner}/${githubRepo}.git`;
@@ -96,6 +99,7 @@ export async function cloneLlamaCppRepo(
                 await gitWithCloneProgress.clone(remoteGitUrl, llamaCppDirectory, {
                     "--depth": 1,
                     "--branch": tag,
+                    ...(recursive ? {"--recursive": null} : {}),
                     "--quiet": null
                 });
             });
