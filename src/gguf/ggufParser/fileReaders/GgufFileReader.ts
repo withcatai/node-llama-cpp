@@ -1,78 +1,76 @@
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 
-export const METHOD_TO_BYTE_COUNT = {
-    readUint8: 1,
-    readUint16: 2,
-    readUint32: 4,
-    readUint64: 8,
-    readInt8: 1,
-    readInt16: 2,
-    readInt32: 4,
-    readInt64: 8,
-    readFloat32: 4,
-    readFloat64: 8,
-    readBool: 1
+export const valueTypeToBytesToRead = {
+    uint8: 1,
+    uint16: 2,
+    uint32: 4,
+    uint64: 8,
+    int8: 1,
+    int16: 2,
+    int32: 4,
+    int64: 8,
+    float32: 4,
+    float64: 8,
+    bool: 1
 } as const;
 
-export const ALLOCATION_SIZE = 1024 * 1024 * 1.5; // 1.5MB
-
-export abstract class GgufBaseFileReader {
+export abstract class GgufFileReader {
     protected _buffer = Buffer.alloc(0);
 
     public abstract readByteRange(offset: number | GgufReadOffset, length: number): Promise<Buffer>;
 
     public async readUint8(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readUint8);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint8);
         return response.readUInt8();
     }
 
     public async readUint16(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readUint16);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint16);
         return response.readUInt16LE();
     }
 
     public async readUint32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readUint32);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint32);
         return response.readUInt32LE();
     }
 
     public async readUint64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readUint64);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint64);
         return response.readBigUInt64LE();
     }
 
     public async readInt8(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readInt8);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int8);
         return response.readInt8();
     }
 
     public async readInt16(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readInt16);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int16);
         return response.readInt16LE();
     }
 
     public async readInt32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readInt32);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int32);
         return response.readInt32LE();
     }
 
     public async readInt64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readInt64);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int64);
         return response.readBigInt64LE();
     }
 
     public async readFloat32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readFloat32);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.float32);
         return response.readFloatLE();
     }
 
     public async readFloat64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readFloat64);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.float64);
         return response.readDoubleLE();
     }
 
     public async readBool(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, METHOD_TO_BYTE_COUNT.readUint8);
+        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint8);
         return response.readUInt8() === 1;
     }
 
@@ -80,7 +78,7 @@ export abstract class GgufBaseFileReader {
         const readOffset = GgufReadOffset.resolveReadOffset(offset);
         const length = Number(await this.readUint64(readOffset));
 
-        const readLength = METHOD_TO_BYTE_COUNT.readUint8 * length;
+        const readLength = valueTypeToBytesToRead.uint8 * length;
         const stringBytes = await this.readByteRange(readOffset, readLength);
 
         return String.fromCharCode(...stringBytes);

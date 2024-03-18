@@ -1,5 +1,5 @@
 export class InvalidGgufMagicError extends Error {
-    public constructor(message = "Invalid GGUF magic") {
-        super(message);
+    public constructor(expectedGgufMagic: string, actualGgufMagic: string) {
+        super(`Invalid GGUF magic. Expected "${expectedGgufMagic}" but got "${actualGgufMagic}".`);
     }
 }

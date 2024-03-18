@@ -2,25 +2,19 @@ import fs from "node:fs/promises";
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {GgufBaseFileReader, ALLOCATION_SIZE} from "./GgufBaseFileReader.js";
+import {defaultExtraAllocationSize, ggufDefaultRetryOptions} from "../../consts.js";
+import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFsFileReaderOptions = {
     filePath: string,
     retryOptions?: retry.Options
 };
 
-const defaultRetryOptions: retry.Options = {
-    retries: 10,
-    factor: 2,
-    minTimeout: 1000,
-    maxTimeout: 1000 * 16
-} as const;
-
-export class GgufFsFileReader extends GgufBaseFileReader {
+export class GgufFsFileReader extends GgufFileReader {
     public readonly filePath: string;
     public readonly retryOptions: retry.Options;
 
-    public constructor({filePath, retryOptions = defaultRetryOptions}: GgufFsFileReaderOptions) {
+    public constructor({filePath, retryOptions = ggufDefaultRetryOptions}: GgufFsFileReaderOptions) {
         super();
         this.filePath = filePath;
         this.retryOptions = retryOptions;
@@ -38,7 +32,7 @@ export class GgufFsFileReader extends GgufBaseFileReader {
         return res;
     }
 
-    private async _readToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = ALLOCATION_SIZE) {
+    private async _readToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
         return await withLock(this, "modifyBuffer", async () => {
             if (endOffset < this._buffer.length)
                 return;

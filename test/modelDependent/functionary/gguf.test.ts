@@ -2,9 +2,9 @@ import {describe, expect, it, test} from "vitest";
 import {GgufFsFileReader} from "../../../src/gguf/ggufParser/fileReaders/GgufFsFileReader.js";
 import {GgufParser} from "../../../src/gguf/ggufParser/GgufParser.js";
 import {getModelFile} from "../../utils/modelFiles.js";
-import GGUFInsights from "../../../src/gguf/GGUFInsights.js";
+import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
-import GGUFMetadata from "../../../src/gguf/GGUFMetadata.js";
+import {parseGgufMetadata} from "../../../src/gguf/parseGgufMetadata.js";
 
 describe("GGUF Parser", async () => {
     const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
@@ -32,7 +32,7 @@ describe("GGUF Parser", async () => {
 
         const metadata = await ggufParser.parseMetadata();
 
-        const ggufInsights = new GGUFInsights(metadata);
+        const ggufInsights = new GgufInsights(metadata);
 
         const llama = await getTestLlama();
         const model = await llama.loadModel({
@@ -48,10 +48,11 @@ describe("GGUF Parser", async () => {
     });
 
     it("should fetch GGUF metadata", async () => {
-        const ggufMetadata = new GGUFMetadata(modelPath);
-        await ggufMetadata.parse();
+        const ggufMetadataParseResult = await parseGgufMetadata(modelPath);
 
-        expect(ggufMetadata.metadata).toMatchSnapshot();
-        expect(ggufMetadata.insights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");
+        expect(ggufMetadataParseResult).toMatchSnapshot();
+
+        const insights = new GgufInsights(ggufMetadataParseResult);
+        expect(insights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");
     });
 });

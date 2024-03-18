@@ -1,8 +1,11 @@
 export default class UnsupportedMetadataTypeError extends Error {
-    public readonly type: number;
+    public readonly metadataValueType: number;
 
-    public constructor(type: number) {
-        super(`Unsupported metadata type: "${type}"`);
-        this.type = type;
+    public constructor(metadataValueType: number) {
+        super(`Unsupported GGUF metadata value type "${metadataValueType}"`);
+
+        Object.defineProperty(this, "metadataValueType" satisfies keyof this, {enumerable: false});
+
+        this.metadataValueType = metadataValueType;
     }
 }

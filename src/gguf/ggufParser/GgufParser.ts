@@ -1,10 +1,10 @@
 import {InvalidGgufMagicError} from "../errors/InvalidGgufMagicError.js";
-import UnsupportedMetadataTypeError from "../errors/UnsupportedMetadataTypeError.js";
+import UnsupportedGgufMetadataTypeError from "../errors/UnsupportedMetadataTypeError.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {GgufReadOffset} from "./utils/GgufReadOffset.js";
 import {parseGgufFileTypeNumber} from "./utils/parseGgufFileTypeNumber.js";
 import {GgufMetadataAny} from "./GgufMetadataTypes.js";
-import {GgufBaseFileReader, METHOD_TO_BYTE_COUNT} from "./fileReaders/GgufBaseFileReader.js";
+import {GgufFileReader, valueTypeToBytesToRead} from "./fileReaders/GgufFileReader.js";
 
 const enum MetadataValueType {
     Uint8 = 0,
@@ -21,6 +21,7 @@ const enum MetadataValueType {
 
 const ggufMagic = "GGUF";
 
+// these keys are ignored by default because they contain very long values that aren't very useful in the JS side of this library
 const defaultIgnoreMetadataKeys = [
     "tokenizer.ggml.tokens",
     "tokenizer.ggml.scores",
@@ -28,26 +29,26 @@ const defaultIgnoreMetadataKeys = [
     "tokenizer.ggml.merges"
 ];
 
-export type GGUFMetadataResponse = {
+export type GgufParsedMetadataResult = {
     metadataSize: number,
     metadata: GgufMetadataAny
 };
 
 export type GgufParserOptions = {
-    fileReader: GgufBaseFileReader,
+    fileReader: GgufFileReader,
     ignoreKeys?: string[]
 };
 
 export class GgufParser {
-    private readonly _fileReader: GgufBaseFileReader;
-    public ignoreKeys = defaultIgnoreMetadataKeys;
+    private readonly _fileReader: GgufFileReader;
+    public readonly ignoreKeys = defaultIgnoreMetadataKeys;
 
     public constructor({fileReader, ignoreKeys = defaultIgnoreMetadataKeys}: GgufParserOptions) {
         this.ignoreKeys = ignoreKeys;
         this._fileReader = fileReader;
     }
 
-    public async parseMetadata({logWarnings = true}: {logWarnings?: boolean} = {}): Promise<GGUFMetadataResponse> {
+    public async parseMetadata({logWarnings = true}: {logWarnings?: boolean} = {}): Promise<GgufParsedMetadataResult> {
         const metadataRaw = await this._parseMetadataRaw();
         const metadata: { [key: string]: any } = {};
 
@@ -99,17 +100,17 @@ export class GgufParser {
             return arrayValues;
         }
 
-        throw new UnsupportedMetadataTypeError(type);
+        throw new UnsupportedGgufMetadataTypeError(type);
     }
 
     private async _parseMetadataRaw(): Promise<{metadata: Record<string, any>, metadataSize: number}> {
         const readOffset = new GgufReadOffset(0);
 
-        const magicBytes = await this._fileReader.readByteRange(readOffset, METHOD_TO_BYTE_COUNT.readUint8 * ggufMagic.length);
-        const magicText = String.fromCharCode(...magicBytes);
+        const fileMagicBytes = await this._fileReader.readByteRange(readOffset, valueTypeToBytesToRead.uint8 * ggufMagic.length);
+        const fileMagicText = String.fromCharCode(...fileMagicBytes);
 
-        if (magicText !== ggufMagic)
-            throw new InvalidGgufMagicError();
+        if (fileMagicText !== ggufMagic)
+            throw new InvalidGgufMagicError(ggufMagic, fileMagicText);
 
         const version = await this._fileReader.readUint32(readOffset);
         const tensorCount = await this._fileReader.readUint64(readOffset);
@@ -117,7 +118,7 @@ export class GgufParser {
 
         const metadata: { [key: string]: any } = {
             version,
-            tensorCount: GgufBaseFileReader.castNumber(tensorCount)
+            tensorCount: GgufFileReader.castNumber(tensorCount)
         };
 
         for (let i = 0; i < metadataKVCount; i++) {
