@@ -108,6 +108,22 @@ export default defineConfig({
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
         }
+
+        let canonicalUrl = hostname + pageData.relativePath;
+        if (canonicalUrl.endsWith("/index.html"))
+            canonicalUrl = canonicalUrl.slice(0, -"index.html".length);
+        if (canonicalUrl.endsWith("/index.md"))
+            canonicalUrl = canonicalUrl.slice(0, -"index.md".length);
+        else if (canonicalUrl.endsWith(".html"))
+            canonicalUrl = canonicalUrl.slice(0, -".html".length);
+        else if (canonicalUrl.endsWith(".md"))
+            canonicalUrl = canonicalUrl.slice(0, -".md".length);
+
+        pageData.frontmatter.head ??= [];
+        pageData.frontmatter.head.push([
+            "link",
+            {rel: "canonical", href: canonicalUrl}
+        ])
     },
     themeConfig: {
         editLink: {
