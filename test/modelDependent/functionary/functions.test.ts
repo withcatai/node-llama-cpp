@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("functionary", () => {
     describe("functions", () => {
-        test("get n-th word", async () => {
+        test("get n-th word", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -39,13 +39,11 @@ describe("functionary", () => {
             });
 
             expect(res).to.be.eq('The second word is "secret".');
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 
     describe("functions and grammar", () => {
-        test("get n-th word", async () => {
+        test("get n-th word", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -96,8 +94,6 @@ describe("functionary", () => {
             const parsedRes2 = res2SchemaGrammar.parse(res2);
 
             expect(parsedRes2).to.eql({word: "secret"});
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

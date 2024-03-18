@@ -5,7 +5,7 @@ import {createTestLlama, getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("stableCode", () => {
     describe("parallel", () => {
-        test("can use multiple bindings in parallel", async () => {
+        test("can use multiple bindings in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
             const llama2 = await createTestLlama();
@@ -53,11 +53,9 @@ describe("stableCode", () => {
             expect(model2.disposed).toBe(true);
             expect(context2.disposed).toBe(true);
             expect(completion2.disposed).toBe(true);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("can use multiple models in parallel", async () => {
+        test("can use multiple models in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -99,11 +97,9 @@ describe("stableCode", () => {
             const expectedFullCompletion2 = " " + range(96, 1).join(", ");
             expect(expectedFullCompletion.slice(0, res.length)).to.eql(res);
             expect(expectedFullCompletion2.slice(0, res2.length)).to.eql(res2);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("can use multiple contexts in parallel", async () => {
+        test("can use multiple contexts in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -142,11 +138,9 @@ describe("stableCode", () => {
             const expectedFullCompletion2 = " " + range(96, 1).join(", ");
             expect(expectedFullCompletion.slice(0, res.length)).to.eql(res);
             expect(expectedFullCompletion2.slice(0, res2.length)).to.eql(res2);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("can use multiple context sequences in parallel", async () => {
+        test("can use multiple context sequences in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -183,8 +177,6 @@ describe("stableCode", () => {
             const expectedFullCompletion2 = " " + range(96, 1).join(", ");
             expect(expectedFullCompletion.slice(0, res.length)).to.eql(res);
             expect(expectedFullCompletion2.slice(0, res2.length)).to.eql(res2);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });
