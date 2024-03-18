@@ -1,6 +1,6 @@
 import {describe, expect, it, test} from "vitest";
-import GGUFReadStream from "../../../src/gguf/ggufParser/stream/GGUFReadStream.js";
-import GGUFParser from "../../../src/gguf/ggufParser/GGUFParser.js";
+import {GgufFsReadStream} from "../../../src/gguf/ggufParser/stream/GgufFsReadStream.js";
+import {GgufParser} from "../../../src/gguf/ggufParser/GgufParser.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import GGUFInsights from "../../../src/gguf/GGUFInsights.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
@@ -10,26 +10,26 @@ describe("GGUF Parser", async () => {
     const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
 
     test("Magic should be GGUF local model", async () => {
-        const stream = new GGUFReadStream(modelPath);
-        const magic = await stream.readNBytes(4);
+        const stream = new GgufFsReadStream({filePath: modelPath});
+        const magic = await stream.readByteRange(0, 4);
         const magicText = String.fromCharCode(...magic);
 
         expect(magicText).toBe("GGUF");
     });
 
     it("should parse local gguf model", async () => {
-        const stream = new GGUFReadStream(modelPath);
+        const stream = new GgufFsReadStream({filePath: modelPath});
+        const ggufParser = new GgufParser({stream});
 
-        const ggufParser = new GGUFParser(stream);
         const metadata = await ggufParser.parseMetadata();
 
         expect(metadata).toMatchSnapshot();
     });
 
     it("should calculate GGUF VRAM Usage", async () => {
-        const stream = new GGUFReadStream(modelPath);
+        const stream = new GgufFsReadStream({filePath: modelPath});
+        const ggufParser = new GgufParser({stream});
 
-        const ggufParser = new GGUFParser(stream);
         const metadata = await ggufParser.parseMetadata();
 
         const ggufInsights = new GGUFInsights(metadata);

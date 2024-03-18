@@ -1,17 +1,39 @@
-import {fileTypeIntToString} from "./checkArchitecture.js";
+export const enum GgufArchitectureType {
+    llama = "llama",
+    falcon = "falcon",
+    mpt = "mpt",
+    gptneox = "gptneox",
+    gptj = "gptj",
+    gpt2 = "gpt2",
+    bloom = "bloom",
+    rwkv = "rwkv",
+    whisper = "whisper"
+}
 
-export type GGUFArchitectureType =
-    | "llama"
-    | "falcon"
-    | "mpt"
-    | "gptneox"
-    | "gptj"
-    | "gpt2"
-    | "bloom"
-    | "rwkv"
-    | "whisper";
+export const enum GgufFileType {
+    ALL_F32 = "ALL_F32",
+    MOSTLY_F16 = "MOSTLY_F16",
+    MOSTLY_Q4_0 = "MOSTLY_Q4_0",
+    MOSTLY_Q4_1 = "MOSTLY_Q4_1",
+    MOSTLY_Q4_1_SOME_F16 = "MOSTLY_Q4_1_SOME_F16",
+    MOSTLY_Q4_2 = "MOSTLY_Q4_2",
+    MOSTLY_Q4_3 = "MOSTLY_Q4_3",
+    MOSTLY_Q8_0 = "MOSTLY_Q8_0",
+    MOSTLY_Q5_0 = "MOSTLY_Q5_0",
+    MOSTLY_Q5_1 = "MOSTLY_Q5_1",
+    MOSTLY_Q2_K = "MOSTLY_Q2_K",
+    MOSTLY_Q3_K_S = "MOSTLY_Q3_K_S",
+    MOSTLY_Q3_K_M = "MOSTLY_Q3_K_M",
+    MOSTLY_Q3_K_L = "MOSTLY_Q3_K_L",
+    MOSTLY_Q4_K_S = "MOSTLY_Q4_K_S",
+    MOSTLY_Q4_K_M = "MOSTLY_Q4_K_M",
+    MOSTLY_Q5_K_S = "MOSTLY_Q5_K_S",
+    MOSTLY_Q5_K_M = "MOSTLY_Q5_K_M",
+    MOSTLY_Q6_K = "MOSTLY_Q6_K"
+}
 
-export type GGUFMetadataArchitectureProperties = {
+
+export type GgufMetadataArchitectureProperties = {
     context_length: number,
     embedding_length: number,
     block_count: number,
@@ -44,8 +66,9 @@ export type GGUFMetadataArchitectureProperties = {
     }
 };
 
-export type GGUFMetadataGeneralProperties = {
-    architecture: GGUFArchitectureType,
+export type GgufMetadataGeneralProperties = {
+    architecture: GgufArchitectureType,
+
     /**
      * The version of the quantization format. Not required if the model is not
      * quantized (i.e. no tensors are quantized). If any tensors are quantized,
@@ -82,6 +105,7 @@ export type GGUFMetadataGeneralProperties = {
      * covered by the other fields
      */
     description: string,
+
     /**
      * License of the model, expressed as a SPDX license expression
      * (e.g. `MIT OR Apache-2.0`). *Should not* include any other information,
@@ -109,18 +133,18 @@ export type GGUFMetadataGeneralProperties = {
      * An enumerated value describing the type of the majority of the tensors
      * in the file. Optional; can be inferred from the tensor types.
      */
-    file_type: ReturnType<typeof fileTypeIntToString>
+    file_type?: GgufFileType | undefined
 };
 
-export type GGUFMetadataAny = {
-    general: GGUFMetadataGeneralProperties
+export type GgufMetadataAny = {
+    general: GgufMetadataGeneralProperties
 } & {
-    [key in GGUFArchitectureType]: GGUFMetadataArchitectureProperties
+    [key in GgufArchitectureType]: GgufMetadataArchitectureProperties
 };
 
-export type GGUFMetadataLLAMA = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "llama"
+export type GgufMetadataLLAMA = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.llama
     },
 
     llama: {
@@ -143,9 +167,9 @@ export type GGUFMetadataLLAMA = {
     }
 };
 
-export type GGUFMetadataFalcon = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "falcon"
+export type GgufMetadataFalcon = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.falcon
     },
 
     falcon: {
@@ -162,9 +186,9 @@ export type GGUFMetadataFalcon = {
     }
 };
 
-export type GGUFMetadataMPT = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "mpt"
+export type GgufMetadataMPT = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.mpt
     },
 
     mpt: {
@@ -180,9 +204,9 @@ export type GGUFMetadataMPT = {
     }
 };
 
-export type GGUFMetadataGPTNeoX = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "gptneox"
+export type GgufMetadataGPTNeoX = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.gptneox
     },
 
     gptneox: {
@@ -202,9 +226,9 @@ export type GGUFMetadataGPTNeoX = {
     }
 };
 
-export type GGUFMetadataGPTJ = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "gptj"
+export type GgufMetadataGPTJ = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.gptj
     },
 
     gptj: {
@@ -222,9 +246,9 @@ export type GGUFMetadataGPTJ = {
     }
 };
 
-export type GGUFMetadataGPT2 = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "gpt2"
+export type GgufMetadataGPT2 = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.gpt2
     },
 
     gpt2: {
@@ -238,9 +262,9 @@ export type GGUFMetadataGPT2 = {
     }
 };
 
-export type GGUFMetadataBloom = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "bloom"
+export type GgufMetadataBloom = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.bloom
     },
 
     bloom: {
@@ -255,9 +279,9 @@ export type GGUFMetadataBloom = {
     }
 };
 
-export type GGUFMetadataRWKV = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "rwkv"
+export type GgufMetadataRWKV = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.rwkv
     },
 
     rwkv: {
@@ -268,9 +292,9 @@ export type GGUFMetadataRWKV = {
     }
 };
 
-export type GGUFMetadataWhisper = {
-    general: GGUFMetadataGeneralProperties & {
-        architecture: "whisper"
+export type GgufMetadataWhisper = {
+    general: GgufMetadataGeneralProperties & {
+        architecture: GgufArchitectureType.whisper
     },
     whisper: {
         encoder: {
@@ -293,14 +317,46 @@ export type GGUFMetadataWhisper = {
     }
 };
 
+export type GgufMetadata =
+    | GgufMetadataLLAMA
+    | GgufMetadataFalcon
+    | GgufMetadataMPT
+    | GgufMetadataGPTNeoX
+    | GgufMetadataGPTJ
+    | GgufMetadataGPT2
+    | GgufMetadataBloom
+    | GgufMetadataRWKV
+    | GgufMetadataWhisper;
 
-export type GGUFMetadata =
-    | GGUFMetadataLLAMA
-    | GGUFMetadataFalcon
-    | GGUFMetadataMPT
-    | GGUFMetadataGPTNeoX
-    | GGUFMetadataGPTJ
-    | GGUFMetadataGPT2
-    | GGUFMetadataBloom
-    | GGUFMetadataRWKV
-    | GGUFMetadataWhisper;
+
+export function isLlamaMetadata(metadata: GgufMetadata): metadata is GgufMetadataLLAMA {
+    return metadata.general.architecture === GgufArchitectureType.llama;
+}
+
+export function isMPTMetadata(metadata: GgufMetadata): metadata is GgufMetadataMPT {
+    return metadata.general.architecture === GgufArchitectureType.mpt;
+}
+
+export function isGPTNeoXMetadata(metadata: GgufMetadata): metadata is GgufMetadataGPTNeoX {
+    return metadata.general.architecture === GgufArchitectureType.gptneox;
+}
+
+export function isGPTJMetadata(metadata: GgufMetadata): metadata is GgufMetadataGPTJ {
+    return metadata.general.architecture === GgufArchitectureType.gptj;
+}
+
+export function isGPT2Metadata(metadata: GgufMetadata): metadata is GgufMetadataGPT2 {
+    return metadata.general.architecture === GgufArchitectureType.gpt2;
+}
+
+export function isBloomMetadata(metadata: GgufMetadata): metadata is GgufMetadataBloom {
+    return metadata.general.architecture === GgufArchitectureType.bloom;
+}
+
+export function isFalconMetadata(metadata: GgufMetadata): metadata is GgufMetadataFalcon {
+    return metadata.general.architecture === GgufArchitectureType.falcon;
+}
+
+export function isRWKVMetadata(metadata: GgufMetadata): metadata is GgufMetadataRWKV {
+    return metadata.general.architecture === GgufArchitectureType.rwkv;
+}

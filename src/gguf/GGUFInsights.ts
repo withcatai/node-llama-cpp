@@ -1,6 +1,6 @@
 import {Llama} from "../bindings/Llama.js";
 import MissingNodeLlamaError from "./errors/MissingNodeLlamaError.js";
-import {GGUFMetadataResponse} from "./ggufParser/GGUFParser.js";
+import {GGUFMetadataResponse} from "./ggufParser/GgufParser.js";
 import NotEnoughVRamError from "./errors/ModelScore/NotEnoughVRamError.js";
 
 const PAD_AVAILABLE_VRAM = 1024 ** 2 * 500; // 500MB
