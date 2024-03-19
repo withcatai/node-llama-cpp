@@ -1,10 +1,22 @@
 import chalk from "chalk";
 
-export function prettyPrintObject(obj: any, indent: number = 4): string {
+type PrettyPrintObjectOptions = {
+    maxArrayValues?: number,
+    useNumberGrouping?: boolean
+};
+
+export function prettyPrintObject(obj: any, indent: number = 4, options: PrettyPrintObjectOptions = {}): string {
     if (typeof obj === "string")
         return chalk.green(JSON.stringify(obj, null, 4));
     else if (typeof obj === "number")
-        return chalk.yellow(obj);
+        return chalk.yellow(
+            options.useNumberGrouping
+                ? obj.toLocaleString("en-US", {
+                    style: "decimal",
+                    useGrouping: true
+                }).replaceAll(",", "_")
+                : obj
+        );
     else if (typeof obj === "boolean")
         return chalk.magenta.italic(obj);
     else if (obj === null)
@@ -12,12 +24,7 @@ export function prettyPrintObject(obj: any, indent: number = 4): string {
     else if (obj === undefined)
         return chalk.magenta.italic("undefined");
     else if (obj instanceof Array)
-        return [
-            chalk.whiteBright("["),
-            obj.map(prettyPrintObject)
-                .join(chalk.whiteBright(", ")),
-            chalk.whiteBright("]")
-        ].join("");
+        return prettyPrintArray(obj, indent, options);
 
     const rows: string[] = [];
     for (const key of Object.keys(obj)) {
@@ -29,7 +36,7 @@ export function prettyPrintObject(obj: any, indent: number = 4): string {
                 ? chalk.red(key)
                 : chalk.green(JSON.stringify(key)),
             chalk.whiteBright(": "),
-            prettyPrintObject(value, indent)
+            prettyPrintObject(value, indent, options)
                 .replaceAll("\n", "\n" + " ".repeat(indent))
         ].join(""));
     }
@@ -42,4 +49,23 @@ export function prettyPrintObject(obj: any, indent: number = 4): string {
 
 function canStringBeKeyWithoutQuotes(key: string): boolean {
     return JSON.stringify(key).slice(1, -1) === key && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key);
+}
+
+function prettyPrintArray(arr: any[], indent: number = 4, options: PrettyPrintObjectOptions = {}) {
+    const slicedArray = (options.maxArrayValues != null && arr.length > options.maxArrayValues)
+        ? arr.slice(0, options.maxArrayValues)
+        : arr;
+    const hiddenItems = arr.length - slicedArray.length;
+
+    return [
+        chalk.whiteBright("["),
+        slicedArray.map((item) => prettyPrintObject(item, indent, options))
+            .concat(
+                hiddenItems > 0
+                    ? [chalk.white("..." + hiddenItems + " more item" + (hiddenItems !== 1 ? "s" : ""))]
+                    : []
+            )
+            .join(chalk.whiteBright(", ")),
+        chalk.whiteBright("]")
+    ].join("");
 }

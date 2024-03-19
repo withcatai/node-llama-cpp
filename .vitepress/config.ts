@@ -199,7 +199,15 @@ export default defineConfig({
                     {text: "Download", link: "/download"},
                     {text: "Complete", link: "/complete"},
                     {text: "Infill", link: "/infill"},
-                    {text: "Inspect", link: "/inspect"},
+                    {
+                        text: "Inspect",
+                        link: "/inspect",
+                        collapsed: true,
+                        items: [
+                            {text: "GPU", link: "/inspect/gpu"},
+                            {text: "GGUF", link: "/inspect/gguf"},
+                        ]
+                    },
                     {text: "Build", link: "/build"},
                     {text: "Clear", link: "/clear"}
                 ]

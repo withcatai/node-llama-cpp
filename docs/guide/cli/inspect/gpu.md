@@ -1,11 +1,11 @@
 ---
 outline: deep
 ---
-# `inspect` command
+# `inspect gpu` command
 
 <script setup lang="ts">
-import {data as docs} from "./cli.data.js";
-const commandDoc = docs.inspect.index;
+import {data as docs} from "../cli.data.js";
+const commandDoc = docs.inspect.gpu;
 </script>
 
 {{commandDoc.description}}
