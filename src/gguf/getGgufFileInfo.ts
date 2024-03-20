@@ -1,7 +1,7 @@
 import retry from "async-retry";
-import {parseGguf} from "./ggufParser/parseGguf.js";
-import {GgufNetworkFetchFileReader} from "./ggufParser/fileReaders/GgufNetworkFetchFileReader.js";
-import {GgufFsFileReader} from "./ggufParser/fileReaders/GgufFsFileReader.js";
+import {parseGguf} from "./parser/parseGguf.js";
+import {GgufNetworkFetchFileReader} from "./parser/fileReaders/GgufNetworkFetchFileReader.js";
+import {GgufFsFileReader} from "./parser/fileReaders/GgufFsFileReader.js";
 import {ggufDefaultRetryOptions} from "./consts.js";
 
 

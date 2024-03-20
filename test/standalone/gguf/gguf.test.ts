@@ -1,6 +1,6 @@
 import {describe, expect, it, test} from "vitest";
-import {parseGguf} from "../../../src/gguf/ggufParser/parseGguf.js";
-import {GgufNetworkFetchFileReader} from "../../../src/gguf/ggufParser/fileReaders/GgufNetworkFetchFileReader.js";
+import {parseGguf} from "../../../src/gguf/parser/parseGguf.js";
+import {GgufNetworkFetchFileReader} from "../../../src/gguf/parser/fileReaders/GgufNetworkFetchFileReader.js";
 import {simplifyGgufInfoForTestSnapshot} from "../../utils/helpers/simplifyGgufInfoForTestSnapshot.js";
 
 const remoteGGUFModel = "https://huggingface.co/TheBloke/Falcon-180B-Chat-GGUF/resolve/main/falcon-180b-chat.Q6_K.gguf-split-a?download=true";

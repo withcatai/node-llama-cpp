@@ -1,4 +1,4 @@
-import {GgufFileInfo} from "../../../src/gguf/ggufParser/types/GgufFileInfoTypes.js";
+import {GgufFileInfo} from "../../../src/gguf/parser/types/GgufFileInfoTypes.js";
 
 export function simplifyGgufInfoForTestSnapshot(ggufFileInfo: GgufFileInfo) {
     const ggufFileInfoCopy = structuredClone(ggufFileInfo);
