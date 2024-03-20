@@ -417,6 +417,8 @@ export type GgufMetadataRWKV = {
     feed_forward_length: number
 };
 
-export function isGgufMetadataOfArchitectureType<A extends GgufArchitectureType>(metadata: GgufMetadata, type: A): metadata is GgufMetadata<A> {
+export function isGgufMetadataOfArchitectureType<A extends GgufArchitectureType>(
+    metadata: GgufMetadata, type: A
+): metadata is GgufMetadata<A> {
     return metadata?.general?.architecture === type;
 }
