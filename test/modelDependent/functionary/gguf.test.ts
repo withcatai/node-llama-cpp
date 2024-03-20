@@ -1,6 +1,6 @@
 import {describe, expect, it, test} from "vitest";
 import {GgufFsFileReader} from "../../../src/gguf/ggufParser/fileReaders/GgufFsFileReader.js";
-import {GgufParser} from "../../../src/gguf/ggufParser/GgufParser.js";
+import {parseGguf} from "../../../src/gguf/ggufParser/parseGguf.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
@@ -20,11 +20,10 @@ describe("GGUF Parser", async () => {
 
     it("should parse local gguf model", async () => {
         const fileReader = new GgufFsFileReader({filePath: modelPath});
-        const ggufParser = new GgufParser({
+
+        const metadata = await parseGguf({
             fileReader: fileReader
         });
-
-        const metadata = await ggufParser.parseFileInfo();
         expect(metadata.tensorInfo!.length).to.be.eql(Number(metadata.tensorCount));
 
         expect(simplifyGgufInfoForTestSnapshot(metadata)).toMatchSnapshot();
@@ -32,9 +31,10 @@ describe("GGUF Parser", async () => {
 
     it("should calculate GGUF VRAM Usage", async () => {
         const fileReader = new GgufFsFileReader({filePath: modelPath});
-        const ggufParser = new GgufParser({fileReader: fileReader});
 
-        const metadata = await ggufParser.parseFileInfo();
+        const metadata = await parseGguf({
+            fileReader: fileReader
+        });
 
         const ggufInsights = new GgufInsights(metadata);
 

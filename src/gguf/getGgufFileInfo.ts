@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {GgufParser} from "./ggufParser/GgufParser.js";
+import {parseGguf} from "./ggufParser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./ggufParser/fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./ggufParser/fileReaders/GgufFsFileReader.js";
 import {ggufDefaultRetryOptions} from "./consts.js";
@@ -12,12 +12,14 @@ export async function getGgufFileInfo(pathOrUrl: string, {
     readTensorInfo = true,
     sourceType,
     retryOptions = ggufDefaultRetryOptions,
-    ignoreKeys = []
+    ignoreKeys = [],
+    logWarnings = true
 }: {
     readTensorInfo?: boolean,
     sourceType?: "network" | "filesystem",
     retryOptions?: retry.Options,
-    ignoreKeys?: string[]
+    ignoreKeys?: string[],
+    logWarnings?: boolean
 } = {}) {
     function createFileReader() {
         if (sourceType === "network" || (sourceType == null && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")))) {
@@ -37,11 +39,10 @@ export async function getGgufFileInfo(pathOrUrl: string, {
     }
 
     const fileReader = createFileReader();
-    const parser = new GgufParser({
+    return await parseGguf({
         fileReader,
         ignoreKeys,
-        readTensorInfo
+        readTensorInfo,
+        logWarnings
     });
-
-    return await parser.parseFileInfo();
 }

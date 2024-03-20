@@ -1,5 +1,5 @@
 import {describe, expect, it, test} from "vitest";
-import {GgufParser} from "../../../src/gguf/ggufParser/GgufParser.js";
+import {parseGguf} from "../../../src/gguf/ggufParser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "../../../src/gguf/ggufParser/fileReaders/GgufNetworkFetchFileReader.js";
 import {simplifyGgufInfoForTestSnapshot} from "../../utils/helpers/simplifyGgufInfoForTestSnapshot.js";
 
@@ -17,23 +17,21 @@ describe("GGUF Parser", async () => {
 
     it("should parse remote gguf model", async () => {
         const fileReader = new GgufNetworkFetchFileReader({url: remoteGGUFModel});
-        const ggufParser = new GgufParser({
+
+        const metadata = await parseGguf({
             fileReader: fileReader
         });
-
-        const metadata = await ggufParser.parseFileInfo();
 
         expect(simplifyGgufInfoForTestSnapshot(metadata)).toMatchSnapshot();
     });
 
     it("should parse remote gguf model without tensor info", async () => {
         const fileReader = new GgufNetworkFetchFileReader({url: remoteGGUFModel});
-        const ggufParser = new GgufParser({
+
+        const metadata = await parseGguf({
             fileReader: fileReader,
             readTensorInfo: false
         });
-
-        const metadata = await ggufParser.parseFileInfo();
 
         expect(simplifyGgufInfoForTestSnapshot(metadata)).toMatchSnapshot();
     });

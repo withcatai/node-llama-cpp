@@ -74,16 +74,6 @@ export abstract class GgufFileReader {
         return response.readUInt8() === 1;
     }
 
-    public async readString(offset: number | GgufReadOffset) {
-        const readOffset = GgufReadOffset.resolveReadOffset(offset);
-        const length = Number(await this.readUint64(readOffset));
-
-        const readLength = valueTypeToBytesToRead.uint8 * length;
-        const stringBytes = await this.readByteRange(readOffset, readLength);
-
-        return String.fromCharCode(...stringBytes);
-    }
-
     protected _addToBuffer(buffer: Buffer){
         this._buffer = Buffer.concat([this._buffer, buffer]);
     }
@@ -97,8 +87,10 @@ export abstract class GgufFileReader {
         return response;
     }
 
-    public static castNumber(value: bigint) {
-        if (value > Number.MAX_SAFE_INTEGER) return value;
+    public static castNumberIfSafe(value: bigint) {
+        if (value > Number.MAX_SAFE_INTEGER)
+            return value;
+
         return Number(value);
     }
 }
