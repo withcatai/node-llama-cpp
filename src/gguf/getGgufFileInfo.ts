@@ -5,11 +5,16 @@ import {GgufFsFileReader} from "./ggufParser/fileReaders/GgufFsFileReader.js";
 import {ggufDefaultRetryOptions} from "./consts.js";
 
 
-export async function parseGgufMetadata(pathOrUrl: string, {
+/**
+ * Parse a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`)
+ */
+export async function getGgufFileInfo(pathOrUrl: string, {
+    readTensorInfo = true,
     sourceType,
     retryOptions = ggufDefaultRetryOptions,
     ignoreKeys = []
 }: {
+    readTensorInfo?: boolean,
     sourceType?: "network" | "filesystem",
     retryOptions?: retry.Options,
     ignoreKeys?: string[]
@@ -34,8 +39,9 @@ export async function parseGgufMetadata(pathOrUrl: string, {
     const fileReader = createFileReader();
     const parser = new GgufParser({
         fileReader,
-        ignoreKeys
+        ignoreKeys,
+        readTensorInfo
     });
 
-    return await parser.parseMetadata();
+    return await parser.parseFileInfo();
 }

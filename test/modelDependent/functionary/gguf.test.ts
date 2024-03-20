@@ -4,7 +4,8 @@ import {GgufParser} from "../../../src/gguf/ggufParser/GgufParser.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
-import {parseGgufMetadata} from "../../../src/gguf/parseGgufMetadata.js";
+import {getGgufFileInfo} from "../../../src/gguf/getGgufFileInfo.js";
+import {simplifyGgufInfoForTestSnapshot} from "../../utils/helpers/simplifyGgufInfoForTestSnapshot.js";
 
 describe("GGUF Parser", async () => {
     const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
@@ -19,18 +20,21 @@ describe("GGUF Parser", async () => {
 
     it("should parse local gguf model", async () => {
         const fileReader = new GgufFsFileReader({filePath: modelPath});
-        const ggufParser = new GgufParser({fileReader: fileReader});
+        const ggufParser = new GgufParser({
+            fileReader: fileReader
+        });
 
-        const metadata = await ggufParser.parseMetadata();
+        const metadata = await ggufParser.parseFileInfo();
+        expect(metadata.tensorInfo!.length).to.be.eql(Number(metadata.tensorCount));
 
-        expect(metadata).toMatchSnapshot();
+        expect(simplifyGgufInfoForTestSnapshot(metadata)).toMatchSnapshot();
     });
 
     it("should calculate GGUF VRAM Usage", async () => {
         const fileReader = new GgufFsFileReader({filePath: modelPath});
         const ggufParser = new GgufParser({fileReader: fileReader});
 
-        const metadata = await ggufParser.parseMetadata();
+        const metadata = await ggufParser.parseFileInfo();
 
         const ggufInsights = new GgufInsights(metadata);
 
@@ -48,9 +52,9 @@ describe("GGUF Parser", async () => {
     });
 
     it("should fetch GGUF metadata", async () => {
-        const ggufMetadataParseResult = await parseGgufMetadata(modelPath);
+        const ggufMetadataParseResult = await getGgufFileInfo(modelPath);
 
-        expect(ggufMetadataParseResult).toMatchSnapshot();
+        expect(simplifyGgufInfoForTestSnapshot(ggufMetadataParseResult)).toMatchSnapshot();
 
         const insights = new GgufInsights(ggufMetadataParseResult);
         expect(insights.VRAMUsage).toMatchInlineSnapshot("4474643028.666667");

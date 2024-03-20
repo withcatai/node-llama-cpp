@@ -5,7 +5,7 @@ exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
   "metadata": {
     "general": {
       "architecture": "llama",
-      "file_type": "MOSTLY_Q4_0",
+      "file_type": 2,
       "name": "workspace",
       "quantization_version": 2,
     },
@@ -24,7 +24,6 @@ exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
         "freq_base": 10000,
       },
     },
-    "tensorCount": 291,
     "tokenizer": {
       "chat_template": "{% for message in messages %}
 {% if message['role'] == 'user' or message['role'] == 'system' %}
@@ -63,12 +62,87 @@ exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
         "eos_token_id": 2,
         "model": "llama",
         "padding_token_id": 2,
+        "scores": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ],
+        "token_type": [
+          2,
+          3,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+        ],
+        "tokens": [
+          "<unk>",
+          "<s>",
+          "</s>",
+          "<0x00>",
+          "<0x01>",
+          "<0x02>",
+          "<0x03>",
+          "<0x04>",
+          "<0x05>",
+          "<0x06>",
+        ],
         "unknown_token_id": 0,
       },
     },
-    "version": 3,
   },
   "metadataSize": 718762,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        32004,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 73737216,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 73753600,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 106783744,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "version": 3,
 }
 `;
 
@@ -77,7 +151,7 @@ exports[`GGUF Parser > should parse local gguf model 1`] = `
   "metadata": {
     "general": {
       "architecture": "llama",
-      "file_type": "MOSTLY_Q4_0",
+      "file_type": 2,
       "name": "workspace",
       "quantization_version": 2,
     },
@@ -96,7 +170,6 @@ exports[`GGUF Parser > should parse local gguf model 1`] = `
         "freq_base": 10000,
       },
     },
-    "tensorCount": 291,
     "tokenizer": {
       "chat_template": "{% for message in messages %}
 {% if message['role'] == 'user' or message['role'] == 'system' %}
@@ -135,11 +208,86 @@ exports[`GGUF Parser > should parse local gguf model 1`] = `
         "eos_token_id": 2,
         "model": "llama",
         "padding_token_id": 2,
+        "scores": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ],
+        "token_type": [
+          2,
+          3,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+        ],
+        "tokens": [
+          "<unk>",
+          "<s>",
+          "</s>",
+          "<0x00>",
+          "<0x01>",
+          "<0x02>",
+          "<0x03>",
+          "<0x04>",
+          "<0x05>",
+          "<0x06>",
+        ],
         "unknown_token_id": 0,
       },
     },
-    "version": 3,
   },
   "metadataSize": 718762,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        32004,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 73737216,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 73753600,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 106783744,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "version": 3,
 }
 `;

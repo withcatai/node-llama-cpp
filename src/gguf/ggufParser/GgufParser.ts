@@ -1,12 +1,14 @@
 import {InvalidGgufMagicError} from "../errors/InvalidGgufMagicError.js";
-import UnsupportedGgufMetadataTypeError from "../errors/UnsupportedMetadataTypeError.js";
+import {UnsupportedGgufValueTypeError} from "../errors/UnsupportedGgufValueTypeError.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {GgufReadOffset} from "./utils/GgufReadOffset.js";
-import {parseGgufFileTypeNumber} from "./utils/parseGgufFileTypeNumber.js";
-import {GgufMetadataAny} from "./GgufMetadataTypes.js";
+import {GgufMetadata} from "./types/GgufMetadataTypes.js";
 import {GgufFileReader, valueTypeToBytesToRead} from "./fileReaders/GgufFileReader.js";
+import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
+import {GgmlType, GgufTensorInfo} from "./types/GgufTensorInfoTypes.js";
 
-const enum MetadataValueType {
+// source: `enum gguf_type` in `ggml.h` in the `llama.cpp` source code
+const enum GgufValueType {
     Uint8 = 0,
     Int8 = 1,
     Uint16 = 2,
@@ -16,44 +18,42 @@ const enum MetadataValueType {
     Float32 = 6,
     Bool = 7,
     String = 8,
-    Array = 9
+    Array = 9,
+    Uint64 = 10,
+    Int64 = 11,
+    Float64 = 12
 }
 
 const ggufMagic = "GGUF";
 
-// these keys are ignored by default because they contain very long values that aren't very useful in the JS side of this library
-const defaultIgnoreMetadataKeys = [
-    "tokenizer.ggml.tokens",
-    "tokenizer.ggml.scores",
-    "tokenizer.ggml.token_type",
-    "tokenizer.ggml.merges"
-];
-
-export type GgufParsedMetadataResult = {
-    metadataSize: number,
-    metadata: GgufMetadataAny
-};
 
 export type GgufParserOptions = {
     fileReader: GgufFileReader,
+    readTensorInfo?: boolean,
     ignoreKeys?: string[]
 };
 
 export class GgufParser {
     private readonly _fileReader: GgufFileReader;
-    public readonly ignoreKeys = defaultIgnoreMetadataKeys;
+    private readonly _readTensorInfo: boolean;
+    private readonly _ignoreKeys: string[];
 
-    public constructor({fileReader, ignoreKeys = defaultIgnoreMetadataKeys}: GgufParserOptions) {
-        this.ignoreKeys = ignoreKeys;
+    public constructor({fileReader, readTensorInfo = true, ignoreKeys = []}: GgufParserOptions) {
         this._fileReader = fileReader;
+        this._readTensorInfo = readTensorInfo;
+        this._ignoreKeys = ignoreKeys;
     }
 
-    public async parseMetadata({logWarnings = true}: {logWarnings?: boolean} = {}): Promise<GgufParsedMetadataResult> {
-        const metadataRaw = await this._parseMetadataRaw();
+    public async parseFileInfo({logWarnings = true}: {logWarnings?: boolean} = {}): Promise<GgufFileInfo> {
+        const readOffset = new GgufReadOffset(0);
+        const headerReadResult = await this._parseHeaderRaw(readOffset);
+        const tensorReadResult = this._readTensorInfo
+            ? await this._parseTensorInfo(headerReadResult.tensorCount, readOffset)
+            : null;
         const metadata: { [key: string]: any } = {};
 
-        for (const [key, value] of Object.entries(metadataRaw.metadata)) {
-            if (this.ignoreKeys.includes(key))
+        for (const [key, value] of Object.entries(headerReadResult.metadata)) {
+            if (this._ignoreKeys.includes(key))
                 continue;
 
             const {lastObject, lastKey} = GgufParser._getNestedObject(key, metadata);
@@ -63,49 +63,51 @@ export class GgufParser {
             lastObject[lastKey] = value;
         }
 
-        if (typeof metadata?.general?.file_type === "number") {
-            metadata.general["file_type"] = parseGgufFileTypeNumber(metadata.general.file_type) || metadata.general.file_type;
-        }
-
         return {
-            metadata: metadata as GgufMetadataAny,
-            metadataSize: metadataRaw.metadataSize
+            version: headerReadResult.version,
+            tensorCount: headerReadResult.tensorCount,
+            metadata: metadata as GgufMetadata,
+            tensorInfo: tensorReadResult?.tensorInfo,
+            metadataSize: headerReadResult.metadataSize,
+            tensorInfoSize: tensorReadResult?.tensorInfoSize
         };
     }
 
-    private async _readMetadataValue(type: MetadataValueType, offset: number | GgufReadOffset): Promise<any> {
+    private async _readGgufValue(type: GgufValueType, offset: number | GgufReadOffset): Promise<any> {
         const readOffset = GgufReadOffset.resolveReadOffset(offset);
 
         switch (type) {
-            case MetadataValueType.Uint8: return await this._fileReader.readUint8(readOffset);
-            case MetadataValueType.Int8: return await this._fileReader.readInt8(readOffset);
-            case MetadataValueType.Uint16: return await this._fileReader.readUint16(readOffset);
-            case MetadataValueType.Int16: return await this._fileReader.readInt16(readOffset);
-            case MetadataValueType.Uint32: return await this._fileReader.readUint32(readOffset);
-            case MetadataValueType.Int32: return await this._fileReader.readInt32(readOffset);
-            case MetadataValueType.Float32: return await this._fileReader.readFloat32(readOffset);
-            case MetadataValueType.Bool: return await this._fileReader.readBool(readOffset);
-            case MetadataValueType.String: return await this._fileReader.readString(readOffset);
+            case GgufValueType.Uint8: return await this._fileReader.readUint8(readOffset);
+            case GgufValueType.Int8: return await this._fileReader.readInt8(readOffset);
+            case GgufValueType.Uint16: return await this._fileReader.readUint16(readOffset);
+            case GgufValueType.Int16: return await this._fileReader.readInt16(readOffset);
+            case GgufValueType.Uint32: return await this._fileReader.readUint32(readOffset);
+            case GgufValueType.Int32: return await this._fileReader.readInt32(readOffset);
+            case GgufValueType.Float32: return await this._fileReader.readFloat32(readOffset);
+            case GgufValueType.Bool: return await this._fileReader.readBool(readOffset);
+            case GgufValueType.String: return await this._fileReader.readString(readOffset);
+            case GgufValueType.Uint64: return await this._fileReader.readUint64(readOffset);
+            case GgufValueType.Int64: return await this._fileReader.readInt64(readOffset);
+            case GgufValueType.Float64: return await this._fileReader.readFloat64(readOffset);
         }
 
-        if (type === MetadataValueType.Array) {
+        if (type === GgufValueType.Array) {
             const arrayType = await this._fileReader.readUint32(readOffset);
             const arrayLength = await this._fileReader.readUint64(readOffset);
 
             const arrayValues: any[] = [];
             for (let i = 0; i < arrayLength; i++) {
-                const value = await this._readMetadataValue(arrayType, readOffset);
+                const value = await this._readGgufValue(arrayType, readOffset);
                 arrayValues.push(value);
             }
             return arrayValues;
         }
 
-        throw new UnsupportedGgufMetadataTypeError(type);
+        throw new UnsupportedGgufValueTypeError(type);
     }
 
-    private async _parseMetadataRaw(): Promise<{metadata: Record<string, any>, metadataSize: number}> {
-        const readOffset = new GgufReadOffset(0);
-
+    private async _parseHeaderRaw(readOffset: GgufReadOffset) {
+        const initialOffset = readOffset.offset;
         const fileMagicBytes = await this._fileReader.readByteRange(readOffset, valueTypeToBytesToRead.uint8 * ggufMagic.length);
         const fileMagicText = String.fromCharCode(...fileMagicBytes);
 
@@ -116,20 +118,50 @@ export class GgufParser {
         const tensorCount = await this._fileReader.readUint64(readOffset);
         const metadataKVCount = Number(await this._fileReader.readUint64(readOffset));
 
-        const metadata: { [key: string]: any } = {
-            version,
-            tensorCount: GgufFileReader.castNumber(tensorCount)
-        };
+        const metadata: Record<string, any> = {};
 
         for (let i = 0; i < metadataKVCount; i++) {
             const keyResult = await this._fileReader.readString(readOffset);
             const valueType = await this._fileReader.readUint32(readOffset);
-            metadata[keyResult] = await this._readMetadataValue(valueType, readOffset);
+            metadata[keyResult] = await this._readGgufValue(valueType, readOffset);
         }
 
         return {
+            version,
+            tensorCount: GgufFileReader.castNumber(tensorCount),
             metadata: metadata,
-            metadataSize: readOffset.offset
+            metadataSize: readOffset.offset - initialOffset
+        };
+    }
+
+    private async _parseTensorInfo(tensorCount: number | bigint, readOffset: GgufReadOffset) {
+        const initialOffset = readOffset.offset;
+        const tensorInfo: GgufTensorInfo[] = [];
+
+        for (let i = 0n; i < BigInt(tensorCount); i++) {
+            const name = await this._fileReader.readString(readOffset);
+            const dimensionsNumber = await this._fileReader.readUint32(readOffset);
+            const dimensions: (number | bigint)[] = [];
+
+            for (let i = 0; i < dimensionsNumber; i++) {
+                const dimension = await this._fileReader.readUint64(readOffset);
+                dimensions.push(GgufFileReader.castNumber(dimension));
+            }
+
+            const ggmlType = await this._fileReader.readUint32(readOffset);
+            const offset = await this._fileReader.readUint64(readOffset);
+
+            tensorInfo.push({
+                name,
+                dimensions,
+                ggmlType: ggmlType as GgmlType,
+                offset: GgufFileReader.castNumber(offset)
+            });
+        }
+
+        return {
+            tensorInfo,
+            tensorInfoSize: readOffset.offset - initialOffset
         };
     }
 

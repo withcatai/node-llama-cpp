@@ -1,18 +1,19 @@
-import {GgufParsedMetadataResult} from "./ggufParser/GgufParser.js";
+import {getGgufMetadataLlmData} from "./ggufParser/utils/getGgufMetadataLlmData.js";
+import {GgufMetadata} from "./ggufParser/types/GgufMetadataTypes.js";
 
 export class GgufInsights {
-    public readonly metadataResponse: GgufParsedMetadataResult;
+    public readonly metadata: GgufMetadata;
+    public readonly metadataSize: number;
 
-    public constructor(metadataResponse: GgufParsedMetadataResult) {
-        this.metadataResponse = metadataResponse;
-    }
-
-    public get metadata() {
-        return this.metadataResponse.metadata;
-    }
-
-    public get architectureMetadata() {
-        return this.metadata[this.metadata.general.architecture];
+    public constructor({
+        metadata,
+        metadataSize
+    }: {
+        metadata: GgufMetadata,
+        metadataSize: number
+    }) {
+        this.metadata = metadata;
+        this.metadataSize = metadataSize;
     }
 
     /**
@@ -20,13 +21,14 @@ export class GgufInsights {
      */
     public get kvMatrices() {
         // 2 bytes each * 2 key and value
+        const llmData = getGgufMetadataLlmData(this.metadata);
         return (
             2 * 2 *
-            this.architectureMetadata.context_length *
-            this.architectureMetadata.block_count *
-            this.architectureMetadata.embedding_length *
-            this.architectureMetadata.attention.head_count_kv /
-            this.architectureMetadata.attention.head_count
+            (llmData.context_length ?? 1) *
+            (llmData.block_count ?? 1) *
+            (llmData.embedding_length ?? 1) *
+            (llmData.attention?.head_count_kv ?? 1) /
+            (llmData.attention?.head_count ?? 1)
         );
     }
 
@@ -36,10 +38,14 @@ export class GgufInsights {
     public get graphSize() {
         // TODO: get this from the llama.cpp's graph calculations instead of
         // estimating it's 1/6 * kv_cache_size * num_gqa
-        return (this.architectureMetadata.attention.head_count_kv / this.architectureMetadata.attention.head_count) * this.kvMatrices / 6;
+        const llmData = getGgufMetadataLlmData(this.metadata);
+        return (
+            (llmData.attention?.head_count_kv ?? 1) /
+            (llmData.attention?.head_count ?? 1)
+        ) * this.kvMatrices / 6;
     }
 
     public get VRAMUsage() {
-        return this.graphSize + this.kvMatrices + this.metadataResponse.metadataSize;
+        return this.graphSize + this.kvMatrices + this.metadataSize;
     }
 }
