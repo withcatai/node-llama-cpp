@@ -1,5 +1,5 @@
-import {getGgufMetadataLlmData} from "./parser/utils/getGgufMetadataLlmData.js";
-import {GgufMetadata} from "./parser/types/GgufMetadataTypes.js";
+import {getGgufMetadataLlmData} from "./utils/getGgufMetadataLlmData.js";
+import {GgufMetadata} from "./types/GgufMetadataTypes.js";
 
 export class GgufInsights {
     public readonly metadata: GgufMetadata;

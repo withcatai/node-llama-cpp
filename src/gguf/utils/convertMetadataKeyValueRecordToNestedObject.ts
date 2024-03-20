@@ -1,4 +1,4 @@
-import {getConsoleLogPrefix} from "../../../utils/getConsoleLogPrefix.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {MetadataKeyValueRecord, MetadataNestedObject, MetadataValue} from "../types/GgufFileInfoTypes.js";
 
 export function convertMetadataKeyValueRecordToNestedObject(

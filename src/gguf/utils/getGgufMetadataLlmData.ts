@@ -1,5 +1,5 @@
 import {GgufArchitectureType, GgufMetadata} from "../types/GgufMetadataTypes.js";
-import {MergeOptionalUnionTypes} from "../../../utils/mergeUnionTypes.js";
+import {MergeOptionalUnionTypes} from "../../utils/mergeUnionTypes.js";
 
 export function getGgufMetadataLlmData<const T extends GgufArchitectureType>(ggufMetadata: GgufMetadata<T>): (
     GgufArchitectureType extends T

@@ -1,5 +1,5 @@
 import {describe, expect, it, test} from "vitest";
-import {GgufFsFileReader} from "../../../src/gguf/parser/fileReaders/GgufFsFileReader.js";
+import {GgufFsFileReader} from "../../../src/gguf/fileReaders/GgufFsFileReader.js";
 import {parseGguf} from "../../../src/gguf/parser/parseGguf.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {GgufInsights} from "../../../src/gguf/GgufInsights.js";

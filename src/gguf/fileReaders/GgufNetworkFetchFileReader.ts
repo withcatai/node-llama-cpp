@@ -1,7 +1,7 @@
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {defaultExtraAllocationSize, ggufDefaultRetryOptions} from "../../consts.js";
+import {defaultExtraAllocationSize, ggufDefaultRetryOptions} from "../consts.js";
 import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFetchFileReaderOptions = {

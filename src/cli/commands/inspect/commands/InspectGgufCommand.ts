@@ -4,7 +4,7 @@ import chalk from "chalk";
 import bytes from "bytes";
 import {getGgufFileInfo} from "../../../../gguf/getGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
-import {getGgufFileTypeName} from "../../../../gguf/parser/utils/getGgufFileTypeName.js";
+import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 
 type InspectGgufCommand = {
     path: string,

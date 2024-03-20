@@ -1,6 +1,6 @@
 import {GgufFileReader, valueTypeToBytesToRead} from "../fileReaders/GgufFileReader.js";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {UnsupportedGgufValueTypeError} from "../../errors/UnsupportedGgufValueTypeError.js";
+import {UnsupportedGgufValueTypeError} from "../errors/UnsupportedGgufValueTypeError.js";
 import {
     GgufValueType, GgufVersionParserOptions, GgufVersionParserResult, MetadataKeyValueRecord, MetadataValue
 } from "../types/GgufFileInfoTypes.js";
