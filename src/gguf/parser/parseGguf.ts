@@ -5,6 +5,7 @@ import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {GgufFileReader, valueTypeToBytesToRead} from "../fileReaders/GgufFileReader.js";
 import {GgufFileInfo, GgufVersionParserOptions, GgufVersionParserResult} from "../types/GgufFileInfoTypes.js";
 import {GgufV2Parser} from "./GgufV2Parser.js";
+import {GgufV3Parser} from "./GgufV3Parser.js";
 
 const ggufMagic = "GGUF";
 
@@ -64,16 +65,18 @@ async function parseGgufUsingASpecificVersionParser(
             throw new UnsupportedError("GGUF version 1 is not supported by llama.cpp anymore");
 
         case 2:
-        case 3:
             return await (new GgufV2Parser(specificVersionParserOptions)).parse();
+
+        case 3:
+            return await (new GgufV3Parser(specificVersionParserOptions)).parse();
 
         default:
             if (specificVersionParserOptions.logWarnings)
                 console.warn(
                     getConsoleLogPrefix() +
-                    `Unsupported GGUF version: ${specificVersionParserOptions.version}. Parsing it as version 3`
+                    `Unsupported GGUF version "${specificVersionParserOptions.version}". Reading the file as GGUF version 3`
                 );
 
-            return await (new GgufV2Parser(specificVersionParserOptions)).parse();
+            return await (new GgufV3Parser(specificVersionParserOptions)).parse();
     }
 }

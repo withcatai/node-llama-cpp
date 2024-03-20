@@ -10,14 +10,14 @@ import {convertMetadataKeyValueRecordToNestedObject} from "../utils/convertMetad
 
 export class GgufV2Parser {
     private readonly _fileReader: GgufFileReader;
-    private readonly _readTensorInfo: boolean;
+    private readonly _shouldReadTensorInfo: boolean;
     private readonly _ignoreKeys: string[];
     private readonly _readOffset: GgufReadOffset;
     private readonly _logWarnings: boolean;
 
     public constructor({fileReader, readTensorInfo = true, ignoreKeys = [], readOffset, logWarnings}: GgufVersionParserOptions) {
         this._fileReader = fileReader;
-        this._readTensorInfo = readTensorInfo;
+        this._shouldReadTensorInfo = readTensorInfo;
         this._ignoreKeys = ignoreKeys;
         this._readOffset = readOffset;
         this._logWarnings = logWarnings;
@@ -28,8 +28,8 @@ export class GgufV2Parser {
         const initialOffset = readOffset.offset;
 
         const headerReadResult = await this._readRawHeader(readOffset);
-        const tensorReadResult = this._readTensorInfo
-            ? await this._parseTensorInfo(headerReadResult.tensorCount, readOffset)
+        const tensorReadResult = this._shouldReadTensorInfo
+            ? await this._readTensorInfo(headerReadResult.tensorCount, readOffset)
             : null;
         const metadata = convertMetadataKeyValueRecordToNestedObject(headerReadResult.metadata, {
             logOverrideWarnings: this._logWarnings,
@@ -109,7 +109,7 @@ export class GgufV2Parser {
         };
     }
 
-    private async _parseTensorInfo(tensorCount: number | bigint, readOffset: GgufReadOffset) {
+    private async _readTensorInfo(tensorCount: number | bigint, readOffset: GgufReadOffset) {
         const initialOffset = readOffset.offset;
         const tensorInfo: GgufTensorInfo[] = [];
 
