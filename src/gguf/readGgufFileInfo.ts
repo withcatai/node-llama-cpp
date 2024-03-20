@@ -6,9 +6,10 @@ import {ggufDefaultRetryOptions} from "./consts.js";
 
 
 /**
- * Parse a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`)
+ * Read a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`).
+ * Only the parts of the file required for the metadata and tensor info are read.
  */
-export async function getGgufFileInfo(pathOrUrl: string, {
+export async function readGgufFileInfo(pathOrUrl: string, {
     readTensorInfo = true,
     sourceType,
     retryOptions = ggufDefaultRetryOptions,

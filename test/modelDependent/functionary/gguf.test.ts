@@ -4,7 +4,7 @@ import {parseGguf} from "../../../src/gguf/parser/parseGguf.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
-import {getGgufFileInfo} from "../../../src/gguf/getGgufFileInfo.js";
+import {readGgufFileInfo} from "../../../src/gguf/readGgufFileInfo.js";
 import {simplifyGgufInfoForTestSnapshot} from "../../utils/helpers/simplifyGgufInfoForTestSnapshot.js";
 
 describe("GGUF Parser", async () => {
@@ -52,7 +52,7 @@ describe("GGUF Parser", async () => {
     });
 
     it("should fetch GGUF metadata", async () => {
-        const ggufMetadataParseResult = await getGgufFileInfo(modelPath);
+        const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
 
         expect(simplifyGgufInfoForTestSnapshot(ggufMetadataParseResult)).toMatchSnapshot();
 

@@ -2,7 +2,7 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import bytes from "bytes";
-import {getGgufFileInfo} from "../../../../gguf/getGgufFileInfo.js";
+import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 
@@ -39,7 +39,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
         else
             console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
 
-        const parsedMetadata = await getGgufFileInfo(ggufPath, {ignoreKeys: []});
+        const parsedMetadata = await readGgufFileInfo(ggufPath, {ignoreKeys: []});
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
         const metadataPrettyPrintOptions: PrettyPrintObjectOptions = {
             maxArrayValues: 10,
