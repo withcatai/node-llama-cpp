@@ -33,6 +33,14 @@ export type BindingModule = {
         new (grammar: AddonGrammar): AddonGrammarEvaluationState
     },
     systemInfo(): string,
+    getSupportsGpuOffloading(): boolean,
+    getSupportsMmap(): boolean,
+    getSupportsMlock(): boolean,
+    getBlockSizeForGgmlType(ggmlType: number): number | undefined,
+    getTypeSizeForGgmlType(ggmlType: number): number | undefined,
+    getConsts(): {
+        ggmlMaxDims: number
+    },
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
     getGpuVramInfo(): {
@@ -64,7 +72,8 @@ export type AddonModel = {
     eotToken(): Token,
     getTokenString(token: number): string,
     getTokenType(token: Token): number,
-    shouldPrependBosToken(): boolean
+    shouldPrependBosToken(): boolean,
+    getModelSize(): number
 };
 
 export type AddonContext = {

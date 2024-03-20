@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`GGUF Parser > should parse remote gguf model 1`] = `
+exports[`gguf > parser > should parse remote gguf model 1`] = `
 {
   "metadata": {
     "falcon": {
@@ -121,7 +121,7 @@ exports[`GGUF Parser > should parse remote gguf model 1`] = `
 }
 `;
 
-exports[`GGUF Parser > should parse remote gguf model without tensor info 1`] = `
+exports[`gguf > parser > should parse remote gguf model without tensor info 1`] = `
 {
   "metadata": {
     "falcon": {

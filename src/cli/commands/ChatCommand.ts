@@ -4,6 +4,7 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
+import bytes from "bytes";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
@@ -373,6 +374,7 @@ async function RunChat({
 
     console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
     console.info(`${chalk.yellow("Model type:")} ${model.typeDescription}`);
+    console.info(`${chalk.yellow("Model size:")} ${bytes(model.size)}`);
     console.info(`${chalk.yellow("BOS:")} ${bos}`);
     console.info(`${chalk.yellow("EOS:")} ${eos}`);
     console.info(`${chalk.yellow("Chat wrapper:")} ${chatWrapper.wrapperName}`);

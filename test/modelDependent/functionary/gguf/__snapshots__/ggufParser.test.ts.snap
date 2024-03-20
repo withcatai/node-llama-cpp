@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
+exports[`gguf > parser > should fetch GGUF metadata 1`] = `
 {
   "metadata": {
     "general": {
@@ -146,7 +146,7 @@ exports[`GGUF Parser > should fetch GGUF metadata 1`] = `
 }
 `;
 
-exports[`GGUF Parser > should parse local gguf model 1`] = `
+exports[`gguf > parser > should parse local gguf model 1`] = `
 {
   "metadata": {
     "general": {

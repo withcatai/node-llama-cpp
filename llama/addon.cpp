@@ -515,6 +515,10 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             return Napi::Boolean::New(info.Env(), shouldPrependBos);
         }
 
+        Napi::Value GetModelSize(const Napi::CallbackInfo& info) {
+            return Napi::Number::From(info.Env(), llama_model_size(model));
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonModel",
@@ -541,6 +545,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                         InstanceMethod("getTokenType", &AddonModel::GetTokenType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
+                        InstanceMethod("getModelSize", &AddonModel::GetModelSize),
                         InstanceMethod("dispose", &AddonModel::Dispose),
                     }
                 )
@@ -1444,6 +1449,49 @@ Napi::Value systemInfo(const Napi::CallbackInfo& info) {
     return Napi::String::From(info.Env(), llama_print_system_info());
 }
 
+Napi::Value addonGetSupportsGpuOffloading(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_gpu_offload());
+}
+
+Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mmap());
+}
+
+Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mlock());
+}
+
+Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto blockSize = ggml_blck_size(static_cast<ggml_type>(ggmlType));
+    
+    return Napi::Number::New(info.Env(), blockSize);
+}
+
+Napi::Value addonGetTypeSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto typeSize = ggml_type_size(static_cast<ggml_type>(ggmlType));
+    
+    return Napi::Number::New(info.Env(), typeSize);
+}
+
+Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
+    Napi::Object consts = Napi::Object::New(info.Env());
+    consts.Set("ggmlMaxDims", Napi::Number::New(info.Env(), GGML_MAX_DIMS));
+
+    return consts;
+}
+
 int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     switch (level) {
         case GGML_LOG_LEVEL_ERROR: return 2;
@@ -1693,6 +1741,12 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
+        Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
+        Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
+        Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
+        Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
