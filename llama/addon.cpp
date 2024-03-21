@@ -157,7 +157,7 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
       }
 
       if (options.Has("embedding")) {
-        context_params.embedding = options.Get("embedding").As<Napi::Boolean>().Value();
+        context_params.embeddings = options.Get("embedding").As<Napi::Boolean>().Value();
       }
 
       if (options.Has("threads")) {
@@ -409,7 +409,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
         llama_sample_tail_free(ctx->ctx, &candidates_p, tfs_z, min_keep);
         llama_sample_typical(ctx->ctx, &candidates_p, typical_p, min_keep);
         llama_sample_top_p(ctx->ctx, &candidates_p, resolved_top_p, min_keep);
-        llama_sample_temperature(ctx->ctx, &candidates_p, temperature);
+        llama_sample_temp(ctx->ctx, &candidates_p, temperature);
         new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
     }
 
