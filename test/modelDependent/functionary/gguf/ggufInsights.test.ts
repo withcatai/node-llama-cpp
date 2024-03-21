@@ -26,9 +26,12 @@ describe("gguf", async () => {
             expect(ggufInsights.modelSize).toMatchInlineSnapshot("4108204160");
         });
 
-        test("predicted VRAM usage should match actual VRAM usage", async () => {
+        test("predicted VRAM usage should match actual VRAM usage", async (context) => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
+
+            if (llama.gpu === false)
+                return context.skip();
 
             const ggufInsights = await GgufInsights.from(ggufMetadataParseResult, llama);
 
@@ -55,9 +58,12 @@ describe("gguf", async () => {
             await model.dispose();
         });
 
-        test("predicted VRAM usage should match actual VRAM usage when using gpuLayers", async () => {
+        test("predicted VRAM usage should match actual VRAM usage when using gpuLayers", async (context) => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
+
+            if (llama.gpu === false)
+                return context.skip();
 
             const ggufInsights = await GgufInsights.from(ggufMetadataParseResult, llama);
 
