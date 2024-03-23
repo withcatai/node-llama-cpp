@@ -4,7 +4,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("functionary", () => {
     describe("embedding", () => {
-        test("deterministic", async () => {
+        test("deterministic", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -25,11 +25,9 @@ describe("functionary", () => {
 
             expect(helloWorld2Embedding.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloWorld2Embedding.vector).to.not.eql(helloThereEmbedding.vector);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("deterministic between runs", async () => {
+        test("deterministic between runs", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -56,8 +54,6 @@ describe("functionary", () => {
 
             expect(helloWorldEmbedding2.vector).to.eql(helloWorldEmbedding.vector);
             expect(helloThereEmbedding2.vector).to.eql(helloThereEmbedding.vector);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

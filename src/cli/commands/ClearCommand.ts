@@ -7,7 +7,7 @@ import {clearAllLocalBuilds} from "../../bindings/utils/clearAllLocalBuilds.js";
 import {clearLocalCmake, fixXpackPermissions} from "../../utils/cmake.js";
 
 type ClearCommand = {
-    type: "source" | "build" | "cmake" | "all"
+    type: "source" | "builds" | "cmake" | "all"
 };
 
 export const ClearCommand: CommandModule<object, ClearCommand> = {
@@ -18,7 +18,7 @@ export const ClearCommand: CommandModule<object, ClearCommand> = {
         return yargs
             .option("type", {
                 type: "string",
-                choices: ["source", "build", "cmake", "all"] satisfies ClearCommand["type"][],
+                choices: ["source", "builds", "cmake", "all"] satisfies ClearCommand["type"][],
                 default: "all" as ClearCommand["type"],
                 description: "Files to clear"
             });
@@ -38,11 +38,11 @@ export async function ClearLlamaCppBuildCommand({type}: ClearCommand) {
         });
     }
 
-    if (type === "build" || type === "all") {
+    if (type === "builds" || type === "all") {
         await withOra({
-            loading: chalk.blue("Clearing build"),
-            success: chalk.blue("Cleared build"),
-            fail: chalk.blue("Failed to clear build")
+            loading: chalk.blue("Clearing all builds"),
+            success: chalk.blue("Cleared all builds"),
+            fail: chalk.blue("Failed to clear all builds")
         }, async () => {
             await clearAllLocalBuilds();
         });

@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("functionary", () => {
     describe("grammar", () => {
-        test("JSON schema", async () => {
+        test("JSON schema", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -41,8 +41,6 @@ describe("functionary", () => {
 
             expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(10);
             expect(parsedRes.verbsInUserMessage).to.eql(["going"]);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

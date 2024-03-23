@@ -4,6 +4,7 @@ import {downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import chalk from "chalk";
 import withStatusLogs from "../../src/utils/withStatusLogs.js";
+import {withLockfile} from "../../src/utils/withLockfile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,22 +23,28 @@ export async function getModelFile(modelName: keyof typeof supportedModels) {
     if (await fs.pathExists(modelFilePath))
         return modelFilePath;
 
+    await fs.ensureDir(modelsFolder);
+
     return await withStatusLogs({
         loading: chalk.blue(`Downloading model "${modelName}"`),
         success: chalk.blue(`Downloaded model "${modelName}"`),
         fail: chalk.blue(`Failed to download model "${modelName}"`)
     }, async () => {
-        const modelUrl = supportedModels[modelName];
+        return await withLockfile({
+            resourcePath: modelFilePath
+        }, async () => {
+            const modelUrl = supportedModels[modelName];
 
-        const downloader = await downloadFile({
-            url: modelUrl,
-            directory: path.dirname(modelFilePath),
-            fileName: path.basename(modelFilePath),
-            cliProgress: true
+            const downloader = await downloadFile({
+                url: modelUrl,
+                directory: path.dirname(modelFilePath),
+                fileName: path.basename(modelFilePath),
+                cliProgress: true
+            });
+            await downloader.download();
+
+            return modelFilePath;
         });
-        await downloader.download();
-
-        return modelFilePath;
     });
 }
 

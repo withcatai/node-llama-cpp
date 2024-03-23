@@ -23,7 +23,10 @@ export type LlamaModelOptions = {
     /** only load the vocabulary, no weights */
     vocabOnly?: boolean,
 
-    /** use mmap if possible */
+    /**
+     * Use mmap if possible.
+     * Enabled by default in llama.cpp.
+     */
     useMmap?: boolean,
 
     /**
@@ -72,7 +75,9 @@ export class LlamaModel {
             gpuLayers,
             vocabOnly,
             useMmap,
-            useMlock,
+            useMlock: _llama.supportsMlock
+                ? useMlock
+                : undefined,
             onLoadProgress: onLoadProgress == null
                 ? undefined
                 : (loadPercentage: number) => {
@@ -132,6 +137,15 @@ export class LlamaModel {
 
     public get filename() {
         return this._filename;
+    }
+
+    /**
+     * Total model size in memory in bytes
+     */
+    public get size() {
+        this._ensureNotDisposed();
+
+        return this._model.getModelSize();
     }
 
     /**

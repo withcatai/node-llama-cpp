@@ -5,7 +5,7 @@ outline: deep
 
 <script setup lang="ts">
 import {data as docs} from "./cli.data.js";
-const commandDoc = docs.inspect;
+const commandDoc = docs.inspect.index;
 </script>
 
 {{commandDoc.description}}

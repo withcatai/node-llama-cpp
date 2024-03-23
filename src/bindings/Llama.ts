@@ -23,9 +23,13 @@ export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
     /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
     /** @internal */ public readonly _memoryLock = {};
+    /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
     /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
+    /** @internal */ private readonly _supportsGpuOffloading: boolean;
+    /** @internal */ private readonly _supportsMmap: boolean;
+    /** @internal */ private readonly _supportsMlock: boolean;
     /** @internal */ private readonly _llamaCppRelease: {
         readonly repo: string,
         readonly release: string
@@ -57,6 +61,10 @@ export class Llama {
     }) {
         this._bindings = bindings;
         this._gpu = bindings.getGpuType() ?? false;
+        this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
+        this._supportsMmap = bindings.getSupportsMmap();
+        this._supportsMlock = bindings.getSupportsMlock();
+        this._consts = bindings.getConsts();
         this._logLevel = logLevel ?? LlamaLogLevel.debug;
         this._logger = logger;
         this._buildType = buildType;
@@ -98,6 +106,18 @@ export class Llama {
 
     public get gpu() {
         return this._gpu;
+    }
+
+    public get supportsGpuOffloading() {
+        return this._supportsGpuOffloading;
+    }
+
+    public get supportsMmap() {
+        return this._supportsMmap;
+    }
+
+    public get supportsMlock() {
+        return this._supportsMlock;
     }
 
     public get logLevel() {
@@ -168,6 +188,11 @@ export class Llama {
                 preventDisposalHandle.dispose();
             }
         });
+    }
+
+    /** @internal */
+    public async _init() {
+        await this._bindings.init();
     }
 
     /** @internal */
@@ -280,7 +305,7 @@ export class Llama {
         });
 
         if (!skipLlamaInit)
-            await llama._bindings.init();
+            await llama._init();
 
         return llama;
     }

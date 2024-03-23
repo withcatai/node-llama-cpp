@@ -515,6 +515,10 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             return Napi::Boolean::New(info.Env(), shouldPrependBos);
         }
 
+        Napi::Value GetModelSize(const Napi::CallbackInfo& info) {
+            return Napi::Number::From(info.Env(), llama_model_size(model));
+        }
+
         static void init(Napi::Object exports) {
             exports.Set(
                 "AddonModel",
@@ -541,6 +545,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                         InstanceMethod("getTokenType", &AddonModel::GetTokenType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
+                        InstanceMethod("getModelSize", &AddonModel::GetModelSize),
                         InstanceMethod("dispose", &AddonModel::Dispose),
                     }
                 )
@@ -822,6 +827,10 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                     context_params.n_ubatch = context_params.n_batch; // the batch queue is managed in the JS side, so there's no need for managing it on the C++ side
                 }
 
+                if (options.Has("sequences")) {
+                    context_params.n_seq_max = options.Get("sequences").As<Napi::Number>().Uint32Value();
+                }
+
                 if (options.Has("embeddings")) {
                     context_params.embeddings = options.Get("embeddings").As<Napi::Boolean>().Value();
                 }
@@ -1039,6 +1048,15 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             return result;
         }
 
+        Napi::Value GetStateSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_get_state_size(ctx));
+        }
+
         Napi::Value PrintTimings(const Napi::CallbackInfo& info) {
             llama_print_timings(ctx);
             llama_reset_timings(ctx);
@@ -1063,6 +1081,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
                         InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
+                        InstanceMethod("getStateSize", &AddonContext::GetStateSize),
                         InstanceMethod("printTimings", &AddonContext::PrintTimings),
                         InstanceMethod("dispose", &AddonContext::Dispose),
                     }
@@ -1444,6 +1463,54 @@ Napi::Value systemInfo(const Napi::CallbackInfo& info) {
     return Napi::String::From(info.Env(), llama_print_system_info());
 }
 
+Napi::Value addonGetSupportsGpuOffloading(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_gpu_offload());
+}
+
+Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mmap());
+}
+
+Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mlock());
+}
+
+Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto blockSize = ggml_blck_size(static_cast<ggml_type>(ggmlType));
+
+    return Napi::Number::New(info.Env(), blockSize);
+}
+
+Napi::Value addonGetTypeSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto typeSize = ggml_type_size(static_cast<ggml_type>(ggmlType));
+
+    return Napi::Number::New(info.Env(), typeSize);
+}
+
+Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
+    Napi::Object consts = Napi::Object::New(info.Env());
+    consts.Set("ggmlMaxDims", Napi::Number::New(info.Env(), GGML_MAX_DIMS));
+    consts.Set("ggmlTypeF16Size", Napi::Number::New(info.Env(), ggml_type_size(GGML_TYPE_F16)));
+    consts.Set("ggmlTypeF32Size", Napi::Number::New(info.Env(), ggml_type_size(GGML_TYPE_F32)));
+    consts.Set("llamaMaxRngState", Napi::Number::New(info.Env(), LLAMA_MAX_RNG_STATE));
+    consts.Set("llamaPosSize", Napi::Number::New(info.Env(), sizeof(llama_pos)));
+    consts.Set("llamaSeqIdSize", Napi::Number::New(info.Env(), sizeof(llama_seq_id)));
+
+    return consts;
+}
+
 int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     switch (level) {
         case GGML_LOG_LEVEL_ERROR: return 2;
@@ -1693,6 +1760,12 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
+        Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
+        Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
+        Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
+        Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),

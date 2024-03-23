@@ -4,12 +4,53 @@ import {cliBinName, npxRunPrefix} from "../../src/config.js";
 import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 
-export async function getCommandHtmlDoc(command: CommandModule<any, any>, cliName: string = cliBinName) {
-    const title = cliName + " " + (command.command ?? "");
+export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
+    cliName = cliBinName,
+    parentCommand,
+    subCommandsParentPageLink
+}: {
+    cliName?: string,
+    parentCommand?: CommandModule<any, any>,
+    subCommandsParentPageLink?: string
+} = {}) {
+    const currentCommandCliCommand = resolveCommandCliCommand(command);
+    const resolvedParentCommandCliCommand = resolveCommandCliCommand(parentCommand);
+    const title = cliName + " " + (resolvedParentCommandCliCommand ?? "<command>").replace("<command>", currentCommandCliCommand ?? "");
     const description = command.describe ?? "";
-    const optionGroups = await getOptionsGroupFromCommand(command);
+    const {subCommands, optionGroups} = await parseCommandDefinition(command);
 
     let res = "";
+
+    if (subCommands.length > 0) {
+        res += buildHtmlHeading("h2", htmlEscape("Commands"), "commands");
+
+        res += buildHtmlTable(
+            [
+                "Command",
+                "Description"
+            ].map(htmlEscape),
+            subCommands
+                .map((subCommand) => {
+                    if (subCommand.command == null || subCommand.describe === false)
+                        return null;
+
+                    const resolvedCommandCliCommand = resolveCommandCliCommand(subCommand) ?? "";
+                    const commandPageLink = resolveCommandPageLink(subCommand);
+
+                    let cliCommand = resolvedCommandCliCommand;
+                    cliCommand = (currentCommandCliCommand ?? "<command>").replace("<command>", cliCommand);
+
+                    if (parentCommand != null)
+                        cliCommand = (resolvedParentCommandCliCommand ?? "<command>").replace("<command>", cliCommand);
+
+                    return [
+                        `<a href="${subCommandsParentPageLink != null ? (subCommandsParentPageLink + "/") : ""}${commandPageLink}"><code>` + htmlEscape(cliName + " " + cliCommand) + "</code></a>",
+                        htmlEscape(String(subCommand.describe ?? ""))
+                    ];
+                })
+                .filter((row): row is string[] => row != null)
+        );
+    }
 
     if (optionGroups.length !== 0) {
         res += buildHtmlHeading("h2", htmlEscape("Options"), "options");
@@ -37,7 +78,10 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, cliNam
 }
 
 
-async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Promise<OptionsGroup[]> {
+async function parseCommandDefinition(command: CommandModule<any, any>): Promise<{
+    subCommands: CommandModule<any, any>[],
+    optionGroups: OptionsGroup[]
+}> {
     const yargsStub = getYargsStub();
     function getYargsStub() {
         function option(name: string, option: Options) {
@@ -57,10 +101,16 @@ async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Pro
             return yargsStub;
         }
 
-        return {option};
+        function command(subCommand: CommandModule<any, any>) {
+            subCommands.push(subCommand);
+            return yargsStub;
+        }
+
+        return {option, command};
     }
 
     const options: Record<string, {name: string, option: Options}[]> = {};
+    const subCommands: CommandModule<any, any>[] = [];
     const groups: string[] = [];
 
     if (command.builder instanceof Function)
@@ -97,10 +147,13 @@ async function getOptionsGroupFromCommand(command: CommandModule<any, any>): Pro
         return 0;
     });
 
-    return groups.map((group) => ({
-        name: normalizeGroupName(group),
-        options: options[group]!
-    }));
+    return {
+        subCommands,
+        optionGroups: groups.map((group) => ({
+            name: normalizeGroupName(group),
+            options: options[group]!
+        }))
+    };
 }
 
 function normalizeGroupName(groupName: string): string {
@@ -182,6 +235,19 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
     }
 
     return buildHtmlTable(tableHeaders, tableRows);
+}
+
+function resolveCommandCliCommand(command?: CommandModule<any, any>) {
+    if (command == null)
+        return undefined;
+
+    return command.command instanceof Array
+        ? command.command[0]
+        : command.command;
+}
+
+function resolveCommandPageLink(command: CommandModule<any, any>) {
+    return resolveCommandCliCommand(command)?.split(" ")?.[0];
 }
 
 type OptionsGroup = {

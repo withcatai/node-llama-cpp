@@ -9,5 +9,9 @@ type UnionToIntersection<U> = (
 type DistributeUnion<U> = {
     [K in keyof U]: U[K]
 };
+type OptionalDistributeUnion<U> = {
+    [K in keyof U]?: U[K]
+};
 
 export type MergeUnionTypes<T> = DistributeUnion<UnionToIntersection<T>>;
+export type MergeOptionalUnionTypes<T> = OptionalDistributeUnion<UnionToIntersection<T>>;

@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("functionary", () => {
     describe("chat session", () => {
-        test("restore chat history", async () => {
+        test("restore chat history", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
             const llama = await getTestLlama();
 
@@ -34,8 +34,6 @@ describe("functionary", () => {
             const res2 = await chatSession2.prompt("Repeat your answer");
 
             expect(res2).to.eql("6+6 equals 12.");
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

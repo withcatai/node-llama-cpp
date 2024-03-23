@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("stableCode", () => {
     describe("completion", () => {
-        test("complete a series", async () => {
+        test("complete a series", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -24,11 +24,9 @@ describe("stableCode", () => {
             });
             const expectedFullCompletion = " " + range(4, 20).join(", ");
             expect(expectedFullCompletion.slice(0, res.length)).to.eql(res);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("complete pretictable text", async () => {
+        test("complete pretictable text", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -47,13 +45,11 @@ describe("stableCode", () => {
             });
             const expectedFullCompletion = " going?";
             expect(res.slice(0, expectedFullCompletion.length)).to.eql(expectedFullCompletion);
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 
     describe("infill", () => {
-        test("fill the gap in a series", async () => {
+        test("fill the gap in a series", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -71,11 +67,9 @@ describe("stableCode", () => {
                 maxTokens: 20
             });
             expect(res).to.eql(range(4, 9).join(", ") + ", ");
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("fill expected text", async () => {
+        test("fill expected text", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -93,8 +87,6 @@ describe("stableCode", () => {
                 maxTokens: 10
             });
             expect(res).to.eql("are you");
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

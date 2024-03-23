@@ -4,7 +4,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("stableCode", () => {
     describe("async model load", () => {
-        test("load asynchronously", async () => {
+        test("load asynchronously", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -49,11 +49,9 @@ describe("stableCode", () => {
 
             expect(loopIterationsBeforeUnload).toBeGreaterThanOrEqual(2);
             expect(disposePromise).resolves.toBeUndefined();
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("load progress emitted", async () => {
+        test("load progress emitted", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -88,11 +86,9 @@ describe("stableCode", () => {
 
             const model = await modelPromise;
             await model.dispose();
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
 
-        test("abort model load works", async () => {
+        test("abort model load works", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -151,8 +147,6 @@ describe("stableCode", () => {
                 expect(logProgresses[logProgresses.length - 1]).to.not.be.eql(1);
                 expect(Math.max(...logProgressesAfterAbort)).toBeLessThan(0.8);
             }
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });
