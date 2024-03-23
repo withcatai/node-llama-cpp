@@ -4,6 +4,7 @@ import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {GgufFileReader, valueTypeToBytesToRead} from "../fileReaders/GgufFileReader.js";
 import {GgufFileInfo, GgufVersionParserOptions, GgufVersionParserResult} from "../types/GgufFileInfoTypes.js";
+import {getGgufMetadataArchitectureData} from "../utils/getGgufMetadataArchitectureData.js";
 import {GgufV2Parser} from "./GgufV2Parser.js";
 import {GgufV3Parser} from "./GgufV3Parser.js";
 
@@ -31,11 +32,13 @@ export async function parseGguf({
         readOffset,
         logWarnings
     });
+    const architectureMetadata = getGgufMetadataArchitectureData(gguifInfo.metadata);
 
     return {
         version: magicAndVersion.version,
         tensorCount: gguifInfo.tensorCount,
         metadata: gguifInfo.metadata,
+        architectureMetadata: architectureMetadata,
         tensorInfo: gguifInfo.tensorInfo,
         metadataSize: gguifInfo.metadataSize,
         tensorInfoSize: gguifInfo.tensorInfoSize

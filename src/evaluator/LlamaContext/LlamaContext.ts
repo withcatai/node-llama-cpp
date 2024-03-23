@@ -70,6 +70,7 @@ export class LlamaContext {
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
+            sequences: this._totalSequences,
             threads: Math.max(0, Math.floor(threads)),
             embeddings: _embeddings,
             noSeed: _noSeed
@@ -127,6 +128,16 @@ export class LlamaContext {
 
     public get batchSize(): number {
         return this._batchSize;
+    }
+
+    /**
+     * The actual size of the state in the memory in bytes.
+     * This value is provided by `llama.cpp` and doesn't include all the memory overhead of the context.
+     */
+    public get stateSize() {
+        this._ensureNotDisposed();
+
+        return this._ctx.getStateSize();
     }
 
     public getAllocatedContextSize(): number {

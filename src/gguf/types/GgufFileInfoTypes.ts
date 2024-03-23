@@ -1,6 +1,7 @@
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {GgufFileReader} from "../fileReaders/GgufFileReader.js";
-import {GgufMetadata} from "./GgufMetadataTypes.js";
+import {MergeOptionalUnionTypes} from "../../utils/mergeUnionTypes.js";
+import {GgufArchitectureType, GgufMetadata} from "./GgufMetadataTypes.js";
 import {GgufTensorInfo} from "./GgufTensorInfoTypes.js";
 
 export type MetadataValue = string | number | bigint | boolean | MetadataValue[];
@@ -14,6 +15,9 @@ export type GgufFileInfo = {
     tensorCount: number | bigint,
     metadata: GgufMetadata,
     metadataSize: number,
+
+    /** Same value as `metadata[metadata.general.architecture]`, but with merged types for convenience */
+    architectureMetadata: MergeOptionalUnionTypes<Exclude<GgufMetadata[GgufArchitectureType], undefined>>,
 
     /** can be null if `readTensorInfo` is set to `false` */
     tensorInfo?: GgufTensorInfo[],

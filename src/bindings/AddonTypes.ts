@@ -18,6 +18,7 @@ export type BindingModule = {
             seed?: number,
             contextSize?: number,
             batchSize?: number,
+            sequences?: number,
             logitsAll?: boolean,
             embeddings?: boolean,
             threads?: number
@@ -39,7 +40,12 @@ export type BindingModule = {
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
     getTypeSizeForGgmlType(ggmlType: number): number | undefined,
     getConsts(): {
-        ggmlMaxDims: number
+        ggmlMaxDims: number,
+        ggmlTypeF16Size: number,
+        ggmlTypeF32Size: number,
+        llamaMaxRngState: number,
+        llamaPosSize: number,
+        llamaSeqIdSize: number
     },
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
@@ -109,6 +115,7 @@ export type AddonContext = {
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
     getEmbedding(inputTokensLength: number): Float64Array,
+    getStateSize(): number,
     printTimings(): void
 };
 
