@@ -8,16 +8,19 @@ import bytes from "bytes";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
-import withStatusLogs from "../../utils/withStatusLogs.js";
 import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
-import {LlamaLogLevel} from "../../bindings/types.js";
+import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
 import {
     ChatWrapperTypeName, chatWrapperTypeNames, resolveChatWrapperBasedOnWrapperTypeName
 } from "../../bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
+import withOra from "../../utils/withOra.js";
+import {TokenMeter} from "../../evaluator/TokenMeter.js";
+import {printInfoLine} from "../utils/printInfoLine.js";
+import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 
 type ChatCommand = {
     model: string,
@@ -27,7 +30,7 @@ type ChatCommand = {
     prompt?: string,
     promptFile?: string,
     wrapper: ChatWrapperTypeName,
-    contextSize: number,
+    contextSize?: number,
     batchSize?: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
@@ -45,19 +48,20 @@ type ChatCommand = {
     maxTokens: number,
     noHistory: boolean,
     environmentFunctions: boolean,
-    noInfoLog: boolean,
+    debug: boolean,
+    meter: boolean,
     printTimings: boolean
 };
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
-    command: "chat",
+    command: "chat [modelPath]",
     describe: "Chat with a Llama model",
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 
         return yargs
             .option("model", {
-                alias: "m",
+                alias: ["m", "modelPath"],
                 type: "string",
                 demandOption: true,
                 description: "Llama model file to use for the chat",
@@ -106,8 +110,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("contextSize", {
                 alias: "c",
                 type: "number",
-                default: 1024 * 4,
                 description: "Context size to use for the model context",
+                defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
             .option("batchSize", {
@@ -168,6 +172,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
+                defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
             .option("repeatPenalty", {
@@ -224,11 +229,17 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Provide access to environment functions like `getDate` and `getTime`",
                 group: "Optional:"
             })
-            .option("noInfoLog", {
-                alias: "nl",
+            .option("debug", {
+                alias: "d",
                 type: "boolean",
                 default: false,
-                description: "Disable llama.cpp info logs",
+                description: "Print llama.cpp info and debug logs",
+                group: "Optional:"
+            })
+            .option("meter", {
+                type: "boolean",
+                default: false,
+                description: "Log how many tokens were used as input and output for each response",
                 group: "Optional:"
             })
             .option("printTimings", {
@@ -245,14 +256,14 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
-        environmentFunctions, noInfoLog, printTimings
+        environmentFunctions, debug, meter, printTimings
     }) {
         try {
             await RunChat({
                 model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
                 grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                noHistory, environmentFunctions, noInfoLog, printTimings
+                noHistory, environmentFunctions, debug, meter, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -267,15 +278,16 @@ async function RunChat({
     model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
     grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    maxTokens, noHistory, environmentFunctions, noInfoLog, printTimings
+    maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
-    if (noInfoLog)
-        console.info(`${chalk.yellow("Log level:")} warn`);
+    if (debug)
+        console.info(`${chalk.yellow("Log level:")} debug`);
 
+    const llamaLogLevel = debug
+        ? LlamaLogLevel.debug
+        : LlamaLogLevel.warn;
     const llama = await getLlama("lastBuild", {
-        logLevel: noInfoLog
-            ? LlamaLogLevel.warn
-            : LlamaLogLevel.debug
+        logLevel: llamaLogLevel
     });
     const logBatchSize = batchSize != null;
 
@@ -296,18 +308,17 @@ async function RunChat({
         prompt = await fs.readFile(path.resolve(process.cwd(), promptFile), "utf8");
     }
 
-    if (batchSize == null)
-        batchSize = contextSize;
-    else if (batchSize > contextSize) {
+    if (batchSize != null && contextSize != null && batchSize > contextSize) {
         console.warn(chalk.yellow("Batch size is greater than the context size. Batch size will be set to the context size."));
         batchSize = contextSize;
     }
 
     let initialPrompt = prompt ?? null;
-    const model = await withStatusLogs({
+    const model = await withOra({
         loading: chalk.blue("Loading model"),
         success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model")
+        fail: chalk.blue("Failed to load model"),
+        useStatusLogs: debug
     }, async () => {
         try {
             return await llama.loadModel({
@@ -321,15 +332,16 @@ async function RunChat({
             }
         }
     });
-    const context = await withStatusLogs({
+    const context = await withOra({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
-        fail: chalk.blue("Failed to create context")
+        fail: chalk.blue("Failed to create context"),
+        useStatusLogs: debug
     }, async () => {
         try {
             return await model.createContext({
-                contextSize,
-                batchSize,
+                contextSize: contextSize != null ? contextSize : undefined,
+                batchSize: batchSize != null ? batchSize : undefined,
                 threads
             });
         } finally {
@@ -354,52 +366,119 @@ async function RunChat({
     const chatWrapper = resolveChatWrapperBasedOnWrapperTypeName(wrapper, {
         bosString: bos,
         filename: model.filename,
-        typeDescription: model.typeDescription
+        fileInfo: model.fileInfo
     });
+    const contextSequence = context.getSequence();
     const session = new LlamaChatSession({
-        contextSequence: context.getSequence(),
+        contextSequence,
         systemPrompt,
         chatWrapper: chatWrapper
     });
+    let lastTokenMeterState = contextSequence.tokenMeter.getState();
 
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
     if (grammarArg != "text" && jsonSchemaGrammarFilePath != null)
         console.warn(chalk.yellow("Both `grammar` and `jsonSchemaGrammarFile` were specified. `jsonSchemaGrammarFile` will be used."));
 
-    console.info(`${chalk.yellow("Context size:")} ${context.contextSize}`);
-
-    if (logBatchSize)
-        console.info(`${chalk.yellow("Batch size:")} ${context.batchSize}`);
-
-    console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
-    console.info(`${chalk.yellow("Model type:")} ${model.typeDescription}`);
-    console.info(`${chalk.yellow("Model size:")} ${bytes(model.size)}`);
-    console.info(`${chalk.yellow("BOS:")} ${bos}`);
-    console.info(`${chalk.yellow("EOS:")} ${eos}`);
-    console.info(`${chalk.yellow("Chat wrapper:")} ${chatWrapper.wrapperName}`);
-    console.info(`${chalk.yellow("Repeat penalty:")} ${repeatPenalty} (apply to last ${lastTokensRepeatPenalty} tokens)`);
-
-    if (repeatFrequencyPenalty != null)
-        console.info(`${chalk.yellow("Repeat frequency penalty:")} ${repeatFrequencyPenalty}`);
-
-    if (repeatPresencePenalty != null)
-        console.info(`${chalk.yellow("Repeat presence penalty:")} ${repeatPresencePenalty}`);
-
-    if (!penalizeRepeatingNewLine)
-        console.info(`${chalk.yellow("Penalize repeating new line:")} disabled`);
-
-    if (jsonSchemaGrammarFilePath != null)
-        console.info(`${chalk.yellow("JSON schema grammar file:")} ${
-            path.relative(process.cwd(), path.resolve(process.cwd(), jsonSchemaGrammarFilePath))
-        }`);
-    else if (grammarArg !== "text")
-        console.info(`${chalk.yellow("Grammar:")} ${grammarArg}`);
-
     if (environmentFunctions && grammar != null) {
         console.warn(chalk.yellow("Environment functions are disabled since a grammar is already specified"));
         environmentFunctions = false;
     }
+
+    const padTitle = "Context".length + 1;
+    if (llama.gpu !== false) {
+        printInfoLine({
+            title: "GPU",
+            padTitle: padTitle,
+            info: [{
+                title: "Type",
+                value: getPrettyBuildGpuName(llama.gpu)
+            }, {
+                title: "VRAM",
+                value: bytes(llama.getVramState().total)
+            }, {
+                title: "Name",
+                value: llama.getGpuDeviceNames().join(", ")
+            }, {
+                title: "GPU layers",
+                value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
+                    chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
+                }`
+            }]
+        });
+    }
+    printInfoLine({
+        title: "Model",
+        padTitle: padTitle,
+        info: [{
+            title: "Type",
+            value: model.typeDescription
+        }, {
+            title: "Size",
+            value: bytes(model.size)
+        }, {
+            title: "BOS",
+            value: String(bos)
+        }, {
+            title: "EOS",
+            value: String(eos)
+        }, {
+            title: "Train context size",
+            value: String(model.trainContextSize)
+        }]
+    });
+    printInfoLine({
+        title: "Context",
+        padTitle: padTitle,
+        info: [{
+            title: "Size",
+            value: String(context.contextSize)
+        }, {
+            show: logBatchSize,
+            title: "Batch size",
+            value: bytes(context.batchSize)
+        }, {
+            show: meter,
+            title: "Token meter",
+            value: "enabled"
+        }]
+    });
+    printInfoLine({
+        title: "Chat",
+        padTitle: padTitle,
+        info: [{
+            title: "Wrapper",
+            value: chatWrapper.wrapperName
+        }, {
+            title: "Repeat penalty",
+            value: `${repeatPenalty} (apply to last ${lastTokensRepeatPenalty} tokens)`
+        }, {
+            show: repeatFrequencyPenalty != null,
+            title: "Repeat frequency penalty",
+            value: String(repeatFrequencyPenalty)
+        }, {
+            show: repeatPresencePenalty != null,
+            title: "Repeat presence penalty",
+            value: String(repeatPresencePenalty)
+        }, {
+            show: !penalizeRepeatingNewLine,
+            title: "Penalize repeating new line",
+            value: "disabled"
+        }, {
+            show: jsonSchemaGrammarFilePath != null,
+            title: "JSON schema grammar file",
+            value: () => path.relative(process.cwd(), path.resolve(process.cwd(), jsonSchemaGrammarFilePath ?? ""))
+        }, {
+            show: jsonSchemaGrammarFilePath == null && grammarArg !== "text",
+            title: "Grammar",
+            value: grammarArg
+        }, {
+            show: environmentFunctions,
+            title: "Environment functions",
+            value: "enabled"
+        }]
+    });
 
     // this is for ora to not interfere with readline
     await new Promise(resolve => setTimeout(resolve, 1));
@@ -467,8 +546,23 @@ async function RunChat({
         process.stdout.write(endColor);
         console.log();
 
-        if (printTimings)
+        if (printTimings) {
+            if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))
+                llama.logLevel = LlamaLogLevel.info;
+
             await context.printTimings();
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+
+            llama.logLevel = llamaLogLevel;
+        }
+
+        if (meter) {
+            const newTokenMeterState = contextSequence.tokenMeter.getState();
+            const tokenMeterDiff = TokenMeter.diff(newTokenMeterState, lastTokenMeterState);
+            lastTokenMeterState = newTokenMeterState;
+
+            console.info(`${chalk.dim("Input tokens:")} ${String(tokenMeterDiff.usedInputTokens).padEnd(5, " ")}  ${chalk.dim("Output tokens:")} ${tokenMeterDiff.usedOutputTokens}`);
+        }
     }
 }
 

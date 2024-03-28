@@ -161,7 +161,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_METAL
     uint64_t metalDeviceTotal = 0;
     uint64_t metalDeviceUsed = 0;
-    get_metal_gpu_info(&metalDeviceTotal, &metalDeviceUsed);
+    getMetalGpuInfo(&metalDeviceTotal, &metalDeviceUsed);
 
     total += metalDeviceTotal;
     used += metalDeviceUsed;
@@ -170,6 +170,32 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     Napi::Object result = Napi::Object::New(info.Env());
     result.Set("total", Napi::Number::From(info.Env(), total));
     result.Set("used", Napi::Number::From(info.Env(), used));
+
+    return result;
+}
+
+Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
+    std::vector<std::string> deviceNames;
+
+#ifdef GPU_INFO_USE_CUBLAS
+    gpuInfoGetCudaDeviceNames(&deviceNames, logCudaError);
+#endif
+
+#ifdef GPU_INFO_USE_VULKAN
+    gpuInfoGetVulkanDeviceNames(&deviceNames, logVulkanWarning);
+#endif
+
+#ifdef GPU_INFO_USE_METAL
+    getMetalGpuDeviceNames(&deviceNames);
+#endif
+
+    Napi::Object result = Napi::Object::New(info.Env());
+
+    Napi::Array deviceNamesNapiArray = Napi::Array::New(info.Env(), deviceNames.size());
+    for (size_t i = 0; i < deviceNames.size(); ++i) {
+        deviceNamesNapiArray[i] = Napi::String::New(info.Env(), deviceNames[i]);
+    }
+    result.Set("deviceNames", deviceNamesNapiArray);
 
     return result;
 }
@@ -1769,6 +1795,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
+        Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),

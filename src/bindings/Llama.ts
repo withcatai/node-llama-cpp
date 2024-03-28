@@ -193,6 +193,14 @@ export class Llama {
         };
     }
 
+    public getGpuDeviceNames() {
+        this._ensureNotDisposed();
+
+        const {deviceNames} = this._bindings.getGpuDeviceInfo();
+
+        return deviceNames;
+    }
+
     public async loadModel(options: LlamaModelOptions) {
         this._ensureNotDisposed();
 

@@ -1,10 +1,22 @@
 #include <stddef.h>
+#include <vector>
 
 #include <vulkan/vulkan.hpp>
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    return enumerateVulkanDevices(total, used, false, nullptr, warningLogCallback);
+}
+
+bool gpuInfoGetVulkanDeviceNames(std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    size_t vulkanDeviceTotal = 0;
+    size_t vulkanDeviceUsed = 0;
+
+    return enumerateVulkanDevices(&vulkanDeviceTotal, &vulkanDeviceUsed, true, deviceNames, warningLogCallback);
+}
+
+static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
@@ -41,8 +53,14 @@ bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkan
 
             for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
                 if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-                    totalMem += memProps.memoryHeaps[i].size;
+                    const auto size = memProps.memoryHeaps[i].size;
+                    totalMem += size;
                     usedMem += memoryBudgetProperties.heapUsage[i];
+
+                    if (size > 0 && addDeviceNames) {
+                        (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
+                    }
+
                     break;
                 }
             }

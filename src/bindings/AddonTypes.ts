@@ -53,6 +53,9 @@ export type BindingModule = {
         total: number,
         used: number
     },
+    getGpuDeviceInfo(): {
+        deviceNames: string[]
+    },
     getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
     init(): Promise<void>,
     dispose(): Promise<void>

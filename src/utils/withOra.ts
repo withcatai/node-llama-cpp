@@ -7,11 +7,12 @@ export default async function withOra<T>(
     message: string | {
         loading: string,
         success?: string,
-        fail?: string
+        fail?: string,
+        useStatusLogs?: boolean
     },
     callback: () => Promise<T>
 ): Promise<T> {
-    if (isRunningInsideGoogleColab)
+    if (isRunningInsideGoogleColab || (typeof message !== "string" && message.useStatusLogs))
         return withStatusLogs(message, callback);
 
     const spinner = ora({
@@ -19,7 +20,7 @@ export default async function withOra<T>(
         ...(
             typeof message === "string"
                 ? {text: message} satisfies Parameters<typeof ora>[0]
-                : message
+                : {loading: message.loading, success: message.success, fail: message.fail}
         )
     });
 

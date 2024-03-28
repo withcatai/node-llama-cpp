@@ -1,5 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <vector>
 
-void get_metal_gpu_info(uint64_t * total, uint64_t * used);
+void getMetalGpuInfo(uint64_t * total, uint64_t * used);
+void getMetalGpuDeviceNames(std::vector<std::string> * deviceNames);
