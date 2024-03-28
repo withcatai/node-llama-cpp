@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <vector>
+#include <string>
 
 #if defined(GPU_INFO_USE_HIPBLAS)
 #include <hip/hip_runtime.h>
