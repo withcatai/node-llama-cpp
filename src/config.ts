@@ -90,3 +90,4 @@ export const documentationPageUrls = {
     Vulkan: documentationUrl + "/guide/vulkan"
 } as const;
 export const recommendedBaseDockerImage = "node:20";
+export const minAllowedContextSizeInCalculations = 24;

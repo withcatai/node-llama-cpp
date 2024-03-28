@@ -2,7 +2,7 @@ import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
 import {getLlama, LlamaOptions} from "./bindings/getLlama.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
-import {LlamaLogLevel} from "./bindings/types.js";
+import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual} from "./bindings/types.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./evaluator/LlamaGrammar.js";
 import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
@@ -14,7 +14,7 @@ import {
 } from "./evaluator/LlamaEmbeddingContext.js";
 import {
     type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
-    type CustomBatchingPrioritizeStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
+    type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
     type ContextTokensDeleteRange, type EvaluationPriority
 } from "./evaluator/LlamaContext/types.js";
 import {
@@ -29,7 +29,9 @@ import {
 import {
     LlamaCompletion, type LlamaCompletionOptions, type LlamaCompletionGenerationOptions, type LlamaInfillGenerationOptions
 } from "./evaluator/LlamaCompletion.js";
+import {TokenMeter, type TokenMeterState} from "./evaluator/TokenMeter.js";
 import {UnsupportedError} from "./utils/UnsupportedError.js";
+import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
 import {ChatWrapper, type ChatWrapperSettings} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {LlamaChatWrapper} from "./chatWrappers/LlamaChatWrapper.js";
@@ -83,7 +85,7 @@ export {
     type LlamaContextOptions,
     type BatchingOptions,
     type CustomBatchingDispatchSchedule,
-    type CustomBatchingPrioritizeStrategy,
+    type CustomBatchingPrioritizationStrategy,
     type BatchItem,
     type PrioritizedBatchItem,
     type ContextShiftOptions,
@@ -111,7 +113,10 @@ export {
     type LlamaCompletionOptions,
     type LlamaCompletionGenerationOptions,
     type LlamaInfillGenerationOptions,
+    TokenMeter,
+    type TokenMeterState,
     UnsupportedError,
+    InsufficientMemoryError,
     DisposedError,
     ChatWrapper,
     type ChatWrapperSettings,
@@ -157,5 +162,7 @@ export {
     type GbnfJsonEnumSchema,
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,
-    type GbnfJsonArraySchema
+    type GbnfJsonArraySchema,
+    LlamaLogLevelGreaterThan,
+    LlamaLogLevelGreaterThanOrEqual
 };

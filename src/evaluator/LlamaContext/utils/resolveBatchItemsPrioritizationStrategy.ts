@@ -1,8 +1,8 @@
 import {BatchingOptions} from "../types.js";
-import {maximumParallelismStrategy} from "./batchItemsPrioritizingStrategies/maximumParallelismStrategy.js";
-import {firstInFirstOutStrategy} from "./batchItemsPrioritizingStrategies/firstInFirstOutStrategy.js";
+import {maximumParallelismStrategy} from "./batchItemsPrioritizationStrategies/maximumParallelismStrategy.js";
+import {firstInFirstOutStrategy} from "./batchItemsPrioritizationStrategies/firstInFirstOutStrategy.js";
 
-export function resolveBatchItemsPrioritizingStrategy(strategy: Required<BatchingOptions>["itemsPrioritizingStrategy"]) {
+export function resolveBatchItemsPrioritizationStrategy(strategy: Required<BatchingOptions>["itemPrioritizationStrategy"]) {
     if (strategy instanceof Function)
         return strategy;
     else if (strategy === "maximumParallelism")

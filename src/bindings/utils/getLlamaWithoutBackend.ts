@@ -21,7 +21,8 @@ export async function getLlamaWithoutBackend() {
             progressLogs: false,
             logLevel: LlamaLogLevel.error,
             build: "never",
-            usePrebuiltBinaries: true
+            usePrebuiltBinaries: true,
+            vramPadding: 0
         }, {
             skipLlamaInit: true
         });

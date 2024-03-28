@@ -1,23 +1,22 @@
 import fs from "node:fs/promises";
-import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {defaultExtraAllocationSize, ggufDefaultRetryOptions} from "../consts.js";
+import {defaultExtraAllocationSize} from "../consts.js";
 import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFsFileReaderOptions = {
     filePath: string,
-    retryOptions?: retry.Options
+    signal?: AbortSignal
 };
 
 export class GgufFsFileReader extends GgufFileReader {
     public readonly filePath: string;
-    public readonly retryOptions: retry.Options;
+    private readonly _signal?: AbortSignal;
 
-    public constructor({filePath, retryOptions = ggufDefaultRetryOptions}: GgufFsFileReaderOptions) {
+    public constructor({filePath, signal}: GgufFsFileReaderOptions) {
         super();
         this.filePath = filePath;
-        this.retryOptions = retryOptions;
+        this._signal = signal;
     }
 
     public async readByteRange(offset: number | GgufReadOffset, length: number) {
@@ -33,13 +32,14 @@ export class GgufFsFileReader extends GgufFileReader {
     }
 
     private async _readToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
-        return await withLock(this, "modifyBuffer", async () => {
+        return await withLock(this, "modifyBuffer", this._signal, async () => {
             if (endOffset < this._buffer.length)
                 return;
 
-            const missingBytesBuffer = await retry(async () => {
-                return await this._readByteRange(this._buffer.length, endOffset + extraAllocationSize - this._buffer.length);
-            }, this.retryOptions);
+            const missingBytesBuffer = await this._readByteRange(
+                this._buffer.length,
+                endOffset + extraAllocationSize - this._buffer.length
+            );
 
             this._addToBuffer(missingBytesBuffer);
         });
@@ -48,6 +48,9 @@ export class GgufFsFileReader extends GgufFileReader {
     private async _readByteRange(start: number, length: number) {
         const fd = await fs.open(this.filePath, "r");
         try {
+            if (this._signal?.aborted)
+                throw this._signal.reason;
+
             const buffer = Buffer.alloc(length);
             await fd.read(buffer, 0, length, start);
             return buffer;

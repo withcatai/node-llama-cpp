@@ -351,7 +351,7 @@ function orderTypes(sidebar: typeof typedocSidebar) {
         (item) => (
             item.text === "BatchItem" ||
             item.text === "CustomBatchingDispatchSchedule" ||
-            item.text === "CustomBatchingPrioritizeStrategy" ||
+            item.text === "CustomBatchingPrioritizationStrategy" ||
             item.text === "PrioritizedBatchItem"
         ),
         {collapsed: false}

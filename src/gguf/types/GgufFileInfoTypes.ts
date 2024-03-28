@@ -1,8 +1,8 @@
-import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {GgufFileReader} from "../fileReaders/GgufFileReader.js";
-import {MergeOptionalUnionTypes} from "../../utils/mergeUnionTypes.js";
-import {GgufArchitectureType, GgufMetadata} from "./GgufMetadataTypes.js";
-import {GgufTensorInfo} from "./GgufTensorInfoTypes.js";
+import type {GgufReadOffset} from "../utils/GgufReadOffset.js";
+import type {GgufFileReader} from "../fileReaders/GgufFileReader.js";
+import type {MergeOptionalUnionTypes} from "../../utils/mergeUnionTypes.js";
+import type {GgufArchitectureType, GgufMetadata} from "./GgufMetadataTypes.js";
+import type {GgufTensorInfo} from "./GgufTensorInfoTypes.js";
 
 export type MetadataValue = string | number | bigint | boolean | MetadataValue[];
 export type MetadataKeyValueRecord = Record<string, MetadataValue>;
@@ -11,19 +11,19 @@ export type MetadataNestedObject = {
 };
 
 export type GgufFileInfo = {
-    version: 2 | 3 | number,
-    tensorCount: number | bigint,
-    metadata: GgufMetadata,
-    metadataSize: number,
+    readonly version: 2 | 3 | number,
+    readonly tensorCount: number | bigint,
+    readonly metadata: GgufMetadata,
+    readonly metadataSize: number,
 
     /** Same value as `metadata[metadata.general.architecture]`, but with merged types for convenience */
-    architectureMetadata: MergeOptionalUnionTypes<Exclude<GgufMetadata[GgufArchitectureType], undefined>>,
+    readonly architectureMetadata: MergeOptionalUnionTypes<Exclude<GgufMetadata[GgufArchitectureType], undefined>>,
 
     /** can be null if `readTensorInfo` is set to `false` */
-    tensorInfo?: GgufTensorInfo[],
+    readonly tensorInfo?: GgufTensorInfo[],
 
     /** can be null if `readTensorInfo` is set to `false` */
-    tensorInfoSize?: number
+    readonly tensorInfoSize?: number
 };
 
 

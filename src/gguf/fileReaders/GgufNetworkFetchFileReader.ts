@@ -1,25 +1,28 @@
 import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {defaultExtraAllocationSize, ggufDefaultRetryOptions} from "../consts.js";
+import {defaultExtraAllocationSize, ggufDefaultFetchRetryOptions} from "../consts.js";
 import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFetchFileReaderOptions = {
     url: string,
     retryOptions?: retry.Options,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    signal?: AbortSignal
 };
 
 export class GgufNetworkFetchFileReader extends GgufFileReader {
     public readonly url: string;
     public readonly retryOptions: retry.Options;
     public readonly headers: Record<string, string>;
+    private readonly _signal?: AbortSignal;
 
-    public constructor({url, retryOptions = ggufDefaultRetryOptions, headers}: GgufFetchFileReaderOptions) {
+    public constructor({url, retryOptions = ggufDefaultFetchRetryOptions, headers, signal}: GgufFetchFileReaderOptions) {
         super();
         this.url = url;
         this.retryOptions = retryOptions;
         this.headers = headers ?? {};
+        this._signal = signal;
     }
 
     public async readByteRange(offset: number | GgufReadOffset, length: number) {
@@ -35,13 +38,26 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
     }
 
     private async _fetchToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
-        await withLock(this, "modifyBuffer", async () => {
+        await withLock(this, "modifyBuffer", this._signal, async () => {
             if (endOffset < this._buffer.length)
                 return;
 
-            const missingBytesBuffer = await retry(async () => {
-                return await this._fetchByteRange(this._buffer.length, endOffset + extraAllocationSize - this._buffer.length);
+            const missingBytesBuffer = await retry(async (bail) => {
+                try {
+                    return await this._fetchByteRange(this._buffer.length, endOffset + extraAllocationSize - this._buffer.length);
+                } catch (err) {
+                    if (this._signal?.aborted) {
+                        bail(this._signal.reason);
+                        throw this._signal.reason;
+                    }
+
+                    throw err;
+                }
             }, this.retryOptions);
+
+            if (this._signal?.aborted)
+                throw this._signal.reason;
+
             this._addToBuffer(missingBytesBuffer);
         });
     }
@@ -52,7 +68,8 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
                 ...this.headers,
                 Range: `bytes=${start}-${start + length}`,
                 accept: "*/*"
-            }
+            },
+            signal: this._signal
         });
 
         if (!response.ok)

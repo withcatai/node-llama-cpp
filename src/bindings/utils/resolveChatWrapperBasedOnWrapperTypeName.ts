@@ -1,4 +1,3 @@
-import {ModelTypeDescription} from "../AddonTypes.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {LlamaChatWrapper} from "../../chatWrappers/LlamaChatWrapper.js";
 import {AlpacaChatWrapper} from "../../chatWrappers/AlpacaChatWrapper.js";
@@ -7,6 +6,7 @@ import {ChatMLChatWrapper} from "../../chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "../../chatWrappers/FalconChatWrapper.js";
 import {resolveChatWrapperBasedOnModel} from "../../chatWrappers/resolveChatWrapperBasedOnModel.js";
 import {GemmaChatWrapper} from "../../chatWrappers/GemmaChatWrapper.js";
+import {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 export const chatWrapperTypeNames = Object.freeze([
     "auto", "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
@@ -33,15 +33,12 @@ const chatWrapperToConfigType = new Map(
 export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapperTypeName, {
     bosString,
     filename,
-    typeDescription,
+    fileInfo,
     customWrapperSettings
 }: {
     bosString?: string | null,
     filename?: string,
-
-    /** @hidden this type alias is too long in the documentation */
-    typeDescription?: ModelTypeDescription,
-
+    fileInfo?: GgufFileInfo,
     customWrapperSettings?: {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     }
@@ -58,7 +55,7 @@ export function resolveChatWrapperBasedOnWrapperTypeName(configType: ChatWrapper
         const chatWrapper = resolveChatWrapperBasedOnModel({
             bosString,
             filename,
-            typeDescription
+            fileInfo
         });
 
         if (chatWrapper != null) {

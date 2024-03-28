@@ -8,7 +8,7 @@ export function resolveChatWrapper(chatWrapper: "auto" | ChatWrapper, model: Lla
         const chatWrapper = resolveChatWrapperBasedOnModel({
             bosString: model.tokens.bosString,
             filename: model.filename,
-            typeDescription: model.typeDescription
+            fileInfo: model.fileInfo
         });
 
         if (chatWrapper != null)

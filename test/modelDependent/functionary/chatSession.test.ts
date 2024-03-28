@@ -35,5 +35,102 @@ describe("functionary", () => {
 
             expect(res2).to.eql("6+6 equals 12.");
         });
+
+        test("disposing a context sequences removes the current state", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize: 4096
+            });
+            const contextSequence = context.getSequence();
+            const chatSession = new LlamaChatSession({
+                contextSequence,
+                autoDisposeSequence: false
+            });
+
+            const res = await chatSession.prompt("How much is 6+6");
+
+            expect(res).to.eql("6+6 equals 12.");
+            const tokenMeterState = contextSequence.tokenMeter.getState();
+            expect(tokenMeterState).to.toMatchInlineSnapshot(`
+              {
+                "usedInputTokens": 140,
+                "usedOutputTokens": 17,
+                "usedRestoreStateTokens": 0,
+              }
+            `);
+
+            chatSession.dispose();
+            contextSequence.dispose();
+
+            const contextSequence2 = context.getSequence();
+            const chatSession2 = new LlamaChatSession({
+                contextSequence: contextSequence2
+            });
+
+            const res2 = await chatSession2.prompt("How much is 6+6+6");
+
+            const tokenMeterState2 = contextSequence2.tokenMeter.getState();
+            expect(tokenMeterState2).to.toMatchInlineSnapshot(`
+              {
+                "usedInputTokens": 142,
+                "usedOutputTokens": 19,
+                "usedRestoreStateTokens": 0,
+              }
+            `);
+            expect(tokenMeterState2.usedInputTokens).to.be.greaterThanOrEqual(tokenMeterState.usedInputTokens);
+            expect(res2).to.eql("6+6+6 equals 18.");
+        });
+
+        test("reusing a context sequences utilizes existing state", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize: 4096
+            });
+            const contextSequence = context.getSequence();
+            const chatSession = new LlamaChatSession({
+                contextSequence,
+                autoDisposeSequence: false
+            });
+
+            const res = await chatSession.prompt("How much is 6+6");
+
+            expect(res).to.eql("6+6 equals 12.");
+            const tokenMeterState = contextSequence.tokenMeter.getState();
+            expect(tokenMeterState).to.toMatchInlineSnapshot(`
+              {
+                "usedInputTokens": 140,
+                "usedOutputTokens": 17,
+                "usedRestoreStateTokens": 0,
+              }
+            `);
+
+            chatSession.dispose();
+            const chatSession2 = new LlamaChatSession({
+                contextSequence
+            });
+
+            const res2 = await chatSession2.prompt("How much is 6+6+6");
+
+            const tokenMeterStateDiff = contextSequence.tokenMeter.diff(tokenMeterState);
+            expect(tokenMeterStateDiff).to.toMatchInlineSnapshot(`
+              {
+                "usedInputTokens": 25,
+                "usedOutputTokens": 19,
+                "usedRestoreStateTokens": 0,
+              }
+            `);
+            expect(tokenMeterStateDiff.usedInputTokens).to.be.lessThan(tokenMeterState.usedInputTokens);
+            expect(res2).to.eql("6+6+6 equals 18.");
+        });
     });
 });

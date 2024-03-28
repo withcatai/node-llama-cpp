@@ -1,8 +1,8 @@
 export type GgufTensorInfo = {
-    name: string,
-    dimensions: (number | bigint)[],
-    ggmlType: GgmlType,
-    offset: number | bigint
+    readonly name: string,
+    readonly dimensions: readonly (number | bigint)[],
+    readonly ggmlType: GgmlType,
+    readonly offset: number | bigint
 };
 
 export const enum GgmlType {

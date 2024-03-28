@@ -1,6 +1,6 @@
 import retry from "async-retry";
 
-export const ggufDefaultRetryOptions: retry.Options = {
+export const ggufDefaultFetchRetryOptions: retry.Options = {
     retries: 10,
     factor: 2,
     minTimeout: 1000,

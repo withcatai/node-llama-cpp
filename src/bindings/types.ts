@@ -69,14 +69,28 @@ export enum LlamaLogLevel {
     info = "info",
     debug = "debug"
 }
-export const LlamaLogLevelValues = [
+export const LlamaLogLevelValues = Object.freeze([
     LlamaLogLevel.disabled,
     LlamaLogLevel.fatal,
     LlamaLogLevel.error,
     LlamaLogLevel.warn,
     LlamaLogLevel.info,
     LlamaLogLevel.debug
-] as const;
+] as const);
+
+/**
+ *Check if a log level is higher than another log level
+ */
+export function LlamaLogLevelGreaterThan(a: LlamaLogLevel, b: LlamaLogLevel): boolean {
+    return LlamaLogLevelValues.indexOf(a) < LlamaLogLevelValues.indexOf(b);
+}
+
+/**
+ *Check if a log level is higher than or equal to another log level
+ */
+export function LlamaLogLevelGreaterThanOrEqual(a: LlamaLogLevel, b: LlamaLogLevel): boolean {
+    return LlamaLogLevelValues.indexOf(a) <= LlamaLogLevelValues.indexOf(b);
+}
 
 export const enum LlamaLocks {
     loadToMemory = "loadToMemory"

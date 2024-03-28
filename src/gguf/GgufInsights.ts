@@ -22,6 +22,16 @@ export class GgufInsights {
         this._modelSize = calculateTensorsSize(ggufFileInfo.tensorInfo ?? [], llama);
     }
 
+    /** The context size the model was trained on */
+    public get trainContextSize() {
+        return this.ggufFileInfo.architectureMetadata.context_length;
+    }
+
+    /** The size of an embedding vector the model can produce */
+    public get embeddingVectorSize() {
+        return this.ggufFileInfo.architectureMetadata.embedding_length;
+    }
+
     public get totalLayers() {
         if (this._totalLayers != null)
             return this._totalLayers;
@@ -56,6 +66,8 @@ export class GgufInsights {
         contextSize: number, batchSize: number, modelGpuLayers: number, sequences: number, isEmbeddingContext?: boolean,
         includeGraphOverhead?: boolean
     }): GgufInsightsResourceRequirements {
+        const actualContextSize = contextSize * sequences;
+
         const totalLayers = this.totalLayers;
         const finalGpuLayers = Math.max(0, Math.min(modelGpuLayers ?? totalLayers, totalLayers));
         const finalCpuLayers = totalLayers - finalGpuLayers;
@@ -86,7 +98,7 @@ export class GgufInsights {
         const sKvCell = this._llama._consts.llamaPosSize + sizeTBytes + this._llama._consts.llamaSeqIdSize;
         const kvSelfLength = this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
             ? Math.max(1, sequences)
-            : contextSize;
+            : actualContextSize;
         const sKvCells = kvSelfLength * sKvCell;
 
         const overheadMemory = (
@@ -120,7 +132,7 @@ export class GgufInsights {
                 }, 0);
 
             // magic numbers for estimation. will be improved in the future
-            return totalDimensions * 77.655 * (contextSize / 4096);
+            return totalDimensions * 77.655 * (actualContextSize / 4096);
         };
 
         const graphOverheadMemory = !includeGraphOverhead
@@ -134,13 +146,13 @@ export class GgufInsights {
                 ? (overheadMemory + graphOverheadMemory)
                 : 0
         ) +
-            this._estimateKvMemorySizeInBytes(contextSize, finalCpuLayers);
+            this._estimateKvMemorySizeInBytes(actualContextSize, finalCpuLayers);
         const gpuVram = usingGpu
             ? (
                 overheadMemory +
                 graphOverheadMemory +
                 this._estimateKvMemorySizeInBytes(
-                    contextSize,
+                    actualContextSize,
                     finalGpuLayers < totalLayers
                         ? (finalGpuLayers + 1)
                         : finalGpuLayers

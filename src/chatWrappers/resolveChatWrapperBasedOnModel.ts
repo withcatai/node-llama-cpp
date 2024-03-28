@@ -1,6 +1,4 @@
 import {parseModelFileName} from "../utils/parseModelFileName.js";
-import {parseModelTypeDescription} from "../utils/parseModelTypeDescription.js";
-import {ModelTypeDescription} from "../bindings/AddonTypes.js";
 import {LlamaChatWrapper} from "./LlamaChatWrapper.js";
 import {ChatMLChatWrapper} from "./ChatMLChatWrapper.js";
 import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
@@ -8,6 +6,7 @@ import {FalconChatWrapper} from "./FalconChatWrapper.js";
 import {FunctionaryChatWrapper} from "./FunctionaryChatWrapper.js";
 import {AlpacaChatWrapper} from "./AlpacaChatWrapper.js";
 import {GemmaChatWrapper} from "./GemmaChatWrapper.js";
+import type {GgufFileInfo} from "../gguf/types/GgufFileInfoTypes.js";
 
 
 /**
@@ -16,13 +15,11 @@ import {GemmaChatWrapper} from "./GemmaChatWrapper.js";
 export function resolveChatWrapperBasedOnModel({
     bosString,
     filename,
-    typeDescription
+    fileInfo
 }: {
     bosString?: string | null,
     filename?: string,
-
-    /** @hidden this type alias is too long in the documentation */
-    typeDescription?: ModelTypeDescription
+    fileInfo?: GgufFileInfo
 }) {
     if (filename != null) {
         const {name, subType, fileType} = parseModelFileName(filename);
@@ -59,8 +56,8 @@ export function resolveChatWrapperBasedOnModel({
         }
     }
 
-    if (typeDescription != null) {
-        const {arch} = parseModelTypeDescription(typeDescription);
+    if (fileInfo != null) {
+        const arch = fileInfo.metadata.general?.architecture;
 
         if (arch === "llama")
             return LlamaChatWrapper;

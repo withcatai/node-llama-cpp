@@ -58,7 +58,8 @@ async function logGpuVramUsage(gpu: BuildGpu) {
             gpu: gpu,
             build: "never",
             progressLogs: false,
-            logLevel: LlamaLogLevel.warn
+            logLevel: LlamaLogLevel.warn,
+            vramPadding: 0
         }, {
             skipLlamaInit: true
         });

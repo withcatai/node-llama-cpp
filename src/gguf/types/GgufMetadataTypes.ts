@@ -29,16 +29,16 @@ export const enum GgufArchitectureType {
 }
 
 export type GgufMetadata<A extends GgufArchitectureType = GgufArchitectureType> = {
-    general: GgufMetadataGeneral<A>,
-    tokenizer: GgufMetadataTokenizer
+    readonly general: GgufMetadataGeneral<A>,
+    readonly tokenizer: GgufMetadataTokenizer
 } & (
     GgufArchitectureType extends A ? {
-        [key in GgufArchitectureType]?: key extends keyof GgufMetadataLlmToType
+        readonly [key in GgufArchitectureType]?: key extends keyof GgufMetadataLlmToType
             ? GgufMetadataLlmToType[key]
             : GgufMetadataLlmDefaultArchitectureType
     }
     : {
-        [key in A]: key extends keyof GgufMetadataLlmToType
+        readonly [key in A]: key extends keyof GgufMetadataLlmToType
             ? GgufMetadataLlmToType[key]
             : GgufMetadataLlmDefaultArchitectureType
     }
@@ -94,7 +94,7 @@ export enum GgufFileType {
 
 
 export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectureType> = {
-    architecture: A,
+    readonly architecture: A,
 
     /**
      * The version of the quantization format. Not required if the model is not
@@ -104,7 +104,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * scheme's name (e.g. the quantization scheme is Q5_K, and the quantization
      * version is 4).
      */
-    quantization_version: string,
+    readonly quantization_version: string,
 
     /**
      * the global alignment to use, as described above. This can vary to allow
@@ -112,33 +112,33 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * writers may not write the alignment. If the alignment is not specified,
      * assume it is `32`.
      */
-    alignment?: string,
+    readonly alignment?: string,
 
     /**
      * The name of the model. This should be a human-readable name that can be
      * used to identify the model. It should be unique within the community
      * that the model is defined in.
      */
-    name?: string,
-    author?: string,
+    readonly name?: string,
+    readonly author?: string,
 
     /**
      * URL to the model's homepage. This can be a GitHub repo, a paper, etc.
      */
-    url?: string,
+    readonly url?: string,
 
     /**
      * free-form description of the model including anything that isn't
      * covered by the other fields
      */
-    description?: string,
+    readonly description?: string,
 
     /**
      * License of the model, expressed as a SPDX license expression
      * (e.g. `MIT OR Apache-2.0`). *Should not* include any other information,
      * such as the license text or the URL to the license.
      */
-    license?: string,
+    readonly license?: string,
 
     /**
      * Information about where this model came from. This is useful for tracking
@@ -146,13 +146,13 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * model is modified. For a model that was converted from GGML, for
      * example, these keys would point to the model that was converted from.
      */
-    source?: {
+    readonly source?: {
         /**
          * URL to the source of the model. Can be a GitHub repo, a paper, etc.
          */
-        url?: string,
-        huggingface?: {
-            repository?: string
+        readonly url?: string,
+        readonly huggingface?: {
+            readonly repository?: string
         }
     },
 
@@ -160,7 +160,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * An enumerated value describing the type of the majority of the tensors
      * in the file. Optional; can be inferred from the tensor types.
      */
-    file_type?: GgufFileType | undefined
+    readonly file_type?: GgufFileType | undefined
 };
 
 export const enum GgufMetadataTokenizerTokenType {
@@ -174,27 +174,27 @@ export const enum GgufMetadataTokenizerTokenType {
 }
 
 export type GgufMetadataTokenizer = {
-    ggml: {
-        model: "no_vocab" | "llama" | "gpt2" | "bert" | "replit" | "rwkv" | string,
-        tokens: string[],
-        token_type: GgufMetadataTokenizerTokenType[],
-        token_type_count?: number,
-        scores?: number[],
-        merges?: string[],
-        bos_token_id?: number,
-        eos_token_id?: number,
-        unknown_token_id?: number,
-        separator_token_id?: number,
-        padding_token_id?: number,
-        add_bos_token?: boolean,
-        add_eos_token?: boolean,
-        add_space_prefix?: boolean,
-        added_tokens?: string[]
+    readonly ggml: {
+        readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | "replit" | "rwkv" | string,
+        readonly tokens: readonly string[],
+        readonly token_type: GgufMetadataTokenizerTokenType[],
+        readonly token_type_count?: number,
+        readonly scores?: readonly number[],
+        readonly merges?: readonly string[],
+        readonly bos_token_id?: number,
+        readonly eos_token_id?: number,
+        readonly unknown_token_id?: number,
+        readonly separator_token_id?: number,
+        readonly padding_token_id?: number,
+        readonly add_bos_token?: boolean,
+        readonly add_eos_token?: boolean,
+        readonly add_space_prefix?: boolean,
+        readonly added_tokens?: readonly string[]
     },
-    huggingface?: {
-        json?: string
+    readonly huggingface?: {
+        readonly json?: string
     },
-    chat_template?: string
+    readonly chat_template?: string
 };
 
 export const enum GgufMetadataLlmPoolingType {
@@ -205,216 +205,216 @@ export const enum GgufMetadataLlmPoolingType {
 }
 
 export type GgufMetadataLlmDefaultArchitectureType = {
-    vocab_size?: number,
-    context_length?: number,
-    embedding_length?: number,
-    block_count?: number,
-    feed_forward_length?: number,
-    use_parallel_residual?: boolean,
-    tensor_data_layout?: string,
-    expert_count?: number,
-    expert_used_count?: number,
-    pooling_type?: GgufMetadataLlmPoolingType,
-    logit_scale?: number,
+    readonly vocab_size?: number,
+    readonly context_length?: number,
+    readonly embedding_length?: number,
+    readonly block_count?: number,
+    readonly feed_forward_length?: number,
+    readonly use_parallel_residual?: boolean,
+    readonly tensor_data_layout?: string,
+    readonly expert_count?: number,
+    readonly expert_used_count?: number,
+    readonly pooling_type?: GgufMetadataLlmPoolingType,
+    readonly logit_scale?: number,
 
-    attention?: {
-        head_count?: number,
-        head_count_kv?: number,
-        max_alibi_bias?: number,
-        clamp_kqv?: number,
-        layer_norm_epsilon?: number,
-        layer_norm_rms_epsilon?: number,
-        key_length?: number,
-        value_length?: number,
-        causal?: boolean
+    readonly attention?: {
+        readonly head_count?: number,
+        readonly head_count_kv?: number,
+        readonly max_alibi_bias?: number,
+        readonly clamp_kqv?: number,
+        readonly layer_norm_epsilon?: number,
+        readonly layer_norm_rms_epsilon?: number,
+        readonly key_length?: number,
+        readonly value_length?: number,
+        readonly causal?: boolean
     },
 
-    rope?: {
-        dimension_count?: number,
-        freq_base?: number,
-        scale_linear?: number,
-        scaling?: {
-            type?: "none" | "linear" | "yarn" | string,
-            factor?: number,
-            original_context_length?: number,
-            finetuned?: boolean
+    readonly rope?: {
+        readonly dimension_count?: number,
+        readonly freq_base?: number,
+        readonly scale_linear?: number,
+        readonly scaling?: {
+            readonly type?: "none" | "linear" | "yarn" | string,
+            readonly factor?: number,
+            readonly original_context_length?: number,
+            readonly finetuned?: boolean
         }
     },
 
-    ssm?: {
-        conv_kernel?: number,
-        inner_size?: number,
-        state_size?: number,
-        time_step_rank?: number
+    readonly ssm?: {
+        readonly conv_kernel?: number,
+        readonly inner_size?: number,
+        readonly state_size?: number,
+        readonly time_step_rank?: number
     }
 };
 
 // export type GgufMetadataLlmKeyTypes = {
-//     context_length: number,
-//     embedding_length: number,
-//     block_count: number,
-//     feed_forward_length: number,
-//     use_parallel_residual: boolean,
-//     tensor_data_layout: string,
-//     expert_count: number,
-//     expert_used_count: number,
+//     readonly context_length: number,
+//     readonly embedding_length: number,
+//     readonly block_count: number,
+//     readonly feed_forward_length: number,
+//     readonly use_parallel_residual: boolean,
+//     readonly tensor_data_layout: string,
+//     readonly expert_count: number,
+//     readonly expert_used_count: number,
 //
-//     attention: {
-//         head_count: number,
-//         head_count_kv: number,
-//         max_alibi_bias: number,
-//         clamp_kqv: number,
-//         layer_norm_epsilon: number,
-//         layer_norm_rms_epsilon: number,
-//         key_length: number,
-//         value_length: number
+//     readonly attention: {
+//         readonly head_count: number,
+//         readonly head_count_kv: number,
+//         readonly max_alibi_bias: number,
+//         readonly clamp_kqv: number,
+//         readonly layer_norm_epsilon: number,
+//         readonly layer_norm_rms_epsilon: number,
+//         readonly key_length: number,
+//         readonly value_length: number
 //     },
 //
-//     rope: {
-//         dimension_count: number,
-//         freq_base: number,
-//         scaling: {
-//             type: "none" | "linear" | "yarn" | string,
-//             factor: number,
-//             original_context_length: number,
-//             finetuned: boolean,
-//             scale_linear?: number
+//     readonly rope: {
+//         readonly dimension_count: number,
+//         readonly freq_base: number,
+//         readonly scaling: {
+//             readonly type: "none" | "linear" | "yarn" | string,
+//             readonly factor: number,
+//             readonly original_context_length: number,
+//             readonly finetuned: boolean,
+//             readonly scale_linear?: number
 //         }
 //     },
 //
-//     ssm: {
-//         conv_kernel: number,
-//         inner_size: number,
-//         state_size: number,
-//         time_step_rank: number
+//     readonly ssm: {
+//         readonly conv_kernel: number,
+//         readonly inner_size: number,
+//         readonly state_size: number,
+//         readonly time_step_rank: number
 //     }
 // };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#llama
 export type GgufMetadataLlmLLaMA = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    feed_forward_length: number,
-    attention: {
-        head_count: number,
-        layer_norm_rms_epsilon: number,
-        head_count_kv?: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly feed_forward_length: number,
+    readonly attention: {
+        readonly head_count: number,
+        readonly layer_norm_rms_epsilon: number,
+        readonly head_count_kv?: number
     },
-    rope: {
-        dimension_count: number,
-        scale?: number
+    readonly rope: {
+        readonly dimension_count: number,
+        readonly scale?: number
     },
-    expert_count?: number,
-    expert_used_count?: number,
-    tensor_data_layout?: string
+    readonly expert_count?: number,
+    readonly expert_used_count?: number,
+    readonly tensor_data_layout?: string
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#mpt
 export type GgufMetadataMPT = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    attention: {
-        head_count: number,
-        alibi_bias_max: number,
-        clip_kqv: number,
-        layer_norm_epsilon: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly attention: {
+        readonly head_count: number,
+        readonly alibi_bias_max: number,
+        readonly clip_kqv: number,
+        readonly layer_norm_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-neox
 export type GgufMetadataGPTNeoX = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    use_parallel_residual: boolean,
-    rope: {
-        dimension_count: number,
-        // freq_base: number,
-        scale?: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly use_parallel_residual: boolean,
+    readonly rope: {
+        readonly dimension_count: number,
+        // readonly freq_base: number,
+        readonly scale?: number
     },
-    attention: {
-        head_count: number,
-        layer_norm_epsilon: number
+    readonly attention: {
+        readonly head_count: number,
+        readonly layer_norm_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-j
 export type GgufMetadataGPTJ = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    rope: {
-        dimension_count: number,
-        scale?: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly rope: {
+        readonly dimension_count: number,
+        readonly scale?: number
     },
-    attention: {
-        head_count: number,
-        layer_norm_epsilon: number
+    readonly attention: {
+        readonly head_count: number,
+        readonly layer_norm_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-2
 export type GgufMetadataGPT2 = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    attention: {
-        head_count: number,
-        layer_norm_epsilon: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly attention: {
+        readonly head_count: number,
+        readonly layer_norm_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#bloom
 export type GgufMetadataBloom = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    feed_forward_length: number,
-    attention: {
-        head_count: number,
-        layer_norm_epsilon: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly feed_forward_length: number,
+    readonly attention: {
+        readonly head_count: number,
+        readonly layer_norm_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#falcon
 export type GgufMetadataFalcon = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    attention: {
-        head_count: number,
-        head_count_kv: number,
-        use_norm: boolean,
-        layer_norm_epsilon: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly attention: {
+        readonly head_count: number,
+        readonly head_count_kv: number,
+        readonly use_norm: boolean,
+        readonly layer_norm_epsilon: number
     },
-    tensor_data_layout?: string
+    readonly tensor_data_layout?: string
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#mamba
 export type GgufMetadataMamba = {
-    context_length: number,
-    embedding_length: number,
-    block_count: number,
-    ssm: {
-        conv_kernel: number,
-        inner_size: number,
-        state_size: number,
-        time_step_rank: number
+    readonly context_length: number,
+    readonly embedding_length: number,
+    readonly block_count: number,
+    readonly ssm: {
+        readonly conv_kernel: number,
+        readonly inner_size: number,
+        readonly state_size: number,
+        readonly time_step_rank: number
     },
-    attention: {
-        layer_norm_rms_epsilon: number
+    readonly attention: {
+        readonly layer_norm_rms_epsilon: number
     }
 };
 
 // source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#rwkv
 export type GgufMetadataRWKV = {
-    architecture_version: 4 | number,
-    context_length: number,
-    block_count: number,
-    embedding_length: number,
-    feed_forward_length: number
+    readonly architecture_version: 4 | number,
+    readonly context_length: number,
+    readonly block_count: number,
+    readonly embedding_length: number,
+    readonly feed_forward_length: number
 };
 
 export function isGgufMetadataOfArchitectureType<A extends GgufArchitectureType>(
