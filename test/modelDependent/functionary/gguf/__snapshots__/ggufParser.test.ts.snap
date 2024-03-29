@@ -2,6 +2,21 @@
 
 exports[`gguf > parser > should fetch GGUF metadata 1`] = `
 {
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 32768,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 10000,
+    },
+  },
   "metadata": {
     "general": {
       "architecture": "llama",
@@ -148,6 +163,21 @@ exports[`gguf > parser > should fetch GGUF metadata 1`] = `
 
 exports[`gguf > parser > should parse local gguf model 1`] = `
 {
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 32768,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 10000,
+    },
+  },
   "metadata": {
     "general": {
       "architecture": "llama",
