@@ -5,17 +5,6 @@
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    return enumerateVulkanDevices(total, used, false, nullptr, warningLogCallback);
-}
-
-bool gpuInfoGetVulkanDeviceNames(std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    size_t vulkanDeviceTotal = 0;
-    size_t vulkanDeviceUsed = 0;
-
-    return enumerateVulkanDevices(&vulkanDeviceTotal, &vulkanDeviceUsed, true, deviceNames, warningLogCallback);
-}
-
 static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
@@ -80,4 +69,15 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNa
     *total = totalMem;
     *used = usedMem;
     return true;
+}
+
+bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    return enumerateVulkanDevices(total, used, false, nullptr, warningLogCallback);
+}
+
+bool gpuInfoGetVulkanDeviceNames(std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    size_t vulkanDeviceTotal = 0;
+    size_t vulkanDeviceUsed = 0;
+
+    return enumerateVulkanDevices(&vulkanDeviceTotal, &vulkanDeviceUsed, true, deviceNames, warningLogCallback);
 }
