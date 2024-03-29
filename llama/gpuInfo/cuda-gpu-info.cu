@@ -114,7 +114,7 @@ void gpuInfoGetCudaDeviceNames(std::vector<std::string> * deviceNames, gpuInfoCu
         if (getDevicePropertiesResult != cudaSuccess) {
             errorLogCallback(cudaGetErrorString(getDevicePropertiesResult));
         } else {
-            (*deviceNames)->push_back(std::string(prop.name));
+            (*deviceNames).push_back(std::string(prop.name));
         }
     }
 }
