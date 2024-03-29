@@ -73,8 +73,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 else if (!cmakeCustomOptions.has("LLAMA_METAL"))
                     cmakeCustomOptions.set("LLAMA_METAL", "OFF");
 
-                if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("LLAMA_CUBLAS"))
-                    cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
+                if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("LLAMA_CUDA"))
+                    cmakeCustomOptions.set("LLAMA_CUDA", "1");
 
                 if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("LLAMA_VULKAN"))
                     cmakeCustomOptions.set("LLAMA_VULKAN", "1");

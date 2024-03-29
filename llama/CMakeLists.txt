@@ -29,19 +29,19 @@ include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
-if (LLAMA_CUBLAS)
+if (LLAMA_CUDA)
     cmake_minimum_required(VERSION 3.17)
 
     find_package(CUDAToolkit)
     if (CUDAToolkit_FOUND)
-        message(STATUS "Using cuBLAS for GPU info")
+        message(STATUS "Using CUDA for GPU info")
 
         enable_language(CUDA)
 
         set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS} gpuInfo/cuda-gpu-info.h)
         set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/cuda-gpu-info.cu)
 
-        add_compile_definitions(GPU_INFO_USE_CUBLAS)
+        add_compile_definitions(GPU_INFO_USE_CUDA)
 
         if (LLAMA_STATIC)
             set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
@@ -60,7 +60,7 @@ if (LLAMA_CUBLAS)
             endif()
         endif()
     else()
-        message(FATAL_ERROR "cuBLAS was not found")
+        message(FATAL_ERROR "CUDA was not found")
     endif()
 endif()
 
@@ -100,7 +100,7 @@ if (LLAMA_HIPBLAS)
 
     if (${hipblas_FOUND} AND ${hip_FOUND})
         message(STATUS "Using HIP and hipBLAS for GPU info")
-        add_compile_definitions(GPU_INFO_USE_HIPBLAS GPU_INFO_USE_CUBLAS)
+        add_compile_definitions(GPU_INFO_USE_HIPBLAS GPU_INFO_USE_CUDA)
         add_library(gpu-info-rocm OBJECT gpuInfo/cuda-gpu-info.cu gpuInfo/cuda-gpu-info.h)
         set_source_files_properties(gpuInfo/cuda-gpu-info.cu PROPERTIES LANGUAGE CXX)
         target_link_libraries(gpu-info-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)

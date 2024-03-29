@@ -9,7 +9,7 @@
 #include "llama.h"
 #include "napi.h"
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
 #  include "gpuInfo/cuda-gpu-info.h"
 #endif
 #ifdef GPU_INFO_USE_VULKAN
@@ -121,7 +121,7 @@ std::string addon_model_token_to_piece(const struct llama_model* model, llama_to
     return std::string(result.data(), result.size());
 }
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
 void logCudaError(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
 }
@@ -136,7 +136,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     uint64_t total = 0;
     uint64_t used = 0;
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
     size_t cudaDeviceTotal = 0;
     size_t cudaDeviceUsed = 0;
     bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, logCudaError);
@@ -177,7 +177,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
     std::vector<std::string> deviceNames;
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
     gpuInfoGetCudaDeviceNames(&deviceNames, logCudaError);
 #endif
 
@@ -201,7 +201,7 @@ Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value getGpuType(const Napi::CallbackInfo& info) {
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
     return Napi::String::New(info.Env(), "cuda");
 #endif
 
