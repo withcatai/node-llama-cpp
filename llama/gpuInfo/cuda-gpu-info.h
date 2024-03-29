@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <vector>
+#include <string>
 
 typedef void (*gpuInfoCudaErrorLogCallback_t)(const char* message);
 
