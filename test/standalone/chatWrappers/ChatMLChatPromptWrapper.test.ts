@@ -39,30 +39,26 @@ describe("ChatMLChatWrapper", () => {
           [
             {
               "type": "specialToken",
+              "value": "BOS",
+            },
+            {
+              "type": "specialTokensText",
               "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
             "Hello!",
@@ -76,52 +72,40 @@ describe("ChatMLChatWrapper", () => {
           [
             {
               "type": "specialToken",
+              "value": "BOS",
+            },
+            {
+              "type": "specialTokensText",
               "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
+          <|im_start|>user
           ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
             "I'm good, how are you?",
@@ -142,30 +126,26 @@ describe("ChatMLChatWrapper", () => {
           [
             {
               "type": "specialToken",
+              "value": "BOS",
+            },
+            {
+              "type": "specialTokensText",
               "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
             "Hello!",
@@ -176,41 +156,33 @@ describe("ChatMLChatWrapper", () => {
           [
             {
               "type": "specialToken",
+              "value": "BOS",
+            },
+            {
+              "type": "specialTokensText",
               "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>user
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<|im_end|>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<|im_start|>assistant
+          <|im_start|>assistant
           ",
             },
           ]
