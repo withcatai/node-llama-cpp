@@ -4,7 +4,6 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
-import bytes from "bytes";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
@@ -31,8 +30,10 @@ type ChatCommand = {
     prompt?: string,
     promptFile?: string,
     wrapper: SpecializedChatWrapperTypeName | "auto",
+    noJinja?: boolean,
     contextSize?: number,
     batchSize?: number,
+    noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
     threads: number,
@@ -108,6 +109,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
             })
+            .option("noJinja", {
+                type: "boolean",
+                default: false,
+                description: "Don't use a Jinja wrapper, even if it's the best option for the model",
+                group: "Optional:"
+            })
             .option("contextSize", {
                 alias: "c",
                 type: "number",
@@ -120,6 +127,13 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "b",
                 type: "number",
                 description: "Batch size to use for the model context. The default value is the context size",
+                group: "Optional:"
+            })
+            .option("noTrimWhitespace", {
+                type: "boolean",
+                alias: ["noTrim"],
+                default: false,
+                description: "Don't trim whitespaces from the model response",
                 group: "Optional:"
             })
             .option("grammar", {
@@ -255,17 +269,17 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         model, systemInfo, systemPrompt, systemPromptFile, prompt,
-        promptFile, wrapper, contextSize, batchSize,
-        grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
+        promptFile, wrapper, noJinja, contextSize, batchSize,
+        noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
         environmentFunctions, debug, meter, printTimings
     }) {
         try {
             await RunChat({
-                model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
-                grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
-                repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
+                model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
+                noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers,
+                lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 noHistory, environmentFunctions, debug, meter, printTimings
             });
         } catch (err) {
@@ -278,13 +292,15 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, contextSize, batchSize,
-    grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK, topP, gpuLayers,
-    lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
+    model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
+    noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK, topP,
+    gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
+
+    const trimWhitespace = !noTrimWhitespace;
 
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
@@ -372,7 +388,8 @@ async function RunChat({
         bosString: model.tokens.bosString,
         filename: model.filename,
         fileInfo: model.fileInfo,
-        tokenizer: model.tokenize
+        tokenizer: model.tokenize,
+        noJinja
     }) ?? new GeneralChatWrapper();
     const contextSequence = context.getSequence();
     const session = new LlamaChatSession({
@@ -457,6 +474,7 @@ async function RunChat({
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
+        let hadNoWhitespaceTextInThisIteration = false;
         const input = initialPrompt != null
             ? initialPrompt
             : await getPrompt();
@@ -494,11 +512,22 @@ async function RunChat({
                     ? undefined
                     : maxTokens,
             onToken(chunk) {
-                process.stdout.write(model.detokenize(chunk));
+                const text = model.detokenize(chunk);
+
+                if (trimWhitespace && !hadNoWhitespaceTextInThisIteration) {
+                    const trimmedText = text.trimStart();
+
+                    if (trimmedText.length > 0) {
+                        process.stdout.write(trimmedText);
+                        hadNoWhitespaceTextInThisIteration = true;
+                    }
+                } else
+                    process.stdout.write(text);
             },
             functions: (grammar == null && environmentFunctions)
                 ? defaultEnvironmentFunctions
-                : undefined
+                : undefined,
+            trimWhitespaceSuffix: trimWhitespace
         });
         process.stdout.write(endColor);
         console.log();

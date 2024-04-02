@@ -66,7 +66,12 @@ export type ResolveChatWrapperOptions = {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     },
     warningLogs?: boolean,
-    fallbackToOtherWrappersOnJinjaError?: boolean
+    fallbackToOtherWrappersOnJinjaError?: boolean,
+
+    /**
+     * Don't resolve to a Jinja chat wrapper unless `type` is set to a Jinja chat wrapper type.
+     */
+    noJinja?: boolean
 };
 
 /**
@@ -90,7 +95,8 @@ export function resolveChatWrapper({
     tokenizer,
     customWrapperSettings,
     warningLogs = true,
-    fallbackToOtherWrappersOnJinjaError = true
+    fallbackToOtherWrappersOnJinjaError = true,
+    noJinja = false
 }: ResolveChatWrapperOptions) {
     function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
         specializedChatWrapper: T,
@@ -150,7 +156,7 @@ export function resolveChatWrapper({
 
     const modelJinjaTemplate = customWrapperSettings?.jinjaTemplate?.template ?? fileInfo?.metadata?.tokenizer?.chat_template;
 
-    if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
+    if (!noJinja && modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
         const jinjaTemplateChatWrapperOptions: JinjaTemplateChatWrapperOptions = {
             ...(customWrapperSettings?.jinjaTemplate ?? {}),
             template: modelJinjaTemplate
@@ -200,12 +206,14 @@ export function resolveChatWrapper({
     }
 
     if (filename != null) {
-        const {name, subType, fileType} = parseModelFileName(filename);
+        const {name, subType, fileType, otherInfo} = parseModelFileName(filename);
 
         if (fileType?.toLowerCase() === "gguf") {
             const lowercaseName = name?.toLowerCase();
             const lowercaseSubType = subType?.toLowerCase();
-            const splitLowercaseSubType = lowercaseSubType?.split("-") ?? [];
+            const splitLowercaseSubType = (lowercaseSubType?.split("-") ?? []).concat(
+                otherInfo.map(info => info.toLowerCase())
+            );
             const firstSplitLowercaseSubType = splitLowercaseSubType[0];
 
             if (lowercaseName === "llama") {
