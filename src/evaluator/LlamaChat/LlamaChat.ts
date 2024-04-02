@@ -1146,7 +1146,7 @@ async function getContextWindow({
     return {
         history: compressedHistory,
         stopGenerationTriggers,
-        tokens: contextText .tokenize(model.tokenize),
+        tokens: contextText.tokenize(model.tokenize),
         newResolvedHistory: resolvedHistory,
         newHistoryCompressionMetadata: metadata,
         ignoreStartText: ignoreStartText ?? [],

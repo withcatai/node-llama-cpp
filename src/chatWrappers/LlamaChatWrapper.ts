@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.js";
+import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 export class LlamaChatWrapper extends ChatWrapper {
@@ -87,16 +87,16 @@ export class LlamaChatWrapper extends ChatWrapper {
                     (system.length === 0 && user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("[INST] "),
+                            new SpecialTokensText("[INST] "),
                             system.length === 0
                                 ? LlamaText([])
                                 : LlamaText([
-                                    new SpecialToken("<<SYS>>\n"),
+                                    new SpecialTokensText("<<SYS>>\n"),
                                     system,
-                                    new SpecialToken("\n<</SYS>>\n\n")
+                                    new SpecialTokensText("\n<</SYS>>\n\n")
                                 ]),
                             user,
-                            new SpecialToken(" [/INST] ")
+                            new SpecialTokensText(" [/INST] ")
                         ]),
                     model,
                     this._addSpaceBeforeEos

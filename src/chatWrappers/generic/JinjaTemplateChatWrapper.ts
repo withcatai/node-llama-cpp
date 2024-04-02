@@ -1,7 +1,7 @@
 import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
 import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage} from "../../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../../utils/LlamaText.js";
+import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
@@ -287,7 +287,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const contextText = LlamaText(
             splitJinjaParts.map((part) => {
                 if (typeof part === "string")
-                    return new SpecialToken(part); // things that are not message content can be tokenized with special tokens
+                    return new SpecialTokensText(part); // things that are not message content can be tokenized with special tokens
 
                 const message = idToContent.get(part.separator);
 
@@ -314,7 +314,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                             LlamaText(
                                 stopGenerationJinjaParts.map((part) => {
                                     if (typeof part === "string")
-                                        return new SpecialToken(part);
+                                        return new SpecialTokensText(part);
 
                                     const message = idToContent.get(part.separator);
 

@@ -49,8 +49,8 @@ import {
     type ResolveChatWrapperOptions
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {
-    LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
-    type LlamaTextSpecialTokenJSON
+    LlamaText, SpecialTokensText, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
+    type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
@@ -152,12 +152,13 @@ export {
     templateChatWrapperTypeNames,
     type TemplateChatWrapperTypeName,
     LlamaText,
-    SpecialToken,
+    SpecialTokensText,
     BuiltinSpecialToken,
     isLlamaText,
     tokenizeText,
     type LlamaTextJSON,
     type LlamaTextJSONValue,
+    type LlamaTextSpecialTokensTextJSON,
     type LlamaTextSpecialTokenJSON,
     appendUserMessageToChatHistory,
     getModuleVersion,

@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions, isChatModelResponseFunctionCall} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.js";
+import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {getTypeScriptTypeStringForGbnfJsonSchema} from "../utils/getTypeScriptTypeStringForGbnfJsonSchema.js";
 
 // source: https://github.com/MeetKai/functionary/blob/main/tests/prompt_test_v2.txt
@@ -53,20 +53,20 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                     return LlamaText([
                         isFirstItem
                             ? LlamaText([])
-                            : new SpecialToken("\n"),
-                        new SpecialToken("<|from|>system\n"),
-                        new SpecialToken("<|recipient|>all\n"),
-                        new SpecialToken("<|content|>"),
+                            : new SpecialTokensText("\n"),
+                        new SpecialTokensText("<|from|>system\n"),
+                        new SpecialTokensText("<|recipient|>all\n"),
+                        new SpecialTokensText("<|content|>"),
                         item.text
                     ]);
                 } else if (item.type === "user") {
                     return LlamaText([
                         isFirstItem
                             ? LlamaText([])
-                            : new SpecialToken("\n"),
-                        new SpecialToken("<|from|>user\n"),
-                        new SpecialToken("<|recipient|>all\n"),
-                        new SpecialToken("<|content|>"),
+                            : new SpecialTokensText("\n"),
+                        new SpecialTokensText("<|from|>user\n"),
+                        new SpecialTokensText("<|recipient|>all\n"),
+                        new SpecialTokensText("<|content|>"),
                         item.text
                     ]);
                 } else if (item.type === "model") {
@@ -74,10 +74,10 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         return LlamaText([
                             isFirstItem
                                 ? LlamaText([])
-                                : new SpecialToken("\n"),
-                            new SpecialToken("<|from|>assistant\n"),
-                            new SpecialToken("<|recipient|>all\n"),
-                            new SpecialToken("<|content|>")
+                                : new SpecialTokensText("\n"),
+                            new SpecialTokensText("<|from|>assistant\n"),
+                            new SpecialTokensText("<|recipient|>all\n"),
+                            new SpecialTokensText("<|content|>")
                         ]);
 
                     return LlamaText(
@@ -89,14 +89,14 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                 return LlamaText([
                                     (isFirstItem && isFirstResponse)
                                         ? LlamaText([])
-                                        : new SpecialToken("\n"),
-                                    new SpecialToken("<|from|>assistant\n"),
-                                    new SpecialToken("<|recipient|>all\n"),
-                                    new SpecialToken("<|content|>"),
+                                        : new SpecialTokensText("\n"),
+                                    new SpecialTokensText("<|from|>assistant\n"),
+                                    new SpecialTokensText("<|recipient|>all\n"),
+                                    new SpecialTokensText("<|content|>"),
                                     response,
                                     (isLastResponse && isLastItem)
                                         ? ""
-                                        : new SpecialToken("<|stop|>")
+                                        : new SpecialTokensText("<|stop|>")
                                 ]);
                             else if (isChatModelResponseFunctionCall(response)) {
                                 return LlamaText([
@@ -105,20 +105,20 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                         : LlamaText([
                                             (isFirstItem && isFirstResponse)
                                                 ? LlamaText([])
-                                                : new SpecialToken("\n"),
+                                                : new SpecialTokensText("\n"),
 
-                                            new SpecialToken("<|from|>assistant\n"),
-                                            new SpecialToken("<|recipient|>"), response.name, new SpecialToken("\n"),
-                                            new SpecialToken("<|content|>"),
+                                            new SpecialTokensText("<|from|>assistant\n"),
+                                            new SpecialTokensText("<|recipient|>"), response.name, new SpecialTokensText("\n"),
+                                            new SpecialTokensText("<|content|>"),
                                             response.params === undefined
                                                 ? ""
                                                 : JSON.stringify(response.params),
-                                            new SpecialToken("<|stop|>"),
+                                            new SpecialTokensText("<|stop|>"),
 
-                                            new SpecialToken("\n"),
-                                            new SpecialToken("<|from|>"), response.name, new SpecialToken("\n"),
-                                            new SpecialToken("<|recipient|>all\n"),
-                                            new SpecialToken("<|content|>"),
+                                            new SpecialTokensText("\n"),
+                                            new SpecialTokensText("<|from|>"), response.name, new SpecialTokensText("\n"),
+                                            new SpecialTokensText("<|recipient|>all\n"),
+                                            new SpecialTokensText("<|content|>"),
                                             response.result === undefined
                                                 ? "" // "void"
                                                 : JSON.stringify(response.result)
@@ -127,10 +127,10 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     hasFunctions
                                         ? LlamaText([])
                                         : LlamaText([
-                                            new SpecialToken("\n"),
-                                            new SpecialToken("<|from|>assistant\n"),
-                                            new SpecialToken("<|recipient|>all\n"),
-                                            new SpecialToken("<|content|>")
+                                            new SpecialTokensText("\n"),
+                                            new SpecialTokensText("<|from|>assistant\n"),
+                                            new SpecialTokensText("<|recipient|>all\n"),
+                                            new SpecialTokensText("<|content|>")
                                         ])
                                 ]);
                             }
@@ -151,18 +151,18 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                 contextText,
                 stopGenerationTriggers: [
                     LlamaText(new BuiltinSpecialToken("EOS")),
-                    LlamaText(new SpecialToken("<|stop|>")),
+                    LlamaText(new SpecialTokensText("<|stop|>")),
                     LlamaText(" <|stop|>"),
                     LlamaText("<|stop|>"),
                     LlamaText("\n<|from|>user"),
                     LlamaText("\n<|from|>assistant"),
                     LlamaText("\n<|from|>system"),
 
-                    LlamaText(new SpecialToken(" <|stop|>")),
-                    LlamaText(new SpecialToken("<|stop|>")),
-                    LlamaText(new SpecialToken("\n<|from|>user")),
-                    LlamaText(new SpecialToken("\n<|from|>assistant")),
-                    LlamaText(new SpecialToken("\n<|from|>system"))
+                    LlamaText(new SpecialTokensText(" <|stop|>")),
+                    LlamaText(new SpecialTokensText("<|stop|>")),
+                    LlamaText(new SpecialTokensText("\n<|from|>user")),
+                    LlamaText(new SpecialTokensText("\n<|from|>assistant")),
+                    LlamaText(new SpecialTokensText("\n<|from|>system"))
                 ]
             };
         }
@@ -171,29 +171,29 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             contextText,
             stopGenerationTriggers: [
                 LlamaText(new BuiltinSpecialToken("EOS")),
-                LlamaText(new SpecialToken("<|stop|>")),
+                LlamaText(new SpecialTokensText("<|stop|>")),
 
                 LlamaText(" <|stop|>"),
                 LlamaText("<|stop|>"),
                 LlamaText("\n<|from|>user"),
 
-                LlamaText(new SpecialToken(" <|stop|>")),
-                LlamaText(new SpecialToken("<|stop|>")),
-                LlamaText(new SpecialToken("\n<|from|>user"))
+                LlamaText(new SpecialTokensText(" <|stop|>")),
+                LlamaText(new SpecialTokensText("<|stop|>")),
+                LlamaText(new SpecialTokensText("\n<|from|>user"))
             ],
             ignoreStartText: [
                 LlamaText("\n<|from|>assistant\n<|recipient|>all\n<|content|>"),
-                LlamaText(new SpecialToken("\n<|from|>assistant\n<|recipient|>all\n<|content|>")),
+                LlamaText(new SpecialTokensText("\n<|from|>assistant\n<|recipient|>all\n<|content|>")),
                 LlamaText("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"),
-                LlamaText(new SpecialToken("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"))
+                LlamaText(new SpecialTokensText("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"))
             ],
             functionCall: {
                 initiallyEngaged: true,
                 disengageInitiallyEngaged: [
                     LlamaText("\n<|from|>assistant\n<|recipient|>all\n<|content|>"),
-                    LlamaText(new SpecialToken("\n<|from|>assistant\n<|recipient|>all\n<|content|>")),
+                    LlamaText(new SpecialTokensText("\n<|from|>assistant\n<|recipient|>all\n<|content|>")),
                     LlamaText("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"),
-                    LlamaText(new SpecialToken("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"))
+                    LlamaText(new SpecialTokensText("\n\n<|from|>assistant\n<|recipient|>all\n<|content|>"))
                 ]
             }
         };

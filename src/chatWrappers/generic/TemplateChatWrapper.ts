@@ -1,5 +1,5 @@
 import {ChatHistoryItem, ChatModelFunctions} from "../../types.js";
-import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialToken} from "../../utils/LlamaText.js";
+import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
 import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
@@ -155,9 +155,9 @@ export class TemplateChatWrapper extends ChatWrapper {
         const getHistoryItem = (role: "system" | "user" | "model", text: string, prefix?: string | null) => {
             const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
             return LlamaText([
-                new SpecialToken((prefix ?? "") + roleNamePrefix + role + messagePrefix),
+                new SpecialTokensText((prefix ?? "") + roleNamePrefix + role + messagePrefix),
                 text,
-                new SpecialToken(messageSuffix)
+                new SpecialTokensText(messageSuffix)
             ]);
         };
 
@@ -169,12 +169,14 @@ export class TemplateChatWrapper extends ChatWrapper {
                 const res = LlamaText([
                     isFirstItem
                         ? system.length === 0
-                            ? new SpecialToken((this._parsedChatTemplate.systemPromptPrefix ?? "") + this._parsedChatTemplate.historyPrefix)
+                            ? new SpecialTokensText(
+                                (this._parsedChatTemplate.systemPromptPrefix ?? "") + this._parsedChatTemplate.historyPrefix
+                            )
                             : this._parsedChatTemplate.systemPromptPrefix != null
                                 ? LlamaText([
-                                    new SpecialToken(this._parsedChatTemplate.systemPromptPrefix),
+                                    new SpecialTokensText(this._parsedChatTemplate.systemPromptPrefix),
                                     system,
-                                    new SpecialToken(this._parsedChatTemplate.historyPrefix)
+                                    new SpecialTokensText(this._parsedChatTemplate.historyPrefix)
                                 ])
                                 : getHistoryItem("system", system, this._parsedChatTemplate.historyPrefix)
                         : system.length === 0
@@ -191,21 +193,21 @@ export class TemplateChatWrapper extends ChatWrapper {
                         : !isLastItem
                             ? getHistoryItem("model", model)
                             : LlamaText([
-                                new SpecialToken(this._parsedChatTemplate.completionPrefix),
+                                new SpecialTokensText(this._parsedChatTemplate.completionPrefix),
                                 model
                             ])
                 ]);
 
                 return LlamaText(
                     res.values.reduce((res, value) => {
-                        if (value instanceof SpecialToken) {
+                        if (value instanceof SpecialTokensText) {
                             const lastItem = res[res.length - 1];
 
-                            if (lastItem == null || !(lastItem instanceof SpecialToken))
+                            if (lastItem == null || !(lastItem instanceof SpecialTokensText))
                                 return res.concat([value]);
 
                             return res.slice(0, -1).concat([
-                                new SpecialToken(lastItem.value + value.value)
+                                new SpecialTokensText(lastItem.value + value.value)
                             ]);
                         }
 
@@ -220,7 +222,7 @@ export class TemplateChatWrapper extends ChatWrapper {
             stopGenerationTriggers: [
                 LlamaText(new BuiltinSpecialToken("EOS")),
                 LlamaText(this._parsedChatTemplate.completionSuffix),
-                LlamaText(new SpecialToken(this._parsedChatTemplate.completionSuffix))
+                LlamaText(new SpecialTokensText(this._parsedChatTemplate.completionSuffix))
             ]
         };
     }

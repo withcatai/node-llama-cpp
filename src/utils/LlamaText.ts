@@ -28,15 +28,16 @@ export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
     includes(value: LlamaText): boolean
 };
 
-export type LlamaTextValue = string | SpecialToken;
+export type LlamaTextValue = string | SpecialTokensText | BuiltinSpecialToken;
 
 export type LlamaTextJSON = Array<LlamaTextJSONValue>;
-export type LlamaTextJSONValue = string | LlamaTextSpecialTokenJSON;
-export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string, builtin?: true};
+export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | LlamaTextSpecialTokenJSON;
+export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: string};
+export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 
 export const LlamaText: LlamaTextClass = function LlamaText(
-    strings: TemplateStringsArray | string | string[] | SpecialToken | LlamaText | LlamaText[],
-    ...values: (SpecialToken | string | string[] | number | boolean | LlamaText | LlamaText[])[]
+    strings: TemplateStringsArray | string | string[] | SpecialTokensText | BuiltinSpecialToken | LlamaText | LlamaText[],
+    ...values: (SpecialTokensText | BuiltinSpecialToken | string | string[] | number | boolean | LlamaText | LlamaText[])[]
 ) {
     return createLlamaText(createHistoryFromStringsAndValues(strings, values));
 } as LlamaTextClass;
@@ -45,8 +46,10 @@ LlamaText.fromJSON = function fromJSON(json: LlamaTextJSON) {
         json.map((value) => {
             if (typeof value === "string")
                 return value;
-            else if (SpecialToken.isSpecialTokenJSON(value))
-                return SpecialToken.fromJSON(value);
+            else if (BuiltinSpecialToken.isSpecialTokenJSON(value))
+                return BuiltinSpecialToken.fromJSON(value);
+            else if (SpecialTokensText.isSpecialTokensTextJSON(value))
+                return SpecialTokensText.fromJSON(value);
             else {
                 void (value satisfies never);
                 throw new Error(`Unknown value type: ${value}`);
@@ -69,7 +72,7 @@ LlamaText.compare = function compare(a: LlamaText, b: LlamaText) {
     return true;
 };
 
-export class SpecialToken {
+export class SpecialTokensText {
     public readonly value: string;
 
     public constructor(value: string) {
@@ -84,6 +87,51 @@ export class SpecialToken {
         return tokenizer(this.value, trimLeadingSpace ? "trimLeadingSpace" : true);
     }
 
+    public toJSON(): LlamaTextSpecialTokensTextJSON {
+        return {
+            type: "specialTokensText",
+            value: this.value
+        };
+    }
+
+    public static fromJSON(json: LlamaTextSpecialTokensTextJSON): SpecialTokensText {
+        if (SpecialTokensText.isSpecialTokensTextJSON(json))
+            return new SpecialTokensText(json.value);
+
+        throw new Error(`Invalid JSON for SpecialTokensText: ${JSON.stringify(json)}`);
+    }
+
+    public static isSpecialTokensTextJSON(value: LlamaTextJSONValue): value is LlamaTextSpecialTokensTextJSON {
+        return value != null && typeof value === "object" && value.type === "specialTokensText";
+    }
+
+    /**
+     * Wraps the value with a `SpecialTokensText` only if `shouldWrap` is true
+     */
+    public static wrapIf(shouldWrap: boolean, value: string): SpecialTokensText | string {
+        if (shouldWrap)
+            return new SpecialTokensText(value);
+        else
+            return value;
+    }
+}
+
+export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL";
+export class BuiltinSpecialToken {
+    public readonly value: BuiltinSpecialTokenValue;
+
+    public constructor(value: BuiltinSpecialTokenValue) {
+        this.value = value;
+    }
+
+    public toString() {
+        return this.value;
+    }
+
+    public tokenize(tokenizer: Tokenizer): Token[] {
+        return tokenizer(this.value, "builtin");
+    }
+
     public toJSON(): LlamaTextSpecialTokenJSON {
         return {
             type: "specialToken",
@@ -91,48 +139,15 @@ export class SpecialToken {
         };
     }
 
-    public static fromJSON(json: LlamaTextSpecialTokenJSON): SpecialToken {
-        if (json.builtin)
+    public static fromJSON(json: LlamaTextSpecialTokenJSON): BuiltinSpecialToken {
+        if (BuiltinSpecialToken.isSpecialTokenJSON(json))
             return new BuiltinSpecialToken(json.value as BuiltinSpecialTokenValue);
-        else
-            return new SpecialToken(json.value);
+
+        throw new Error(`Invalid JSON for SpecialToken: ${JSON.stringify(json)}`);
     }
 
     public static isSpecialTokenJSON(value: LlamaTextJSONValue): value is LlamaTextSpecialTokenJSON {
         return value != null && typeof value === "object" && value.type === "specialToken";
-    }
-
-    /**
-     * Wraps the value with a `SpecialToken` only if `shouldWrap` is true
-     */
-    public static wrapIf(shouldWrap: boolean, value: string): SpecialToken | string {
-        if (shouldWrap)
-            return new SpecialToken(value);
-        else
-            return value;
-    }
-}
-
-export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL";
-export class BuiltinSpecialToken extends SpecialToken {
-    public override readonly value: BuiltinSpecialTokenValue;
-
-    public constructor(value: BuiltinSpecialTokenValue) {
-        super(value);
-
-        this.value = value;
-    }
-
-    public override tokenize(tokenizer: Tokenizer): Token[] {
-        return tokenizer(this.value, "builtin");
-    }
-
-    public override toJSON(): LlamaTextSpecialTokenJSON {
-        return {
-            type: "specialToken",
-            value: this.value,
-            builtin: true
-        };
     }
 }
 
@@ -177,7 +192,9 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
     toString(this: LlamaText) {
         return this.values
             .map((value) => {
-                if (value instanceof SpecialToken)
+                if (value instanceof BuiltinSpecialToken)
+                    return value.toString();
+                else if (value instanceof SpecialTokensText)
                     return value.toString();
                 else
                     return value;
@@ -192,7 +209,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
             if (value instanceof BuiltinSpecialToken) {
                 res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer));
                 textToTokenize = "";
-            } else if (value instanceof SpecialToken) {
+            } else if (value instanceof SpecialTokensText) {
                 res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer, res.length > 0 || textToTokenize.length > 0));
                 textToTokenize = "";
             } else
@@ -205,8 +222,10 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
     },
     toJSON(this: LlamaText) {
         return this.values.map((value) => {
-            if (value instanceof SpecialToken)
-                return {type: "specialToken", value: value.value} satisfies LlamaTextJSONValue;
+            if (value instanceof BuiltinSpecialToken)
+                return value.toJSON() satisfies LlamaTextJSONValue;
+            else if (value instanceof SpecialTokensText)
+                return value.toJSON() satisfies LlamaTextJSONValue;
             else
                 return value satisfies LlamaTextJSONValue;
         });
@@ -223,13 +242,13 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
             if (firstValue instanceof BuiltinSpecialToken)
                 break;
 
-            if (firstValue instanceof SpecialToken) {
+            if (firstValue instanceof SpecialTokensText) {
                 const newValue = firstValue.value.trimStart();
                 if (newValue === "") {
                     newValues.shift();
                     continue;
                 } else if (newValue !== firstValue.value) {
-                    newValues[0] = new SpecialToken(newValue);
+                    newValues[0] = new SpecialTokensText(newValue);
                     break;
                 }
 
@@ -260,13 +279,13 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
             if (lastValue instanceof BuiltinSpecialToken)
                 break;
 
-            if (lastValue instanceof SpecialToken) {
+            if (lastValue instanceof SpecialTokensText) {
                 const newValue = lastValue.value.trimEnd();
                 if (newValue === "") {
                     newValues.pop();
                     continue;
                 } else if (newValue !== lastValue.value) {
-                    newValues[newValues.length - 1] = new SpecialToken(newValue);
+                    newValues[newValues.length - 1] = new SpecialTokensText(newValue);
                     break;
                 }
 
@@ -395,9 +414,9 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
     values: LlamaTextInputValue<V>[]
 ): Array<LlamaTextValue> {
     function addItemToRes(res: Array<LlamaTextValue>, item: LlamaTextInputValue) {
-        if (item === undefined || item === "" || (item instanceof SpecialToken && item.value === ""))
+        if (item === undefined || item === "" || (item instanceof SpecialTokensText && item.value === ""))
             return res;
-        else if (typeof item === "string" || item instanceof SpecialToken)
+        else if (typeof item === "string" || item instanceof SpecialTokensText || item instanceof BuiltinSpecialToken)
             return res.concat([item]);
         else if (isLlamaText(item))
             return res.concat(item.values);
@@ -406,7 +425,7 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
                 item.reduce((res, value) => {
                     if (isLlamaText(value))
                         return res.concat(value.values);
-                    else if (value === "" || (value instanceof SpecialToken && value.value === ""))
+                    else if (value === "" || (value instanceof SpecialTokensText && value.value === ""))
                         return res;
 
                     return res.concat([value]);
@@ -434,8 +453,8 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
         if (typeof lastItem === "string" && typeof item === "string") {
             res[res.length - 1] += item;
             return res;
-        } else if (lastItem instanceof SpecialToken && item instanceof SpecialToken) {
-            res[res.length - 1] = new SpecialToken(lastItem.value + item.value);
+        } else if (lastItem instanceof SpecialTokensText && item instanceof SpecialTokensText) {
+            res[res.length - 1] = new SpecialTokensText(lastItem.value + item.value);
             return res;
         }
 
@@ -469,12 +488,11 @@ function isTemplateStringsArray(value: unknown): value is TemplateStringsArray {
 }
 
 function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
-    if (a instanceof SpecialToken && b instanceof SpecialToken) {
-        if (a instanceof BuiltinSpecialToken !== b instanceof BuiltinSpecialToken)
-            return false;
-
+    if (a instanceof SpecialTokensText && b instanceof SpecialTokensText)
         return a.value === b.value;
-    } else if (a !== a)
+    else if (a instanceof BuiltinSpecialToken && b instanceof BuiltinSpecialToken)
+        return a.value === b.value;
+    else if (a !== a)
         return false;
 
     return true;

@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {LlamaText, BuiltinSpecialToken, SpecialToken} from "../utils/LlamaText.js";
+import {LlamaText, BuiltinSpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 
 export class FalconChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Falcon";
@@ -105,27 +105,27 @@ export class FalconChatWrapper extends ChatWrapper {
                         : LlamaText([
                             isFirstItem
                                 ? LlamaText([])
-                                : SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `${this._middleSystemMessageTitle}: `),
+                                : SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, `${this._middleSystemMessageTitle}: `),
                             system,
-                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
+                            SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ]),
 
                     (user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `${this._userMessageTitle}: `),
+                            SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, `${this._userMessageTitle}: `),
                             user,
-                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
+                            SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ]),
 
                     (model.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
-                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `${this._modelResponseTitle}: `),
+                            SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, `${this._modelResponseTitle}: `),
                             model,
                             isLastItem
                                 ? LlamaText([])
-                                : SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
+                                : SpecialTokensText.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ])
                 ]);
             })
@@ -144,9 +144,9 @@ export class FalconChatWrapper extends ChatWrapper {
                     !this._allowSpecialTokensInTitles
                         ? []
                         : [
-                            LlamaText(new SpecialToken(`\n${this._userMessageTitle}:`)),
-                            LlamaText(new SpecialToken(`\n${this._modelResponseTitle}:`)),
-                            LlamaText(new SpecialToken(`\n${this._middleSystemMessageTitle}:`))
+                            LlamaText(new SpecialTokensText(`\n${this._userMessageTitle}:`)),
+                            LlamaText(new SpecialTokensText(`\n${this._modelResponseTitle}:`)),
+                            LlamaText(new SpecialTokensText(`\n${this._middleSystemMessageTitle}:`))
                         ]
                 )
             ]
