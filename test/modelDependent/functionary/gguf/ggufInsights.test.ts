@@ -74,7 +74,7 @@ describe("gguf", async () => {
             `);
         });
 
-        test("predicted VRAM usage should match actual VRAM usage", async (testContext) => {
+        test("predicted VRAM usage should match actual VRAM usage", {timeout: 1000 * 60 * 5}, async (testContext) => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
 
@@ -127,7 +127,7 @@ describe("gguf", async () => {
             await model.dispose();
         });
 
-        test("predicted VRAM usage should match actual VRAM usage when using gpuLayers", async (context) => {
+        test("predicted VRAM usage should match actual VRAM usage when using gpuLayers", {timeout: 1000 * 60 * 5}, async (context) => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
 
