@@ -63,12 +63,14 @@ export class ChatMLChatWrapper extends ChatWrapper {
 
                 currentAggregateFocus = null;
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
 
         const contextText = LlamaText(
+            new BuiltinSpecialToken("BOS"),
             resultItems.map(({system, user, model}, index) => {
                 const isLastItem = index === resultItems.length - 1;
 

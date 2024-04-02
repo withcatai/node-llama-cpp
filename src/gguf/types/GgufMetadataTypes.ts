@@ -35,12 +35,12 @@ export type GgufMetadata<A extends GgufArchitectureType = GgufArchitectureType> 
     GgufArchitectureType extends A ? {
         readonly [key in GgufArchitectureType]?: key extends keyof GgufMetadataLlmToType
             ? GgufMetadataLlmToType[key]
-            : GgufMetadataLlmDefaultArchitectureType
+            : GgufMetadataDefaultArchitectureType
     }
     : {
         readonly [key in A]: key extends keyof GgufMetadataLlmToType
             ? GgufMetadataLlmToType[key]
-            : GgufMetadataLlmDefaultArchitectureType
+            : GgufMetadataDefaultArchitectureType
     }
 );
 
@@ -197,14 +197,14 @@ export type GgufMetadataTokenizer = {
     readonly chat_template?: string
 };
 
-export const enum GgufMetadataLlmPoolingType {
+export const enum GgufMetadataArchitecturePoolingType {
     unspecified = -1,
     none = 0,
     mean = 1,
     max = 2,
 }
 
-export type GgufMetadataLlmDefaultArchitectureType = {
+export type GgufMetadataDefaultArchitectureType = {
     readonly vocab_size?: number,
     readonly context_length?: number,
     readonly embedding_length?: number,
@@ -214,7 +214,7 @@ export type GgufMetadataLlmDefaultArchitectureType = {
     readonly tensor_data_layout?: string,
     readonly expert_count?: number,
     readonly expert_used_count?: number,
-    readonly pooling_type?: GgufMetadataLlmPoolingType,
+    readonly pooling_type?: GgufMetadataArchitecturePoolingType,
     readonly logit_scale?: number,
 
     readonly attention?: {

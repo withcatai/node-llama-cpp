@@ -7,6 +7,7 @@ import fs from "fs-extra";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
+import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
 
 type InspectGgufCommand = {
     path: string,
@@ -55,7 +56,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
     async handler({path: ggufPath, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile}: InspectGgufCommand) {
         const isPathUrl = ggufPath.startsWith("http://") || ggufPath.startsWith("https://");
         const resolvedGgufPath = isPathUrl
-            ? ggufPath
+            ? normalizeGgufDownloadUrl(ggufPath)
             : path.resolve(ggufPath);
 
         if (!plainJson) {

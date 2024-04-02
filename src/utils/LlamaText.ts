@@ -6,7 +6,8 @@ export type LlamaTextClass = {
         ...values: readonly (V | LlamaText<V> | V2 | LlamaText<V2> | number | boolean |
             readonly (LlamaText<V> | V | LlamaText<V2> | V2)[])[]
     ): LlamaText<V | V2>,
-    fromJSON(json: LlamaTextJSON): LlamaText
+    fromJSON(json: LlamaTextJSON): LlamaText,
+    compare(a: LlamaText, b: LlamaText): boolean
 };
 
 export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
@@ -20,7 +21,11 @@ export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
     joinValues<V extends LlamaTextValue = LlamaTextValue>(separator: LlamaText<V> | V): LlamaText<T | V>,
     toString(): string,
     toJSON(): LlamaTextJSON,
-    tokenize(tokenizer: Tokenizer): Token[]
+    tokenize(tokenizer: Tokenizer): Token[],
+    compare(other: LlamaText): boolean,
+    trimStart(): LlamaText<T>,
+    trimEnd(): LlamaText<T>,
+    includes(value: LlamaText): boolean
 };
 
 export type LlamaTextValue = string | SpecialToken;
@@ -49,6 +54,20 @@ LlamaText.fromJSON = function fromJSON(json: LlamaTextJSON) {
         })
     );
 };
+LlamaText.compare = function compare(a: LlamaText, b: LlamaText) {
+    if (!isLlamaText(a) || !isLlamaText(b))
+        return false;
+
+    if (a.values.length !== b.values.length)
+        return false;
+
+    for (let i = 0; i < a.values.length; i++) {
+        if (!compareLlamaTextValues(a.values[i], b.values[i]))
+            return false;
+    }
+
+    return true;
+};
 
 export class SpecialToken {
     public readonly value: string;
@@ -61,8 +80,8 @@ export class SpecialToken {
         return this.value;
     }
 
-    public tokenize(tokenizer: Tokenizer): Token[] {
-        return tokenizer(this.value, true);
+    public tokenize(tokenizer: Tokenizer, trimLeadingSpace: boolean = false): Token[] {
+        return tokenizer(this.value, trimLeadingSpace ? "trimLeadingSpace" : true);
     }
 
     public toJSON(): LlamaTextSpecialTokenJSON {
@@ -81,6 +100,16 @@ export class SpecialToken {
 
     public static isSpecialTokenJSON(value: LlamaTextJSONValue): value is LlamaTextSpecialTokenJSON {
         return value != null && typeof value === "object" && value.type === "specialToken";
+    }
+
+    /**
+     * Wraps the value with a `SpecialToken` only if `shouldWrap` is true
+     */
+    public static wrapIf(shouldWrap: boolean, value: string): SpecialToken | string {
+        if (shouldWrap)
+            return new SpecialToken(value);
+        else
+            return value;
     }
 }
 
@@ -160,8 +189,11 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
         const res: Token[] = [];
 
         for (const value of this.values) {
-            if (value instanceof SpecialToken) {
+            if (value instanceof BuiltinSpecialToken) {
                 res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer));
+                textToTokenize = "";
+            } else if (value instanceof SpecialToken) {
+                res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer, res.length > 0 || textToTokenize.length > 0));
                 textToTokenize = "";
             } else
                 textToTokenize += value;
@@ -178,6 +210,99 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
             else
                 return value satisfies LlamaTextJSONValue;
         });
+    },
+    compare(this: LlamaText, other: LlamaText) {
+        return LlamaText.compare(this, other);
+    },
+    trimStart(this: LlamaText) {
+        const newValues = this.values.slice();
+
+        while (newValues.length > 0) {
+            const firstValue = newValues[0];
+
+            if (firstValue instanceof BuiltinSpecialToken)
+                break;
+
+            if (firstValue instanceof SpecialToken) {
+                const newValue = firstValue.value.trimStart();
+                if (newValue === "") {
+                    newValues.shift();
+                    continue;
+                } else if (newValue !== firstValue.value) {
+                    newValues[0] = new SpecialToken(newValue);
+                    break;
+                }
+
+                break;
+            } else if (typeof firstValue === "string") {
+                const newValue = firstValue.trimStart();
+                if (newValue === "") {
+                    newValues.shift();
+                    continue;
+                } else if (newValue !== firstValue) {
+                    newValues[0] = newValue;
+                    break;
+                }
+
+                break;
+            } else
+                void (firstValue satisfies never);
+        }
+
+        return createLlamaText(newValues);
+    },
+    trimEnd(this: LlamaText) {
+        const newValues = this.values.slice();
+
+        while (newValues.length > 0) {
+            const lastValue = newValues[newValues.length - 1];
+
+            if (lastValue instanceof BuiltinSpecialToken)
+                break;
+
+            if (lastValue instanceof SpecialToken) {
+                const newValue = lastValue.value.trimEnd();
+                if (newValue === "") {
+                    newValues.pop();
+                    continue;
+                } else if (newValue !== lastValue.value) {
+                    newValues[newValues.length - 1] = new SpecialToken(newValue);
+                    break;
+                }
+
+                break;
+            } else if (typeof lastValue === "string") {
+                const newValue = lastValue.trimEnd();
+                if (newValue === "") {
+                    newValues.pop();
+                    continue;
+                } else if (newValue !== lastValue) {
+                    newValues[newValues.length - 1] = newValue;
+                    break;
+                }
+
+                break;
+            } else
+                void (lastValue satisfies never);
+        }
+
+        return createLlamaText(newValues);
+    },
+    includes(this: LlamaText, value: LlamaText) {
+        for (let i = 0; i < this.values.length; i++) {
+            if (compareLlamaTextValues(this.values[i], value.values[0])) {
+                let j = 1;
+                for (; j < value.values.length; j++) {
+                    if (!compareLlamaTextValues(this.values[i + j], value.values[j]))
+                        break;
+                }
+
+                if (j === value.values.length)
+                    return true;
+            }
+        }
+
+        return false;
     }
 };
 
@@ -235,6 +360,30 @@ function createLlamaText(history: readonly LlamaTextValue[]): LlamaText {
             writable: false,
             configurable: false,
             enumerable: false
+        },
+        ["compare" satisfies keyof LlamaText]: {
+            value: LlamaTextPrototypeFunctions.compare,
+            writable: false,
+            configurable: false,
+            enumerable: false
+        },
+        ["trimStart" satisfies keyof LlamaText]: {
+            value: LlamaTextPrototypeFunctions.trimStart,
+            writable: false,
+            configurable: false,
+            enumerable: false
+        },
+        ["trimEnd" satisfies keyof LlamaText]: {
+            value: LlamaTextPrototypeFunctions.trimEnd,
+            writable: false,
+            configurable: false,
+            enumerable: false
+        },
+        ["includes" satisfies keyof LlamaText]: {
+            value: LlamaTextPrototypeFunctions.includes,
+            writable: false,
+            configurable: false,
+            enumerable: false
         }
     });
 
@@ -269,10 +418,36 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
         return item satisfies never;
     }
 
+    function squashAdjacentItems(res: Array<LlamaTextValue>, item: LlamaTextValue) {
+        if (res.length === 0) {
+            res.push(item);
+            return res;
+        }
+
+        const lastItem = res[res.length - 1];
+
+        if (lastItem instanceof BuiltinSpecialToken || item instanceof BuiltinSpecialToken) {
+            res.push(item);
+            return res;
+        }
+
+        if (typeof lastItem === "string" && typeof item === "string") {
+            res[res.length - 1] += item;
+            return res;
+        } else if (lastItem instanceof SpecialToken && item instanceof SpecialToken) {
+            res[res.length - 1] = new SpecialToken(lastItem.value + item.value);
+            return res;
+        }
+
+        res.push(item);
+        return res;
+    }
+
     if (!isTemplateStringsArray(strings)) {
         return ([strings] as LlamaTextInputValue[])
             .concat(values)
-            .reduce(addItemToRes, []);
+            .reduce(addItemToRes, [])
+            .reduce(squashAdjacentItems, []);
     }
 
 
@@ -285,10 +460,22 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
             res = addItemToRes(res, values[i]);
     }
 
-    return res;
+    return res.reduce(squashAdjacentItems, []);
 }
 
 function isTemplateStringsArray(value: unknown): value is TemplateStringsArray {
     return value instanceof Array && (value as any as TemplateStringsArray).raw instanceof Array &&
         value.length === (value as any as TemplateStringsArray).raw.length;
+}
+
+function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
+    if (a instanceof SpecialToken && b instanceof SpecialToken) {
+        if (a instanceof BuiltinSpecialToken !== b instanceof BuiltinSpecialToken)
+            return false;
+
+        return a.value === b.value;
+    } else if (a !== a)
+        return false;
+
+    return true;
 }

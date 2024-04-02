@@ -3,6 +3,7 @@ import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
 import {ggufDefaultFetchRetryOptions} from "./consts.js";
+import {normalizeGgufDownloadUrl} from "./utils/normalizeGgufDownloadUrl.js";
 
 
 /**
@@ -50,7 +51,7 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     function createFileReader() {
         if (sourceType === "network" || (sourceType == null && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")))) {
             return new GgufNetworkFetchFileReader({
-                url: pathOrUrl,
+                url: normalizeGgufDownloadUrl(pathOrUrl),
                 retryOptions: fetchRetryOptions,
                 headers: fetchHeaders,
                 signal

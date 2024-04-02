@@ -1,6 +1,5 @@
 import {DisposeAggregator, DisposedError, EventRelay} from "lifecycle-utils";
 import {ChatWrapper} from "../../ChatWrapper.js";
-import {resolveChatWrapper} from "../../utils/resolveChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {ChatHistoryItem, ChatModelFunctions, ChatModelResponse, LLamaContextualRepeatPenalty, Token, Tokenizer} from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
@@ -13,6 +12,8 @@ import {QueuedTokenReleaseLock, TokenStreamRegulator} from "../../utils/TokenStr
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
+import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
+import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -180,7 +181,16 @@ export class LlamaChat {
         );
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
 
-        this._chatWrapper = resolveChatWrapper(chatWrapper, contextSequence.model);
+        this._chatWrapper = chatWrapper === "auto"
+            ? (
+                resolveChatWrapper({
+                    bosString: contextSequence.model.tokens.bosString,
+                    filename: contextSequence.model.filename,
+                    fileInfo: contextSequence.model.fileInfo,
+                    tokenizer: contextSequence.model.tokenize
+                }) ?? new GeneralChatWrapper()
+            )
+            : chatWrapper;
     }
 
     public dispose({disposeSequence = this._autoDisposeSequence}: {disposeSequence?: boolean} = {}) {

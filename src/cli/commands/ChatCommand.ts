@@ -14,13 +14,14 @@ import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
-import {
-    ChatWrapperTypeName, chatWrapperTypeNames, resolveChatWrapperBasedOnWrapperTypeName
-} from "../../bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {
+    resolveChatWrapper, SpecializedChatWrapperTypeName, specializedChatWrapperTypeNames
+} from "../../chatWrappers/utils/resolveChatWrapper.js";
+import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 
 type ChatCommand = {
     model: string,
@@ -29,7 +30,7 @@ type ChatCommand = {
     systemPromptFile?: string,
     prompt?: string,
     promptFile?: string,
-    wrapper: ChatWrapperTypeName,
+    wrapper: SpecializedChatWrapperTypeName | "auto",
     contextSize?: number,
     batchSize?: number,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
@@ -103,7 +104,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "w",
                 type: "string",
                 default: "auto" as ChatCommand["wrapper"],
-                choices: chatWrapperTypeNames,
+                choices: ["auto", ...specializedChatWrapperTypeNames] as const,
                 description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
                 group: "Optional:"
             })
@@ -363,11 +364,13 @@ async function RunChat({
             : undefined;
     const bos = model.tokens.bosString; // bos = beginning of sequence
     const eos = model.tokens.bosString; // eos = end of sequence
-    const chatWrapper = resolveChatWrapperBasedOnWrapperTypeName(wrapper, {
+    const chatWrapper = resolveChatWrapper({
+        type: wrapper,
         bosString: bos,
         filename: model.filename,
-        fileInfo: model.fileInfo
-    });
+        fileInfo: model.fileInfo,
+        tokenizer: model.tokenize
+    }) ?? new GeneralChatWrapper();
     const contextSequence = context.getSequence();
     const session = new LlamaChatSession({
         contextSequence,

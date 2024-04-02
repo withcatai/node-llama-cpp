@@ -8,17 +8,20 @@ export class GeneralChatWrapper extends ChatWrapper {
     /** @internal */ private readonly _userMessageTitle: string;
     /** @internal */ private readonly _modelResponseTitle: string;
     /** @internal */ private readonly _middleSystemMessageTitle: string;
+    /** @internal */ private readonly _allowSpecialTokensInTitles: boolean;
 
     public constructor({
-        userMessageTitle = "Human", modelResponseTitle = "Assistant", middleSystemMessageTitle = "System"
+        userMessageTitle = "Human", modelResponseTitle = "Assistant", middleSystemMessageTitle = "System",
+        allowSpecialTokensInTitles = false
     }: {
-        userMessageTitle?: string, modelResponseTitle?: string, middleSystemMessageTitle?: string
+        userMessageTitle?: string, modelResponseTitle?: string, middleSystemMessageTitle?: string, allowSpecialTokensInTitles?: boolean
     } = {}) {
         super();
 
         this._userMessageTitle = userMessageTitle;
         this._modelResponseTitle = modelResponseTitle;
         this._middleSystemMessageTitle = middleSystemMessageTitle;
+        this._allowSpecialTokensInTitles = allowSpecialTokensInTitles;
     }
 
     public get userMessageTitle() {
@@ -85,7 +88,8 @@ export class GeneralChatWrapper extends ChatWrapper {
 
                 currentAggregateFocus = null;
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
@@ -102,27 +106,27 @@ export class GeneralChatWrapper extends ChatWrapper {
                         : LlamaText([
                             isFirstItem
                                 ? LlamaText([])
-                                : `### ${this._middleSystemMessageTitle}\n`,
+                                : SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `### ${this._middleSystemMessageTitle}\n`),
                             system,
-                            "\n\n"
+                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ]),
 
                     (user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            `### ${this._userMessageTitle}\n`,
+                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `### ${this._userMessageTitle}\n`),
                             user,
-                            "\n\n"
+                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ]),
 
                     (model.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
-                            `### ${this._modelResponseTitle}\n`,
+                            SpecialToken.wrapIf(this._allowSpecialTokensInTitles, `### ${this._modelResponseTitle}\n`),
                             model,
                             isLastItem
                                 ? LlamaText([])
-                                : "\n\n"
+                                : SpecialToken.wrapIf(this._allowSpecialTokensInTitles, "\n\n")
                         ])
                 ]);
             })
@@ -145,8 +149,33 @@ export class GeneralChatWrapper extends ChatWrapper {
 
                 LlamaText(`### ${this._middleSystemMessageTitle}`),
                 LlamaText(`\n### ${this._middleSystemMessageTitle}`),
-                LlamaText(`\n\n### ${this._middleSystemMessageTitle}`)
+                LlamaText(`\n\n### ${this._middleSystemMessageTitle}`),
+
+                ...(
+                    !this._allowSpecialTokensInTitles
+                        ? []
+                        : [
+                            LlamaText(new SpecialToken(`### ${this._userMessageTitle}`)),
+                            LlamaText(new SpecialToken(`\n### ${this._userMessageTitle}`)),
+                            LlamaText(new SpecialToken(`\n\n### ${this._userMessageTitle}`)),
+
+                            LlamaText(new SpecialToken(`### ${this._modelResponseTitle}`)),
+                            LlamaText(new SpecialToken(`\n### ${this._modelResponseTitle}`)),
+                            LlamaText(new SpecialToken(`\n\n### ${this._modelResponseTitle}`)),
+
+                            LlamaText(new SpecialToken(`### ${this._middleSystemMessageTitle}`)),
+                            LlamaText(new SpecialToken(`\n### ${this._middleSystemMessageTitle}`)),
+                            LlamaText(new SpecialToken(`\n\n### ${this._middleSystemMessageTitle}`))
+                        ]
+                )
             ]
         };
+    }
+
+    /** @internal */
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+        return [{
+            allowSpecialTokensInTitles: true
+        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }

@@ -1,7 +1,8 @@
-import {ChatHistoryItem, ChatModelFunctions} from "./types.js";
-import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialToken} from "./utils/LlamaText.js";
-import {ChatWrapper, ChatWrapperSettings} from "./ChatWrapper.js";
-import {parseTextTemplate} from "./utils/parseTextTemplate.js";
+import {ChatHistoryItem, ChatModelFunctions} from "../../types.js";
+import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialToken} from "../../utils/LlamaText.js";
+import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
+import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
+import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
 export type TemplateChatWrapperOptions = {
     template: ChatTemplate,
@@ -12,6 +13,9 @@ export type TemplateChatWrapperOptions = {
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
     joinAdjacentMessagesOfTheSameType?: boolean
 };
+
+type ChatTemplate = `${`${string}{{systemPrompt}}` | ""}${string}{{history}}${string}{{completion}}${string}`;
+type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
 
 /**
  * A chat wrapper based on a simple template.
@@ -69,6 +73,9 @@ export class TemplateChatWrapper extends ChatWrapper {
     }: TemplateChatWrapperOptions) {
         super();
 
+        if (template == null || historyTemplate == null || modelRoleName == null || userRoleName == null)
+            throw new Error("Template chat wrapper settings must have a template, historyTemplate, modelRoleName, and userRoleName.");
+
         this.template = template;
         this.historyTemplate = historyTemplate;
         this.modelRoleName = modelRoleName;
@@ -102,9 +109,9 @@ export class TemplateChatWrapper extends ChatWrapper {
             model: string
         }> = [];
 
-        let systemTexts: string[] = [];
-        let userTexts: string[] = [];
-        let modelTexts: string[] = [];
+        const systemTexts: string[] = [];
+        const userTexts: string[] = [];
+        const modelTexts: string[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
@@ -115,19 +122,10 @@ export class TemplateChatWrapper extends ChatWrapper {
                     model: modelTexts.join("\n\n")
                 });
 
-            systemTexts = [];
-            userTexts = [];
-            modelTexts = [];
+            systemTexts.length = 0;
+            userTexts.length = 0;
+            modelTexts.length = 0;
         }
-
-        const getHistoryItem = (role: "system" | "user" | "model", text: string, prefix?: string | null) => {
-            const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
-            return LlamaText([
-                new SpecialToken((prefix ?? "") + roleNamePrefix + role + messagePrefix),
-                text,
-                new SpecialToken(messageSuffix)
-            ]);
-        };
 
         for (const item of historyWithFunctions) {
             if (item.type === "system") {
@@ -148,10 +146,20 @@ export class TemplateChatWrapper extends ChatWrapper {
 
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
+
+        const getHistoryItem = (role: "system" | "user" | "model", text: string, prefix?: string | null) => {
+            const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
+            return LlamaText([
+                new SpecialToken((prefix ?? "") + roleNamePrefix + role + messagePrefix),
+                text,
+                new SpecialToken(messageSuffix)
+            ]);
+        };
 
         const contextText = LlamaText(
             resultItems.map(({system, user, model}, index) => {
@@ -216,68 +224,6 @@ export class TemplateChatWrapper extends ChatWrapper {
             ]
         };
     }
-}
-
-type ChatTemplate = `${`${string}{{systemPrompt}}` | ""}${string}{{history}}${string}{{completion}}${string}`;
-type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
-
-type ChatHistoryFunctionCallMessageTemplate = [
-    call: `${string}{{functionName}}${string}{{functionParams}}${string}`,
-    result: `${string}{{functionCallResult}}${string}`
-];
-
-function parseFunctionCallMessageTemplate(template?: ChatHistoryFunctionCallMessageTemplate) {
-    if (template == null)
-        return null;
-
-    const [functionCallTemplate, functionCallResultTemplate] = template;
-
-    if (functionCallTemplate == null || functionCallResultTemplate == null)
-        throw new Error("Both function call and function call result templates are required");
-
-    const parsedFunctionCallTemplate = parseTextTemplate(functionCallTemplate, [{
-        text: "{{functionName}}",
-        key: "functionName"
-    }, {
-        text: "{{functionParams}}",
-        key: "functionParams"
-    }]);
-    const parsedFunctionCallResultTemplate = parseTextTemplate(functionCallResultTemplate, [{
-        text: "{{functionCallResult}}",
-        key: "functionCallResult"
-    }]);
-
-    const callPrefix = parsedFunctionCallTemplate.functionName.prefix;
-    const callParamsPrefix = parsedFunctionCallTemplate.functionParams.prefix;
-    const callSuffix = parsedFunctionCallTemplate.functionParams.suffix;
-
-    const resultPrefix = parsedFunctionCallResultTemplate.functionCallResult.prefix;
-    const resultSuffix = parsedFunctionCallResultTemplate.functionCallResult.suffix;
-
-    if (callPrefix.length === 0)
-        throw new Error('Function call template must have text before "{{functionName}}"');
-
-    if (callSuffix.length === 0)
-        throw new Error('Function call template must have text after "{{functionParams}}"');
-
-    if (resultPrefix.length === 0)
-        throw new Error('Function call result template must have text before "{{functionCallResult}}"');
-
-    if (resultSuffix.length === 0)
-        throw new Error('Function call result template must have text after "{{functionCallResult}}"');
-
-    return {
-        call: {
-            optionalPrefixSpace: true,
-            prefix: callPrefix,
-            paramsPrefix: callParamsPrefix,
-            suffix: callSuffix
-        },
-        result: {
-            prefix: resultPrefix,
-            suffix: resultSuffix
-        }
-    };
 }
 
 function parseChatTemplate(template: ChatTemplate): {

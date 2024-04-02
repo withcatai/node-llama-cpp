@@ -81,6 +81,7 @@ export type AddonModel = {
     eotToken(): Token,
     getTokenString(token: number): string,
     getTokenType(token: Token): number,
+    getVocabularyType(): number,
     shouldPrependBosToken(): boolean,
     getModelSize(): number
 };

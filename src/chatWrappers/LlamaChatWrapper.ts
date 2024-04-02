@@ -6,6 +6,20 @@ import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.j
 export class LlamaChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "LlamaChat";
 
+    /** @internal */ private readonly _addSpaceBeforeEos: boolean;
+
+    /** @internal */
+    public constructor({
+        _addSpaceBeforeEos = true
+    }: {
+        /** @internal */
+        _addSpaceBeforeEos?: boolean
+    } = {}) {
+        super();
+
+        this._addSpaceBeforeEos = _addSpaceBeforeEos;
+    }
+
     public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
         availableFunctions?: ChatModelFunctions,
         documentFunctionParams?: boolean
@@ -57,7 +71,8 @@ export class LlamaChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
@@ -80,9 +95,12 @@ export class LlamaChatWrapper extends ChatWrapper {
                                     new SpecialToken("\n<</SYS>>\n\n")
                                 ]),
                             user,
-                            new SpecialToken(" [/INST]\n\n")
+                            new SpecialToken(" [/INST] ")
                         ]),
                     model,
+                    this._addSpaceBeforeEos
+                        ? " "
+                        : "",
                     isLastItem
                         ? LlamaText([])
                         : new BuiltinSpecialToken("EOS")
@@ -97,5 +115,12 @@ export class LlamaChatWrapper extends ChatWrapper {
                 LlamaText("</s>")
             ]
         };
+    }
+
+    /** @internal */
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+        return [{}, {
+            _addSpaceBeforeEos: false
+        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }

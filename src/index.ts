@@ -2,7 +2,7 @@ import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
 import {getLlama, LlamaOptions} from "./bindings/getLlama.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
-import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual} from "./bindings/types.js";
+import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType} from "./bindings/types.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./evaluator/LlamaGrammar.js";
 import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
@@ -41,17 +41,20 @@ import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
 import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
-import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./TemplateChatWrapper.js";
-import {resolveChatWrapperBasedOnModel} from "./chatWrappers/resolveChatWrapperBasedOnModel.js";
+import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
+import {JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
 import {
-    resolveChatWrapperBasedOnWrapperTypeName, chatWrapperTypeNames, type ChatWrapperTypeName
-} from "./bindings/utils/resolveChatWrapperBasedOnWrapperTypeName.js";
+    resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
+    type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
+    type ResolveChatWrapperOptions
+} from "./chatWrappers/utils/resolveChatWrapper.js";
 import {
     LlamaText, SpecialToken, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
     type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
+import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -62,6 +65,14 @@ import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
     type GbnfJsonOneOfSchema, type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
 } from "./utils/gbnfJson/types.js";
+import {type GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
+import {
+    type GgufMetadata, type GgufMetadataLlmToType, GgufArchitectureType, GgufFileType, GgufMetadataTokenizerTokenType,
+    GgufMetadataArchitecturePoolingType, type GgufMetadataGeneral, type GgufMetadataTokenizer, type GgufMetadataDefaultArchitectureType,
+    type GgufMetadataLlmLLaMA, type GgufMetadataMPT, type GgufMetadataGPTNeoX, type GgufMetadataGPTJ, type GgufMetadataGPT2,
+    type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, type GgufMetadataRWKV, isGgufMetadataOfArchitectureType
+} from "./gguf/types/GgufMetadataTypes.js";
+import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
 
 
 export {
@@ -130,10 +141,16 @@ export {
     GemmaChatWrapper,
     TemplateChatWrapper,
     type TemplateChatWrapperOptions,
-    resolveChatWrapperBasedOnModel,
-    resolveChatWrapperBasedOnWrapperTypeName,
-    chatWrapperTypeNames,
-    type ChatWrapperTypeName,
+    JinjaTemplateChatWrapper,
+    type JinjaTemplateChatWrapperOptions,
+    resolveChatWrapper,
+    type ResolveChatWrapperOptions,
+    resolvableChatWrapperTypeNames,
+    type ResolvableChatWrapperTypeName,
+    specializedChatWrapperTypeNames,
+    type SpecializedChatWrapperTypeName,
+    templateChatWrapperTypeNames,
+    type TemplateChatWrapperTypeName,
     LlamaText,
     SpecialToken,
     BuiltinSpecialToken,
@@ -163,6 +180,30 @@ export {
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,
     type GbnfJsonArraySchema,
+    LlamaVocabularyType,
     LlamaLogLevelGreaterThan,
-    LlamaLogLevelGreaterThanOrEqual
+    LlamaLogLevelGreaterThanOrEqual,
+    readGgufFileInfo,
+    type GgufFileInfo,
+    type GgufMetadata,
+    type GgufTensorInfo,
+    type GgufMetadataLlmToType,
+    GgufArchitectureType,
+    GgufFileType,
+    GgufMetadataTokenizerTokenType,
+    GgufMetadataArchitecturePoolingType,
+    type GgufMetadataGeneral,
+    type GgufMetadataTokenizer,
+    type GgufMetadataDefaultArchitectureType,
+    type GgufMetadataLlmLLaMA,
+    type GgufMetadataMPT,
+    type GgufMetadataGPTNeoX,
+    type GgufMetadataGPTJ,
+    type GgufMetadataGPT2,
+    type GgufMetadataBloom,
+    type GgufMetadataFalcon,
+    type GgufMetadataMamba,
+    type GgufMetadataRWKV,
+    GgmlType,
+    isGgufMetadataOfArchitectureType
 };

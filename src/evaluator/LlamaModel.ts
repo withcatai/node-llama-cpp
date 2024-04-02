@@ -3,15 +3,17 @@ import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
-import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
+import {AddonModel, ModelTypeDescription} from "../bindings/AddonTypes.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
-import {BuildGpu, LlamaLocks} from "../bindings/types.js";
+import {BuildGpu, LlamaLocks, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../bindings/types.js";
 import {GgufFileInfo} from "../gguf/types/GgufFileInfoTypes.js";
 import {readGgufFileInfo} from "../gguf/readGgufFileInfo.js";
 import {GgufInsights} from "../gguf/GgufInsights.js";
 import {findBestOption} from "../utils/findBestOption.js";
 import {InsufficientMemoryError} from "../utils/InsufficientMemoryError.js";
 import {minAllowedContextSizeInCalculations} from "../config.js";
+import {GgufMetadataTokenizerTokenType} from "../gguf/types/GgufMetadataTypes.js";
+import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {LlamaContextOptions} from "./LlamaContext/types.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize, LlamaContext} from "./LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
@@ -92,6 +94,7 @@ export class LlamaModel {
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
+    /** @internal */ private _vocabularyType?: LlamaVocabularyType;
 
     public readonly onDispose = new EventRelay<void>();
 
@@ -215,9 +218,9 @@ export class LlamaModel {
      * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
      * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
      */
-    public tokenize(text: string, specialTokens?: boolean): Token[];
+    public tokenize(text: string, specialTokens?: boolean | "trimLeadingSpace"): Token[];
     public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
-    public tokenize(text: string, specialTokens: boolean | "builtin" = false): Token[] {
+    public tokenize(text: string, specialTokens: boolean | "builtin" | "trimLeadingSpace" = false): Token[] {
         this._ensureNotDisposed();
 
         if (text === "")
@@ -236,6 +239,29 @@ export class LlamaModel {
             throw new Error(`Unknown builtin special token: ${builtinToken}`);
         }
 
+        if (specialTokens === "trimLeadingSpace") {
+            specialTokens = true;
+
+            const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
+                ? [this.tokens.bos, this.tokens.bosString]
+                : (this.tokens.eos != null && this.tokens.eosString != null)
+                    ? [this.tokens.eos, this.tokens.eosString]
+                    : (this.tokens.nl != null && this.tokens.nlString != null)
+                        ? [this.tokens.nl, this.tokens.nlString]
+                        : [null, null];
+
+            if (workaroundToken != null && workaroundTokenString != null) {
+                const tokens = Array.from(this._model.tokenize(workaroundTokenString + text, true)) as Token[];
+                const workaroundTokenIndex = tokens.indexOf(workaroundToken);
+
+                // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
+                    tokens.splice(0, workaroundTokenIndex + 1);
+                    return tokens;
+                }
+            }
+        }
+
         return Array.from(this._model.tokenize(text, specialTokens)) as Token[];
     }
 
@@ -247,6 +273,13 @@ export class LlamaModel {
             return "";
 
         return this._model.detokenize(Uint32Array.from(tokens));
+    }
+
+    public getTokenType(token: Token): GgufMetadataTokenizerTokenType | null {
+        if (this.vocabularyType === LlamaVocabularyType.none)
+            return null;
+
+        return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
     }
 
     public async createContext(options: LlamaContextOptions) {
@@ -299,6 +332,22 @@ export class LlamaModel {
             this._embeddingVectorSize = this._model.getEmbeddingVectorSize();
 
         return this._embeddingVectorSize;
+    }
+
+    public get vocabularyType(): LlamaVocabularyType {
+        this._ensureNotDisposed();
+
+        if (this._vocabularyType == null) {
+            const vocabType = this._model.getVocabularyType();
+            this._vocabularyType = LlamaVocabularyTypeValues[vocabType];
+
+            if (this._vocabularyType == null) {
+                console.warn(getConsoleLogPrefix() + "Unknown vocabulary type:", vocabType);
+                this._vocabularyType = LlamaVocabularyType.none;
+            }
+        }
+
+        return this._vocabularyType;
     }
 
     /** @internal */

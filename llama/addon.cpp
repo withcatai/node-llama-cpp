@@ -533,6 +533,16 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
 
             return Napi::Number::From(info.Env(), int32_t(tokenType));
         }
+        Napi::Value GetVocabularyType(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            auto vocabularyType = llama_vocab_type(model);
+
+            return Napi::Number::From(info.Env(), int32_t(vocabularyType));
+        }
         Napi::Value ShouldPrependBosToken(const Napi::CallbackInfo& info) {
             const int addBos = llama_add_bos_token(model);
 
@@ -570,6 +580,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                         InstanceMethod("getTokenType", &AddonModel::GetTokenType),
+                        InstanceMethod("getVocabularyType", &AddonModel::GetVocabularyType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
                         InstanceMethod("getModelSize", &AddonModel::GetModelSize),
                         InstanceMethod("dispose", &AddonModel::Dispose),

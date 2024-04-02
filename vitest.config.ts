@@ -10,6 +10,7 @@ export default defineConfig({
                 minThreads: 1,
                 maxThreads: 1
             }
-        }
+        },
+        snapshotSerializers: ["./test/utils/helpers/llamaTextSerializer.ts"]
     }
 });

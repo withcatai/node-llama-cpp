@@ -185,4 +185,11 @@ export abstract class ChatWrapper {
 
         return {};
     }
+
+    /** @internal */
+    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): Record<string | symbol, any>[] {
+        return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
+    }
 }
+
+type FirstItemOfTupleOrFallback<T extends any[], Fallback> = T extends [infer U, ...any[]] ? U : Fallback;

@@ -78,6 +78,19 @@ export const LlamaLogLevelValues = Object.freeze([
     LlamaLogLevel.debug
 ] as const);
 
+export enum LlamaVocabularyType {
+    none = "none",
+    spm = "spm",
+    bpe = "bpe",
+    wpm = "wpm",
+}
+export const LlamaVocabularyTypeValues = Object.freeze([
+    LlamaVocabularyType.none,
+    LlamaVocabularyType.spm,
+    LlamaVocabularyType.bpe,
+    LlamaVocabularyType.wpm
+] as const);
+
 /**
  *Check if a log level is higher than another log level
  */

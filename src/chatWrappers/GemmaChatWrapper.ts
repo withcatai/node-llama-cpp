@@ -73,7 +73,8 @@ export class GemmaChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();

@@ -6,7 +6,7 @@ export type Token = number & {
 };
 
 export type Tokenizer = {
-    tokenize(text: string, specialTokens?: boolean): Token[],
+    tokenize(text: string, specialTokens?: boolean | "trimLeadingSpace"): Token[],
     tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[]
 }["tokenize"];
 

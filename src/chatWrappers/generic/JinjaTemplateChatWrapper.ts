@@ -1,0 +1,458 @@
+import {Template} from "@huggingface/jinja";
+import {splitText} from "lifecycle-utils";
+import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage} from "../../types.js";
+import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../../utils/LlamaText.js";
+import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
+import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
+
+export type JinjaTemplateChatWrapperOptions = {
+    template: string,
+    modelRoleName?: string,
+    userRoleName?: string,
+    systemRoleName?: string,
+    convertUnsupportedSystemMessagesToUserMessages?: boolean | "auto" | ConvertMessageFormatOptions,
+    functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
+    joinAdjacentMessagesOfTheSameType?: boolean
+};
+
+type ConvertMessageFormatOptions = {
+    use?: "always" | "ifNeeded",
+    format: `${string}{{message}}${string}`
+};
+
+const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: ConvertMessageFormatOptions = {
+    format: "System: {{message}}"
+};
+
+/**
+ * A chat wrapper based on a Jinja template.
+ * Useful for using the original model's Jinja template as-is without any additional conversion work to chat with a model.
+ *
+ * If you want to create a new chat wrapper from scratch, using this chat wrapper is not recommended, and instead you better inherit
+ * from the `ChatWrapper` class and implement a custom chat wrapper of your own in TypeScript.
+ *
+ * For a simpler way to create a chat wrapper, see the `TemplateChatWrapper` class.
+ */
+export class JinjaTemplateChatWrapper extends ChatWrapper {
+    public readonly wrapperName = "JinjaTemplate";
+    public override readonly settings: ChatWrapperSettings;
+
+    public readonly template: string;
+    public readonly modelRoleName: string;
+    public readonly userRoleName: string;
+    public readonly systemRoleName: string;
+    public readonly convertUnsupportedSystemMessagesToUserMessages?: ConvertMessageFormatOptions;
+    public readonly joinAdjacentMessagesOfTheSameType: boolean;
+
+    /** @internal */ private readonly _jinjaTemplate: Template;
+
+    public constructor({
+        template,
+        modelRoleName = "assistant",
+        userRoleName = "user",
+        systemRoleName = "system",
+        convertUnsupportedSystemMessagesToUserMessages = defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
+        functionCallMessageTemplate,
+        joinAdjacentMessagesOfTheSameType = true
+    }: JinjaTemplateChatWrapperOptions) {
+        super();
+
+        if (template == null)
+            throw new Error("template cannot be null");
+
+        this.template = template;
+        this.modelRoleName = modelRoleName;
+        this.userRoleName = userRoleName;
+        this.systemRoleName = systemRoleName;
+        this.convertUnsupportedSystemMessagesToUserMessages =
+            resolveConvertUnsupportedSystemMessagesToUserMessagesOption(convertUnsupportedSystemMessagesToUserMessages);
+        this.joinAdjacentMessagesOfTheSameType = joinAdjacentMessagesOfTheSameType;
+
+        this.settings = {
+            ...super.settings,
+            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
+        };
+
+        if (this.convertUnsupportedSystemMessagesToUserMessages != null && !this.convertUnsupportedSystemMessagesToUserMessages.format.includes("{{message}}"))
+            throw new Error('convertUnsupportedSystemMessagesToUserMessages format must include "{{message}}"');
+
+        this._jinjaTemplate = new Template(this.template);
+        this._runSanityTest();
+    }
+
+    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
+        availableFunctions?: ChatModelFunctions,
+        documentFunctionParams?: boolean
+    } = {}): {
+        contextText: LlamaText,
+        stopGenerationTriggers: LlamaText[]
+    } {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+            documentParams: documentFunctionParams
+        });
+
+        if (this.convertUnsupportedSystemMessagesToUserMessages == null) {
+            return this._generateContextText(historyWithFunctions, {
+                convertSystemMessagesToUserMessagesFormat: undefined
+            });
+        } else if (this.convertUnsupportedSystemMessagesToUserMessages.use === "always") {
+            return this._generateContextText(historyWithFunctions, {
+                convertSystemMessagesToUserMessagesFormat: this.convertUnsupportedSystemMessagesToUserMessages.format
+            });
+        }
+
+        try {
+            return this._generateContextText(historyWithFunctions, {
+                convertSystemMessagesToUserMessagesFormat: undefined
+            });
+        } catch (error) {
+            return this._generateContextText(historyWithFunctions, {
+                convertSystemMessagesToUserMessagesFormat: this.convertUnsupportedSystemMessagesToUserMessages.format
+            });
+        }
+    }
+
+    /** @internal */
+    private _generateContextText(history: readonly ChatHistoryItem[], {
+        convertSystemMessagesToUserMessagesFormat
+    }: {
+        convertSystemMessagesToUserMessagesFormat?: string
+    }): {
+        contextText: LlamaText,
+        stopGenerationTriggers: LlamaText[]
+    } {
+        const transformedHistory = convertSystemMessagesToUserMessagesFormat == null
+            ? history
+            : history.map((item) => {
+                if (item.type === "system")
+                    return {
+                        type: "user",
+                        text: convertSystemMessagesToUserMessagesFormat.replaceAll("{{message}}", item.text)
+                    } satisfies ChatUserMessage;
+
+                return item;
+            });
+
+        const resultItems: Array<{
+            role: "system" | "user" | "model",
+            content: string
+        }> = [];
+
+        const currentTexts: string[] = [];
+        let currentAggregateFocus: "system" | "user" | "model" | null = null;
+
+        function flush() {
+            if (currentTexts.length > 0 && currentAggregateFocus != null)
+                resultItems.push({role: currentAggregateFocus, content: currentTexts.join("\n\n")});
+
+            currentTexts.length = 0;
+        }
+
+        for (const item of transformedHistory) {
+            if (item.type === "system") {
+                if (!this.joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "system")
+                    flush();
+
+                currentAggregateFocus = "system";
+                currentTexts.push(item.text);
+            } else if (item.type === "user") {
+                if (!this.joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "user")
+                    flush();
+
+                currentAggregateFocus = "user";
+                currentTexts.push(item.text);
+            } else if (item.type === "model") {
+                if (!this.joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "model")
+                    flush();
+
+                currentAggregateFocus = "model";
+                currentTexts.push(this.generateModelResponseText(item.response));
+            } else
+                void (item satisfies never);
+        }
+
+        const lastItemIsModelMessage = currentAggregateFocus === "model";
+        flush();
+
+        const idsGenerator = new UniqueTemplateId(
+            this.template + this.modelRoleName + this.userRoleName + this.systemRoleName +
+            (convertSystemMessagesToUserMessagesFormat ?? "") + resultItems.map(({content}) => content).join("\n\n")
+        );
+
+        const jinjaItems: Array<{
+            role: string,
+            content: string
+        }> = [];
+        const jinjaRoleMap = {
+            system: this.systemRoleName,
+            user: this.userRoleName,
+            model: this.modelRoleName
+        } as const;
+        const idToContent = new Map<string, string | BuiltinSpecialToken>();
+        const modelMessageIds = new Set<string>();
+        const messageIds = new Set<string>();
+
+        for (const resultItem of resultItems) {
+            const id = idsGenerator.generateId();
+
+            messageIds.add(id);
+            idToContent.set(id, resultItem.content);
+            jinjaItems.push({
+                role: jinjaRoleMap[resultItem.role],
+                content: id
+            });
+
+            if (resultItem.role === "model")
+                modelMessageIds.add(id);
+        }
+
+        const bosTokenId = idsGenerator.generateId();
+        const eosTokenId = idsGenerator.generateId();
+
+        idToContent.set(bosTokenId, new BuiltinSpecialToken("BOS"));
+        idToContent.set(eosTokenId, new BuiltinSpecialToken("EOS"));
+
+        const renderJinjaText = () => {
+            try {
+                return this._jinjaTemplate.render({
+                    messages: jinjaItems,
+                    "bos_token": bosTokenId,
+                    "eos_token": eosTokenId
+                });
+            } catch (err) {
+                return this._jinjaTemplate.render({
+                    messages: jinjaItems,
+                    "bos_token": bosTokenId,
+                    "eos_token": eosTokenId,
+                    "add_generation_prompt": true
+                });
+            }
+        };
+
+        const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string[]>>) => {
+            const messageIdsLeft = new Set(messageIds);
+
+            for (const part of parts) {
+                if (typeof part === "string")
+                    continue;
+
+                messageIdsLeft.delete(part.separator);
+            }
+
+            if (messageIdsLeft.size !== 0)
+                throw new Error("Some input messages are not present in the generated Jinja template output");
+        };
+
+        const renderJinjaAndSplitIntoParts = () => {
+            const splitJinjaParts = splitText(renderJinjaText(), [...idToContent.keys()]);
+
+            if (lastItemIsModelMessage) {
+                let lastModelResponseIndex = -1;
+
+                for (let i = splitJinjaParts.length - 1; i >= 0; i--) {
+                    const part = splitJinjaParts[i];
+
+                    if (typeof part === "string")
+                        continue;
+
+                    if (modelMessageIds.has(part.separator)) {
+                        lastModelResponseIndex = i;
+                        break;
+                    } else if (messageIds.has(part.separator)) {
+                        validateThatAllMessageIdsAreUsed(splitJinjaParts);
+                        throw new Error("Last message was expected to be a model message, but it was not");
+                    }
+                }
+
+                if (lastModelResponseIndex < 0) {
+                    validateThatAllMessageIdsAreUsed(splitJinjaParts);
+                    throw new Error("A model message was expected to be the last message, but it was not found");
+                }
+
+                return {
+                    splitJinjaParts: splitJinjaParts.slice(0, lastModelResponseIndex + 1),
+                    stopGenerationJinjaParts: splitJinjaParts.slice(lastModelResponseIndex + 1)
+                };
+            }
+
+            return {
+                splitJinjaParts,
+                stopGenerationJinjaParts: []
+            };
+        };
+
+        const {splitJinjaParts, stopGenerationJinjaParts} = renderJinjaAndSplitIntoParts();
+
+        const messageIdsLeftToProcess = new Set(messageIds);
+        const contextText = LlamaText(
+            splitJinjaParts.map((part) => {
+                if (typeof part === "string")
+                    return new SpecialToken(part); // things that are not message content can be tokenized with special tokens
+
+                const message = idToContent.get(part.separator);
+
+                if (message == null)
+                    throw new Error(`Message with id "${part.separator}" not found`);
+
+                messageIdsLeftToProcess.delete(part.separator);
+
+                return message;
+            })
+        );
+
+        if (messageIdsLeftToProcess.size !== 0)
+            throw new Error("Some input messages are not present in the generated Jinja template output");
+
+        return {
+            contextText,
+            stopGenerationTriggers: [
+                LlamaText(new BuiltinSpecialToken("EOS")),
+                ...(
+                    stopGenerationJinjaParts.length === 0
+                        ? []
+                        : [
+                            LlamaText(
+                                stopGenerationJinjaParts.map((part) => {
+                                    if (typeof part === "string")
+                                        return new SpecialToken(part);
+
+                                    const message = idToContent.get(part.separator);
+
+                                    if (message == null)
+                                        throw new Error(`Message with id "${part.separator}" not found`);
+
+                                    return message;
+                                })
+                            )
+                        ]
+                )
+            ]
+        };
+    }
+
+    /**
+     * Validate that this Jinja template can be rendered
+     * @internal
+     */
+    private _runSanityTest() {
+        try {
+            for (const chatHistory of chatHistoriesForSanityTest) {
+                this.generateContextText(chatHistory);
+            }
+        } catch (err) {
+            throw new Error("The provided Jinja template failed that sanity test: " + String(err));
+        }
+    }
+}
+
+class UniqueTemplateId {
+    public readonly antiText: string;
+    private readonly _ids = new Set<string>();
+
+    public constructor(antiText: string) {
+        this.antiText = antiText;
+    }
+
+    public generateId(): string {
+        let id: string;
+
+        do {
+            id = "W" + (Math.random()
+                .toString(36)
+                .slice(2)) + "W";
+        } while (this._ids.has(id) || this.antiText.includes(id));
+
+        this._ids.add(id);
+
+        return id;
+    }
+
+    public removeId(id: string) {
+        this._ids.delete(id);
+    }
+}
+
+function resolveConvertUnsupportedSystemMessagesToUserMessagesOption(
+    convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptions["convertUnsupportedSystemMessagesToUserMessages"]
+): ConvertMessageFormatOptions | undefined {
+    if (convertUnsupportedSystemMessagesToUserMessages === false)
+        return undefined;
+
+    if (convertUnsupportedSystemMessagesToUserMessages === true)
+        return {
+            ...defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
+            use: "always"
+        };
+
+    if (convertUnsupportedSystemMessagesToUserMessages === "auto")
+        return {
+            ...defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
+            use: "ifNeeded"
+        };
+
+    if (typeof convertUnsupportedSystemMessagesToUserMessages === "object")
+        return {
+            ...convertUnsupportedSystemMessagesToUserMessages,
+            use: convertUnsupportedSystemMessagesToUserMessages.use ?? "ifNeeded"
+        };
+
+    return {...defaultConvertUnsupportedSystemMessagesToUserMessagesFormat, use: "ifNeeded"};
+}
+
+const chatHistoriesForSanityTest: ChatHistoryItem[][] = [
+    [{
+        type: "system",
+        text: "System message ~!@#$%^&*()\n*"
+    }, {
+        type: "user",
+        text: "Message 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: [""]
+    }],
+
+    [{
+        type: "system",
+        text: "System message ~!@#$%^&*()\n*"
+    }, {
+        type: "user",
+        text: "Message 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: ["Result 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"]
+    }],
+
+    [{
+        type: "system",
+        text: "System message ~!@#$%^&*()\n*"
+    }, {
+        type: "user",
+        text: "Message 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: ["Result 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"]
+    }, {
+        type: "user",
+        text: "Message2 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: [""]
+    }],
+
+    [{
+        type: "system",
+        text: "System message ~!@#$%^&*()\n*"
+    }, {
+        type: "user",
+        text: "Message 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: ["Result 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"]
+    }, {
+        type: "user",
+        text: "Message2 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"
+    }, {
+        type: "model",
+        response: ["Result2 1234567890!@#$%^&*()_+-=[]{}|\\:;\"',./<>?`~"]
+    }]
+];
