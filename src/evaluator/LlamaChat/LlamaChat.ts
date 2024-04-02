@@ -404,7 +404,7 @@ export class LlamaChat {
                         ignoredStartTextTokens = mostExhaustiveTriggeredStop.stopTrigger
                             .map((stopTrigger) => {
                                 if (typeof stopTrigger === "string")
-                                    return model.tokenize(stopTrigger);
+                                    return model.tokenize(stopTrigger, false, "trimLeadingSpace");
                                 else
                                     return [stopTrigger];
                             })
@@ -413,7 +413,7 @@ export class LlamaChat {
                         const newPendingTokens = mostExhaustiveTriggeredStop.remainingGenerations
                             .map((generation) => {
                                 if (typeof generation === "string")
-                                    return model.tokenize(generation);
+                                    return model.tokenize(generation, false, "trimLeadingSpace");
                                 else
                                     return generation;
                             })
@@ -640,7 +640,9 @@ export class LlamaChat {
                                 ? firstRemainingGenerationAfterStop
                                 : model.detokenize(firstRemainingGenerationAfterStop);
 
-                    functionCallTokens.push(...model.tokenize(this._chatWrapper.settings.functions.call.prefix + remainingTextAfterStop));
+                    functionCallTokens.push(...model.tokenize(
+                        this._chatWrapper.settings.functions.call.prefix + remainingTextAfterStop, false, "trimLeadingSpace"
+                    ));
 
                     for (const functionCallToken of functionCallTokens)
                         context._acceptTokenOnGrammarEvaluationState(functionsEvaluationState, functionCallToken);

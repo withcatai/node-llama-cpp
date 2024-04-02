@@ -248,7 +248,7 @@ export class StopGenerationDetector<T extends string = string> {
                     else if (value instanceof SpecialToken)
                         return value.tokenize(tokenizer);
                     else if (value instanceof SpecialTokensText)
-                        return value.tokenize(tokenizer);
+                        return value.tokenize(tokenizer, true);
 
                     return value satisfies never;
                 })

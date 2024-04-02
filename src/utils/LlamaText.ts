@@ -84,7 +84,7 @@ export class SpecialTokensText {
     }
 
     public tokenize(tokenizer: Tokenizer, trimLeadingSpace: boolean = false): Token[] {
-        return tokenizer(this.value, trimLeadingSpace ? "trimLeadingSpace" : true);
+        return tokenizer(this.value, true, trimLeadingSpace ? "trimLeadingSpace" : undefined);
     }
 
     public toJSON(): LlamaTextSpecialTokensTextJSON {

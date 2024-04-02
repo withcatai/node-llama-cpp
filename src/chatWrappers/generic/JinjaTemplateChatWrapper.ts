@@ -10,9 +10,39 @@ export type JinjaTemplateChatWrapperOptions = {
     modelRoleName?: string,
     userRoleName?: string,
     systemRoleName?: string,
-    convertUnsupportedSystemMessagesToUserMessages?: boolean | "auto" | ConvertMessageFormatOptions,
+
+    /**
+     * Some Jinja templates may not support system messages, and in such cases,
+     * it'll be detected and system messages can be converted to user messages.
+     *
+     * You can specify the format of the converted user message.
+     * - **"auto"**: Convert system messages to user messages only if the template does not support system messages.
+     * - **`true`**: Always convert system messages to user messages.
+     * - **`false`**: Never convert system messages to user messages.
+     * May throw an error if some system messages don't appear in the template.
+     * - **`{use: "ifNeeded", format: "..."}`**: Convert system messages to user messages only if the template does not support system
+     * messages with the specified format.
+     * - **`{use: "always", format: "..."}`**: Always convert system messages to user messages with the specified format.
+     *
+     * Defaults to `"auto"`.
+     */
+    convertUnsupportedSystemMessagesToUserMessages?: "auto" | boolean | ConvertMessageFormatOptions,
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
-    joinAdjacentMessagesOfTheSameType?: boolean
+
+    /**
+     * Whether to join adjacent messages of the same type.
+     * Some Jinja templates may throw an error if this is not set to `true`.
+     *
+     * Defaults to `true`.
+     */
+    joinAdjacentMessagesOfTheSameType?: boolean,
+
+    /**
+     * Whether to trim leading whitespace in responses.
+     *
+     * Defaults to `true`.
+     */
+    trimLeadingWhitespaceInResponses?: boolean
 };
 
 type ConvertMessageFormatOptions = {
@@ -43,6 +73,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly systemRoleName: string;
     public readonly convertUnsupportedSystemMessagesToUserMessages?: ConvertMessageFormatOptions;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
+    public readonly trimLeadingWhitespaceInResponses: boolean;
 
     /** @internal */ private readonly _jinjaTemplate: Template;
 
@@ -53,7 +84,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         systemRoleName = "system",
         convertUnsupportedSystemMessagesToUserMessages = defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
         functionCallMessageTemplate,
-        joinAdjacentMessagesOfTheSameType = true
+        joinAdjacentMessagesOfTheSameType = true,
+        trimLeadingWhitespaceInResponses = true
     }: JinjaTemplateChatWrapperOptions) {
         super();
 
@@ -67,6 +99,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         this.convertUnsupportedSystemMessagesToUserMessages =
             resolveConvertUnsupportedSystemMessagesToUserMessagesOption(convertUnsupportedSystemMessagesToUserMessages);
         this.joinAdjacentMessagesOfTheSameType = joinAdjacentMessagesOfTheSameType;
+        this.trimLeadingWhitespaceInResponses = trimLeadingWhitespaceInResponses;
 
         this.settings = {
             ...super.settings,
@@ -119,7 +152,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         convertSystemMessagesToUserMessagesFormat?: string
     }): {
         contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
+        stopGenerationTriggers: LlamaText[],
+        ignoreStartText?: LlamaText[]
     } {
         const transformedHistory = convertSystemMessagesToUserMessagesFormat == null
             ? history
@@ -305,6 +339,17 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         return {
             contextText,
+            ignoreStartText: !this.trimLeadingWhitespaceInResponses
+                ? []
+                : [
+                    // ignore up to 4 leading spaces
+                    ...Array(4).fill(0)
+                        .map((_, index) => LlamaText(" ".repeat(index + 1))),
+                    LlamaText("\t"),
+                    LlamaText("\t\t"),
+                    LlamaText("\t "),
+                    LlamaText(" \t")
+                ],
             stopGenerationTriggers: [
                 LlamaText(new SpecialToken("EOS")),
                 ...(

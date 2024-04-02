@@ -17,11 +17,11 @@ import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
-import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {
     resolveChatWrapper, SpecializedChatWrapperTypeName, specializedChatWrapperTypeNames
 } from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
+import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 
 type ChatCommand = {
     model: string,
@@ -112,6 +112,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "c",
                 type: "number",
                 description: "Context size to use for the model context",
+                default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
@@ -173,6 +174,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
+                default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
@@ -281,6 +283,9 @@ async function RunChat({
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
+    if (contextSize === -1) contextSize = undefined;
+    if (gpuLayers === -1) gpuLayers = undefined;
+
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
 
@@ -362,11 +367,9 @@ async function RunChat({
         : grammarArg !== "text"
             ? await LlamaGrammar.getFor(llama, grammarArg)
             : undefined;
-    const bos = model.tokens.bosString; // bos = beginning of sequence
-    const eos = model.tokens.bosString; // eos = end of sequence
     const chatWrapper = resolveChatWrapper({
         type: wrapper,
-        bosString: bos,
+        bosString: model.tokens.bosString,
         filename: model.filename,
         fileInfo: model.fileInfo,
         tokenizer: model.tokenize
@@ -390,62 +393,13 @@ async function RunChat({
     }
 
     const padTitle = "Context".length + 1;
-    if (llama.gpu !== false) {
-        printInfoLine({
-            title: "GPU",
-            padTitle: padTitle,
-            info: [{
-                title: "Type",
-                value: getPrettyBuildGpuName(llama.gpu)
-            }, {
-                title: "VRAM",
-                value: bytes(llama.getVramState().total)
-            }, {
-                title: "Name",
-                value: llama.getGpuDeviceNames().join(", ")
-            }, {
-                title: "GPU layers",
-                value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
-                    chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
-                }`
-            }]
-        });
-    }
-    printInfoLine({
-        title: "Model",
-        padTitle: padTitle,
-        info: [{
-            title: "Type",
-            value: model.typeDescription
-        }, {
-            title: "Size",
-            value: bytes(model.size)
-        }, {
-            title: "BOS",
-            value: String(bos)
-        }, {
-            title: "EOS",
-            value: String(eos)
-        }, {
-            title: "Train context size",
-            value: String(model.trainContextSize)
-        }]
-    });
-    printInfoLine({
-        title: "Context",
-        padTitle: padTitle,
-        info: [{
-            title: "Size",
-            value: String(context.contextSize)
-        }, {
-            show: logBatchSize,
-            title: "Batch size",
-            value: bytes(context.batchSize)
-        }, {
-            show: meter,
-            title: "Token meter",
-            value: "enabled"
-        }]
+    printCommonInfoLines({
+        context,
+        minTitleLength: padTitle,
+        printBos: true,
+        printEos: true,
+        logBatchSize,
+        tokenMeterEnabled: meter
     });
     printInfoLine({
         title: "Chat",

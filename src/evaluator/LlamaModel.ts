@@ -218,9 +218,9 @@ export class LlamaModel {
      * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
      * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
      */
-    public tokenize(text: string, specialTokens?: boolean | "trimLeadingSpace"): Token[];
+    public tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[];
     public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
-    public tokenize(text: string, specialTokens: boolean | "builtin" | "trimLeadingSpace" = false): Token[] {
+    public tokenize(text: string, specialTokens: boolean | "builtin" = false, options?: "trimLeadingSpace"): Token[] {
         this._ensureNotDisposed();
 
         if (text === "")
@@ -239,24 +239,35 @@ export class LlamaModel {
             throw new Error(`Unknown builtin special token: ${builtinToken}`);
         }
 
-        if (specialTokens === "trimLeadingSpace") {
-            specialTokens = true;
+        if (options === "trimLeadingSpace") {
+            if (specialTokens) {
+                const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
+                    ? [this.tokens.bos, this.tokens.bosString]
+                    : (this.tokens.eos != null && this.tokens.eosString != null)
+                        ? [this.tokens.eos, this.tokens.eosString]
+                        : (this.tokens.nl != null && this.tokens.nlString != null)
+                            ? [this.tokens.nl, this.tokens.nlString]
+                            : [null, null];
 
-            const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
-                ? [this.tokens.bos, this.tokens.bosString]
-                : (this.tokens.eos != null && this.tokens.eosString != null)
-                    ? [this.tokens.eos, this.tokens.eosString]
-                    : (this.tokens.nl != null && this.tokens.nlString != null)
-                        ? [this.tokens.nl, this.tokens.nlString]
-                        : [null, null];
+                if (workaroundToken != null && workaroundTokenString != null) {
+                    const tokens = Array.from(this._model.tokenize(workaroundTokenString + text, true)) as Token[];
+                    const workaroundTokenIndex = tokens.indexOf(workaroundToken);
 
-            if (workaroundToken != null && workaroundTokenString != null) {
-                const tokens = Array.from(this._model.tokenize(workaroundTokenString + text, true)) as Token[];
-                const workaroundTokenIndex = tokens.indexOf(workaroundToken);
+                    // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                    if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
+                        tokens.splice(0, workaroundTokenIndex + 1);
+                        return tokens;
+                    }
+                }
+            } else {
+                const workaroundTokens = Array.from(this._model.tokenize("\n", false)) as Token[];
+                const workaroundTokensString = "\n";
+
+                const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, false)) as Token[];
 
                 // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
-                if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
-                    tokens.splice(0, workaroundTokenIndex + 1);
+                if (workaroundTokens.length > 0 && workaroundTokens.every((token, index) => tokens[index] === token)) {
+                    tokens.splice(0, workaroundTokens.length);
                     return tokens;
                 }
             }

@@ -11,7 +11,7 @@ import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
-import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 
 type CompleteCommand = {
     model: string,
@@ -70,6 +70,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 alias: "c",
                 type: "number",
                 description: "Context size to use for the model context",
+                default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
@@ -117,6 +118,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
+                default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
@@ -210,6 +212,9 @@ async function RunCompletion({
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
 }: CompleteCommand) {
+    if (contextSize === -1) contextSize = undefined;
+    if (gpuLayers === -1) gpuLayers = undefined;
+
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
 
@@ -284,56 +289,11 @@ async function RunCompletion({
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
     const padTitle = "Complete".length + 1;
-    if (llama.gpu !== false) {
-        printInfoLine({
-            title: "GPU",
-            padTitle: padTitle,
-            info: [{
-                title: "Type",
-                value: getPrettyBuildGpuName(llama.gpu)
-            }, {
-                title: "VRAM",
-                value: bytes(llama.getVramState().total)
-            }, {
-                title: "Name",
-                value: llama.getGpuDeviceNames().join(", ")
-            }, {
-                title: "GPU layers",
-                value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
-                    chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
-                }`
-            }]
-        });
-    }
-    printInfoLine({
-        title: "Model",
-        padTitle: padTitle,
-        info: [{
-            title: "Type",
-            value: model.typeDescription
-        }, {
-            title: "Size",
-            value: bytes(model.size)
-        }, {
-            title: "Train context size",
-            value: String(model.trainContextSize)
-        }]
-    });
-    printInfoLine({
-        title: "Context",
-        padTitle: padTitle,
-        info: [{
-            title: "Size",
-            value: String(context.contextSize)
-        }, {
-            show: logBatchSize,
-            title: "Batch size",
-            value: bytes(context.batchSize)
-        }, {
-            show: meter,
-            title: "Token meter",
-            value: "enabled"
-        }]
+    printCommonInfoLines({
+        context,
+        minTitleLength: padTitle,
+        logBatchSize,
+        tokenMeterEnabled: meter
     });
     printInfoLine({
         title: "Complete",

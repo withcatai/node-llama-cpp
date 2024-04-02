@@ -19,10 +19,23 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
             ...jinjaTemplateWrapperOptions,
             convertUnsupportedSystemMessagesToUserMessages: canTestMultipleConvertSystemMessagesToUserMessages
                 ? false
-                : jinjaTemplateWrapperOptions.convertUnsupportedSystemMessagesToUserMessages
+                : jinjaTemplateWrapperOptions.convertUnsupportedSystemMessagesToUserMessages,
+            trimLeadingWhitespaceInResponses: false
         });
 
         if (checkEquivalence(jinjaChatWrapper, specializedChatWrapper, testChatHistories, tokenizer))
+            return true;
+
+
+        const jinjaChatWrapperWithLeadingWhitespaceTrimming = new JinjaTemplateChatWrapper({
+            ...jinjaTemplateWrapperOptions,
+            convertUnsupportedSystemMessagesToUserMessages: canTestMultipleConvertSystemMessagesToUserMessages
+                ? false
+                : jinjaTemplateWrapperOptions.convertUnsupportedSystemMessagesToUserMessages,
+            trimLeadingWhitespaceInResponses: true
+        });
+
+        if (checkEquivalence(jinjaChatWrapperWithLeadingWhitespaceTrimming, specializedChatWrapper, testChatHistories, tokenizer))
             return true;
     } catch (err) {
         // Do nothing
@@ -38,7 +51,8 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
             convertUnsupportedSystemMessagesToUserMessages: {
                 use: "always",
                 format: convertSystemMessagesToUserMessagesTemplate
-            }
+            },
+            trimLeadingWhitespaceInResponses: false
         });
 
         const transformedTestChatHistories = testChatHistories
@@ -67,6 +81,21 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
             ));
 
         if (checkEquivalence(jinjaChatWrapper, specializedChatWrapper, transformedTestChatHistories, tokenizer))
+            return true;
+
+
+        const jinjaChatWrapperWithLeadingWhitespaceTrimming = new JinjaTemplateChatWrapper({
+            ...jinjaTemplateWrapperOptions,
+            convertUnsupportedSystemMessagesToUserMessages: {
+                use: "always",
+                format: convertSystemMessagesToUserMessagesTemplate
+            },
+            trimLeadingWhitespaceInResponses: true
+        });
+
+        if (checkEquivalence(
+            jinjaChatWrapperWithLeadingWhitespaceTrimming, specializedChatWrapper, transformedTestChatHistories, tokenizer
+        ))
             return true;
     } catch (err) {
         // Do nothing
