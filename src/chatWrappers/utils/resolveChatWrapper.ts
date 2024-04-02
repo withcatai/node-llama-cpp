@@ -239,6 +239,8 @@ export function resolveChatWrapper({
                 return createSpecializedChatWrapper(ChatMLChatWrapper);
             else if (lowercaseName === "gemma")
                 return createSpecializedChatWrapper(GemmaChatWrapper);
+            else if (splitLowercaseSubType.includes("chatml"))
+                return createSpecializedChatWrapper(ChatMLChatWrapper);
         }
     }
 

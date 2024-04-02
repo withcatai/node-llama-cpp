@@ -21,7 +21,7 @@ describe("functionary", () => {
 
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("6+6 equals 12.");
+            expect(res).to.eql("The sum of 6 and 6 is 12.");
         });
 
         test("text is tokenized with special tokens when appropriate", {timeout: 1000 * 60 * 60 * 2}, async () => {

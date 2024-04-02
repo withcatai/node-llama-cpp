@@ -106,19 +106,19 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "SYS: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -131,35 +131,31 @@ describe("TemplateChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "SYS: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model: ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "user: ",
+          user: ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -179,19 +175,19 @@ describe("TemplateChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "SYS: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -202,19 +198,19 @@ describe("TemplateChatWrapper", () => {
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "SYS: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -229,29 +225,25 @@ describe("TemplateChatWrapper", () => {
         expect(contextText4.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "SYS: 
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model: ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "user: ",
+          user: ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           ",
             },
@@ -272,19 +264,19 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "BEGIN system: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -306,19 +298,19 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "system: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -342,7 +334,7 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "system: ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -365,13 +357,13 @@ describe("TemplateChatWrapper", () => {
           After calling a function the result will appear afterwards and be visible only to the assistant, so the assistant has to tell the user about it outside of the function call context.
           The assistant calls the functions in advance before telling the user about the result",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model:",
             },
@@ -399,7 +391,7 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "system: ",
             },
             "The assistant calls the provided functions as needed to retrieve information instead of relying on things it already knows.
@@ -419,30 +411,26 @@ describe("TemplateChatWrapper", () => {
           After calling a function the result will appear afterwards and be visible only to the assistant, so the assistant has to tell the user about it outside of the function call context.
           The assistant calls the functions in advance before telling the user about the result",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model: ",
             },
             "Hello!
           [[call: func2({"message":"Hello","feeling":"good","words":1})]] [[result: {"yes":true,"message":"ok"}]]",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "user: ",
+          user: ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           ",
             },
@@ -469,7 +457,7 @@ describe("TemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "system: ",
             },
             "The assistant calls the provided functions as needed to retrieve information instead of relying on things it already knows.
@@ -489,13 +477,13 @@ describe("TemplateChatWrapper", () => {
           After calling a function the result will appear afterwards and be visible only to the assistant, so the assistant has to tell the user about it outside of the function call context.
           The assistant calls the functions in advance before telling the user about the result",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           user: ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           model: ",
             },
@@ -505,17 +493,13 @@ describe("TemplateChatWrapper", () => {
           Function result: {"yes":true,"message":"ok"}
           ",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "user: ",
+          user: ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           ",
             },

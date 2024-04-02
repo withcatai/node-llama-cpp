@@ -21,7 +21,7 @@ export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
     joinValues<V extends LlamaTextValue = LlamaTextValue>(separator: LlamaText<V> | V): LlamaText<T | V>,
     toString(): string,
     toJSON(): LlamaTextJSON,
-    tokenize(tokenizer: Tokenizer): Token[],
+    tokenize(tokenizer: Tokenizer, options?: "trimLeadingSpace"): Token[],
     compare(other: LlamaText): boolean,
     trimStart(): LlamaText<T>,
     trimEnd(): LlamaText<T>,
@@ -201,23 +201,24 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
             })
             .join("");
     },
-    tokenize(this: LlamaText, tokenizer): Token[] {
+    tokenize(this: LlamaText, tokenizer, options?: "trimLeadingSpace"): Token[] {
         let textToTokenize = "";
         const res: Token[] = [];
         const hasContent = () => (res.length > 0 || textToTokenize.length > 0);
+        const resolveTokenizerOptions = () => (hasContent() ? "trimLeadingSpace" : options);
 
         for (const value of this.values) {
             if (value instanceof SpecialToken) {
-                res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined), ...value.tokenize(tokenizer));
+                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer));
                 textToTokenize = "";
             } else if (value instanceof SpecialTokensText) {
-                res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined), ...value.tokenize(tokenizer, hasContent()));
+                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer, hasContent() || options === "trimLeadingSpace"));
                 textToTokenize = "";
             } else
                 textToTokenize += value;
         }
 
-        res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined));
+        res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()));
 
         return res;
     },

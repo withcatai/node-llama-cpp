@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {LlamaChatSession} from "../../../src/index.js";
+import {FunctionaryChatWrapper, LlamaChatSession} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -19,9 +19,11 @@ describe("functionary", () => {
                 contextSequence: context.getSequence()
             });
 
+            expect(chatSession.chatWrapper).to.be.an.instanceof(FunctionaryChatWrapper);
+
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("6+6 equals 12.");
+            expect(res).to.eql("The sum of 6 and 6 is 12.");
 
             const chatHistory = chatSession.getChatHistory();
 
@@ -33,7 +35,7 @@ describe("functionary", () => {
 
             const res2 = await chatSession2.prompt("Repeat your answer");
 
-            expect(res2).to.eql("6+6 equals 12.");
+            expect(res2).to.eql("The sum of 6 and 6 is 12.");
         });
 
         test("disposing a context sequences removes the current state", {timeout: 1000 * 60 * 60 * 2}, async () => {
@@ -52,14 +54,16 @@ describe("functionary", () => {
                 autoDisposeSequence: false
             });
 
+            expect(chatSession.chatWrapper).to.be.an.instanceof(FunctionaryChatWrapper);
+
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("6+6 equals 12.");
+            expect(res).to.eql("The sum of 6 and 6 is 12.");
             const tokenMeterState = contextSequence.tokenMeter.getState();
             expect(tokenMeterState).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 140,
-                "usedOutputTokens": 17,
+                "usedInputTokens": 96,
+                "usedOutputTokens": 14,
                 "usedRestoreStateTokens": 0,
               }
             `);
@@ -77,13 +81,13 @@ describe("functionary", () => {
             const tokenMeterState2 = contextSequence2.tokenMeter.getState();
             expect(tokenMeterState2).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 142,
-                "usedOutputTokens": 19,
+                "usedInputTokens": 98,
+                "usedOutputTokens": 15,
                 "usedRestoreStateTokens": 0,
               }
             `);
             expect(tokenMeterState2.usedInputTokens).to.be.greaterThanOrEqual(tokenMeterState.usedInputTokens);
-            expect(res2).to.eql("6+6+6 equals 18.");
+            expect(res2).to.eql("The sum of 6+6+6 is 18.");
         });
 
         test("reusing a context sequences utilizes existing state", {timeout: 1000 * 60 * 60 * 2}, async () => {
@@ -102,14 +106,16 @@ describe("functionary", () => {
                 autoDisposeSequence: false
             });
 
+            expect(chatSession.chatWrapper).to.be.an.instanceof(FunctionaryChatWrapper);
+
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("6+6 equals 12.");
+            expect(res).to.eql("The sum of 6 and 6 is 12.");
             const tokenMeterState = contextSequence.tokenMeter.getState();
             expect(tokenMeterState).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 140,
-                "usedOutputTokens": 17,
+                "usedInputTokens": 96,
+                "usedOutputTokens": 14,
                 "usedRestoreStateTokens": 0,
               }
             `);
@@ -124,13 +130,13 @@ describe("functionary", () => {
             const tokenMeterStateDiff = contextSequence.tokenMeter.diff(tokenMeterState);
             expect(tokenMeterStateDiff).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 25,
-                "usedOutputTokens": 19,
+                "usedInputTokens": 10,
+                "usedOutputTokens": 15,
                 "usedRestoreStateTokens": 0,
               }
             `);
             expect(tokenMeterStateDiff.usedInputTokens).to.be.lessThan(tokenMeterState.usedInputTokens);
-            expect(res2).to.eql("6+6+6 equals 18.");
+            expect(res2).to.eql("The sum of 6+6+6 is 18.");
         });
     });
 });

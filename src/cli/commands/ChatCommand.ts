@@ -475,6 +475,7 @@ async function RunChat({
     // eslint-disable-next-line no-constant-condition
     while (true) {
         let hadNoWhitespaceTextInThisIteration = false;
+        let nextPrintLeftovers = "";
         const input = initialPrompt != null
             ? initialPrompt
             : await getPrompt();
@@ -512,17 +513,26 @@ async function RunChat({
                     ? undefined
                     : maxTokens,
             onToken(chunk) {
-                const text = model.detokenize(chunk);
+                let text = nextPrintLeftovers + model.detokenize(chunk);
+                nextPrintLeftovers = "";
 
-                if (trimWhitespace && !hadNoWhitespaceTextInThisIteration) {
-                    const trimmedText = text.trimStart();
+                if (trimWhitespace) {
+                    if (!hadNoWhitespaceTextInThisIteration) {
+                        text = text.trimStart();
 
-                    if (trimmedText.length > 0) {
-                        process.stdout.write(trimmedText);
-                        hadNoWhitespaceTextInThisIteration = true;
+                        if (text.length > 0)
+                            hadNoWhitespaceTextInThisIteration = true;
                     }
-                } else
-                    process.stdout.write(text);
+
+                    const textWithTrimmedEnd = text.trimEnd();
+
+                    if (textWithTrimmedEnd.length < text.length) {
+                        nextPrintLeftovers = text.slice(textWithTrimmedEnd.length);
+                        text = textWithTrimmedEnd;
+                    }
+                }
+
+                process.stdout.write(text);
             },
             functions: (grammar == null && environmentFunctions)
                 ? defaultEnvironmentFunctions

@@ -34,7 +34,7 @@ describe("functionary", () => {
                 }
             } as const);
 
-            const res = await chatSession.prompt("How's your day going so far?", {
+            const res = await chatSession.prompt("How's your great day going so far?", {
                 grammar
             });
             const parsedRes = grammar.parse(res);

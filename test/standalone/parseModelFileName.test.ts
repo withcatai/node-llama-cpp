@@ -112,4 +112,28 @@ describe("parseModelFileName", () => {
                 otherInfo: ["chat"]
             });
     });
+
+    test("rpguild-chatml-13b.Q4_K_M.gguf", () => {
+        expect(parseModelFileName("rpguild-chatml-13b.Q4_K_M.gguf"))
+            .toEqual({
+                name: "rpguild",
+                subType: "chatml",
+                quantization: "Q4_K_M",
+                fileType: "gguf",
+                parameters: "13B",
+                otherInfo: []
+            });
+    });
+
+    test("neuralbeagle14-7b.Q4_K_M.gguf", () => {
+        expect(parseModelFileName("neuralbeagle14-7b.Q4_K_M.gguf"))
+            .toEqual({
+                name: "neuralbeagle14",
+                subType: "",
+                quantization: "Q4_K_M",
+                fileType: "gguf",
+                parameters: "7B",
+                otherInfo: []
+            });
+    });
 });

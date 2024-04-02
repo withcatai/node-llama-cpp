@@ -135,31 +135,30 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -169,18 +168,16 @@ describe("JinjaTemplateChatWrapper", () => {
           [
             LlamaText [
               {
-                "builtin": true,
                 "type": "specialToken",
                 "value": "EOS",
               },
             ],
             LlamaText [
               {
-                "type": "specialToken",
+                "type": "specialTokensText",
                 "value": " ",
               },
               {
-                "builtin": true,
                 "type": "specialToken",
                 "value": "EOS",
               },
@@ -193,55 +190,52 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "EOS",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "I'm good, how are you?",
@@ -260,31 +254,30 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -294,31 +287,30 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!
@@ -332,41 +324,38 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText4.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "EOS",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST]",
             },
           ]
@@ -382,12 +371,11 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "System: You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -395,7 +383,7 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST]",
             },
             "Hello!",
@@ -412,12 +400,11 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "System: You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -425,7 +412,7 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -443,12 +430,11 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "System: You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -456,7 +442,7 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -474,14 +460,14 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
@@ -491,24 +477,23 @@ describe("JinjaTemplateChatWrapper", () => {
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -527,7 +512,7 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<<SYS>>
           ",
             },
@@ -551,24 +536,23 @@ describe("JinjaTemplateChatWrapper", () => {
           After calling a function the result will appear afterwards and be visible only to the assistant, so the assistant has to tell the user about it outside of the function call context.
           The assistant calls the functions in advance before telling the user about the result",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
           ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!",
@@ -591,12 +575,11 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "System: The assistant calls the provided functions as needed to retrieve information instead of relying on things it already knows.
@@ -618,32 +601,30 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!
           [[call: func2({"message":"Hello","feeling":"good","words":1})]] [[result: {"yes":true,"message":"ok"}]]",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "EOS",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST]",
             },
           ]
@@ -665,12 +646,11 @@ describe("JinjaTemplateChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "System: The assistant calls the provided functions as needed to retrieve information instead of relying on things it already knows.
@@ -692,7 +672,7 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST] ",
             },
             "Hello!
@@ -701,26 +681,24 @@ describe("JinjaTemplateChatWrapper", () => {
           Function result: {"yes":true,"message":"ok"}
           ",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " ",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "EOS",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": " [/INST]",
             },
           ]

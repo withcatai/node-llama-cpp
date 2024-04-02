@@ -38,22 +38,15 @@ describe("FalconChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "User: ",
-            "Hi there!",
-            "
+          User: Hi there!
 
-          ",
-            "Assistant: ",
-            "Hello!",
+          Assistant: Hello!",
           ]
         `);
 
@@ -63,32 +56,19 @@ describe("FalconChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "User: ",
-            "Hi there!",
-            "
+          User: Hi there!
 
-          ",
-            "Assistant: ",
-            "Hello!",
-            "
+          Assistant: Hello!
 
-          ",
-            "User: ",
-            "How are you?",
-            "
+          User: How are you?
 
-          ",
-            "Assistant: ",
-            "I'm good, how are you?",
+          Assistant: I'm good, how are you?",
           ]
         `);
 
@@ -105,48 +85,32 @@ describe("FalconChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "User: ",
-            "Hi there!",
-            "
+          User: Hi there!
 
-          ",
-            "Assistant: ",
-            "Hello!",
+          Assistant: Hello!",
           ]
         `);
 
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "User: ",
-            "Hi there!",
-            "
+          User: Hi there!
 
-          ",
-            "Assistant: ",
-            "Hello!",
-            "
+          Assistant: Hello!
 
-          ",
-            "Assistant: ",
+          Assistant: ",
           ]
         `);
     });
