@@ -92,11 +92,17 @@ export function resolveChatWrapper({
     warningLogs = true,
     fallbackToOtherWrappersOnJinjaError = true
 }: ResolveChatWrapperOptions) {
-    function createSpecializedChatWrapper(specializedChatWrapper: typeof chatWrappers[SpecializedChatWrapperTypeName]) {
+    function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
+        specializedChatWrapper: T,
+        defaultSettings: ConstructorParameters<T>[0] = {}
+    ) {
         const chatWrapperConfigType = chatWrapperToConfigType.get(specializedChatWrapper) as SpecializedChatWrapperTypeName;
         const chatWrapperSettings = customWrapperSettings?.[chatWrapperConfigType];
 
-        return new (specializedChatWrapper as any)(chatWrapperSettings);
+        return new (specializedChatWrapper as any)({
+            ...(defaultSettings ?? {}),
+            ...(chatWrapperSettings ?? {})
+        });
     }
 
     if (type !== "auto" && type != null) {
@@ -159,13 +165,14 @@ export function resolveChatWrapper({
                 testOptionConfigurations.push({} as any);
 
             for (const testConfiguration of testOptionConfigurations) {
-                const chatWrapper = new (Wrapper as any)({
+                const testChatWrapperSettings = {
                     ...(wrapperSettings ?? {}),
                     ...(testConfiguration ?? {})
-                });
+                };
+                const chatWrapper = new (Wrapper as any)(testChatWrapperSettings);
 
                 if (isJinjaTemplateEquivalentToSpecializedChatWrapper(jinjaTemplateChatWrapperOptions, chatWrapper, tokenizer))
-                    return new (Wrapper as any)(wrapperSettings ?? {});
+                    return new (Wrapper as any)(testChatWrapperSettings);
             }
         }
 
@@ -177,6 +184,19 @@ export function resolveChatWrapper({
         } catch (err) {
             console.error(getConsoleLogPrefix() + "Error creating Jinja template chat wrapper. Falling back to resolve other chat wrappers. Error:", err);
         }
+    }
+
+    // try to find a pattern in the Jinja template to resolve to a specialized chat wrapper,
+    // with a logic similar to `llama.cpp`'s `llama_chat_apply_template_internal` function
+    if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
+        if (modelJinjaTemplate.includes("<|im_start|>"))
+            return createSpecializedChatWrapper(ChatMLChatWrapper);
+        else if (modelJinjaTemplate.includes("[INST]"))
+            return createSpecializedChatWrapper(LlamaChatWrapper, {
+                addSpaceBeforeEos: modelJinjaTemplate.includes("' ' + eos_token")
+            });
+        else if (modelJinjaTemplate.includes("<start_of_turn>"))
+            return createSpecializedChatWrapper(GemmaChatWrapper);
     }
 
     if (filename != null) {

@@ -8,16 +8,17 @@ export class LlamaChatWrapper extends ChatWrapper {
 
     /** @internal */ private readonly _addSpaceBeforeEos: boolean;
 
-    /** @internal */
     public constructor({
-        _addSpaceBeforeEos = true
+        addSpaceBeforeEos = true
     }: {
-        /** @internal */
-        _addSpaceBeforeEos?: boolean
+        /**
+         * Default to `true`
+         */
+        addSpaceBeforeEos?: boolean
     } = {}) {
         super();
 
-        this._addSpaceBeforeEos = _addSpaceBeforeEos;
+        this._addSpaceBeforeEos = addSpaceBeforeEos;
     }
 
     public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
@@ -120,7 +121,7 @@ export class LlamaChatWrapper extends ChatWrapper {
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
         return [{}, {
-            _addSpaceBeforeEos: false
+            addSpaceBeforeEos: false
         }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }

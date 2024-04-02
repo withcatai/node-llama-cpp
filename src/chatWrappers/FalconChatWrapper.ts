@@ -155,7 +155,7 @@ export class FalconChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{
+        return [{}, {
             allowSpecialTokensInTitles: true
         }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
