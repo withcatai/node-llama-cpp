@@ -20,6 +20,7 @@ export function parseModelFileName(filename: string) {
     const {previousParts, parameters, nextParts} = splitByModelParameters(parts);
 
     const name = previousParts.shift();
+    const otherInfo: string[] = [];
 
     for (let i = 0; i < nextParts.length; i++) {
         const part = nextParts[i];
@@ -31,6 +32,8 @@ export function parseModelFileName(filename: string) {
             version = part.toLowerCase();
             nextParts.splice(i, 1);
             i--;
+        } else {
+            otherInfo.push(part);
         }
     }
 
@@ -41,7 +44,8 @@ export function parseModelFileName(filename: string) {
         fileType,
         version,
         contextSize,
-        parameters
+        parameters,
+        otherInfo
     };
 }
 

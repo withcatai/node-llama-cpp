@@ -9,7 +9,7 @@ export class LlamaChatWrapper extends ChatWrapper {
     /** @internal */ private readonly _addSpaceBeforeEos: boolean;
 
     public constructor({
-        addSpaceBeforeEos = true
+        addSpaceBeforeEos = false
     }: {
         /**
          * Default to `true`
@@ -26,7 +26,8 @@ export class LlamaChatWrapper extends ChatWrapper {
         documentFunctionParams?: boolean
     } = {}): {
         contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
+        stopGenerationTriggers: LlamaText[],
+        ignoreStartText?: LlamaText[]
     } {
         const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
             documentParams: documentFunctionParams
@@ -120,8 +121,10 @@ export class LlamaChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{}, {
+        return [{
             addSpaceBeforeEos: false
+        }, {
+            addSpaceBeforeEos: true
         }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }

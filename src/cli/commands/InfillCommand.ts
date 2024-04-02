@@ -4,7 +4,6 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
-import bytes from "bytes";
 import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";

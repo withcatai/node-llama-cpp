@@ -204,19 +204,20 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
     tokenize(this: LlamaText, tokenizer): Token[] {
         let textToTokenize = "";
         const res: Token[] = [];
+        const hasContent = () => (res.length > 0 || textToTokenize.length > 0);
 
         for (const value of this.values) {
             if (value instanceof SpecialToken) {
-                res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer));
+                res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined), ...value.tokenize(tokenizer));
                 textToTokenize = "";
             } else if (value instanceof SpecialTokensText) {
-                res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer, res.length > 0 || textToTokenize.length > 0));
+                res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined), ...value.tokenize(tokenizer, hasContent()));
                 textToTokenize = "";
             } else
                 textToTokenize += value;
         }
 
-        res.push(...tokenizer(textToTokenize, false));
+        res.push(...tokenizer(textToTokenize, false, hasContent() ? "trimLeadingSpace" : undefined));
 
         return res;
     },
