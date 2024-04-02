@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
-import {ChatHistoryItem, LlamaChatWrapper} from "../../../../src/index.js";
-import {defaultChatSystemPrompt} from "../../../../src/config.js";
+import {ChatHistoryItem, LlamaChatWrapper} from "../../../src/index.js";
+import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
 describe("LlamaChatWrapper", () => {

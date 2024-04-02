@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
-import {ChatHistoryItem, TemplateChatWrapper} from "../../../src/index.js";
-import {defaultChatSystemPrompt} from "../../../src/config.js";
+import {ChatHistoryItem, TemplateChatWrapper} from "../../../../src/index.js";
+import {defaultChatSystemPrompt} from "../../../../src/config.js";
 
 
 describe("TemplateChatWrapper", () => {
