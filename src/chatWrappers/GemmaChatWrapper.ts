@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://ai.google.dev/gemma/docs/formatting
 // source: https://www.promptingguide.ai/models/gemma
@@ -109,7 +109,7 @@ export class GemmaChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText(new SpecialTokensText("<end_of_turn>\n")),
                 LlamaText("<end_of_turn>")
             ]

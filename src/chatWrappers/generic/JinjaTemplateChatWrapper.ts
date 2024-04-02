@@ -1,7 +1,7 @@
 import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
 import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage} from "../../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
@@ -188,7 +188,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             user: this.userRoleName,
             model: this.modelRoleName
         } as const;
-        const idToContent = new Map<string, string | BuiltinSpecialToken>();
+        const idToContent = new Map<string, string | SpecialToken>();
         const modelMessageIds = new Set<string>();
         const messageIds = new Set<string>();
 
@@ -209,8 +209,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const bosTokenId = idsGenerator.generateId();
         const eosTokenId = idsGenerator.generateId();
 
-        idToContent.set(bosTokenId, new BuiltinSpecialToken("BOS"));
-        idToContent.set(eosTokenId, new BuiltinSpecialToken("EOS"));
+        idToContent.set(bosTokenId, new SpecialToken("BOS"));
+        idToContent.set(eosTokenId, new SpecialToken("EOS"));
 
         const renderJinjaText = () => {
             try {
@@ -306,7 +306,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 ...(
                     stopGenerationJinjaParts.length === 0
                         ? []

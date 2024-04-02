@@ -28,7 +28,7 @@ export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
     includes(value: LlamaText): boolean
 };
 
-export type LlamaTextValue = string | SpecialTokensText | BuiltinSpecialToken;
+export type LlamaTextValue = string | SpecialTokensText | SpecialToken;
 
 export type LlamaTextJSON = Array<LlamaTextJSONValue>;
 export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | LlamaTextSpecialTokenJSON;
@@ -36,8 +36,8 @@ export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: 
 export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 
 export const LlamaText: LlamaTextClass = function LlamaText(
-    strings: TemplateStringsArray | string | string[] | SpecialTokensText | BuiltinSpecialToken | LlamaText | LlamaText[],
-    ...values: (SpecialTokensText | BuiltinSpecialToken | string | string[] | number | boolean | LlamaText | LlamaText[])[]
+    strings: TemplateStringsArray | string | string[] | SpecialTokensText | SpecialToken | LlamaText | LlamaText[],
+    ...values: (SpecialTokensText | SpecialToken | string | string[] | number | boolean | LlamaText | LlamaText[])[]
 ) {
     return createLlamaText(createHistoryFromStringsAndValues(strings, values));
 } as LlamaTextClass;
@@ -46,8 +46,8 @@ LlamaText.fromJSON = function fromJSON(json: LlamaTextJSON) {
         json.map((value) => {
             if (typeof value === "string")
                 return value;
-            else if (BuiltinSpecialToken.isSpecialTokenJSON(value))
-                return BuiltinSpecialToken.fromJSON(value);
+            else if (SpecialToken.isSpecialTokenJSON(value))
+                return SpecialToken.fromJSON(value);
             else if (SpecialTokensText.isSpecialTokensTextJSON(value))
                 return SpecialTokensText.fromJSON(value);
             else {
@@ -117,7 +117,7 @@ export class SpecialTokensText {
 }
 
 export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL";
-export class BuiltinSpecialToken {
+export class SpecialToken {
     public readonly value: BuiltinSpecialTokenValue;
 
     public constructor(value: BuiltinSpecialTokenValue) {
@@ -139,9 +139,9 @@ export class BuiltinSpecialToken {
         };
     }
 
-    public static fromJSON(json: LlamaTextSpecialTokenJSON): BuiltinSpecialToken {
-        if (BuiltinSpecialToken.isSpecialTokenJSON(json))
-            return new BuiltinSpecialToken(json.value as BuiltinSpecialTokenValue);
+    public static fromJSON(json: LlamaTextSpecialTokenJSON): SpecialToken {
+        if (SpecialToken.isSpecialTokenJSON(json))
+            return new SpecialToken(json.value as BuiltinSpecialTokenValue);
 
         throw new Error(`Invalid JSON for SpecialToken: ${JSON.stringify(json)}`);
     }
@@ -192,7 +192,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
     toString(this: LlamaText) {
         return this.values
             .map((value) => {
-                if (value instanceof BuiltinSpecialToken)
+                if (value instanceof SpecialToken)
                     return value.toString();
                 else if (value instanceof SpecialTokensText)
                     return value.toString();
@@ -206,7 +206,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
         const res: Token[] = [];
 
         for (const value of this.values) {
-            if (value instanceof BuiltinSpecialToken) {
+            if (value instanceof SpecialToken) {
                 res.push(...tokenizer(textToTokenize, false), ...value.tokenize(tokenizer));
                 textToTokenize = "";
             } else if (value instanceof SpecialTokensText) {
@@ -222,7 +222,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
     },
     toJSON(this: LlamaText) {
         return this.values.map((value) => {
-            if (value instanceof BuiltinSpecialToken)
+            if (value instanceof SpecialToken)
                 return value.toJSON() satisfies LlamaTextJSONValue;
             else if (value instanceof SpecialTokensText)
                 return value.toJSON() satisfies LlamaTextJSONValue;
@@ -239,7 +239,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
         while (newValues.length > 0) {
             const firstValue = newValues[0];
 
-            if (firstValue instanceof BuiltinSpecialToken)
+            if (firstValue instanceof SpecialToken)
                 break;
 
             if (firstValue instanceof SpecialTokensText) {
@@ -276,7 +276,7 @@ const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
         while (newValues.length > 0) {
             const lastValue = newValues[newValues.length - 1];
 
-            if (lastValue instanceof BuiltinSpecialToken)
+            if (lastValue instanceof SpecialToken)
                 break;
 
             if (lastValue instanceof SpecialTokensText) {
@@ -416,7 +416,7 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
     function addItemToRes(res: Array<LlamaTextValue>, item: LlamaTextInputValue) {
         if (item === undefined || item === "" || (item instanceof SpecialTokensText && item.value === ""))
             return res;
-        else if (typeof item === "string" || item instanceof SpecialTokensText || item instanceof BuiltinSpecialToken)
+        else if (typeof item === "string" || item instanceof SpecialTokensText || item instanceof SpecialToken)
             return res.concat([item]);
         else if (isLlamaText(item))
             return res.concat(item.values);
@@ -445,7 +445,7 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
 
         const lastItem = res[res.length - 1];
 
-        if (lastItem instanceof BuiltinSpecialToken || item instanceof BuiltinSpecialToken) {
+        if (lastItem instanceof SpecialToken || item instanceof SpecialToken) {
             res.push(item);
             return res;
         }
@@ -490,7 +490,7 @@ function isTemplateStringsArray(value: unknown): value is TemplateStringsArray {
 function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
     if (a instanceof SpecialTokensText && b instanceof SpecialTokensText)
         return a.value === b.value;
-    else if (a instanceof BuiltinSpecialToken && b instanceof BuiltinSpecialToken)
+    else if (a instanceof SpecialToken && b instanceof SpecialToken)
         return a.value === b.value;
     else if (a !== a)
         return false;

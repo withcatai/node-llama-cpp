@@ -326,7 +326,7 @@ function orderClasses(sidebar: typeof typedocSidebar) {
         items: []
     };
     (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
-    const LlamaTextGroupItemsOrder = ["SpecialTokensText", "BuiltinSpecialToken"];
+    const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
 
     groupItems(
         classes.items,

@@ -1,7 +1,7 @@
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelResponse, ChatUserMessage, Tokenizer} from "../../types.js";
 import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../generic/JinjaTemplateChatWrapper.js";
-import {BuiltinSpecialToken, LlamaText} from "../../utils/LlamaText.js";
+import {SpecialToken, LlamaText} from "../../utils/LlamaText.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {StopGenerationDetector} from "../../utils/StopGenerationDetector.js";
 
@@ -242,7 +242,7 @@ function removeLeadingBos(llamaText: LlamaText) {
 
     const firstValue = llamaText.values[0];
 
-    if (firstValue instanceof BuiltinSpecialToken && firstValue.value === "BOS")
+    if (firstValue instanceof SpecialToken && firstValue.value === "BOS")
         return LlamaText(llamaText.values.slice(1));
 
     return llamaText;

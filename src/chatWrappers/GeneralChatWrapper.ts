@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 export class GeneralChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "General";
@@ -95,7 +95,7 @@ export class GeneralChatWrapper extends ChatWrapper {
         flush();
 
         const contextText = LlamaText(
-            new BuiltinSpecialToken("BOS"),
+            new SpecialToken("BOS"),
             resultItems.map(({system, user, model}, index) => {
                 const isFirstItem = index === 0;
                 const isLastItem = index === resultItems.length - 1;
@@ -135,7 +135,7 @@ export class GeneralChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText(new SpecialTokensText("<end>")),
                 LlamaText("<end>"),
 

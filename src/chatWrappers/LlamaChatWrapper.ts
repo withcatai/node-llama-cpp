@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 export class LlamaChatWrapper extends ChatWrapper {
@@ -83,7 +83,7 @@ export class LlamaChatWrapper extends ChatWrapper {
                 const isLastItem = index === resultItems.length - 1;
 
                 return LlamaText([
-                    new BuiltinSpecialToken("BOS"),
+                    new SpecialToken("BOS"),
                     (system.length === 0 && user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
@@ -104,7 +104,7 @@ export class LlamaChatWrapper extends ChatWrapper {
                         : "",
                     isLastItem
                         ? LlamaText([])
-                        : new BuiltinSpecialToken("EOS")
+                        : new SpecialToken("EOS")
                 ]);
             })
         );
@@ -112,7 +112,7 @@ export class LlamaChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText("</s>")
             ]
         };

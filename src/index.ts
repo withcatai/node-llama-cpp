@@ -49,7 +49,7 @@ import {
     type ResolveChatWrapperOptions
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {
-    LlamaText, SpecialTokensText, BuiltinSpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
+    LlamaText, SpecialTokensText, SpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
     type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
@@ -153,7 +153,7 @@ export {
     type TemplateChatWrapperTypeName,
     LlamaText,
     SpecialTokensText,
-    BuiltinSpecialToken,
+    SpecialToken,
     isLlamaText,
     tokenizeText,
     type LlamaTextJSON,

@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions, isChatModelResponseFunctionCall} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {getTypeScriptTypeStringForGbnfJsonSchema} from "../utils/getTypeScriptTypeStringForGbnfJsonSchema.js";
 
 // source: https://github.com/MeetKai/functionary/blob/main/tests/prompt_test_v2.txt
@@ -41,7 +41,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
         });
 
         const contextText = LlamaText(
-            new BuiltinSpecialToken("BOS"),
+            new SpecialToken("BOS"),
             historyWithFunctions.map((item, index) => {
                 const isFirstItem = index === 0;
                 const isLastItem = index === historyWithFunctions.length - 1;
@@ -150,7 +150,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             return {
                 contextText,
                 stopGenerationTriggers: [
-                    LlamaText(new BuiltinSpecialToken("EOS")),
+                    LlamaText(new SpecialToken("EOS")),
                     LlamaText(new SpecialTokensText("<|stop|>")),
                     LlamaText(" <|stop|>"),
                     LlamaText("<|stop|>"),
@@ -170,7 +170,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText(new SpecialTokensText("<|stop|>")),
 
                 LlamaText(" <|stop|>"),

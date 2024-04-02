@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {LlamaText, BuiltinSpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
+import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 
 export class FalconChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Falcon";
@@ -94,7 +94,7 @@ export class FalconChatWrapper extends ChatWrapper {
         flush();
 
         const contextText = LlamaText(
-            new BuiltinSpecialToken("BOS"),
+            new SpecialToken("BOS"),
             resultItems.map(({system, user, model}, index) => {
                 const isFirstItem = index === 0;
                 const isLastItem = index === resultItems.length - 1;
@@ -134,7 +134,7 @@ export class FalconChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
 
                 LlamaText(`\n${this._userMessageTitle}:`),
                 LlamaText(`\n${this._modelResponseTitle}:`),

@@ -1,5 +1,5 @@
 import {ChatHistoryItem, ChatModelFunctions} from "../../types.js";
-import {BuiltinSpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
+import {SpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
 import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
@@ -220,7 +220,7 @@ export class TemplateChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText(this._parsedChatTemplate.completionSuffix),
                 LlamaText(new SpecialTokensText(this._parsedChatTemplate.completionSuffix))
             ]

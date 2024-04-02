@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://github.com/openai/openai-python/blob/120d225b91a8453e15240a49fb1c6794d8119326/chatml.md
 export class ChatMLChatWrapper extends ChatWrapper {
@@ -70,7 +70,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
         flush();
 
         const contextText = LlamaText(
-            new BuiltinSpecialToken("BOS"),
+            new SpecialToken("BOS"),
             resultItems.map(({system, user, model}, index) => {
                 const isLastItem = index === resultItems.length - 1;
 
@@ -108,7 +108,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText(new SpecialTokensText("<|im_end|>")),
                 LlamaText("<|im_end|>")
             ]
