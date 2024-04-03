@@ -21,6 +21,7 @@ import {
 } from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
+import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 
 type ChatCommand = {
     model: string,
@@ -305,6 +306,8 @@ async function RunChat({
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
 
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
+
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
         : LlamaLogLevel.warn;
@@ -344,7 +347,7 @@ async function RunChat({
     }, async () => {
         try {
             return await llama.loadModel({
-                modelPath: path.resolve(process.cwd(), modelArg),
+                modelPath: resolvedModelPath,
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {

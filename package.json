@@ -168,6 +168,7 @@
     "proper-lockfile": "^4.1.2",
     "semver": "^7.6.0",
     "simple-git": "^3.19.1",
+    "slice-ansi": "^7.1.0",
     "strip-ansi": "^7.1.0",
     "uuid": "^9.0.0",
     "which": "^4.0.0",

@@ -11,6 +11,7 @@ import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
 import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
+import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 
 type InfillCommand = {
     model: string,
@@ -229,6 +230,8 @@ async function RunInfill({
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
 
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
+
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
         : LlamaLogLevel.warn;
@@ -275,7 +278,7 @@ async function RunInfill({
     }, async () => {
         try {
             return await llama.loadModel({
-                modelPath: path.resolve(process.cwd(), modelArg),
+                modelPath: resolvedModelPath,
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {

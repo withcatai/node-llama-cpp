@@ -14,6 +14,7 @@ import {cliBinName, npxRunPrefix} from "../../../src/config.js";
 import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
 import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../../src/state.js";
+import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
 
 export default {
     async load() {
@@ -41,6 +42,9 @@ export default {
                     parentCommand: InspectCommand
                 }),
                 gguf: await getCommandHtmlDoc(InspectGgufCommand, {
+                    parentCommand: InspectCommand
+                }),
+                measure: await getCommandHtmlDoc(InspectMeasureCommand, {
                     parentCommand: InspectCommand
                 })
             },

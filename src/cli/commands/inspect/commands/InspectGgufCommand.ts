@@ -25,7 +25,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             .option("path", {
                 type: "string",
                 demandOption: true,
-                description: "The path to the GGUF file to inspect"
+                description: "The path or URL of the GGUF file to inspect. If a URL is provided, the metadata will be read from the remote file without downloading the entire file."
             })
             .option("fullTensorInfo", {
                 alias: "t",
@@ -66,7 +66,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
         }
 
-        const parsedMetadata = await readGgufFileInfo(ggufPath, {ignoreKeys: []});
+        const parsedMetadata = await readGgufFileInfo(ggufPath);
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {

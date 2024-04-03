@@ -35,7 +35,7 @@ export function printCommonInfoLines({
                 value: bytes(llama.getVramState().total)
             }, {
                 title: "Name",
-                value: llama.getGpuDeviceNames().join(", ")
+                value: toOneLine(llama.getGpuDeviceNames().join(", "))
             }, {
                 title: "GPU layers",
                 value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
@@ -49,18 +49,18 @@ export function printCommonInfoLines({
         padTitle: padTitle,
         info: [{
             title: "Type",
-            value: model.typeDescription
+            value: toOneLine(model.typeDescription)
         }, {
             title: "Size",
             value: bytes(model.size)
         }, {
             show: printBos,
             title: "BOS",
-            value: () => String(model.tokens.bosString)
+            value: () => toOneLine(String(model.tokens.bosString))
         }, {
             show: printEos,
             title: "EOS",
-            value: () => String(model.tokens.eosString)
+            value: () => toOneLine(String(model.tokens.eosString))
         }, {
             title: "Train context size",
             value: String(model.trainContextSize)
@@ -82,4 +82,8 @@ export function printCommonInfoLines({
             value: "enabled"
         }]
     });
+}
+
+function toOneLine(text: string) {
+    return text.replaceAll("\n", chalk.grey("\\n"));
 }

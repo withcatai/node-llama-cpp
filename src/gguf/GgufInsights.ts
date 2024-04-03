@@ -1,5 +1,6 @@
 import {Llama} from "../bindings/Llama.js";
 import {getLlamaWithoutBackend} from "../bindings/utils/getLlamaWithoutBackend.js";
+import {getDefaultContextBatchSize, getDefaultContextSequences} from "../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
 import {GgufTensorInfo} from "./types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "./types/GgufMetadataTypes.js";
@@ -61,11 +62,14 @@ export class GgufInsights {
      * The estimation for the graph overhead memory will be improved in the future to be more precise, but it's good enough for now.
      */
     public estimateContextResourceRequirements({
-        contextSize, batchSize, modelGpuLayers, sequences, isEmbeddingContext = false, includeGraphOverhead = true
+        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true
     }: {
-        contextSize: number, batchSize: number, modelGpuLayers: number, sequences: number, isEmbeddingContext?: boolean,
+        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
         includeGraphOverhead?: boolean
     }): GgufInsightsResourceRequirements {
+        if (sequences == null) sequences = getDefaultContextSequences();
+        if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
+
         const actualContextSize = contextSize * sequences;
 
         const totalLayers = this.totalLayers;
