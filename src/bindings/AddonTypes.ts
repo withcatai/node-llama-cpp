@@ -18,6 +18,7 @@ export type BindingModule = {
             seed?: number,
             contextSize?: number,
             batchSize?: number,
+            sequences?: number,
             logitsAll?: boolean,
             embeddings?: boolean,
             threads?: number
@@ -33,11 +34,28 @@ export type BindingModule = {
         new (grammar: AddonGrammar): AddonGrammarEvaluationState
     },
     systemInfo(): string,
+    getSupportsGpuOffloading(): boolean,
+    getSupportsMmap(): boolean,
+    getSupportsMlock(): boolean,
+    getBlockSizeForGgmlType(ggmlType: number): number | undefined,
+    getTypeSizeForGgmlType(ggmlType: number): number | undefined,
+    getConsts(): {
+        ggmlMaxDims: number,
+        ggmlTypeF16Size: number,
+        ggmlTypeF32Size: number,
+        ggmlTensorOverhead: number,
+        llamaMaxRngState: number,
+        llamaPosSize: number,
+        llamaSeqIdSize: number
+    },
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
     getGpuVramInfo(): {
         total: number,
         used: number
+    },
+    getGpuDeviceInfo(): {
+        deviceNames: string[]
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
     init(): Promise<void>,
@@ -64,7 +82,9 @@ export type AddonModel = {
     eotToken(): Token,
     getTokenString(token: number): string,
     getTokenType(token: Token): number,
-    shouldPrependBosToken(): boolean
+    getVocabularyType(): number,
+    shouldPrependBosToken(): boolean,
+    getModelSize(): number
 };
 
 export type AddonContext = {
@@ -100,6 +120,7 @@ export type AddonContext = {
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
     getEmbedding(inputTokensLength: number): Float64Array,
+    getStateSize(): number,
     printTimings(): void
 };
 

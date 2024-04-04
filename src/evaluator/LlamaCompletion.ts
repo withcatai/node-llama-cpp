@@ -243,7 +243,13 @@ export class LlamaCompletion {
             if (this._sequence == null || this.disposed)
                 throw new DisposedError();
 
-            const resolvedInput = tokenizeInput(input, this._sequence.model.tokenize);
+            const resolvedInput = tokenizeInput(
+                input,
+                this._sequence.model.tokenize,
+                (shouldPrependBosToken && bosToken != null)
+                    ? "trimLeadingSpace"
+                    : undefined
+            );
             const resolvedContextShiftSize = await resolveContextShiftSize(contextShiftSize, this._sequence);
             ensureNotAborted();
 
@@ -420,8 +426,8 @@ export class LlamaCompletion {
             if (this._sequence == null || this.disposed)
                 throw new DisposedError();
 
-            const resolvedPrefixInputTokens = tokenizeInput(prefixInput, this._sequence.model.tokenize);
-            const resolvedSuffixInputTokens = tokenizeInput(suffixInput, this._sequence.model.tokenize);
+            const resolvedPrefixInputTokens = tokenizeInput(prefixInput, this._sequence.model.tokenize, "trimLeadingSpace");
+            const resolvedSuffixInputTokens = tokenizeInput(suffixInput, this._sequence.model.tokenize, "trimLeadingSpace");
             const resolvedContextShiftSize = await resolveContextShiftSize(contextShiftSize, this._sequence);
             ensureNotAborted();
 

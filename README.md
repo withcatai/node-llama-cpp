@@ -20,7 +20,7 @@
 ## Features
 * Run a text generation model locally on your machine
 * Metal, CUDA and Vulkan support
-* Pre-built binaries are provided, with a fallback to building from source without `node-gyp` or Python
+* Pre-built binaries are provided, with a fallback to building from source _**without**_ `node-gyp` or Python
 * Chat with a model using a chat wrapper
 * Use the CLI to chat with a model without writing any code
 * Up-to-date with the latest version of `llama.cpp`. Download and compile the latest release with a single CLI command.

@@ -1,17 +1,33 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
 export class LlamaChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "LlamaChat";
+
+    /** @internal */ private readonly _addSpaceBeforeEos: boolean;
+
+    public constructor({
+        addSpaceBeforeEos = false
+    }: {
+        /**
+         * Default to `true`
+         */
+        addSpaceBeforeEos?: boolean
+    } = {}) {
+        super();
+
+        this._addSpaceBeforeEos = addSpaceBeforeEos;
+    }
 
     public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
         availableFunctions?: ChatModelFunctions,
         documentFunctionParams?: boolean
     } = {}): {
         contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
+        stopGenerationTriggers: LlamaText[],
+        ignoreStartText?: LlamaText[]
     } {
         const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
             documentParams: documentFunctionParams
@@ -57,7 +73,8 @@ export class LlamaChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
@@ -67,25 +84,28 @@ export class LlamaChatWrapper extends ChatWrapper {
                 const isLastItem = index === resultItems.length - 1;
 
                 return LlamaText([
-                    new BuiltinSpecialToken("BOS"),
+                    new SpecialToken("BOS"),
                     (system.length === 0 && user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("[INST] "),
+                            new SpecialTokensText("[INST] "),
                             system.length === 0
                                 ? LlamaText([])
                                 : LlamaText([
-                                    new SpecialToken("<<SYS>>\n"),
+                                    new SpecialTokensText("<<SYS>>\n"),
                                     system,
-                                    new SpecialToken("\n<</SYS>>\n\n")
+                                    new SpecialTokensText("\n<</SYS>>\n\n")
                                 ]),
                             user,
-                            new SpecialToken(" [/INST]\n\n")
+                            new SpecialTokensText(" [/INST] ")
                         ]),
                     model,
+                    this._addSpaceBeforeEos
+                        ? " "
+                        : "",
                     isLastItem
                         ? LlamaText([])
-                        : new BuiltinSpecialToken("EOS")
+                        : new SpecialToken("EOS")
                 ]);
             })
         );
@@ -93,9 +113,18 @@ export class LlamaChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOS")),
                 LlamaText("</s>")
             ]
         };
+    }
+
+    /** @internal */
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+        return [{
+            addSpaceBeforeEos: false
+        }, {
+            addSpaceBeforeEos: true
+        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }

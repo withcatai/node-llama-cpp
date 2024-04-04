@@ -4,7 +4,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("stableCode", () => {
     describe("async context load", () => {
-        test("load asynchronously", async () => {
+        test("load asynchronously", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
             const model = await llama.loadModel({
@@ -52,8 +52,6 @@ describe("stableCode", () => {
 
             expect(loopIterationsBeforeUnload).toBeGreaterThanOrEqual(2);
             expect(disposePromise).resolves.toBeUndefined();
-        }, {
-            timeout: 1000 * 60 * 60 * 2
         });
     });
 });

@@ -1,6 +1,6 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
-import {BuiltinSpecialToken, LlamaText, SpecialToken} from "../utils/LlamaText.js";
+import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://ai.google.dev/gemma/docs/formatting
 // source: https://www.promptingguide.ai/models/gemma
@@ -73,7 +73,8 @@ export class GemmaChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
-            }
+            } else
+                void (item satisfies never);
         }
 
         flush();
@@ -86,20 +87,20 @@ export class GemmaChatWrapper extends ChatWrapper {
                     (user.length === 0)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("<start_of_turn>user\n"),
+                            new SpecialTokensText("<start_of_turn>user\n"),
                             user,
-                            new SpecialToken("<end_of_turn>\n")
+                            new SpecialTokensText("<end_of_turn>\n")
                         ]),
 
                     (model.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
-                            new SpecialToken("<start_of_turn>model\n"),
+                            new SpecialTokensText("<start_of_turn>model\n"),
                             model,
 
                             isLastItem
                                 ? LlamaText([])
-                                : new SpecialToken("<end_of_turn>\n")
+                                : new SpecialTokensText("<end_of_turn>\n")
                         ])
                 ]);
             })
@@ -108,8 +109,8 @@ export class GemmaChatWrapper extends ChatWrapper {
         return {
             contextText,
             stopGenerationTriggers: [
-                LlamaText(new BuiltinSpecialToken("EOS")),
-                LlamaText(new SpecialToken("<end_of_turn>\n")),
+                LlamaText(new SpecialToken("EOS")),
+                LlamaText(new SpecialTokensText("<end_of_turn>\n")),
                 LlamaText("<end_of_turn>")
             ]
         };

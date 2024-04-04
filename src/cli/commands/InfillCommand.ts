@@ -4,10 +4,14 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
-import withStatusLogs from "../../utils/withStatusLogs.js";
 import {getLlama} from "../../bindings/getLlama.js";
-import {LlamaLogLevel} from "../../bindings/types.js";
+import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
+import withOra from "../../utils/withOra.js";
+import {TokenMeter} from "../../evaluator/TokenMeter.js";
+import {printInfoLine} from "../utils/printInfoLine.js";
+import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
+import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 
 type InfillCommand = {
     model: string,
@@ -16,7 +20,7 @@ type InfillCommand = {
     prefixFile?: string,
     suffix?: string,
     suffixFile?: string,
-    contextSize: number,
+    contextSize?: number,
     batchSize?: number,
     threads: number,
     temperature: number,
@@ -30,20 +34,21 @@ type InfillCommand = {
     repeatFrequencyPenalty?: number,
     repeatPresencePenalty?: number,
     maxTokens: number,
-    noInfoLog: boolean,
+    debug: boolean,
+    meter: boolean,
     printTimings: boolean
 };
 
 export const InfillCommand: CommandModule<object, InfillCommand> = {
-    command: "infill",
+    command: "infill [modelPath]",
     describe: "Generate an infill completion for a given suffix and prefix texts",
     builder(yargs) {
         return yargs
             .option("model", {
-                alias: "m",
+                alias: ["m", "modelPath"],
                 type: "string",
                 demandOption: true,
-                description: "Llama model file to use for the chat",
+                description: "Llama model file to use for the infill",
                 group: "Required:"
             })
             .option("systemInfo", {
@@ -76,8 +81,9 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
             .option("contextSize", {
                 alias: "c",
                 type: "number",
-                default: 1024 * 4,
                 description: "Context size to use for the model context",
+                default: -1,
+                defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
             .option("batchSize", {
@@ -124,6 +130,8 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
+                default: -1,
+                defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
             .option("repeatPenalty", {
@@ -166,11 +174,17 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size",
                 group: "Optional:"
             })
-            .option("noInfoLog", {
-                alias: "nl",
+            .option("debug", {
+                alias: "d",
                 type: "boolean",
                 default: false,
-                description: "Disable llama.cpp info logs",
+                description: "Print llama.cpp info and debug logs",
+                group: "Optional:"
+            })
+            .option("meter", {
+                type: "boolean",
+                default: false,
+                description: "Log how many tokens were used as input and output for each response",
                 group: "Optional:"
             })
             .option("printTimings", {
@@ -186,14 +200,14 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
         threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-        noInfoLog, printTimings
+        debug, meter, printTimings
     }) {
         try {
             await RunInfill({
                 model, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
                 threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                noInfoLog, printTimings
+                debug, meter, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -208,15 +222,21 @@ async function RunInfill({
     model: modelArg, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
     threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    maxTokens, noInfoLog, printTimings
+    maxTokens, debug, meter, printTimings
 }: InfillCommand) {
-    if (noInfoLog)
-        console.info(`${chalk.yellow("Log level:")} warn`);
+    if (contextSize === -1) contextSize = undefined;
+    if (gpuLayers === -1) gpuLayers = undefined;
 
+    if (debug)
+        console.info(`${chalk.yellow("Log level:")} debug`);
+
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
+
+    const llamaLogLevel = debug
+        ? LlamaLogLevel.debug
+        : LlamaLogLevel.warn;
     const llama = await getLlama("lastBuild", {
-        logLevel: noInfoLog
-            ? LlamaLogLevel.warn
-            : LlamaLogLevel.debug
+        logLevel: llamaLogLevel
     });
     const logBatchSize = batchSize != null;
 
@@ -242,9 +262,7 @@ async function RunInfill({
         suffix = undefined;
     }
 
-    if (batchSize == null)
-        batchSize = contextSize;
-    else if (batchSize > contextSize) {
+    if (batchSize != null && contextSize != null && batchSize > contextSize) {
         console.warn(chalk.yellow("Batch size is greater than the context size. Batch size will be set to the context size."));
         batchSize = contextSize;
     }
@@ -252,14 +270,15 @@ async function RunInfill({
     let initialPrefix = prefix ?? null;
     let initialSuffix = suffix ?? null;
 
-    const model = await withStatusLogs({
+    const model = await withOra({
         loading: chalk.blue("Loading model"),
         success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model")
+        fail: chalk.blue("Failed to load model"),
+        useStatusLogs: debug
     }, async () => {
         try {
             return await llama.loadModel({
-                modelPath: path.resolve(process.cwd(), modelArg),
+                modelPath: resolvedModelPath,
                 gpuLayers: gpuLayers != null ? gpuLayers : undefined
             });
         } finally {
@@ -269,15 +288,16 @@ async function RunInfill({
             }
         }
     });
-    const context = await withStatusLogs({
+    const context = await withOra({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
-        fail: chalk.blue("Failed to create context")
+        fail: chalk.blue("Failed to create context"),
+        useStatusLogs: debug
     }, async () => {
         try {
             return await model.createContext({
-                contextSize,
-                batchSize,
+                contextSize: contextSize != null ? contextSize : undefined,
+                batchSize: batchSize != null ? batchSize : undefined,
                 threads
             });
         } finally {
@@ -288,29 +308,41 @@ async function RunInfill({
         }
     });
 
+    const contextSequence = context.getSequence();
     const completion = new LlamaCompletion({
-        contextSequence: context.getSequence()
+        contextSequence
     });
+    let lastTokenMeterState = contextSequence.tokenMeter.getState();
 
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
-    console.info(`${chalk.yellow("Context size:")} ${context.contextSize}`);
-
-    if (logBatchSize)
-        console.info(`${chalk.yellow("Batch size:")} ${context.batchSize}`);
-
-    console.info(`${chalk.yellow("Train context size:")} ${model.trainContextSize}`);
-    console.info(`${chalk.yellow("Model type:")} ${model.typeDescription}`);
-    console.info(`${chalk.yellow("Repeat penalty:")} ${repeatPenalty} (apply to last ${lastTokensRepeatPenalty} tokens)`);
-
-    if (repeatFrequencyPenalty != null)
-        console.info(`${chalk.yellow("Repeat frequency penalty:")} ${repeatFrequencyPenalty}`);
-
-    if (repeatPresencePenalty != null)
-        console.info(`${chalk.yellow("Repeat presence penalty:")} ${repeatPresencePenalty}`);
-
-    if (!penalizeRepeatingNewLine)
-        console.info(`${chalk.yellow("Penalize repeating new line:")} disabled`);
+    const padTitle = "Context".length + 1;
+    printCommonInfoLines({
+        context,
+        minTitleLength: padTitle,
+        logBatchSize,
+        tokenMeterEnabled: meter
+    });
+    printInfoLine({
+        title: "Infill",
+        padTitle: padTitle,
+        info: [{
+            title: "Repeat penalty",
+            value: `${repeatPenalty} (apply to last ${lastTokensRepeatPenalty} tokens)`
+        }, {
+            show: repeatFrequencyPenalty != null,
+            title: "Repeat frequency penalty",
+            value: String(repeatFrequencyPenalty)
+        }, {
+            show: repeatPresencePenalty != null,
+            title: "Repeat presence penalty",
+            value: String(repeatPresencePenalty)
+        }, {
+            show: !penalizeRepeatingNewLine,
+            title: "Penalize repeating new line",
+            value: "disabled"
+        }]
+    });
 
     // this is for ora to not interfere with readline
     await new Promise(resolve => setTimeout(resolve, 1));
@@ -395,7 +427,22 @@ async function RunInfill({
         process.stdout.write(endColor);
         console.log();
 
-        if (printTimings)
+        if (printTimings) {
+            if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))
+                llama.logLevel = LlamaLogLevel.info;
+
             await context.printTimings();
+            await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+
+            llama.logLevel = llamaLogLevel;
+        }
+
+        if (meter) {
+            const newTokenMeterState = contextSequence.tokenMeter.getState();
+            const tokenMeterDiff = TokenMeter.diff(newTokenMeterState, lastTokenMeterState);
+            lastTokenMeterState = newTokenMeterState;
+
+            console.info(`${chalk.dim("Input tokens:")} ${String(tokenMeterDiff.usedInputTokens).padEnd(5, " ")}  ${chalk.dim("Output tokens:")} ${tokenMeterDiff.usedOutputTokens}`);
+        }
     }
 }

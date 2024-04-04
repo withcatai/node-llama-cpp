@@ -4,7 +4,9 @@ import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
 import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
 import {CompleteCommand} from "../../../src/cli/commands/CompleteCommand.js";
 import {InfillCommand} from "../../../src/cli/commands/InfillCommand.js";
-import {InspectCommand} from "../../../src/cli/commands/InspectCommand.js";
+import {InspectCommand} from "../../../src/cli/commands/inspect/InspectCommand.js";
+import {InspectGpuCommand} from "../../../src/cli/commands/inspect/commands/InspectGpuCommand.js";
+import {InspectGgufCommand} from "../../../src/cli/commands/inspect/commands/InspectGgufCommand.js";
 import {DownloadCommand} from "../../../src/cli/commands/DownloadCommand.js";
 import {ClearCommand} from "../../../src/cli/commands/ClearCommand.js";
 import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
@@ -12,6 +14,7 @@ import {cliBinName, npxRunPrefix} from "../../../src/config.js";
 import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
 import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../../src/state.js";
+import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
 
 export default {
     async load() {
@@ -31,7 +34,20 @@ export default {
             chat: await getCommandHtmlDoc(ChatCommand),
             complete: await getCommandHtmlDoc(CompleteCommand),
             infill: await getCommandHtmlDoc(InfillCommand),
-            inspect: await getCommandHtmlDoc(InspectCommand),
+            inspect: {
+                index: await getCommandHtmlDoc(InspectCommand, {
+                    subCommandsParentPageLink: "inspect"
+                }),
+                gpu: await getCommandHtmlDoc(InspectGpuCommand, {
+                    parentCommand: InspectCommand
+                }),
+                gguf: await getCommandHtmlDoc(InspectGgufCommand, {
+                    parentCommand: InspectCommand
+                }),
+                measure: await getCommandHtmlDoc(InspectMeasureCommand, {
+                    parentCommand: InspectCommand
+                })
+            },
             download: await getCommandHtmlDoc(DownloadCommand),
             build: await getCommandHtmlDoc(BuildCommand),
             clear: await getCommandHtmlDoc(ClearCommand)

@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include <vector>
+#include <string>
 
 #if defined(GPU_INFO_USE_HIPBLAS)
 #include <hip/hip_runtime.h>
@@ -96,4 +98,23 @@ bool gpuInfoGetTotalCudaDevicesInfo(size_t * total, size_t * used, gpuInfoCudaEr
     *used = usedMem;
 
     return true;
+}
+
+void gpuInfoGetCudaDeviceNames(std::vector<std::string> * deviceNames, gpuInfoCudaErrorLogCallback_t errorLogCallback) {
+    int deviceCount = gpuInfoGetCudaDeviceCount(errorLogCallback);
+
+    if (deviceCount < 0) {
+        return;
+    }
+
+    for (int i = 0; i < deviceCount; i++) {
+        cudaDeviceProp prop;
+        auto getDevicePropertiesResult = cudaGetDeviceProperties(&prop, i);
+
+        if (getDevicePropertiesResult != cudaSuccess) {
+            errorLogCallback(cudaGetErrorString(getDevicePropertiesResult));
+        } else {
+            (*deviceNames).push_back(std::string(prop.name));
+        }
+    }
 }

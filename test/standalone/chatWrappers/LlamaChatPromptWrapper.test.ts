@@ -38,23 +38,18 @@ describe("LlamaChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
-              "value": "[INST] ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<<SYS>>
+              "type": "specialTokensText",
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
@@ -62,10 +57,8 @@ describe("LlamaChatWrapper", () => {
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": " [/INST]
-
-          ",
+              "type": "specialTokensText",
+              "value": " [/INST] ",
             },
             "Hello!",
           ]
@@ -77,23 +70,18 @@ describe("LlamaChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
-              "value": "[INST] ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<<SYS>>
+              "type": "specialTokensText",
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
@@ -101,32 +89,26 @@ describe("LlamaChatWrapper", () => {
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": " [/INST]
-
-          ",
+              "type": "specialTokensText",
+              "value": " [/INST] ",
             },
             "Hello!",
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "EOS",
             },
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "[INST] ",
             },
             "How are you?",
             {
-              "type": "specialToken",
-              "value": " [/INST]
-
-          ",
+              "type": "specialTokensText",
+              "value": " [/INST] ",
             },
             "I'm good, how are you?",
           ]
@@ -145,23 +127,18 @@ describe("LlamaChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
-              "value": "[INST] ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<<SYS>>
+              "type": "specialTokensText",
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
@@ -169,10 +146,8 @@ describe("LlamaChatWrapper", () => {
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": " [/INST]
-
-          ",
+              "type": "specialTokensText",
+              "value": " [/INST] ",
             },
             "Hello!",
           ]
@@ -181,23 +156,18 @@ describe("LlamaChatWrapper", () => {
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             {
-              "type": "specialToken",
-              "value": "[INST] ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<<SYS>>
+              "type": "specialTokensText",
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "
           <</SYS>>
 
@@ -205,10 +175,8 @@ describe("LlamaChatWrapper", () => {
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": " [/INST]
-
-          ",
+              "type": "specialTokensText",
+              "value": " [/INST] ",
             },
             "Hello!
 

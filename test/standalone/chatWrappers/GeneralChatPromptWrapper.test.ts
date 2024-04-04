@@ -38,24 +38,17 @@ describe("GeneralChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Human
-          ",
-            "Hi there!",
-            "
+          ### Human
+          Hi there!
 
-          ",
-            "### Assistant
-          ",
-            "Hello!",
+          ### Assistant
+          Hello!",
           ]
         `);
 
@@ -65,36 +58,23 @@ describe("GeneralChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Human
-          ",
-            "Hi there!",
-            "
+          ### Human
+          Hi there!
 
-          ",
-            "### Assistant
-          ",
-            "Hello!",
-            "
+          ### Assistant
+          Hello!
 
-          ",
-            "### Human
-          ",
-            "How are you?",
-            "
+          ### Human
+          How are you?
 
-          ",
-            "### Assistant
-          ",
-            "I'm good, how are you?",
+          ### Assistant
+          I'm good, how are you?",
           ]
         `);
 
@@ -111,52 +91,36 @@ describe("GeneralChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Human
-          ",
-            "Hi there!",
-            "
+          ### Human
+          Hi there!
 
-          ",
-            "### Assistant
-          ",
-            "Hello!",
+          ### Assistant
+          Hello!",
           ]
         `);
 
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Human
-          ",
-            "Hi there!",
-            "
+          ### Human
+          Hi there!
 
-          ",
-            "### Assistant
-          ",
-            "Hello!",
-            "
+          ### Assistant
+          Hello!
 
-          ",
-            "### Assistant
+          ### Assistant
           ",
           ]
         `);
@@ -172,24 +136,17 @@ describe("GeneralChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Instruction
-          ",
-            "Hi there!",
-            "
+          ### Instruction
+          Hi there!
 
-          ",
-            "### Response
-          ",
-            "Hello!",
+          ### Response
+          Hello!",
           ]
         `);
 
@@ -202,36 +159,23 @@ describe("GeneralChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "builtin": true,
               "type": "specialToken",
               "value": "BOS",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
-          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            "
+          If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
-          ",
-            "### Instruction
-          ",
-            "Hi there!",
-            "
+          ### Instruction
+          Hi there!
 
-          ",
-            "### Response
-          ",
-            "Hello!",
-            "
+          ### Response
+          Hello!
 
-          ",
-            "### Instruction
-          ",
-            "How are you?",
-            "
+          ### Instruction
+          How are you?
 
-          ",
-            "### Response
-          ",
-            "I'm good, how are you?",
+          ### Response
+          I'm good, how are you?",
           ]
         `);
     });

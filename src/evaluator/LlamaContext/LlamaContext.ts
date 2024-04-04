@@ -5,11 +5,15 @@ import {BatchLogitIndex, AddonContext} from "../../bindings/AddonTypes.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
+import {GgufInsights} from "../../gguf/GgufInsights.js";
+import {minAllowedContextSizeInCalculations} from "../../config.js";
+import {TokenMeter} from "../TokenMeter.js";
+import {BuildGpu} from "../../bindings/types.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
-import {resolveBatchItemsPrioritizingStrategy} from "./utils/resolveBatchItemsPrioritizingStrategy.js";
+import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {LlamaModel} from "../LlamaModel.js";
 
@@ -44,18 +48,22 @@ export class LlamaContext {
     }: {
         _model: LlamaModel
     }, {
-        sequences = 1,
+        sequences,
         seed = null,
-        contextSize = _model.trainContextSize,
-        batchSize = Math.min(contextSize * sequences, 512),
+        contextSize,
+        batchSize,
         threads = 6,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
-            itemsPrioritizingStrategy: batchingItemsPrioritizingStrategy = "maximumParallelism"
+            itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
         _embeddings,
         _noSeed
-    }: LlamaContextOptions) {
+    }: LlamaContextOptions & {
+        sequences: number,
+        contextSize: number,
+        batchSize: number
+    }) {
         if (_model.disposed)
             throw new DisposedError();
 
@@ -70,13 +78,14 @@ export class LlamaContext {
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
+            sequences: this._totalSequences,
             threads: Math.max(0, Math.floor(threads)),
             embeddings: _embeddings,
             noSeed: _noSeed
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
-            itemsPrioritizingStrategy: batchingItemsPrioritizingStrategy
+            itemPrioritizationStrategy: batchingItemsPrioritizationStrategy
         };
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
@@ -129,6 +138,16 @@ export class LlamaContext {
         return this._batchSize;
     }
 
+    /**
+     * The actual size of the state in the memory in bytes.
+     * This value is provided by `llama.cpp` and doesn't include all the memory overhead of the context.
+     */
+    public get stateSize() {
+        this._ensureNotDisposed();
+
+        return this._ctx.getStateSize();
+    }
+
     public getAllocatedContextSize(): number {
         this._ensureNotDisposed();
 
@@ -155,9 +174,14 @@ export class LlamaContext {
         contextShift: {
             size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
-        } = {}
+        } = {},
+
+        _tokenMeter
     }: {
-        contextShift?: ContextShiftOptions
+        contextShift?: ContextShiftOptions,
+
+        /** @internal */
+        _tokenMeter?: TokenMeter
     } = {}): LlamaContextSequence {
         this._ensureNotDisposed();
 
@@ -169,6 +193,7 @@ export class LlamaContext {
         return LlamaContextSequence._create({
             sequenceId: nextSequenceId,
             context: this,
+            tokenMeter: _tokenMeter,
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
@@ -190,18 +215,22 @@ export class LlamaContext {
             this._dispatchDecodeScheduled = false;
             this._batchDispatchPending = false;
 
-            let prioritizeStrategy: ReturnType<typeof resolveBatchItemsPrioritizingStrategy>;
-            try {
-                this._ensureNotDisposed();
-                prioritizeStrategy = resolveBatchItemsPrioritizingStrategy(this._batchingOptions.itemsPrioritizingStrategy);
-            } catch (err) {
-                this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                return;
-            }
+            let shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
 
-            let shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
+            const resolvePrioritizationStrategy = () => {
+                try {
+                    this._ensureNotDisposed();
+                    return resolveBatchItemsPrioritizationStrategy(this._batchingOptions.itemPrioritizationStrategy);
+                } catch (err) {
+                    this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
+                }
 
-            while (shouldHaveAnotherBatch) {
+                return null;
+            };
+
+            const getOrderedQueuedDecodes = (
+                prioritizationStrategy: ReturnType<typeof resolveBatchItemsPrioritizationStrategy>
+            ): null | CurrentBatchItem[] => {
                 const batchItemToQueuedDecodeMap = new Map<BatchItem, InternalQueuedDecode>();
                 const batchItemsList: BatchItem[] = [];
 
@@ -216,31 +245,16 @@ export class LlamaContext {
 
                 let prioritizedItems: PrioritizedBatchItem[];
                 try {
-                    prioritizedItems = prioritizeStrategy({
+                    prioritizedItems = prioritizationStrategy({
                         items: batchItemsList,
                         size: this._batchSize
                     });
                 } catch (err) {
                     this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                    return;
+                    return null;
                 }
 
-                let batchTokenSlotsLeft = this._batchSize;
-                const afterDecodeActions: Array<{
-                    batchLogitIndex: BatchLogitIndex | undefined,
-                    response: [accept: (res: any) => void, reject: (reason: unknown) => void],
-                    onDone?: (batchLogitIndex: BatchLogitIndex) => any
-                }> = [];
-                const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
-                const currentQueuedDecodeItems = new Set<InternalQueuedDecode>();
-
-                const currentBatchItems: Array<{
-                    queuedDecode: InternalQueuedDecode,
-                    processAmount: number
-                }> = [];
-                let currentBatchSize = 0;
-
-                for (const prioritizedItem of prioritizedItems) {
+                return prioritizedItems.map((prioritizedItem): CurrentBatchItem => {
                     const queuedDecode = batchItemToQueuedDecodeMap.get(prioritizedItem.item);
 
                     if (queuedDecode == null)
@@ -249,22 +263,138 @@ export class LlamaContext {
                             "of the batch item on `item` on `PrioritizedBatchItem` in your custom prioritization strategy"
                         );
 
-                    const processAmount = Math.min(queuedDecode.tokens.length, prioritizedItem.processAmount, batchTokenSlotsLeft);
+                    return {
+                        queuedDecode,
+                        processAmount: prioritizedItem.processAmount
+                    };
+                });
+            };
 
-                    if (processAmount <= 0)
+            const fitQueuedDecodesToABatch = (queuedDecodes: CurrentBatchItem[], batchSize: number) => {
+                const currentBatchItems: CurrentBatchItem[] = [];
+                let currentBatchSize = 0;
+                let batchTokenSlotsLeft = batchSize;
+
+                for (const {queuedDecode, processAmount} of queuedDecodes) {
+                    const resolvedProcessAmount = Math.min(
+                        processAmount <= 0 ? 1 : processAmount, queuedDecode.tokens.length, batchTokenSlotsLeft
+                    );
+
+                    if (resolvedProcessAmount <= 0) {
+                        if (batchTokenSlotsLeft === 0)
+                            break;
+
                         continue;
+                    }
 
-                    batchTokenSlotsLeft -= processAmount;
+                    batchTokenSlotsLeft -= resolvedProcessAmount;
+                    currentBatchSize += resolvedProcessAmount;
 
                     currentBatchItems.push({
                         queuedDecode,
-                        processAmount
+                        processAmount: resolvedProcessAmount
                     });
-                    currentBatchSize += processAmount;
                 }
 
-                let preventDisposalHandle: DisposalPreventionHandle;
+                return {
+                    currentBatchItems,
+                    currentBatchSize
+                };
+            };
 
+            const decodeTokenBatchItems = async (batchItems: CurrentBatchItem[], currentBatchSize: number) => {
+                const afterDecodeActions: Array<{
+                    batchLogitIndex: BatchLogitIndex | undefined,
+                    response: [accept: (res: any) => void, reject: (reason: unknown) => void],
+                    onDone?: (batchLogitIndex: BatchLogitIndex) => any
+                }> = [];
+                const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
+                const currentQueuedDecodeItems = new Set<InternalQueuedDecode>();
+
+                if (currentBatchSize !== 0)
+                    this._ctx.initBatch(currentBatchSize);
+
+                for (const {queuedDecode, processAmount} of batchItems) {
+                    let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
+                    try {
+                        const shouldGenerateLogitAtTheEnd = queuedDecode.generateLogitAtTheEnd &&
+                            processAmount === queuedDecode.tokens.length;
+
+                        const tokensToProcess = queuedDecode.tokens.slice(0, processAmount);
+
+                        const numberOfOutputTokens = shouldGenerateLogitAtTheEnd ? 1 : 0;
+                        TokenMeter.useTokens(queuedDecode.tokenMeter, Math.max(0, tokensToProcess.length - numberOfOutputTokens), "input");
+                        TokenMeter.useTokens(queuedDecode.tokenMeter, numberOfOutputTokens, "output");
+
+                        batchLogitIndex = this._ctx.addToBatch(
+                            queuedDecode.sequenceId,
+                            queuedDecode.firstTokenSequenceIndex,
+                            Uint32Array.from(tokensToProcess),
+                            shouldGenerateLogitAtTheEnd
+                        );
+                    } catch (err) {
+                        this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
+                        continue;
+                    }
+                    currentQueuedDecodeItems.add(queuedDecode);
+
+                    if (queuedDecode.tokens.length === processAmount) {
+                        queuedDecodesToDelete.add(queuedDecode);
+                        afterDecodeActions.push({
+                            batchLogitIndex,
+                            response: queuedDecode.response,
+                            onDone: queuedDecode.onDone
+                        });
+                    } else {
+                        queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
+                        queuedDecode.firstTokenSequenceIndex += processAmount;
+                    }
+                }
+
+                for (let i = 0; i < this._queuedDecodes.length; i++) {
+                    const queuedDecode = this._queuedDecodes[i];
+                    if (queuedDecodesToDelete.has(queuedDecode)) {
+                        this._queuedDecodes.splice(i, 1);
+                        this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
+                        i--;
+                    }
+                }
+
+                try {
+                    if (currentBatchSize !== 0)
+                        await this._ctx.decodeBatch();
+                } catch (err) {
+                    this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                    return;
+                }
+
+                for (const action of afterDecodeActions) {
+                    const [accept, reject] = action.response;
+                    if (action.onDone != null && action.batchLogitIndex != null) {
+                        try {
+                            accept(action.onDone(action.batchLogitIndex ?? null));
+                        } catch (err) {
+                            reject(err);
+                        }
+                    }
+
+                    accept(undefined);
+                }
+            };
+
+            const prioritizationStrategy = resolvePrioritizationStrategy();
+            if (prioritizationStrategy == null) return; // all queued items are rejected and dequeued when we get here
+
+            while (shouldHaveAnotherLoop) {
+                const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizationStrategy);
+                if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
+
+                const {
+                    currentBatchItems,
+                    currentBatchSize
+                } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
+
+                let preventDisposalHandle: DisposalPreventionHandle;
                 try {
                     preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
                 } catch (err) {
@@ -273,71 +403,9 @@ export class LlamaContext {
                 }
 
                 try {
-                    if (currentBatchSize !== 0)
-                        this._ctx.initBatch(currentBatchSize);
+                    await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
 
-                    for (const {queuedDecode, processAmount} of currentBatchItems) {
-                        let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
-                        try {
-                            batchLogitIndex = this._ctx.addToBatch(
-                                queuedDecode.sequenceId,
-                                queuedDecode.firstTokenSequenceIndex,
-                                Uint32Array.from(queuedDecode.tokens.slice(0, processAmount)),
-                                queuedDecode.generateLogitAtTheEnd && processAmount === queuedDecode.tokens.length
-                            );
-                        } catch (err) {
-                            this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
-                            continue;
-                        }
-                        currentQueuedDecodeItems.add(queuedDecode);
-
-                        if (queuedDecode.tokens.length === processAmount) {
-                            queuedDecodesToDelete.add(queuedDecode);
-                            afterDecodeActions.push({
-                                batchLogitIndex,
-                                response: queuedDecode.response,
-                                onDone: queuedDecode.onDone
-                            });
-                        } else {
-                            queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
-                            queuedDecode.firstTokenSequenceIndex += processAmount;
-                        }
-
-                        if (batchTokenSlotsLeft === 0)
-                            break;
-                    }
-
-                    for (let i = 0; i < this._queuedDecodes.length; i++) {
-                        const queuedDecode = this._queuedDecodes[i];
-                        if (queuedDecodesToDelete.has(queuedDecode)) {
-                            this._queuedDecodes.splice(i, 1);
-                            this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
-                            i--;
-                        }
-                    }
-
-                    shouldHaveAnotherBatch = this._queuedDecodes.length > 0;
-
-                    try {
-                        if (currentBatchSize !== 0)
-                            await this._ctx.decodeBatch();
-                    } catch (err) {
-                        this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
-                        return;
-                    }
-
-                    for (const action of afterDecodeActions) {
-                        const [accept, reject] = action.response;
-                        if (action.onDone != null && action.batchLogitIndex != null) {
-                            try {
-                                accept(action.onDone(action.batchLogitIndex ?? null));
-                            } catch (err) {
-                                reject(err);
-                            }
-                        }
-
-                        accept(undefined);
-                    }
+                    shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
                 } finally {
                     preventDisposalHandle.dispose();
                 }
@@ -345,6 +413,11 @@ export class LlamaContext {
         });
     }
 
+    /**
+     * Print the timings of token evaluation since that last print for this context.
+     * > **Note:** it prints on the `LlamaLogLevel.info` level, so if you set the level of your `Llama` instance higher than that,
+     * it won't print anything.
+     */
     public async printTimings() {
         this._ensureNotDisposed();
 
@@ -354,10 +427,10 @@ export class LlamaContext {
 
     /** @internal */
     public async _decodeTokens<T>({
-        sequenceId, firstTokenSequenceIndex, tokens, generateLogitAtTheEnd = false, evaluationPriority = 5
+        sequenceId, firstTokenSequenceIndex, tokens, generateLogitAtTheEnd = false, evaluationPriority = 5, tokenMeter
     }: {
         sequenceId: number, firstTokenSequenceIndex: number, tokens: Token[], generateLogitAtTheEnd?: boolean,
-        evaluationPriority?: EvaluationPriority
+        evaluationPriority?: EvaluationPriority, tokenMeter: TokenMeter
     }, onDone?: ((batchLogitIndex: BatchLogitIndex) => (T | Promise<T>))): Promise<T> {
         return await new Promise((accept, reject) => {
             this._queuedDecodes.push({
@@ -366,6 +439,7 @@ export class LlamaContext {
                 firstTokenSequenceIndex,
                 generateLogitAtTheEnd,
                 evaluationPriority,
+                tokenMeter,
                 response: [accept, reject],
                 onDone
             });
@@ -463,20 +537,49 @@ export class LlamaContext {
     public static async _create(options: LlamaContextOptions, {_model}: {
         _model: LlamaModel
     }): Promise<LlamaContext> {
-        const context = new LlamaContext({_model}, options);
+        const sequences = options.sequences ?? getDefaultContextSequences();
+        const contextSize = resolveContextContextSizeOption({
+            contextSize: options.contextSize,
+            batchSize: options.batchSize,
+            sequences: sequences,
+            modelFileInsights: _model.fileInsights,
+            modelGpuLayers: _model.gpuLayers,
+            modelTrainContextSize: _model.trainContextSize,
+            getVramState: () => _model._llama._vramOrchestrator.getMemoryState(),
+            llamaGpu: _model._llama.gpu,
+            ignoreMemorySafetyChecks: options.ignoreMemorySafetyChecks,
+            isEmbeddingContext: options._embeddings
+        });
+        const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
+        const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
+            contextSize,
+            sequences,
+            isEmbeddingContext: options._embeddings,
+            modelGpuLayers: _model.gpuLayers,
+            batchSize
+        }).gpuVram;
+
+        const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences});
         const {createSignal} = options;
+        const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
+            ? null
+            : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-        const contextLoaded = await context._ctx.init();
+        try {
+            const contextLoaded = await context._ctx.init();
 
-        if (createSignal?.aborted) {
-            if (contextLoaded)
-                await context._ctx.dispose();
+            if (createSignal?.aborted) {
+                if (contextLoaded)
+                    await context._ctx.dispose();
 
-            throw createSignal.reason;
-        } else if (!contextLoaded)
-            throw new Error("Failed to create context");
+                throw createSignal.reason;
+            } else if (!contextLoaded)
+                throw new Error("Failed to create context");
 
-        return context;
+            return context;
+        } finally {
+            contextCreationMemoryReservation?.dispose?.();
+        }
     }
 }
 
@@ -485,6 +588,7 @@ export class LlamaContextSequence {
     /** @internal */ private readonly _gcRegistry: FinalizationRegistry<number>;
     /** @internal */ private readonly _context: LlamaContext;
     /** @internal */ private readonly _contextShift: Required<ContextShiftOptions>;
+    /** @internal */ private readonly _tokenMeter: TokenMeter;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private _contextTokens: Token[] = [];
     /** @internal */ private _nextTokenIndex: number = 0;
@@ -493,14 +597,16 @@ export class LlamaContextSequence {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        sequenceId, context, contextShift
+        sequenceId, context, tokenMeter, contextShift
     }: {
         sequenceId: number,
         context: LlamaContext,
+        tokenMeter?: TokenMeter,
         contextShift: Required<ContextShiftOptions>
     }) {
         this._sequenceId = sequenceId;
         this._context = context;
+        this._tokenMeter = tokenMeter ?? new TokenMeter();
         this._contextShift = contextShift;
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
@@ -555,6 +661,10 @@ export class LlamaContextSequence {
         return this._contextTokens.slice();
     }
 
+    public get tokenMeter() {
+        return this._tokenMeter;
+    }
+
     public get isLoadedToMemory() {
         return !this._disposed;
     }
@@ -588,7 +698,7 @@ export class LlamaContextSequence {
 
     /**
      * Erase context tokens in the provided ranges to free up space for new tokens to be generated.
-     * the start and end of each range are exclusive.
+     * The start of each range is inclusive, and the end of each range is exclusive.
      * For example, the range `{start: 0, end: 1}` will remove the token at the `0` index only.
      */
     public async eraseContextTokenRanges(ranges: ContextTokensDeleteRange[]) {
@@ -801,6 +911,7 @@ export class LlamaContextSequence {
                 evalTokens,
                 generateNewTokens,
                 evaluationPriority,
+                this._tokenMeter,
                 contextShiftOptions,
                 (batchLogitIndex) => {
                     const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
@@ -849,6 +960,7 @@ export class LlamaContextSequence {
         tokens: Token[],
         generateLogit: boolean,
         evaluationPriority: EvaluationPriority,
+        tokenMeter: TokenMeter,
         contextShiftOptions: Required<ContextShiftOptions>,
         onDecodeDone: ((batchLogitIndex: BatchLogitIndex) => T | Promise<T>)
     ): Promise<T | null> {
@@ -878,7 +990,8 @@ export class LlamaContextSequence {
                     tokens: tokensToDecode,
                     firstTokenSequenceIndex: this._nextTokenIndex,
                     generateLogitAtTheEnd,
-                    evaluationPriority
+                    evaluationPriority,
+                    tokenMeter
                 }, !generateLogitAtTheEnd
                     ? undefined
                     : onDecodeDone
@@ -945,7 +1058,7 @@ export class LlamaContextSequence {
      * @internal
      */
     public static _create({
-        sequenceId, context,
+        sequenceId, context, tokenMeter,
         contextShift: {
             size: contextShiftSize = Math.min(100, Math.ceil(context.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
@@ -953,11 +1066,13 @@ export class LlamaContextSequence {
     }: {
         sequenceId: number,
         context: LlamaContext,
+        tokenMeter?: TokenMeter,
         contextShift?: ContextShiftOptions
     }): LlamaContextSequence {
         return new LlamaContextSequence({
             sequenceId,
             context,
+            tokenMeter,
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
@@ -972,8 +1087,14 @@ type InternalQueuedDecode = {
     tokens: readonly Token[],
     generateLogitAtTheEnd: boolean,
     evaluationPriority: EvaluationPriority,
+    tokenMeter: TokenMeter,
     response: [accept: (res: any) => void, reject: (reason: unknown) => void],
     onDone?: (batchLogitIndex: BatchLogitIndex) => any
+};
+
+type CurrentBatchItem = {
+    queuedDecode: InternalQueuedDecode,
+    processAmount: number
 };
 
 function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {
@@ -988,4 +1109,100 @@ function disposeContextSequenceIfReferenced(contextRef: WeakRef<LlamaContextSequ
 
     if (context != null)
         context.dispose();
+}
+
+export function resolveContextContextSizeOption({
+    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, getVramState, llamaGpu,
+    ignoreMemorySafetyChecks = false, isEmbeddingContext = false
+}: {
+    contextSize?: LlamaContextOptions["contextSize"],
+    batchSize?: LlamaContextOptions["batchSize"],
+    sequences: number,
+    modelFileInsights: GgufInsights,
+    modelGpuLayers: number,
+    modelTrainContextSize: number,
+    getVramState(): {total: number, free: number},
+    llamaGpu: BuildGpu,
+    ignoreMemorySafetyChecks?: boolean,
+    isEmbeddingContext?: boolean
+}): number {
+    if (contextSize == null)
+        contextSize = "auto";
+
+    if (typeof contextSize === "number") {
+        const resolvedContextSize = Math.max(1, Math.floor(contextSize));
+
+        if (ignoreMemorySafetyChecks)
+            return resolvedContextSize;
+
+        const vramState = getVramState();
+        const contextVram = modelFileInsights.estimateContextResourceRequirements({
+            contextSize: resolvedContextSize,
+            batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: resolvedContextSize, sequences}),
+            modelGpuLayers: modelGpuLayers,
+            sequences,
+            isEmbeddingContext
+        }).gpuVram;
+
+        if (contextVram > vramState.free)
+            throw new Error(`The context size of ${resolvedContextSize}${sequences > 1 ? ` with ${sequences} sequences` : ""} is too large for the available VRAM`);
+
+        return resolvedContextSize;
+    } else if (contextSize === "auto" || typeof contextSize === "object") {
+        if (llamaGpu === false)
+            return modelTrainContextSize;
+
+        const vramState = getVramState();
+
+        if (vramState.total === 0)
+            return modelTrainContextSize;
+
+        const freeVram = vramState.free;
+
+        const maxContextSize = contextSize === "auto"
+            ? getDefaultModelContextSize({trainContextSize: modelTrainContextSize})
+            : Math.min(
+                contextSize.max ?? getDefaultModelContextSize({trainContextSize: modelTrainContextSize}),
+                getDefaultModelContextSize({trainContextSize: modelTrainContextSize})
+            );
+
+        const minContextSize = contextSize === "auto"
+            ? minAllowedContextSizeInCalculations
+            : Math.max(
+                contextSize.min ?? minAllowedContextSizeInCalculations,
+                minAllowedContextSizeInCalculations
+            );
+
+        for (let testContextSize = maxContextSize; testContextSize >= minContextSize; testContextSize--) {
+            const contextVram = modelFileInsights.estimateContextResourceRequirements({
+                contextSize: testContextSize,
+                batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: testContextSize, sequences}),
+                modelGpuLayers: modelGpuLayers,
+                sequences,
+                isEmbeddingContext
+            }).gpuVram;
+
+            if (contextVram <= freeVram)
+                return testContextSize;
+        }
+
+        if (ignoreMemorySafetyChecks)
+            return minContextSize;
+
+        throw new Error(`The available VRAM is too small to fit the context size of ${maxContextSize}${sequences > 1 ? ` with ${sequences} sequences` : ""}`);
+    }
+
+    throw new Error(`Invalid context size: "${contextSize}"`);
+}
+
+export function getDefaultContextBatchSize({contextSize, sequences}: {contextSize: number, sequences: number}) {
+    return Math.min(contextSize * sequences, 512);
+}
+export function getDefaultContextSequences() {
+    return 1;
+}
+
+const defaultFallbackContextSize = 4096;
+export function getDefaultModelContextSize({trainContextSize}: {trainContextSize?: number}) {
+    return trainContextSize ?? defaultFallbackContextSize;
 }

@@ -108,6 +108,22 @@ export default defineConfig({
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
         }
+
+        let canonicalUrl = hostname + pageData.relativePath;
+        if (canonicalUrl.endsWith("/index.html"))
+            canonicalUrl = canonicalUrl.slice(0, -"index.html".length);
+        if (canonicalUrl.endsWith("/index.md"))
+            canonicalUrl = canonicalUrl.slice(0, -"index.md".length);
+        else if (canonicalUrl.endsWith(".html"))
+            canonicalUrl = canonicalUrl.slice(0, -".html".length);
+        else if (canonicalUrl.endsWith(".md"))
+            canonicalUrl = canonicalUrl.slice(0, -".md".length);
+
+        pageData.frontmatter.head ??= [];
+        pageData.frontmatter.head.push([
+            "link",
+            {rel: "canonical", href: canonicalUrl}
+        ])
     },
     themeConfig: {
         editLink: {
@@ -183,7 +199,16 @@ export default defineConfig({
                     {text: "Download", link: "/download"},
                     {text: "Complete", link: "/complete"},
                     {text: "Infill", link: "/infill"},
-                    {text: "Inspect", link: "/inspect"},
+                    {
+                        text: "Inspect",
+                        link: "/inspect",
+                        collapsed: true,
+                        items: [
+                            {text: "GPU", link: "/inspect/gpu"},
+                            {text: "GGUF", link: "/inspect/gguf"},
+                            {text: "Measure", link: "/inspect/measure"},
+                        ]
+                    },
                     {text: "Build", link: "/build"},
                     {text: "Clear", link: "/clear"}
                 ]
@@ -302,7 +327,7 @@ function orderClasses(sidebar: typeof typedocSidebar) {
         items: []
     };
     (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
-    const LlamaTextGroupItemsOrder = ["SpecialToken", "BuiltinSpecialToken"];
+    const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
 
     groupItems(
         classes.items,
@@ -327,7 +352,7 @@ function orderTypes(sidebar: typeof typedocSidebar) {
         (item) => (
             item.text === "BatchItem" ||
             item.text === "CustomBatchingDispatchSchedule" ||
-            item.text === "CustomBatchingPrioritizeStrategy" ||
+            item.text === "CustomBatchingPrioritizationStrategy" ||
             item.text === "PrioritizedBatchItem"
         ),
         {collapsed: false}

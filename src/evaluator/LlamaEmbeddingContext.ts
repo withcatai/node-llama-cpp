@@ -6,8 +6,22 @@ import type {LlamaModel} from "./LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
 export type LlamaEmbeddingContextOptions = {
-    /** text context size */
-    contextSize?: number,
+    /**
+     * The number of tokens the model can see at once.
+     * - **`"auto"`** - adapt to the current VRAM state and attemp to set the context size as high as possible up to the size
+     * the model was trained on.
+     * - **`number`** - set the context size to a specific number of tokens.
+     * If there's not enough VRAM, an error will be thrown.
+     * Use with caution.
+     * - **`{min?: number, max?: number}`** - adapt to the current VRAM state and attemp to set the context size as high as possible
+     * up to the size the model was trained on, but at least `min` and at most `max`.
+     *
+     * Defaults to `"auto"`.
+     */
+    contextSize?: "auto" | number | {
+        min?: number,
+        max?: number
+    },
 
     /** prompt processing batch size */
     batchSize?: number,
@@ -19,7 +33,15 @@ export type LlamaEmbeddingContextOptions = {
     threads?: number,
 
     /** An abort signal to abort the context creation */
-    createSignal?: AbortSignal
+    createSignal?: AbortSignal,
+
+    /**
+     * Ignore insufficient memory errors and continue with the context creation.
+     * Can cause the process to crash if there's not enough VRAM for the new context.
+     *
+     * Defaults to `false`.
+     */
+    ignoreMemorySafetyChecks?: boolean
 };
 
 export class LlamaEmbeddingContext {
@@ -97,19 +119,18 @@ export class LlamaEmbeddingContext {
     }: {
         _model: LlamaModel
     }, {
-        contextSize = _model.trainContextSize,
-        batchSize = contextSize,
+        contextSize,
+        batchSize,
         threads = 6,
-        createSignal
+        createSignal,
+        ignoreMemorySafetyChecks
     }: LlamaEmbeddingContextOptions) {
-        const resolvedContextSize = Math.min(contextSize, _model.trainContextSize);
-        const resolvedBatchSize = Math.min(batchSize, resolvedContextSize);
-
         const llamaContext = await _model.createContext({
-            contextSize: resolvedContextSize,
-            batchSize: resolvedBatchSize,
+            contextSize,
+            batchSize,
             threads,
             createSignal,
+            ignoreMemorySafetyChecks,
             _embeddings: true,
             _noSeed: true
         });

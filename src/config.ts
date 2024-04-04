@@ -78,9 +78,16 @@ export const defaultChatSystemPrompt = "You are a helpful, respectful and honest
 export const cliBinName = "node-llama-cpp";
 export const npxRunPrefix = "npx --no ";
 
+// No need for that at the moment.
+// Disabled due to a recursive clone of the llama.cpp repo taking up a lot of space (in the embedded bundle)
+// and due to making the clone significantly slower.
+// The submodules of the repo are not being used for the compilation for the supported backends, so there's no need to clone them.
+export const enableRecursiveClone = false;
+
 const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",
     Vulkan: documentationUrl + "/guide/vulkan"
 } as const;
 export const recommendedBaseDockerImage = "node:20";
+export const minAllowedContextSizeInCalculations = 24;

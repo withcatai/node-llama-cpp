@@ -1,0 +1,323 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`gguf > parser > should fetch GGUF metadata 1`] = `
+{
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 32768,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 10000,
+    },
+  },
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": 2,
+      "name": "workspace",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 32768,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 10000,
+      },
+    },
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|from|>' + message['role'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% elif message['role'] == 'tool' %}
+{{ '<|from|>' + message['name'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% else %}
+{% set contain_content='no'%}
+{% if message['content'] is not none %}
+{{ '<|from|>assistant
+<|recipient|>all
+<|content|>' + message['content'] }}{% set contain_content='yes'%}
+{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{% set prompt='<|from|>assistant
+<|recipient|>' + tool_call['function']['name'] + '
+<|content|>' + tool_call['function']['arguments'] %}
+{% if loop.index == 1 and contain_content == "no" %}
+{{ prompt }}{% else %}
+{{ '
+' + prompt}}{% endif %}
+{% endfor %}
+{% endif %}
+{{ '<|stop|>
+' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|from|>assistant
+<|recipient|>' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "model": "llama",
+        "padding_token_id": 2,
+        "scores": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ],
+        "token_type": [
+          2,
+          3,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+        ],
+        "tokens": [
+          "<unk>",
+          "<s>",
+          "</s>",
+          "<0x00>",
+          "<0x01>",
+          "<0x02>",
+          "<0x03>",
+          "<0x04>",
+          "<0x05>",
+          "<0x06>",
+        ],
+        "unknown_token_id": 0,
+      },
+    },
+  },
+  "metadataSize": 718762,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        32004,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 73737216,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 73753600,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 106783744,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "version": 3,
+}
+`;
+
+exports[`gguf > parser > should parse local gguf model 1`] = `
+{
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 32768,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 10000,
+    },
+  },
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": 2,
+      "name": "workspace",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 32768,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 10000,
+      },
+    },
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|from|>' + message['role'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% elif message['role'] == 'tool' %}
+{{ '<|from|>' + message['name'] + '
+<|recipient|>all
+<|content|>' + message['content'] + '
+' }}{% else %}
+{% set contain_content='no'%}
+{% if message['content'] is not none %}
+{{ '<|from|>assistant
+<|recipient|>all
+<|content|>' + message['content'] }}{% set contain_content='yes'%}
+{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{% set prompt='<|from|>assistant
+<|recipient|>' + tool_call['function']['name'] + '
+<|content|>' + tool_call['function']['arguments'] %}
+{% if loop.index == 1 and contain_content == "no" %}
+{{ prompt }}{% else %}
+{{ '
+' + prompt}}{% endif %}
+{% endfor %}
+{% endif %}
+{{ '<|stop|>
+' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|from|>assistant
+<|recipient|>' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "model": "llama",
+        "padding_token_id": 2,
+        "scores": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ],
+        "token_type": [
+          2,
+          3,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+        ],
+        "tokens": [
+          "<unk>",
+          "<s>",
+          "</s>",
+          "<0x00>",
+          "<0x01>",
+          "<0x02>",
+          "<0x03>",
+          "<0x04>",
+          "<0x05>",
+          "<0x06>",
+        ],
+        "unknown_token_id": 0,
+      },
+    },
+  },
+  "metadataSize": 718762,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        32004,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 73737216,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 73753600,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 106783744,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "version": 3,
+}
+`;

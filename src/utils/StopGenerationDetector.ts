@@ -1,5 +1,5 @@
 import {Token, Tokenizer} from "../types.js";
-import {isLlamaText, LlamaText, SpecialToken} from "./LlamaText.js";
+import {SpecialToken, isLlamaText, LlamaText, SpecialTokensText} from "./LlamaText.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock} from "./TokenStreamRegulator.js";
 
 export type StopGenerationTrigger = (string | Token)[];
@@ -247,6 +247,8 @@ export class StopGenerationDetector<T extends string = string> {
                         return [value];
                     else if (value instanceof SpecialToken)
                         return value.tokenize(tokenizer);
+                    else if (value instanceof SpecialTokensText)
+                        return value.tokenize(tokenizer, true);
 
                     return value satisfies never;
                 })

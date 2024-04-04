@@ -10,7 +10,8 @@ describe("parseModelFileName", () => {
                 quantization: "Q4_K_M",
                 fileType: "gguf",
                 version: undefined,
-                parameters: "13B"
+                parameters: "13B",
+                otherInfo: []
             });
     });
 
@@ -22,7 +23,8 @@ describe("parseModelFileName", () => {
                 quantization: "Q4_K_M",
                 fileType: "gguf",
                 version: "v2",
-                parameters: "13B"
+                parameters: "13B",
+                otherInfo: []
             });
     });
 
@@ -34,7 +36,8 @@ describe("parseModelFileName", () => {
                 quantization: "Q4_K_M",
                 fileType: "gguf",
                 version: "v2",
-                parameters: "34B"
+                parameters: "34B",
+                otherInfo: []
             });
     });
 
@@ -46,7 +49,8 @@ describe("parseModelFileName", () => {
                 subType: "llama-2",
                 quantization: "Q5_K_S",
                 fileType: "gguf",
-                parameters: "13B"
+                parameters: "13B",
+                otherInfo: []
             });
     });
 
@@ -56,7 +60,8 @@ describe("parseModelFileName", () => {
                 name: "functionary",
                 subType: "small-v2.2",
                 quantization: "q4_0",
-                fileType: "gguf"
+                fileType: "gguf",
+                otherInfo: []
             });
     });
 
@@ -67,7 +72,8 @@ describe("parseModelFileName", () => {
                 subType: "alpaca",
                 quantization: "Q5_K_M",
                 fileType: "gguf",
-                parameters: "13B"
+                parameters: "13B",
+                otherInfo: []
             });
     });
 
@@ -78,7 +84,8 @@ describe("parseModelFileName", () => {
                 subType: "2.1-mistral",
                 quantization: "Q4_K_M",
                 fileType: "gguf",
-                parameters: "7B"
+                parameters: "7B",
+                otherInfo: []
             });
     });
 
@@ -89,7 +96,44 @@ describe("parseModelFileName", () => {
                 subType: "",
                 quantization: "Q5_K_M",
                 fileType: "gguf",
-                parameters: "7B"
+                parameters: "7B",
+                otherInfo: ["it"]
+            });
+    });
+
+    test("llama-2-7b-chat.Q4_0.gguf", () => {
+        expect(parseModelFileName("llama-2-7b-chat.Q4_0.gguf"))
+            .toEqual({
+                name: "llama",
+                subType: "2",
+                quantization: "Q4_0",
+                fileType: "gguf",
+                parameters: "7B",
+                otherInfo: ["chat"]
+            });
+    });
+
+    test("rpguild-chatml-13b.Q4_K_M.gguf", () => {
+        expect(parseModelFileName("rpguild-chatml-13b.Q4_K_M.gguf"))
+            .toEqual({
+                name: "rpguild",
+                subType: "chatml",
+                quantization: "Q4_K_M",
+                fileType: "gguf",
+                parameters: "13B",
+                otherInfo: []
+            });
+    });
+
+    test("neuralbeagle14-7b.Q4_K_M.gguf", () => {
+        expect(parseModelFileName("neuralbeagle14-7b.Q4_K_M.gguf"))
+            .toEqual({
+                name: "neuralbeagle14",
+                subType: "",
+                quantization: "Q4_K_M",
+                fileType: "gguf",
+                parameters: "7B",
+                otherInfo: []
             });
     });
 });

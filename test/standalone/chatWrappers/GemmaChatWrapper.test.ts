@@ -38,7 +38,7 @@ describe("GemmaChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
             },
@@ -49,13 +49,9 @@ describe("GemmaChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>model
+          <start_of_turn>model
           ",
             },
             "Hello!",
@@ -67,7 +63,7 @@ describe("GemmaChatWrapper", () => {
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
             },
@@ -78,35 +74,23 @@ describe("GemmaChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>model
+          <start_of_turn>model
           ",
             },
             "Hello!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>user
+          <start_of_turn>user
           ",
             },
             "How are you?",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>model
+          <start_of_turn>model
           ",
             },
             "I'm good, how are you?",
@@ -125,7 +109,7 @@ describe("GemmaChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
             },
@@ -136,13 +120,9 @@ describe("GemmaChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>model
+          <start_of_turn>model
           ",
             },
             "Hello!",
@@ -152,7 +132,7 @@ describe("GemmaChatWrapper", () => {
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
             },
@@ -163,13 +143,9 @@ describe("GemmaChatWrapper", () => {
 
           Hi there!",
             {
-              "type": "specialToken",
+              "type": "specialTokensText",
               "value": "<end_of_turn>
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "<start_of_turn>model
+          <start_of_turn>model
           ",
             },
             "Hello!

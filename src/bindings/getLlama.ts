@@ -100,7 +100,16 @@ export type LlamaOptions = {
      * When set to `true`, and llama.cpp source is not found, a `NoBinaryFoundError` error will be thrown.
      * Disabled by default.
      */
-    skipDownload?: boolean
+    skipDownload?: boolean,
+
+    /**
+     * Pad the available VRAM for the memory size calculations, as these calculations are not always accurate.
+     * Recommended to ensure stability.
+     *
+     * Defaults to `1.5%` of the total VRAM or 300MB, whichever is lower.
+     * Set to `0` to disable.
+     */
+    vramPadding?: number | ((totalVram: number) => number)
 };
 
 export type LastBuildOptions = {
@@ -133,10 +142,22 @@ export type LastBuildOptions = {
      * When set to `true`, and llama.cpp source is needed but is not found, a `NoBinaryFoundError` error will be thrown.
      * Disabled by default.
      */
-    skipDownload?: boolean
+    skipDownload?: boolean,
+
+    /**
+     * Pad the available VRAM for the memory size calculations, as these calculations are not always accurate.
+     * Recommended to ensure stability.
+     * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
+     *
+     * Defaults to `1.5%` of the total VRAM or 300MB, whichever is lower.
+     * Set to `0` to disable.
+     */
+    vramPadding?: number | ((totalVram: number) => number)
 };
 
 export const getLlamaFunctionName = "getLlama";
+
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.015, 300 * 1024 * 1024));
 
 /**
  * Get a llama.cpp binding.
@@ -153,7 +174,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
             usePrebuiltBinaries: lastBuildOptions?.usePrebuiltBinaries ?? true,
             progressLogs: lastBuildOptions?.progressLogs ?? true,
-            skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload
+            skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload,
+            vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding
         };
 
         if (lastBuildInfo == null)
@@ -173,7 +195,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     buildType: "localBuild",
                     buildMetadata,
                     logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
-                    logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppDebugLogs
+                    logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppDebugLogs,
+                    vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding
                 });
             } catch (err) {
                 console.error(getConsoleLogPrefix() + "Failed to load last build. Error:", err);
@@ -196,7 +219,8 @@ export async function getLlamaForOptions({
     existingPrebuiltBinaryMustMatchBuildOptions = false,
     usePrebuiltBinaries = true,
     progressLogs = true,
-    skipDownload = defaultSkipDownload
+    skipDownload = defaultSkipDownload,
+    vramPadding = defaultLlamaVramPadding
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
     skipLlamaInit = false
@@ -215,6 +239,7 @@ export async function getLlamaForOptions({
     if (usePrebuiltBinaries == null) usePrebuiltBinaries = true;
     if (progressLogs == null) progressLogs = true;
     if (skipDownload == null) skipDownload = defaultSkipDownload;
+    if (vramPadding == null) vramPadding = defaultLlamaVramPadding;
 
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
     let canUsePrebuiltBinaries = (build === "forceRebuild" || !usePrebuiltBinaries)
@@ -260,6 +285,7 @@ export async function getLlamaForOptions({
                 platform,
                 platformInfo,
                 skipLlamaInit,
+                vramPadding,
                 fallbackMessage: !isLastItem
                     ? `falling back to using ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}`
                     : (
@@ -315,6 +341,7 @@ export async function getLlamaForOptions({
                 logLevel,
                 logger,
                 updateLastBuildInfoOnCompile,
+                vramPadding,
                 skipLlamaInit
             });
         } catch (err) {
@@ -348,6 +375,7 @@ async function loadExistingLlamaBinary({
     platform,
     platformInfo,
     skipLlamaInit,
+    vramPadding,
     fallbackMessage
 }: {
     buildOptions: BuildOptions,
@@ -359,6 +387,7 @@ async function loadExistingLlamaBinary({
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     skipLlamaInit: boolean,
+    vramPadding: Required<LlamaOptions>["vramPadding"],
     fallbackMessage: string | null
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
@@ -389,6 +418,7 @@ async function loadExistingLlamaBinary({
                     buildMetadata,
                     logLevel,
                     logger,
+                    vramPadding,
                     skipLlamaInit
                 });
             } else if (progressLogs) {
@@ -441,6 +471,7 @@ async function loadExistingLlamaBinary({
                         buildMetadata,
                         logLevel,
                         logger,
+                        vramPadding,
                         skipLlamaInit
                     });
                 } else if (progressLogs)
@@ -484,6 +515,7 @@ async function buildAndLoadLlamaBinary({
     logLevel,
     logger,
     updateLastBuildInfoOnCompile,
+    vramPadding,
     skipLlamaInit
 }: {
     buildOptions: BuildOptions,
@@ -491,6 +523,7 @@ async function buildAndLoadLlamaBinary({
     logLevel: Required<LlamaOptions>["logLevel"],
     logger: Required<LlamaOptions>["logger"],
     updateLastBuildInfoOnCompile: boolean,
+    vramPadding: Required<LlamaOptions>["vramPadding"],
     skipLlamaInit: boolean
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
@@ -519,6 +552,7 @@ async function buildAndLoadLlamaBinary({
         buildMetadata,
         logLevel,
         logger,
+        vramPadding,
         skipLlamaInit
     });
 }

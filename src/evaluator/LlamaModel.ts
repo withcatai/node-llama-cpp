@@ -3,27 +3,56 @@ import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {Token} from "../types.js";
-import {ModelTypeDescription, AddonModel} from "../bindings/AddonTypes.js";
+import {AddonModel, ModelTypeDescription} from "../bindings/AddonTypes.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
-import {LlamaLocks} from "../bindings/types.js";
+import {BuildGpu, LlamaLocks, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../bindings/types.js";
+import {GgufFileInfo} from "../gguf/types/GgufFileInfoTypes.js";
+import {readGgufFileInfo} from "../gguf/readGgufFileInfo.js";
+import {GgufInsights} from "../gguf/GgufInsights.js";
+import {findBestOption} from "../utils/findBestOption.js";
+import {InsufficientMemoryError} from "../utils/InsufficientMemoryError.js";
+import {minAllowedContextSizeInCalculations} from "../config.js";
+import {GgufMetadataTokenizerTokenType} from "../gguf/types/GgufMetadataTypes.js";
+import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {LlamaContextOptions} from "./LlamaContext/types.js";
-import {LlamaContext} from "./LlamaContext/LlamaContext.js";
+import {getDefaultContextBatchSize, getDefaultModelContextSize, LlamaContext} from "./LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
 import type {Llama} from "../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
 
+const fitContextExtraMemoryPaddingPercentage = 0.5;
 
 export type LlamaModelOptions = {
     /** path to the model on the filesystem */
     modelPath: string,
 
-    /** number of layers to store in VRAM */
-    gpuLayers?: number,
+    /**
+     * Number of layers to store in VRAM.
+     * - **`"auto"`** - adapt to the current VRAM state and try to fit as many layers as possible in it.
+     * Takes into account the VRAM required to create a context with a `contextSize` set to `"auto"`.
+     * - **`"max"`** - store all layers in VRAM. If there's not enough VRAM, an error will be thrown. Use with caution.
+     * - **`number`** - store the specified number of layers in VRAM. If there's not enough VRAM, an error will be thrown. Use with caution.
+     * - **`{min?: number, max?: number, fitContext?: {contextSize: number}}`** - adapt to the current VRAM state and try to fit as
+     * many layers as possible in it, but at least `min` and at most `max` layers. Set `fitContext` to the parameters of a context you
+     * intend to create with the model, so it'll take it into account in the calculations and leave enough memory for such a context.
+     *
+     * If GPU support is disabled, will be set to `0` automatically.
+     *
+     * Defaults to `"auto"`.
+     */
+    gpuLayers?: "auto" | "max" | number | {
+        min?: number,
+        max?: number,
+        fitContext?: {contextSize: number}
+    },
 
     /** only load the vocabulary, no weights */
     vocabOnly?: boolean,
 
-    /** use mmap if possible */
+    /**
+     * Use mmap if possible.
+     * Enabled by default in llama.cpp.
+     */
     useMmap?: boolean,
 
     /**
@@ -39,7 +68,15 @@ export type LlamaModelOptions = {
     onLoadProgress?(loadProgress: number): void,
 
     /** An abort signal to abort the model load */
-    loadSignal?: AbortSignal
+    loadSignal?: AbortSignal,
+
+    /**
+     * Ignore insufficient memory errors and continue with the model load.
+     * Can cause the process to crash if there's not enough VRAM to fit the model.
+     *
+     * Defaults to `false`.
+     */
+    ignoreMemorySafetyChecks?: boolean
 };
 
 export class LlamaModel {
@@ -47,6 +84,9 @@ export class LlamaModel {
     /** @internal */ public readonly _model: AddonModel;
     /** @internal */ public readonly _backendModelDisposeGuard: DisposeGuard;
     /** @internal */ private readonly _tokens: LlamaModelTokens;
+    /** @internal */ private readonly _fileInfo: GgufFileInfo;
+    /** @internal */ private readonly _fileInsights: GgufInsights;
+    /** @internal */ private readonly _gpuLayers: number;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -54,17 +94,27 @@ export class LlamaModel {
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
+    /** @internal */ private _vocabularyType?: LlamaVocabularyType;
 
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
         modelPath, gpuLayers, vocabOnly, useMmap, useMlock, onLoadProgress, loadSignal
-    }: LlamaModelOptions, {
-        _llama
+    }: LlamaModelOptions & {
+        gpuLayers: number
+    }, {
+        _llama,
+        _fileInfo,
+        _fileInsights
     }: {
-        _llama: Llama
+        _llama: Llama,
+        _fileInfo: GgufFileInfo,
+        _fileInsights: GgufInsights
     }) {
         this._llama = _llama;
+        this._fileInfo = _fileInfo;
+        this._fileInsights = _fileInsights;
+        this._gpuLayers = gpuLayers;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
         this._model = new this._llama._bindings.AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
@@ -72,7 +122,9 @@ export class LlamaModel {
             gpuLayers,
             vocabOnly,
             useMmap,
-            useMlock,
+            useMlock: _llama.supportsMlock
+                ? useMlock
+                : undefined,
             onLoadProgress: onLoadProgress == null
                 ? undefined
                 : (loadPercentage: number) => {
@@ -134,6 +186,31 @@ export class LlamaModel {
         return this._filename;
     }
 
+    public get fileInfo(): GgufFileInfo {
+        return this._fileInfo;
+    }
+
+    public get fileInsights(): GgufInsights {
+        return this._fileInsights;
+    }
+
+    /**
+     * Number of layers offloaded to the GPU.
+     * If GPU support is disabled, this will always be `0`.
+     */
+    public get gpuLayers(): number {
+        return this._gpuLayers;
+    }
+
+    /**
+     * Total model size in memory in bytes
+     */
+    public get size() {
+        this._ensureNotDisposed();
+
+        return this._model.getModelSize();
+    }
+
     /**
      * Transform text into tokens that can be fed to the model
      * @param text - the text to tokenize
@@ -141,9 +218,9 @@ export class LlamaModel {
      * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
      * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
      */
-    public tokenize(text: string, specialTokens?: boolean): Token[];
+    public tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[];
     public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
-    public tokenize(text: string, specialTokens: boolean | "builtin" = false): Token[] {
+    public tokenize(text: string, specialTokens: boolean | "builtin" = false, options?: "trimLeadingSpace"): Token[] {
         this._ensureNotDisposed();
 
         if (text === "")
@@ -162,6 +239,40 @@ export class LlamaModel {
             throw new Error(`Unknown builtin special token: ${builtinToken}`);
         }
 
+        if (options === "trimLeadingSpace") {
+            if (specialTokens) {
+                const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
+                    ? [this.tokens.bos, this.tokens.bosString]
+                    : (this.tokens.eos != null && this.tokens.eosString != null)
+                        ? [this.tokens.eos, this.tokens.eosString]
+                        : (this.tokens.nl != null && this.tokens.nlString != null)
+                            ? [this.tokens.nl, this.tokens.nlString]
+                            : [null, null];
+
+                if (workaroundToken != null && workaroundTokenString != null) {
+                    const tokens = Array.from(this._model.tokenize(workaroundTokenString + text, true)) as Token[];
+                    const workaroundTokenIndex = tokens.indexOf(workaroundToken);
+
+                    // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                    if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
+                        tokens.splice(0, workaroundTokenIndex + 1);
+                        return tokens;
+                    }
+                }
+            } else {
+                const workaroundTokens = Array.from(this._model.tokenize("\n", false)) as Token[];
+                const workaroundTokensString = "\n";
+
+                const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, false)) as Token[];
+
+                // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                if (workaroundTokens.length > 0 && workaroundTokens.every((token, index) => tokens[index] === token)) {
+                    tokens.splice(0, workaroundTokens.length);
+                    return tokens;
+                }
+            }
+        }
+
         return Array.from(this._model.tokenize(text, specialTokens)) as Token[];
     }
 
@@ -173,6 +284,13 @@ export class LlamaModel {
             return "";
 
         return this._model.detokenize(Uint32Array.from(tokens));
+    }
+
+    public getTokenType(token: Token): GgufMetadataTokenizerTokenType | null {
+        if (this.vocabularyType === LlamaVocabularyType.none)
+            return null;
+
+        return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
     }
 
     public async createContext(options: LlamaContextOptions) {
@@ -227,6 +345,22 @@ export class LlamaModel {
         return this._embeddingVectorSize;
     }
 
+    public get vocabularyType(): LlamaVocabularyType {
+        this._ensureNotDisposed();
+
+        if (this._vocabularyType == null) {
+            const vocabType = this._model.getVocabularyType();
+            this._vocabularyType = LlamaVocabularyTypeValues[vocabType];
+
+            if (this._vocabularyType == null) {
+                console.warn(getConsoleLogPrefix() + "Unknown vocabulary type:", vocabType);
+                this._vocabularyType = LlamaVocabularyType.none;
+            }
+        }
+
+        return this._vocabularyType;
+    }
+
     /** @internal */
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
@@ -239,8 +373,26 @@ export class LlamaModel {
     }: {
         _llama: Llama
     }) {
-        const model = new LlamaModel(modelOptions, {_llama});
         const {loadSignal} = modelOptions;
+        const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
+            sourceType: "filesystem",
+            signal: loadSignal
+        });
+        const ggufInsights = await GgufInsights.from(fileInfo, _llama);
+        const gpuLayers = resolveModelGpuLayersOption(modelOptions.gpuLayers, {
+            ggufInsights,
+            ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
+            getVramState: () => _llama._vramOrchestrator.getMemoryState(),
+            llamaVramPaddingSize: _llama._vramPadding.size,
+            llamaGpu: _llama.gpu,
+            llamaSupportsGpuOffloading: _llama.supportsGpuOffloading
+        });
+        const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;
+
+        const model = new LlamaModel({...modelOptions, gpuLayers}, {_fileInfo: fileInfo, _fileInsights: ggufInsights, _llama});
+        const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
+            ? null
+            : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
         function onAbort() {
             model._model.abortActiveModelLoad();
@@ -268,6 +420,7 @@ export class LlamaModel {
             return model;
         } finally {
             loadSignal?.removeEventListener("abort", onAbort);
+            modelCreationMemoryReservation?.dispose?.();
         }
     }
 }
@@ -601,6 +754,261 @@ function disposeModelIfReferenced(modelRef: WeakRef<LlamaModel>) {
         void model.dispose();
 }
 
+export function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
+    ggufInsights, isEmbeddingContext = false, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
+    llamaGpu, llamaSupportsGpuOffloading
+}: {
+    ggufInsights: GgufInsights, isEmbeddingContext?: boolean, ignoreMemorySafetyChecks?: boolean,
+    getVramState(): {total: number, free: number}, llamaVramPaddingSize: number, llamaGpu: BuildGpu, llamaSupportsGpuOffloading: boolean
+}): number {
+    if (gpuLayers == null)
+        gpuLayers = "auto";
+
+    if (!llamaSupportsGpuOffloading)
+        return 0;
+
+    if (gpuLayers === "max" || typeof gpuLayers === "number") {
+        const resolvedGpuLayers = typeof gpuLayers === "number"
+            ? Math.max(0, Math.min(ggufInsights.totalLayers, gpuLayers))
+            : ggufInsights.totalLayers;
+
+        if (ignoreMemorySafetyChecks)
+            return resolvedGpuLayers;
+
+        const vramState = getVramState();
+        const maxLayersRequirements = getVramRequiredForGpuLayers({
+            gpuLayers: resolvedGpuLayers,
+            ggufInsights,
+            currentVram: vramState.free,
+            isEmbeddingContext
+        });
+
+        if (maxLayersRequirements == null)
+            throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings");
+
+        return resolvedGpuLayers;
+    } else if (gpuLayers === "auto" || typeof gpuLayers === "object") {
+        if (llamaGpu === false)
+            return 0;
+
+        const vramState = getVramState();
+        if (vramState.total === 0)
+            return 0;
+
+        let freeVram = vramState.free;
+        if (typeof gpuLayers === "object" && gpuLayers.fitContext != null) {
+            freeVram -= llamaVramPaddingSize * fitContextExtraMemoryPaddingPercentage;
+
+            if (freeVram < 0)
+                freeVram = 0;
+        }
+
+        const bestGpuLayersOption = getBestGpuLayersForFreeVram({
+            ggufInsights,
+            freeVram,
+            fitContext: typeof gpuLayers === "object"
+                ? gpuLayers.fitContext
+                : undefined,
+            minGpuLayers: typeof gpuLayers === "object"
+                ? gpuLayers.min
+                : undefined,
+            maxGpuLayers: typeof gpuLayers === "object"
+                ? gpuLayers.max
+                : undefined,
+            isEmbeddingContext
+        });
+
+        const hasGpuLayersRequirements = typeof gpuLayers === "object" &&
+            (gpuLayers.min != null || gpuLayers.max != null || gpuLayers.fitContext?.contextSize != null);
+
+        if (!ignoreMemorySafetyChecks && bestGpuLayersOption == null && hasGpuLayersRequirements)
+            throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings");
+
+        return bestGpuLayersOption ?? 0;
+    }
+
+    throw new Error(`Invalid gpuLayers value: ${gpuLayers}`);
+}
+
+function getBestGpuLayersForFreeVram({
+    ggufInsights,
+    freeVram,
+    fitContext,
+    minGpuLayers,
+    maxGpuLayers,
+    isEmbeddingContext = false
+}: {
+    ggufInsights: GgufInsights,
+    freeVram: number,
+    fitContext?: {contextSize: number},
+    minGpuLayers?: number,
+    maxGpuLayers?: number,
+    isEmbeddingContext?: boolean
+}) {
+    return findBestOption({
+        *generator() {
+            const minLayers = Math.floor(Math.max(0, minGpuLayers ?? 0));
+            const maxLayers = Math.floor(Math.min(ggufInsights.totalLayers, maxGpuLayers ?? ggufInsights.totalLayers));
+
+            for (let layers = maxLayers; layers >= minLayers; layers--) {
+                yield {
+                    gpuLayers: layers
+                };
+            }
+        },
+        score(option) {
+            const layersRequirements = getVramRequiredForGpuLayers({
+                gpuLayers: option.gpuLayers,
+                ggufInsights,
+                currentVram: freeVram,
+                fitContext,
+                isEmbeddingContext
+            });
+
+            if (layersRequirements == null)
+                return null;
+
+            return scoreGpuLayersAndContextCombination({gpuLayers: option.gpuLayers, contextSize: layersRequirements.contextSize}, {
+                totalGpuLayers: ggufInsights.totalLayers,
+                trainContextSize: getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize})
+            });
+        }
+    })?.gpuLayers ?? null;
+}
+
+function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayers: number, contextSize: number}, {
+    totalGpuLayers, trainContextSize
+}: {
+    totalGpuLayers: number, trainContextSize: number
+}) {
+    function scoreGpuLayers() {
+        return scoreLevels(gpuLayers, [{
+            start: 0,
+            points: 4
+        }, {
+            start: 1,
+            points: 26
+        }, {
+            start: totalGpuLayers,
+            points: 14,
+            end: totalGpuLayers
+        }]);
+    }
+
+    function scoreContextSize() {
+        const gpuLayersPercentage = gpuLayers / totalGpuLayers;
+
+        return scoreLevels(contextSize, [{
+            start: 0,
+            points: 2
+        }, {
+            start: 1024,
+            points: 4
+        }, {
+            start: 2048,
+            points: gpuLayersPercentage < 0.1 ? 1 : 8
+        }, {
+            start: 4096,
+            points: gpuLayersPercentage < 0.3 ? 4 : 16
+        }, {
+            start: 8192,
+            points: gpuLayersPercentage < 0.6 ? 1 : 8,
+            end: Math.max(trainContextSize, 16384)
+        }]);
+    }
+
+    return scoreGpuLayers() + scoreContextSize();
+}
+
+function scoreLevels(num: number, levels: {start: number, end?: number, points: number}[]) {
+    let res = 0;
+
+    for (let i = 0; i < levels.length; i++) {
+        const level = levels[i];
+        const start = level.start;
+        const end = level.end ?? levels[i + 1]?.start ?? Math.max(start, num);
+
+        if (num < start)
+            break;
+        else if (num >= end)
+            res += level.points;
+        else
+            res += level.points * ((num - start) / (end - start));
+    }
+
+    return res;
+}
+
+function getVramRequiredForGpuLayers({
+    gpuLayers, ggufInsights, currentVram, fitContext, isEmbeddingContext
+}: {
+    gpuLayers: number, ggufInsights: GgufInsights, currentVram: number, fitContext?: {contextSize: number}, isEmbeddingContext: boolean
+}) {
+    const modelVram = ggufInsights.estimateModelResourceRequirements({gpuLayers}).gpuVram;
+
+    if (modelVram > currentVram)
+        return null;
+
+    if (fitContext != null) {
+        const contextVram = ggufInsights.estimateContextResourceRequirements({
+            contextSize: fitContext.contextSize,
+            batchSize: getDefaultContextBatchSize({contextSize: fitContext.contextSize, sequences: 1}),
+            modelGpuLayers: gpuLayers,
+            sequences: 1,
+            isEmbeddingContext
+        }).gpuVram;
+
+        const totalVram = modelVram + contextVram;
+        if (totalVram > currentVram)
+            return null;
+
+        return {
+            contextSize: fitContext.contextSize,
+            contextVram,
+            totalVram
+        };
+    }
+
+    const maxContext = findMaxPossibleContextSizeForVram({
+        gpuLayers,
+        ggufInsights,
+        vram: currentVram - modelVram,
+        isEmbeddingContext
+    });
+
+    if (maxContext == null || modelVram + maxContext.vram > currentVram)
+        return null;
+
+    return {
+        contextSize: maxContext.contextSize,
+        contextVram: maxContext.vram,
+        totalVram: modelVram + maxContext.vram
+    };
+}
+
+function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmbeddingContext}: {
+    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean
+}) {
+    const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
+
+    for (let contextSize = maxContextSize; contextSize >= minAllowedContextSizeInCalculations; contextSize--) {
+        const contextVram = ggufInsights.estimateContextResourceRequirements({
+            contextSize,
+            batchSize: getDefaultContextBatchSize({contextSize, sequences: 1}),
+            modelGpuLayers: gpuLayers,
+            sequences: 1,
+            isEmbeddingContext
+        }).gpuVram;
+
+        if (contextVram <= vram)
+            return {
+                contextSize,
+                vram: contextVram
+            };
+    }
+
+    return null;
+}
 
 type DisposedState = {
     disposed: boolean

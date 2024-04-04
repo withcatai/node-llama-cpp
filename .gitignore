@@ -11,6 +11,7 @@ node_modules
 /.eslintcache
 /.vitepress/.cache
 /test/.models
+/test/temp
 /coverage
 
 /llama/compile_commands.json
@@ -20,6 +21,8 @@ node_modules
 /llama/lastBuild.json
 /llama/gitRelease.bundle
 /llama/.temp
+/llama/.idea
+/llama/cmake-build-debug
 /llama/localBuilds
 /llama/Release
 /llama/Debug

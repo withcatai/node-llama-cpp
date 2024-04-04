@@ -9,7 +9,7 @@
 #include "llama.h"
 #include "napi.h"
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
 #  include "gpuInfo/cuda-gpu-info.h"
 #endif
 #ifdef GPU_INFO_USE_VULKAN
@@ -121,7 +121,7 @@ std::string addon_model_token_to_piece(const struct llama_model* model, llama_to
     return std::string(result.data(), result.size());
 }
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
 void logCudaError(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
 }
@@ -136,7 +136,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     uint64_t total = 0;
     uint64_t used = 0;
 
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
     size_t cudaDeviceTotal = 0;
     size_t cudaDeviceUsed = 0;
     bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, logCudaError);
@@ -161,7 +161,7 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_METAL
     uint64_t metalDeviceTotal = 0;
     uint64_t metalDeviceUsed = 0;
-    get_metal_gpu_info(&metalDeviceTotal, &metalDeviceUsed);
+    getMetalGpuInfo(&metalDeviceTotal, &metalDeviceUsed);
 
     total += metalDeviceTotal;
     used += metalDeviceUsed;
@@ -174,8 +174,34 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     return result;
 }
 
+Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
+    std::vector<std::string> deviceNames;
+
+#ifdef GPU_INFO_USE_CUDA
+    gpuInfoGetCudaDeviceNames(&deviceNames, logCudaError);
+#endif
+
+#ifdef GPU_INFO_USE_VULKAN
+    gpuInfoGetVulkanDeviceNames(&deviceNames, logVulkanWarning);
+#endif
+
+#ifdef GPU_INFO_USE_METAL
+    getMetalGpuDeviceNames(&deviceNames);
+#endif
+
+    Napi::Object result = Napi::Object::New(info.Env());
+
+    Napi::Array deviceNamesNapiArray = Napi::Array::New(info.Env(), deviceNames.size());
+    for (size_t i = 0; i < deviceNames.size(); ++i) {
+        deviceNamesNapiArray[i] = Napi::String::New(info.Env(), deviceNames[i]);
+    }
+    result.Set("deviceNames", deviceNamesNapiArray);
+
+    return result;
+}
+
 Napi::Value getGpuType(const Napi::CallbackInfo& info) {
-#ifdef GPU_INFO_USE_CUBLAS
+#ifdef GPU_INFO_USE_CUDA
     return Napi::String::New(info.Env(), "cuda");
 #endif
 
@@ -507,12 +533,26 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
 
             return Napi::Number::From(info.Env(), int32_t(tokenType));
         }
+        Napi::Value GetVocabularyType(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            auto vocabularyType = llama_vocab_type(model);
+
+            return Napi::Number::From(info.Env(), int32_t(vocabularyType));
+        }
         Napi::Value ShouldPrependBosToken(const Napi::CallbackInfo& info) {
             const int addBos = llama_add_bos_token(model);
 
             bool shouldPrependBos = addBos != -1 ? bool(addBos) : (llama_vocab_type(model) == LLAMA_VOCAB_TYPE_SPM);
 
             return Napi::Boolean::New(info.Env(), shouldPrependBos);
+        }
+
+        Napi::Value GetModelSize(const Napi::CallbackInfo& info) {
+            return Napi::Number::From(info.Env(), llama_model_size(model));
         }
 
         static void init(Napi::Object exports) {
@@ -540,7 +580,9 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                         InstanceMethod("getTokenType", &AddonModel::GetTokenType),
+                        InstanceMethod("getVocabularyType", &AddonModel::GetVocabularyType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
+                        InstanceMethod("getModelSize", &AddonModel::GetModelSize),
                         InstanceMethod("dispose", &AddonModel::Dispose),
                     }
                 )
@@ -822,6 +864,10 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                     context_params.n_ubatch = context_params.n_batch; // the batch queue is managed in the JS side, so there's no need for managing it on the C++ side
                 }
 
+                if (options.Has("sequences")) {
+                    context_params.n_seq_max = options.Get("sequences").As<Napi::Number>().Uint32Value();
+                }
+
                 if (options.Has("embeddings")) {
                     context_params.embeddings = options.Get("embeddings").As<Napi::Boolean>().Value();
                 }
@@ -1039,6 +1085,15 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             return result;
         }
 
+        Napi::Value GetStateSize(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            return Napi::Number::From(info.Env(), llama_get_state_size(ctx));
+        }
+
         Napi::Value PrintTimings(const Napi::CallbackInfo& info) {
             llama_print_timings(ctx);
             llama_reset_timings(ctx);
@@ -1063,6 +1118,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
                         InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
+                        InstanceMethod("getStateSize", &AddonContext::GetStateSize),
                         InstanceMethod("printTimings", &AddonContext::PrintTimings),
                         InstanceMethod("dispose", &AddonContext::Dispose),
                     }
@@ -1444,6 +1500,55 @@ Napi::Value systemInfo(const Napi::CallbackInfo& info) {
     return Napi::String::From(info.Env(), llama_print_system_info());
 }
 
+Napi::Value addonGetSupportsGpuOffloading(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_gpu_offload());
+}
+
+Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mmap());
+}
+
+Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), llama_supports_mlock());
+}
+
+Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto blockSize = ggml_blck_size(static_cast<ggml_type>(ggmlType));
+
+    return Napi::Number::New(info.Env(), blockSize);
+}
+
+Napi::Value addonGetTypeSizeForGgmlType(const Napi::CallbackInfo& info) {
+    const int ggmlType = info[0].As<Napi::Number>().Int32Value();
+
+    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+        return info.Env().Undefined();
+    }
+
+    const auto typeSize = ggml_type_size(static_cast<ggml_type>(ggmlType));
+
+    return Napi::Number::New(info.Env(), typeSize);
+}
+
+Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
+    Napi::Object consts = Napi::Object::New(info.Env());
+    consts.Set("ggmlMaxDims", Napi::Number::New(info.Env(), GGML_MAX_DIMS));
+    consts.Set("ggmlTypeF16Size", Napi::Number::New(info.Env(), ggml_type_size(GGML_TYPE_F16)));
+    consts.Set("ggmlTypeF32Size", Napi::Number::New(info.Env(), ggml_type_size(GGML_TYPE_F32)));
+    consts.Set("ggmlTensorOverhead", Napi::Number::New(info.Env(), ggml_tensor_overhead()));
+    consts.Set("llamaMaxRngState", Napi::Number::New(info.Env(), LLAMA_MAX_RNG_STATE));
+    consts.Set("llamaPosSize", Napi::Number::New(info.Env(), sizeof(llama_pos)));
+    consts.Set("llamaSeqIdSize", Napi::Number::New(info.Env(), sizeof(llama_seq_id)));
+
+    return consts;
+}
+
 int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     switch (level) {
         case GGML_LOG_LEVEL_ERROR: return 2;
@@ -1693,9 +1798,16 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
+        Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
+        Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
+        Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
+        Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
+        Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),

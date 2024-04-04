@@ -5,6 +5,7 @@ import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaLocks, LlamaLogLevel} from "./types.js";
+import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -23,9 +24,15 @@ export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
     /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
     /** @internal */ public readonly _memoryLock = {};
+    /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
+    /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
+    /** @internal */ public readonly _vramPadding: MemoryReservation;
     /** @internal */ private readonly _gpu: BuildGpu;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
+    /** @internal */ private readonly _supportsGpuOffloading: boolean;
+    /** @internal */ private readonly _supportsMmap: boolean;
+    /** @internal */ private readonly _supportsMlock: boolean;
     /** @internal */ private readonly _llamaCppRelease: {
         readonly repo: string,
         readonly release: string
@@ -43,7 +50,7 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, vramPadding
     }: {
         bindings: BindingModule,
         logLevel: LlamaLogLevel,
@@ -53,10 +60,29 @@ export class Llama {
         llamaCppRelease: {
             repo: string,
             release: string
-        }
+        },
+        vramPadding: number | ((totalVram: number) => number)
     }) {
         this._bindings = bindings;
         this._gpu = bindings.getGpuType() ?? false;
+        this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
+        this._supportsMmap = bindings.getSupportsMmap();
+        this._supportsMlock = bindings.getSupportsMlock();
+        this._consts = bindings.getConsts();
+
+        this._vramOrchestrator = new MemoryOrchestrator(() => {
+            const {total, used} = bindings.getGpuVramInfo();
+
+            return {
+                total,
+                free: Math.max(0, total - used)
+            };
+        });
+        if (vramPadding instanceof Function)
+            this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding(this._vramOrchestrator.getMemoryState().total));
+        else
+            this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding);
+
         this._logLevel = logLevel ?? LlamaLogLevel.debug;
         this._logger = logger;
         this._buildType = buildType;
@@ -98,6 +124,18 @@ export class Llama {
 
     public get gpu() {
         return this._gpu;
+    }
+
+    public get supportsGpuOffloading() {
+        return this._supportsGpuOffloading;
+    }
+
+    public get supportsMmap() {
+        return this._supportsMmap;
+    }
+
+    public get supportsMlock() {
+        return this._supportsMlock;
     }
 
     public get logLevel() {
@@ -155,6 +193,14 @@ export class Llama {
         };
     }
 
+    public getGpuDeviceNames() {
+        this._ensureNotDisposed();
+
+        const {deviceNames} = this._bindings.getGpuDeviceInfo();
+
+        return deviceNames;
+    }
+
     public async loadModel(options: LlamaModelOptions) {
         this._ensureNotDisposed();
 
@@ -168,6 +214,11 @@ export class Llama {
                 preventDisposalHandle.dispose();
             }
         });
+    }
+
+    /** @internal */
+    public async _init() {
+        await this._bindings.init();
     }
 
     /** @internal */
@@ -258,13 +309,14 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger, skipLlamaInit = false
+        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, skipLlamaInit = false
     }: {
         bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
+        vramPadding: number | ((totalVram: number) => number),
         skipLlamaInit?: boolean
     }) {
         const llama =  new Llama({
@@ -276,11 +328,12 @@ export class Llama {
                 release: buildMetadata.buildOptions.llamaCpp.release
             },
             logLevel,
-            logger
+            logger,
+            vramPadding
         });
 
         if (!skipLlamaInit)
-            await llama._bindings.init();
+            await llama._init();
 
         return llama;
     }
