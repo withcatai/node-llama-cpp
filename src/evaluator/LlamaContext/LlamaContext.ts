@@ -551,21 +551,35 @@ export class LlamaContext {
             isEmbeddingContext: options._embeddings
         });
         const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
+        const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
+            contextSize,
+            sequences,
+            isEmbeddingContext: options._embeddings,
+            modelGpuLayers: _model.gpuLayers,
+            batchSize
+        }).gpuVram;
 
         const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences});
         const {createSignal} = options;
+        const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
+            ? null
+            : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-        const contextLoaded = await context._ctx.init();
+        try {
+            const contextLoaded = await context._ctx.init();
 
-        if (createSignal?.aborted) {
-            if (contextLoaded)
-                await context._ctx.dispose();
+            if (createSignal?.aborted) {
+                if (contextLoaded)
+                    await context._ctx.dispose();
 
-            throw createSignal.reason;
-        } else if (!contextLoaded)
-            throw new Error("Failed to create context");
+                throw createSignal.reason;
+            } else if (!contextLoaded)
+                throw new Error("Failed to create context");
 
-        return context;
+            return context;
+        } finally {
+            contextCreationMemoryReservation?.dispose?.();
+        }
     }
 }
 

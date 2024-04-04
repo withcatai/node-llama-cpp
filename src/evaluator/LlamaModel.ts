@@ -387,7 +387,12 @@ export class LlamaModel {
             llamaGpu: _llama.gpu,
             llamaSupportsGpuOffloading: _llama.supportsGpuOffloading
         });
+        const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;
+
         const model = new LlamaModel({...modelOptions, gpuLayers}, {_fileInfo: fileInfo, _fileInsights: ggufInsights, _llama});
+        const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
+            ? null
+            : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
         function onAbort() {
             model._model.abortActiveModelLoad();
@@ -415,6 +420,7 @@ export class LlamaModel {
             return model;
         } finally {
             loadSignal?.removeEventListener("abort", onAbort);
+            modelCreationMemoryReservation?.dispose?.();
         }
     }
 }
