@@ -12,9 +12,7 @@ describe("functionary", () => {
             const model = await llama.loadModel({
                 modelPath
             });
-            const context = await model.createContext({
-                contextSize: 4096
-            });
+            const context = await model.createContext();
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence()
             });

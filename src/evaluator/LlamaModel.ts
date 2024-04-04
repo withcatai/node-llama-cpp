@@ -293,7 +293,7 @@ export class LlamaModel {
         return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
     }
 
-    public async createContext(options: LlamaContextOptions) {
+    public async createContext(options: LlamaContextOptions = {}) {
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
@@ -304,7 +304,7 @@ export class LlamaModel {
         });
     }
 
-    public async createEmbeddingContext(options: LlamaEmbeddingContextOptions) {
+    public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
