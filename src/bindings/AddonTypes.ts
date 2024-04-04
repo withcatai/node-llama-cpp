@@ -43,6 +43,7 @@ export type BindingModule = {
         ggmlMaxDims: number,
         ggmlTypeF16Size: number,
         ggmlTypeF32Size: number,
+        ggmlTensorOverhead: number,
         llamaMaxRngState: number,
         llamaPosSize: number,
         llamaSeqIdSize: number
