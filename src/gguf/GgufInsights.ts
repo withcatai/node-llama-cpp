@@ -185,6 +185,28 @@ export class GgufInsights {
                         )
                     );
                 }
+            } else if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.stablelm) {
+                const headCount = this.ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
+
+                return (int32TBytes * batchSize * actualContextSize * headCount) - (50 * s1MB);
+
+                // if (modelGpuLayers === this.totalLayers) {
+                //     defaultCalculationAdjustment += -(s1MB * 20) + (
+                //         (s1MB * 250) * (
+                //             this.trainContextSize == null
+                //                 ? 1
+                //                 : actualContextSize / this.trainContextSize
+                //         )
+                //     );
+                // } else {
+                //     defaultCalculationAdjustment += -(s1MB * 40) + (
+                //         (s1MB * 300) * (
+                //             this.trainContextSize == null
+                //                 ? 1
+                //                 : actualContextSize / this.trainContextSize
+                //         )
+                //     );
+                // }
             }
 
             const totalElements = tensorInfo.length === 0
