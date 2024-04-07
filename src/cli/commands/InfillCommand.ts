@@ -12,9 +12,10 @@ import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
 import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
+import {withProgressLog} from "../../utils/withProgressLog.js";
 
 type InfillCommand = {
-    model: string,
+    model?: string,
     systemInfo: boolean,
     prefix?: string,
     prefixFile?: string,
@@ -47,7 +48,6 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
             .option("model", {
                 alias: ["m", "modelPath"],
                 type: "string",
-                demandOption: true,
                 description: "Llama model file to use for the infill",
                 group: "Required:"
             })
@@ -230,8 +230,6 @@ async function RunInfill({
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
 
-    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
-
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
         : LlamaLogLevel.warn;
@@ -239,6 +237,8 @@ async function RunInfill({
         logLevel: llamaLogLevel
     });
     const logBatchSize = batchSize != null;
+
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama);
 
     if (systemInfo)
         console.log(llama.systemInfo);
@@ -270,16 +270,25 @@ async function RunInfill({
     let initialPrefix = prefix ?? null;
     let initialSuffix = suffix ?? null;
 
-    const model = await withOra({
-        loading: chalk.blue("Loading model"),
-        success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model"),
-        useStatusLogs: debug
-    }, async () => {
+    const model = await withProgressLog({
+        loadingText: chalk.blue.bold("Loading model"),
+        successText: chalk.blue("Model loaded"),
+        failText: chalk.blue("Failed to load model"),
+        liveUpdates: !debug,
+        noProgress: debug
+    }, async (progressUpdater) => {
         try {
             return await llama.loadModel({
                 modelPath: resolvedModelPath,
-                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+                gpuLayers: gpuLayers != null
+                    ? gpuLayers
+                    : contextSize != null
+                        ? {fitContext: {contextSize}}
+                        : undefined,
+                ignoreMemorySafetyChecks: gpuLayers != null,
+                onLoadProgress(loadProgress: number) {
+                    progressUpdater.setProgress(loadProgress);
+                }
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {
@@ -298,7 +307,8 @@ async function RunInfill({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads
+                threads,
+                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {

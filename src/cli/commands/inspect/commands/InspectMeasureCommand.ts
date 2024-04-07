@@ -13,10 +13,10 @@ import {LlamaLogLevel} from "../../../../bindings/types.js";
 import {LlamaModel} from "../../../../evaluator/LlamaModel.js";
 import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {ConsoleTable, ConsoleTableColumn} from "../../../utils/ConsoleTable.js";
-import {GgufInsights} from "../../../../gguf/GgufInsights.js";
+import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";
 
 type InspectMeasureCommand = {
-    path: string,
+    path?: string,
     minLayers: number,
     maxLayers?: number,
     minContextSize: number,
@@ -34,7 +34,6 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         return yargs
             .option("path", {
                 type: "string",
-                demandOption: true,
                 description: "The path of the GGUF model file to measure"
             })
             .option("minLayers", {
@@ -103,12 +102,12 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         if (maxContextSize === -1) maxContextSize = undefined;
         if (minLayers < 1) minLayers = 1;
 
-        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath);
-
         // ensure a llama build is available
         const llama = await getLlama("lastBuild", {
             logLevel: LlamaLogLevel.error
         });
+
+        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama);
 
         console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
         console.info();
@@ -547,7 +546,8 @@ async function runTestWorkerLogic() {
             try {
                 const preContextVramUsage = llama.getVramState().used;
                 const context = await model.createContext({
-                    contextSize: currentContextSizeCheck ?? undefined
+                    contextSize: currentContextSizeCheck ?? undefined,
+                    ignoreMemorySafetyChecks: currentContextSizeCheck != null
                 });
 
                 if (evaluateText != null && evaluateText != "") {
@@ -597,7 +597,8 @@ async function runTestWorkerLogic() {
             const preModelVramUsage = llama.getVramState().used;
             const model = await llama.loadModel({
                 modelPath,
-                gpuLayers
+                gpuLayers,
+                ignoreMemorySafetyChecks: true
             });
             const postModelVramUsage = llama.getVramState().used;
 

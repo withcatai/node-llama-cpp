@@ -1,12 +1,10 @@
 import {describe, expect, it} from "vitest";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
-import {LlamaModelOptions, resolveModelGpuLayersOption} from "../../../src/evaluator/LlamaModel.js";
-import {readGgufFileInfo} from "../../../src/gguf/readGgufFileInfo.js";
-import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
-import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
+import {LlamaModelOptions, readGgufFileInfo} from "../../../src/index.js";
+import {GgufInsights} from "../../../src/gguf/insights/GgufInsights.js";
 import {BuildGpu} from "../../../src/bindings/types.js";
-import {resolveContextContextSizeOption} from "../../../src/evaluator/LlamaContext/LlamaContext.js";
+import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
 
 describe("stableCode", () => {
     describe("model options", () => {
@@ -24,8 +22,7 @@ describe("stableCode", () => {
             }: {
                 totalVram: number, freeVram: number, ignoreMemorySafetyChecks?: boolean, llamaGpu?: BuildGpu
             }) {
-                const resolvedGpuLayers = resolveModelGpuLayersOption(gpuLayers, {
-                    ggufInsights,
+                const resolvedGpuLayers = ggufInsights.configurationResolver.resolveModelGpuLayers(gpuLayers, {
                     ignoreMemorySafetyChecks,
                     getVramState: () => ({
                         total: llamaGpu === false ? 0 : totalVram,
@@ -42,11 +39,9 @@ describe("stableCode", () => {
                     }).gpuVram;
 
                     try {
-                        return resolveContextContextSizeOption({
-                            contextSize: "auto",
+                        return ggufInsights.configurationResolver.resolveContextContextSize("auto", {
                             batchSize: undefined,
                             sequences: 1,
-                            modelFileInsights: ggufInsights,
                             modelGpuLayers: resolvedGpuLayers,
                             modelTrainContextSize: ggufInsights.trainContextSize ?? 4096,
                             getVramState: () => ({

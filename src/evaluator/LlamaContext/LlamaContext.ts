@@ -5,10 +5,7 @@ import {BatchLogitIndex, AddonContext} from "../../bindings/AddonTypes.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
-import {GgufInsights} from "../../gguf/GgufInsights.js";
-import {minAllowedContextSizeInCalculations} from "../../config.js";
 import {TokenMeter} from "../TokenMeter.js";
-import {BuildGpu} from "../../bindings/types.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
@@ -538,11 +535,9 @@ export class LlamaContext {
         _model: LlamaModel
     }): Promise<LlamaContext> {
         const sequences = options.sequences ?? getDefaultContextSequences();
-        const contextSize = resolveContextContextSizeOption({
-            contextSize: options.contextSize,
+        const contextSize = _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,
-            modelFileInsights: _model.fileInsights,
             modelGpuLayers: _model.gpuLayers,
             modelTrainContextSize: _model.trainContextSize,
             getVramState: () => _model._llama._vramOrchestrator.getMemoryState(),
@@ -1109,90 +1104,6 @@ function disposeContextSequenceIfReferenced(contextRef: WeakRef<LlamaContextSequ
 
     if (context != null)
         context.dispose();
-}
-
-export function resolveContextContextSizeOption({
-    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, getVramState, llamaGpu,
-    ignoreMemorySafetyChecks = false, isEmbeddingContext = false
-}: {
-    contextSize?: LlamaContextOptions["contextSize"],
-    batchSize?: LlamaContextOptions["batchSize"],
-    sequences: number,
-    modelFileInsights: GgufInsights,
-    modelGpuLayers: number,
-    modelTrainContextSize: number,
-    getVramState(): {total: number, free: number},
-    llamaGpu: BuildGpu,
-    ignoreMemorySafetyChecks?: boolean,
-    isEmbeddingContext?: boolean
-}): number {
-    if (contextSize == null)
-        contextSize = "auto";
-
-    if (typeof contextSize === "number") {
-        const resolvedContextSize = Math.max(1, Math.floor(contextSize));
-
-        if (ignoreMemorySafetyChecks)
-            return resolvedContextSize;
-
-        const vramState = getVramState();
-        const contextVram = modelFileInsights.estimateContextResourceRequirements({
-            contextSize: resolvedContextSize,
-            batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: resolvedContextSize, sequences}),
-            modelGpuLayers: modelGpuLayers,
-            sequences,
-            isEmbeddingContext
-        }).gpuVram;
-
-        if (contextVram > vramState.free)
-            throw new Error(`The context size of ${resolvedContextSize}${sequences > 1 ? ` with ${sequences} sequences` : ""} is too large for the available VRAM`);
-
-        return resolvedContextSize;
-    } else if (contextSize === "auto" || typeof contextSize === "object") {
-        if (llamaGpu === false)
-            return modelTrainContextSize;
-
-        const vramState = getVramState();
-
-        if (vramState.total === 0)
-            return modelTrainContextSize;
-
-        const freeVram = vramState.free;
-
-        const maxContextSize = contextSize === "auto"
-            ? getDefaultModelContextSize({trainContextSize: modelTrainContextSize})
-            : Math.min(
-                contextSize.max ?? getDefaultModelContextSize({trainContextSize: modelTrainContextSize}),
-                getDefaultModelContextSize({trainContextSize: modelTrainContextSize})
-            );
-
-        const minContextSize = contextSize === "auto"
-            ? minAllowedContextSizeInCalculations
-            : Math.max(
-                contextSize.min ?? minAllowedContextSizeInCalculations,
-                minAllowedContextSizeInCalculations
-            );
-
-        for (let testContextSize = maxContextSize; testContextSize >= minContextSize; testContextSize--) {
-            const contextVram = modelFileInsights.estimateContextResourceRequirements({
-                contextSize: testContextSize,
-                batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: testContextSize, sequences}),
-                modelGpuLayers: modelGpuLayers,
-                sequences,
-                isEmbeddingContext
-            }).gpuVram;
-
-            if (contextVram <= freeVram)
-                return testContextSize;
-        }
-
-        if (ignoreMemorySafetyChecks)
-            return minContextSize;
-
-        throw new Error(`The available VRAM is too small to fit the context size of ${maxContextSize}${sequences > 1 ? ` with ${sequences} sequences` : ""}`);
-    }
-
-    throw new Error(`Invalid context size: "${contextSize}"`);
 }
 
 export function getDefaultContextBatchSize({contextSize, sequences}: {contextSize: number, sequences: number}) {

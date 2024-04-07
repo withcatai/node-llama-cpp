@@ -22,7 +22,9 @@ export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "g
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
-export const chatCommandHistoryFilePath = path.join(os.homedir(), ".node-llama-cpp.chat_repl_history");
+export const cliHomedirDirectory = path.join(os.homedir(), ".node-llama-cpp");
+export const chatCommandHistoryFilePath = path.join(cliHomedirDirectory, ".chat_repl_history");
+export const cliModelsDirectory = path.join(cliHomedirDirectory, "models");
 export const lastBuildInfoJsonPath = path.join(llamaDirectory, "lastBuild.json");
 export const binariesGithubReleasePath = path.join(llamaDirectory, "binariesGithubRelease.json");
 export const llamaCppDirectoryInfoFilePath = path.join(llamaDirectory, "llama.cpp.info.json");
@@ -41,6 +43,7 @@ export const isCI = env.get("CI")
 export const isRunningInsideGoogleColab = env.get("COLAB_RELEASE_TAG")
     .default("")
     .asString() !== "";
+export const useCiLogs = isCI || isRunningInsideGoogleColab;
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default(builtinLlamaCppGitHubRepo)
     .asString();
@@ -60,7 +63,7 @@ export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
         )
 );
 export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
-    .default(LlamaLogLevel.debug)
+    .default(LlamaLogLevel.warn)
     .asEnum(LlamaLogLevelValues);
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")

@@ -1,5 +1,5 @@
 import ora from "ora";
-import {isRunningInsideGoogleColab} from "../config.js";
+import {useCiLogs} from "../config.js";
 import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 import withStatusLogs from "./withStatusLogs.js";
 
@@ -8,11 +8,12 @@ export default async function withOra<T>(
         loading: string,
         success?: string,
         fail?: string,
-        useStatusLogs?: boolean
+        useStatusLogs?: boolean,
+        noSuccessLiveStatus?: boolean
     },
     callback: () => Promise<T>
 ): Promise<T> {
-    if (isRunningInsideGoogleColab || (typeof message !== "string" && message.useStatusLogs))
+    if (useCiLogs || (typeof message !== "string" && message.useStatusLogs))
         return withStatusLogs(message, callback);
 
     const spinner = ora({
@@ -24,22 +25,29 @@ export default async function withOra<T>(
         )
     });
 
-    spinner.start();
+    spinner.start(
+        typeof message === "string"
+            ? message
+            : message.loading
+    );
 
     try {
         const res = await callback();
 
-        if (typeof message !== "string")
-            spinner.succeed(message.success);
-        else
-            spinner.succeed();
+        if (typeof message !== "string") {
+            if (message.noSuccessLiveStatus)
+                spinner.clear();
+            else
+                spinner.succeed(message.success);
+        } else
+            spinner.succeed(message);
 
         return res;
     } catch (er) {
         if (typeof message !== "string")
             spinner.fail(message.fail);
         else
-            spinner.fail();
+            spinner.fail(message);
 
         throw er;
     }

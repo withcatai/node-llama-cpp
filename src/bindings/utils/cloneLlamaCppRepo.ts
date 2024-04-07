@@ -1,6 +1,5 @@
 import path from "path";
 import simpleGit, {SimpleGit} from "simple-git";
-import cliProgress from "cli-progress";
 import chalk from "chalk";
 import fs from "fs-extra";
 import which from "which";
@@ -14,6 +13,7 @@ import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {isLockfileActive} from "../../utils/isLockfileActive.js";
 import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
+import {withProgressLog} from "../../utils/withProgressLog.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 
 type ClonedLlamaCppRepoTagFile = {
@@ -33,35 +33,40 @@ export async function cloneLlamaCppRepo(
         if (!progressLogs)
             return await callback(simpleGit({}));
 
-        const progressBar = new cliProgress.Bar({
-            clearOnComplete: false,
-            hideCursor: true,
-            autopadding: true,
-            format: getConsoleLogPrefix() + `${chalk.bold("Clone {repo}")}  ${chalk.yellow("{percentage}%")} ${chalk.cyan("{bar}")} ${chalk.grey("{eta_formatted}")}`
-        }, cliProgress.Presets.shades_classic);
+        const repoText = `${githubOwner}/${githubRepo} (${cloneName})`;
 
-        progressBar.start(100, 0, {
-            speed: "",
-            repo: `${githubOwner}/${githubRepo} (${cloneName})`
-        });
+        let lastProgress = 0;
+        let stages = 1;
+        return await withProgressLog({
+            loadingText: chalk.bold("Cloning " + repoText),
+            successText: chalk.blue("Cloned " + repoText),
+            failText: chalk.blue("Failed to clone " + repoText),
+            progressFractionDigits: false
+        }, async (progressUpdater) => {
+            const gitWithCloneProgress = simpleGit({
+                progress({progress}) {
+                    const currentProgress = progress / 100;
 
-        const gitWithCloneProgress = simpleGit({
-            progress({progress, total, processed}) {
-                const totalProgress = (processed / 100) + (progress / total);
+                    if (currentProgress < lastProgress)
+                        stages++;
 
-                progressBar.update(Math.floor(totalProgress * 10000) / 100);
-            }
-        });
+                    lastProgress = currentProgress;
 
-        try {
+                    progressUpdater.setProgress(
+                        currentProgress,
+                        stages > 1
+                            ? `(Stage ${stages})`
+                            : undefined
+                    );
+                }
+            });
+
             const res = await callback(gitWithCloneProgress);
 
-            progressBar.update(100);
+            progressUpdater.setProgress(1);
 
             return res;
-        } finally {
-            progressBar.stop();
-        }
+        });
     }
 
     await withLockfile({

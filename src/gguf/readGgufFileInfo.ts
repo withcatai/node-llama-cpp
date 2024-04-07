@@ -1,4 +1,5 @@
 import retry from "async-retry";
+import {isUrl} from "../utils/isUrl.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -49,7 +50,7 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     signal?: AbortSignal
 } = {}) {
     function createFileReader() {
-        if (sourceType === "network" || (sourceType == null && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")))) {
+        if (sourceType === "network" || (sourceType == null && isUrl(pathOrUrl))) {
             return new GgufNetworkFetchFileReader({
                 url: normalizeGgufDownloadUrl(pathOrUrl),
                 retryOptions: fetchRetryOptions,

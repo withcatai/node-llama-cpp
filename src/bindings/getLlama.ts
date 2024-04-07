@@ -48,7 +48,7 @@ export type LlamaOptions = {
 
     /**
      * Set the minimum log level for llama.cpp.
-     * Defaults to "debug".
+     * Defaults to `"warn"`.
      */
     logLevel?: LlamaLogLevel,
 
@@ -149,7 +149,7 @@ export type LastBuildOptions = {
      * Recommended to ensure stability.
      * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
      *
-     * Defaults to `1.5%` of the total VRAM or 300MB, whichever is lower.
+     * Defaults to `6%` of the total VRAM or 300MB, whichever is lower.
      * Set to `0` to disable.
      */
     vramPadding?: number | ((totalVram: number) => number)
@@ -157,7 +157,7 @@ export type LastBuildOptions = {
 
 export const getLlamaFunctionName = "getLlama";
 
-export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.015, 300 * 1024 * 1024));
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 300 * 1024 * 1024));
 
 /**
  * Get a llama.cpp binding.

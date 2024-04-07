@@ -159,7 +159,6 @@ export async function DownloadLlamaCppCommand({
         await fs.remove(llamaCppDirectoryInfoFilePath);
     });
 
-    console.log(chalk.blue("Cloning llama.cpp"));
     await cloneLlamaCppRepo(githubOwner, githubRepo, githubReleaseTag!, useBundle);
 
     if (!skipBuild) {
