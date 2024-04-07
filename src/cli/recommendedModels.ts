@@ -1,9 +1,9 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
-    name: "Llama 2 chat 7B",
+    name: "Llama 2 Chat 7B",
     abilities: ["chat", "complete"],
-    description: "Llama 2 chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
         "This is the 7 billion parameters version of the model.",
 
     fileOptions: [{
@@ -20,9 +20,9 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
-    name: "Llama 2 chat 13B",
+    name: "Llama 2 Chat 13B",
     abilities: ["chat", "complete"],
-    description: "Llama 2 chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
         "This is the 13 billion parameters version of the model.",
 
     fileOptions: [{
@@ -39,9 +39,9 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
-    name: "Llama 2 chat 70B",
+    name: "Llama 2 Chat 70B",
     abilities: ["chat", "complete"],
-    description: "Llama 2 chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
         "This is the 70 billion parameters version of the model. " +
         "You need a GPU with a lot of VRAM to use this version.",
 
@@ -157,7 +157,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     }]
 }, {
     name: "Code Llama 7B",
-    abilities: ["chat", "complete"],
+    abilities: ["chat", "complete", "infill"],
     description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
         + "This is the 7 billion parameters version of the model.",
 
@@ -176,7 +176,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     }]
 }, {
     name: "Code Llama 13B",
-    abilities: ["chat", "complete"],
+    abilities: ["chat", "complete", "infill"],
     description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
         + "This is the 13 billion parameters version of the model.",
 
@@ -195,7 +195,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     }]
 }, {
     name: "Code Llama 34B",
-    abilities: ["chat", "complete"],
+    abilities: ["chat", "complete", "infill"],
     description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
         + "This is the 34 billion parameters version of the model.\n" +
         "You need a GPU with handful of VRAM to use this version.",
@@ -230,6 +230,68 @@ export const recommendedModels: ModelRecommendation[] = [{
             model: "TheBloke/Orca-2-13B-GGUF",
             branch: "main",
             file: "orca-2-13b.Q4_K_M.gguf"
+        }
+    }]
+}, {
+    name: "Functionary Medium v2.4",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
+        "This is the medium version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "meetkai/functionary-medium-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-medium-v2.4.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-medium-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-medium-v2.4.Q4_0.gguf"
+        }
+    }]
+}, {
+    name: "Functionary Small v2.4",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
+        "This is the small version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.f16.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.Q4_0.gguf"
+        }
+    }]
+}, {
+    name: "Stable Code Instruct 3B",
+    abilities: ["chat", "complete", "infill"],
+    description: "Stable Code model were created by Stability AI and are optimized for code completion.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "stabilityai/stable-code-instruct-3b",
+            branch: "main",
+            file: "stable-code-3b-q5_k_m.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "stabilityai/stable-code-instruct-3b",
+            branch: "main",
+            file: "stable-code-3b-q4_k_m.gguf"
         }
     }]
 }];
