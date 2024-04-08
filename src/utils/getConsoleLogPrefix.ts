@@ -6,7 +6,7 @@ export function getConsoleLogPrefix(forcePrefix: boolean = false, padEnd: boolea
     const forceShowLogPrefix = getForceShowConsoleLogPrefix();
 
     if (!isInCLI || forceShowLogPrefix || forcePrefix)
-        return chalk.grey("[node-llama-cpp]") + (padEnd ? " " : "");
+        return chalk.gray("[node-llama-cpp]") + (padEnd ? " " : "");
 
     return "";
 }

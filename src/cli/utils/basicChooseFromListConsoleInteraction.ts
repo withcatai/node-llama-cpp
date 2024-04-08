@@ -19,8 +19,8 @@ export async function basicChooseFromListConsoleInteraction<T>({
     renderSummaryOnExit = (item) => (item == null ? "" : renderItem(item, false, () => void 0)),
     exitOnCtrlC = true
 }: {
-    title: string | ((focusedItem: T) => string),
-    footer?: string | ((focusedItem: T) => string | undefined),
+    title: string | ((focusedItem: T, rerender: () => void) => string),
+    footer?: string | ((focusedItem: T, rerender: () => void) => string | undefined),
     items: T[],
     renderItem(item: T, focused: boolean, rerender: () => void): string,
     canFocusItem?(item: T): boolean,
@@ -69,8 +69,8 @@ export async function basicChooseFromListConsoleInteraction<T>({
         const maxHeight = (process.stdout.rows ?? 24) - 2;
 
         const focusedItem = items[focusIndex];
-        const titleLines = splitAnsiToLines(title instanceof Function ? title(focusedItem) : title, maxWidth);
-        const footerLines = splitAnsiToLines(footer instanceof Function ? footer(focusedItem) : footer, maxWidth);
+        const titleLines = splitAnsiToLines(title instanceof Function ? title(focusedItem, scheduleRerender) : title, maxWidth);
+        const footerLines = splitAnsiToLines(footer instanceof Function ? footer(focusedItem, scheduleRerender) : footer, maxWidth);
 
         const reservedLinesCount = titleLines.length + footerLines.length;
         const maxItemLinesCount = Math.max(1, maxHeight - reservedLinesCount);
@@ -157,7 +157,7 @@ function renderSingleLine(text: string, maxWidth: number) {
 
     const moreText = "...";
     if (textWithoutAnsi.length > maxWidth)
-        return sliceAnsi(text, 0, maxWidth - moreText.length) + chalk.grey(moreText);
+        return sliceAnsi(text, 0, maxWidth - moreText.length) + chalk.gray(moreText);
 
     return text;
 }

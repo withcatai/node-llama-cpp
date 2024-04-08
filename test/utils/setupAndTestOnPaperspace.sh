@@ -16,7 +16,7 @@ nodejsVersion="21"
 
 colorYellow=$'\e[33m'
 colorBlue=$'\e[34m'
-colorGrey=$'\e[90m'
+colorGray=$'\e[90m'
 colorMagenta=$'\e[35m'
 colorRed=$'\e[31m'
 colorEnd=$'\e[0m'
@@ -27,7 +27,7 @@ if [ ! -d "$targetFolder" ]; then
     # Ensure that running on Ubuntu 22.04
     if [ ! -f /etc/os-release ] || ! grep -q 'NAME="Ubuntu"' /etc/os-release || ! grep -q 'VERSION_ID="22.04"' /etc/os-release || ! which apt>/dev/null; then
         echo "This script is intended to run on Ubuntu 22.04"
-        read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGrey}(y/n)${colorEnd} " continueScript
+        read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGray}(y/n)${colorEnd} " continueScript
         if [[ ! $continueScript =~ ^[Yy]$ ]]; then
             echo "Aborting script..."
             exit 1
@@ -38,7 +38,7 @@ if [ ! -d "$targetFolder" ]; then
     if [ "$USER" != "paperspace" ]; then
         echo "This script is intended to run on Paperspace"
         echo "${colorRed}It's not recommended to run it on your local machine as it will install and remove packages and change settings. It may ruin your machine.${colorEnd}"
-        read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGrey}(y/n)${colorEnd} " continueScript
+        read -r -n 1 -p "${colorYellow}Are you sure you want to continue?${colorEnd} ${colorGray}(y/n)${colorEnd} " continueScript
         if [[ ! $continueScript =~ ^[Yy]$ ]]; then
             echo "Aborting script..."
             exit 1
@@ -60,7 +60,7 @@ if [ ! -d "$targetFolder" ]; then
 
 
     # Receive input from the user regarding the repo and branch to clone and checkout
-    read -r -p "${colorYellow}GitHub repo to clone:${colorEnd} ${colorGrey}($defaultRepo)${colorEnd} " githubRepo
+    read -r -p "${colorYellow}GitHub repo to clone:${colorEnd} ${colorGray}($defaultRepo)${colorEnd} " githubRepo
     githubRepo=${githubRepo:-$defaultRepo}
 
     githubRepoAvailableBranches=$(git ls-remote --heads https://github.com/$githubRepo | cut -d/ -f3-)

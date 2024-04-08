@@ -4,6 +4,7 @@ import {InsufficientMemoryError} from "../../../utils/InsufficientMemoryError.js
 import {findBestOption} from "../../../utils/findBestOption.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 import {minAllowedContextSizeInCalculations} from "../../../config.js";
+import {scoreLevels} from "./scoreLevels.js";
 import type {GgufInsights} from "../GgufInsights.js";
 
 const fitContextExtraMemoryPaddingPercentage = 0.5;
@@ -167,25 +168,6 @@ function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayer
     }
 
     return scoreGpuLayers() + scoreContextSize();
-}
-
-function scoreLevels(num: number, levels: {start: number, end?: number, points: number}[]) {
-    let res = 0;
-
-    for (let i = 0; i < levels.length; i++) {
-        const level = levels[i];
-        const start = level.start;
-        const end = level.end ?? levels[i + 1]?.start ?? Math.max(start, num);
-
-        if (num < start)
-            break;
-        else if (num >= end)
-            res += level.points;
-        else
-            res += level.points * ((num - start) / (end - start));
-    }
-
-    return res;
 }
 
 function getVramRequiredForGpuLayers({

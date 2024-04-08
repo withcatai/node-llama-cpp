@@ -5,6 +5,7 @@ import {downloadFile} from "ipull";
 import fs from "fs-extra";
 import bytes from "bytes";
 import logSymbols from "log-symbols";
+import stripAnsi from "strip-ansi";
 import {cliModelsDirectory} from "../../config.js";
 import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
@@ -14,12 +15,15 @@ import {isUrl} from "../../utils/isUrl.js";
 import {arrowChar} from "../../consts.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {getReadableContextSize} from "../../utils/getReadableContextSize.js";
+import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
+import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
 import {consolePromptQuestion} from "./consolePromptQuestion.js";
 import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendationFileOptions.js";
 import {splitAnsiToLines} from "./splitAnsiToLines.js";
+import {renderInfoLine} from "./printInfoLine.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>) {
     if (ggufPath == null)
@@ -116,8 +120,7 @@ type ModelOption = {
     selectedUrl?: {
         url: string,
         ggufInsights: GgufInsights,
-        compatibilityScore: number,
-        compatibilityContextSize: number
+        compatibilityScore: ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>
     },
     urlSelectionLoadingState?: "done" | "loading"
 } | {
@@ -129,10 +132,15 @@ type ModelOption = {
     key: string
 };
 
+const vramStateUpdateInterval = 1000;
+
 async function interactiveChooseModel(llama: Llama): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
     const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
     const activeInteractionController = new AbortController();
+    let scheduledTitleRerenderTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
+    let lastVramState: {used: number, total: number} = llama.getVramState();
+    const canUseGpu = lastVramState.total > 0;
 
     if (await fs.existsSync(cliModelsDirectory)) {
         const ggufFileNames = (await fs.readdir(cliModelsDirectory)).filter((fileName) => fileName.endsWith(".gguf"));
@@ -231,7 +239,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string> {
                 : [
                     {
                         type: "separator",
-                        text: () => "   " + chalk.grey("-".repeat(4))
+                        text: () => "   " + chalk.gray("-".repeat(4))
                     },
                     {
                         type: "separator",
@@ -246,7 +254,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string> {
                 : [
                     {
                         type: "separator",
-                        text: () => "   " + chalk.grey("-".repeat(4))
+                        text: () => "   " + chalk.gray("-".repeat(4))
                     },
                     {
                         type: "separator",
@@ -260,18 +268,64 @@ async function interactiveChooseModel(llama: Llama): Promise<string> {
     try {
         // eslint-disable-next-line no-constant-condition
         while (true) {
+            const minWidth = Math.min(80, process.stdout.columns - 1);
             const selectedItem = await basicChooseFromListConsoleInteraction({
-                title: chalk.bold("Select a model:"),
+                title(item, rerender) {
+                    const title = chalk.bold("Select a model:") + "  ";
+
+                    const vramState = llama.getVramState();
+                    const vramStateText = vramState.total === 0
+                        ? chalk.bgGray(
+                            " " +
+                            "No GPU" +
+                            " "
+                        )
+                        : (
+                            chalk.bgGray(
+                                " " +
+                                chalk.yellow("GPU:") + " " + getPrettyBuildGpuName(llama.gpu) +
+                                " "
+                            ) +
+                            " " +
+                            chalk.bgGray(
+                                " " +
+                                chalk.yellow("VRAM usage:") + " " +
+                                (String(Math.floor((vramState.used / vramState.total) * 100 * 100) / 100) + "%") + " " +
+                                chalk.dim("(" + bytes(vramState.used) + "/" + bytes(vramState.total) + ")") +
+                                " "
+                            )
+                        );
+
+                    const pad = Math.max(0, minWidth - (stripAnsi(title).length + stripAnsi(vramStateText).length));
+
+                    lastVramState = vramState;
+                    clearTimeout(scheduledTitleRerenderTimeout);
+                    scheduledTitleRerenderTimeout = setTimeout(() => {
+                        const vramState = llama.getVramState();
+                        if (lastVramState.used !== vramState.used || lastVramState.total !== vramState.total)
+                            rerender();
+                    }, vramStateUpdateInterval);
+
+                    return [
+                        title,
+                        " ".repeat(pad),
+                        vramStateText
+                    ].join("");
+                },
                 footer(item) {
                     if (item.type !== "recommendedModel" || item.description == null)
                         return undefined;
 
                     const leftPad = 3;
-                    const lines = splitAnsiToLines(item.description, Math.max(1, process.stdout.columns - leftPad));
+                    const maxWidth = Math.max(1, process.stdout.columns - leftPad);
+                    const lines = splitAnsiToLines(item.description, maxWidth);
 
                     return " \n" +
-                        " ".repeat(leftPad) + chalk.bold.grey("Model description") + "\n" +
-                        lines.map((line) => (" ".repeat(leftPad) + line)).join("\n");
+                        " ".repeat(leftPad) + chalk.bold.gray("Model description") + "\n" +
+                        lines.map((line) => (" ".repeat(leftPad) + line)).join("\n") + "\n" +
+                        splitAnsiToLines(renderRecommendedModelTechnicalInfo(item.selectedUrl, maxWidth, canUseGpu), maxWidth)
+                            .map((line) => (" ".repeat(leftPad) + line))
+                            .join("\n");
                 },
                 items: options,
                 renderItem(item, focused, rerender) {
@@ -407,8 +461,8 @@ function renderSelectionItem(item: ModelOption, focused: boolean, rerender: () =
         } else
             modelText += "  " + renderModelCompatibility(
                 item.selectedUrl.ggufInsights,
-                item.selectedUrl.compatibilityScore,
-                item.selectedUrl.compatibilityContextSize
+                item.selectedUrl.compatibilityScore.compatibilityScore,
+                item.selectedUrl.compatibilityScore.resolvedValues.contextSize
             );
 
         return renderSelectableItem(modelText, focused);
@@ -446,18 +500,70 @@ function renderModelCompatibility(
             + (
                 compatibilityContextSize == null
                     ? ""
-                    : chalk.white(" (" + chalk.yellow(getReadableContextSize(compatibilityContextSize)) + " context)")
+                    : (chalk.gray(" | ") + chalk.yellow(getReadableContextSize(compatibilityContextSize)) + chalk.whiteBright(" context"))
             )
         );
-
-    if (ggufInsights.trainContextSize != null)
-        info.push(chalk.yellow("Train context:") + " " + chalk.whiteBright(getReadableContextSize(ggufInsights.trainContextSize)));
 
     info.push(chalk.yellow("Size:") + " " + chalk.whiteBright(bytes(ggufInsights.modelSize)));
 
     return info
         .map((item) => chalk.bgGray(" " + item + " "))
         .join(" ");
+}
+
+function renderRecommendedModelTechnicalInfo(
+    modelSelectedUrl: (ModelOption & {type: "recommendedModel"})["selectedUrl"],
+    maxWidth: number,
+    canUseGpu: boolean
+) {
+    if (modelSelectedUrl == null)
+        return " \n" + chalk.bgGray.yellow(" Loading info ") + "\n ";
+
+    const ggufInsights = modelSelectedUrl.ggufInsights;
+    const compatibilityScore = modelSelectedUrl.compatibilityScore;
+
+    const longestTitle = Math.max("Model info".length, "Resolved config".length) + 1;
+    return " \n" + [
+        renderInfoLine({
+            title: "Model info",
+            padTitle: longestTitle,
+            separateLines: false,
+            maxWidth,
+            info: [{
+                title: "Size",
+                value: bytes(ggufInsights.modelSize)
+            }, {
+                show: ggufInsights.trainContextSize != null,
+                title: "Train context size",
+                value: () => getReadableContextSize(ggufInsights.trainContextSize ?? 0)
+            }]
+        }),
+        renderInfoLine({
+            title: "Resolved config",
+            padTitle: longestTitle,
+            separateLines: false,
+            maxWidth,
+            info: [{
+                title: "",
+                value: renderCompatibilityPercentageWithColors(compatibilityScore.compatibilityScore * 100) + " compatibility"
+            }, {
+                show: ggufInsights.trainContextSize != null,
+                title: "Context size",
+                value: getReadableContextSize(compatibilityScore.resolvedValues.contextSize)
+            }, {
+                show: canUseGpu,
+                title: "GPU layers",
+                value: () => (
+                    compatibilityScore.resolvedValues.gpuLayers + "/" + ggufInsights.totalLayers + " " +
+                    chalk.dim(`(${Math.floor((compatibilityScore.resolvedValues.gpuLayers / ggufInsights.totalLayers) * 100)}%)`)
+                )
+            }, {
+                show: canUseGpu,
+                title: "VRAM usage",
+                value: () => bytes(compatibilityScore.resolvedValues.totalVramUsage)
+            }]
+        })
+    ].join("\n");
 }
 
 function renderCompatibilityPercentageWithColors(percentage: number, {
@@ -518,8 +624,7 @@ async function selectFileForModelRecommendation({
                     bestScoreSelectedUrl = {
                         url: potentialUrl,
                         ggufInsights,
-                        compatibilityScore: compatibilityScore.compatibilityScore,
-                        compatibilityContextSize: compatibilityScore.resolvedValues.contextSize
+                        compatibilityScore
                     };
 
                     if (bestScore === 1)

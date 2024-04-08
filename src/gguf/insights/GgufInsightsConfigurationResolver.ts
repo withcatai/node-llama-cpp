@@ -1,9 +1,11 @@
+import os from "os";
 import {BuildGpu} from "../../bindings/types.js";
 import {LlamaModelOptions} from "../../evaluator/LlamaModel.js";
 import {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
 import {getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {resolveModelGpuLayersOption} from "./utils/resolveModelGpuLayersOption.js";
 import {resolveContextContextSizeOption} from "./utils/resolveContextContextSizeOption.js";
+import {scoreLevels} from "./utils/scoreLevels.js";
 import type {GgufInsights} from "./GgufInsights.js";
 
 
@@ -22,7 +24,7 @@ export class GgufInsightsConfigurationResolver {
      * Score the compatibility of the model configuration with the current GPU and VRAM state.
      * Assumes a model is loaded with the default `"auto"` configurations.
      * Scored based on the following criteria:
-     * - The number of GPU layers that can be offloaded to the GPU
+     * - The number of GPU layers that can be offloaded to the GPU (only if there's a GPU. If there's no GPU then by how small the model is)
      * - Whether all layers can be offloaded to the GPU (gives additional points)
      * - Whether the resolved context size is at least as large as the specified `contextSize`
      *
@@ -39,11 +41,13 @@ export class GgufInsightsConfigurationResolver {
         embeddingContext?: boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
+        getRamState = (() => ({total: os.totalmem(), free: os.freemem()})),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize,
         llamaGpu = this._ggufInsights._llama.gpu,
         llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading
     }: {
         getVramState?(): {total: number, free: number},
+        getRamState?(): {total: number, free: number},
         llamaVramPaddingSize?: number,
         llamaGpu?: BuildGpu,
         llamaSupportsGpuOffloading?: boolean
@@ -70,6 +74,11 @@ export class GgufInsightsConfigurationResolver {
         resolvedValues: {
             gpuLayers: number,
             contextSize: number,
+
+            modelRamUsage: number,
+            contextRamUsage: number,
+            totalRamUsage: number,
+
             modelVramUsage: number,
             contextVramUsage: number,
             totalVramUsage: number
@@ -78,33 +87,37 @@ export class GgufInsightsConfigurationResolver {
         const defaultTrainContextSize = 4096;
 
         const vramState = getVramState();
+        const ramState = getRamState();
         const resolvedGpuLayers = this.resolveModelGpuLayers("auto", {
             getVramState: () => vramState,
             llamaVramPaddingSize,
             llamaGpu,
             llamaSupportsGpuOffloading
         });
-        const estimatedModelVramUsage = this._ggufInsights.estimateModelResourceRequirements({
+        const canUseGpu = llamaSupportsGpuOffloading && llamaGpu !== false;
+        const estimatedModelResourceUsage = this._ggufInsights.estimateModelResourceRequirements({
             gpuLayers: resolvedGpuLayers
-        }).gpuVram;
+        });
 
         const resolvedContextSize = this.resolveContextContextSize("auto", {
-            getVramState: () => ({total: vramState.total, free: Math.max(0, vramState.free - estimatedModelVramUsage)}),
+            getVramState: () => ({total: vramState.total, free: Math.max(0, vramState.free - estimatedModelResourceUsage.gpuVram)}),
             llamaGpu,
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers,
             modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSize
         });
-        const estimatedContextVramUsage = this._ggufInsights.estimateContextResourceRequirements({
+        const estimatedContextResourceUsage = this._ggufInsights.estimateContextResourceRequirements({
             contextSize: resolvedContextSize,
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers
-        }).gpuVram;
+        });
 
         const rankPoints = {
             gpuLayers: 60,
             allLayersAreOffloaded: 10,
             contextSize: 30,
+            ramUsageFitsInRam: 10,
+            cpuOnlySmallModelSize: 60, // also defined inside `scoreModelSizeForCpuOnlyUsage`
             bonusContextSize: 10
         } as const;
 
@@ -113,10 +126,30 @@ export class GgufInsightsConfigurationResolver {
             resolvedGpuLayers === this._ggufInsights.totalLayers ? 1 : 0
         );
         const contextSizePoints = rankPoints.contextSize * Math.min(1, resolvedContextSize / contextSize);
+        const ramUsageFitsInRamPoints = rankPoints.ramUsageFitsInRam * (
+            estimatedModelResourceUsage.cpuRam <= ramState.free
+                ? 1
+                : estimatedModelResourceUsage.cpuRam <= ramState.total
+                    ? 0.5
+                    : (
+                        0.5 - Math.min(
+                            0.5,
+                            0.5 * (
+                                (estimatedModelResourceUsage.cpuRam - ramState.total) / ramState.total
+                            )
+                        )
+                    )
+        );
         const bonusContextSizePoints = 10 * Math.min(1, Math.max(0, resolvedContextSize - contextSize) / contextSize);
 
-        const compatibilityScore = (gpuLayersPoints + allLayersAreOffloadedPoints + contextSizePoints) /
-            (rankPoints.gpuLayers + rankPoints.allLayersAreOffloaded + rankPoints.contextSize);
+        const compatibilityScore = canUseGpu
+            ? (
+                (gpuLayersPoints + allLayersAreOffloadedPoints + contextSizePoints + ramUsageFitsInRamPoints) /
+                (rankPoints.gpuLayers + rankPoints.allLayersAreOffloaded + rankPoints.contextSize + rankPoints.ramUsageFitsInRam)
+            )
+            : (
+                (contextSizePoints + ramUsageFitsInRamPoints + scoreModelSizeForCpuOnlyUsage(this._ggufInsights.modelSize)) /
+                (rankPoints.contextSize + rankPoints.ramUsageFitsInRam + rankPoints.cpuOnlySmallModelSize));
         const bonusScore = bonusContextSizePoints / rankPoints.bonusContextSize;
 
         return {
@@ -127,9 +160,14 @@ export class GgufInsightsConfigurationResolver {
             resolvedValues: {
                 gpuLayers: resolvedGpuLayers,
                 contextSize: resolvedContextSize,
-                modelVramUsage: estimatedModelVramUsage,
-                contextVramUsage: estimatedContextVramUsage,
-                totalVramUsage: estimatedModelVramUsage + estimatedContextVramUsage
+
+                modelRamUsage: estimatedModelResourceUsage.cpuRam,
+                contextRamUsage: estimatedContextResourceUsage.cpuRam,
+                totalRamUsage: estimatedModelResourceUsage.cpuRam + estimatedContextResourceUsage.cpuRam,
+
+                modelVramUsage: estimatedModelResourceUsage.gpuVram,
+                contextVramUsage: estimatedContextResourceUsage.gpuVram,
+                totalVramUsage: estimatedModelResourceUsage.gpuVram + estimatedContextResourceUsage.gpuVram
             }
         };
     }
@@ -192,3 +230,18 @@ export class GgufInsightsConfigurationResolver {
     }
 }
 
+function scoreModelSizeForCpuOnlyUsage(modelSize: number) {
+    const s1GB = Math.pow(1024, 3);
+    return 60 - scoreLevels(modelSize, [{
+        start: s1GB,
+        end: s1GB * 2.5,
+        points: 40
+    }, {
+        start: s1GB * 2.5,
+        end: s1GB * 4,
+        points: 15
+    }, {
+        start: s1GB * 4,
+        points: 5
+    }]);
+}

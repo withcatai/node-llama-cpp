@@ -101,14 +101,14 @@ export async function withProgressLog<T>({
                 loadingText,
                 chalk.yellow(formattedProgress),
                 (currentProgressBarText != null && currentProgressBarText !== "")
-                    ? chalk.grey(
+                    ? chalk.gray(
                         currentProgressBarText + (
                             etaText != null
                                 ? (" | " + etaText)
                                 : ""
                         )
                     )
-                    : chalk.grey(etaText ?? "")
+                    : chalk.gray(etaText ?? "")
             ].join(" ");
         };
 
@@ -178,14 +178,14 @@ export async function withProgressLog<T>({
         return [
             loadingText,
             renderProgressBar({
-                barText: leftPad + ` ${chalk.black.bgWhiteBright(formattedProgress)}${addedText.length === 0 ? "" : (" " + chalk.grey(addedText))} `,
+                barText: leftPad + ` ${chalk.black.bgWhiteBright(formattedProgress)}${addedText.length === 0 ? "" : (" " + chalk.gray(addedText))} `,
                 backgroundText: leftPad + ` ${chalk.yellow.bgGray(formattedProgress)}${addedText.length === 0 ? "" : (" " + chalk.white(addedText))} `,
                 length: progressBarLength,
                 loadedPercentage: Math.max(0, Math.min(1, currentProgress)),
                 barStyle: chalk.black.bgWhiteBright,
                 backgroundStyle: chalk.bgGray
             }),
-            chalk.grey(getEta() ?? "")
+            chalk.gray(getEta() ?? "")
         ].join(" ");
     }
 

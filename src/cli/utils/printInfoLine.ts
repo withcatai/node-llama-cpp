@@ -1,8 +1,12 @@
 import chalk from "chalk";
 import stripAnsi from "strip-ansi";
 
-export function printInfoLine({
-    title, padTitle = 0, separateLines = false, info
+export function printInfoLine(options: Parameters<typeof renderInfoLine>[0]) {
+    console.info(renderInfoLine(options));
+}
+
+export function renderInfoLine({
+    title, padTitle = 0, separateLines = false, info, maxWidth = process.stdout.columns - 1
 }: {
     title?: string,
     padTitle?: number,
@@ -11,7 +15,8 @@ export function printInfoLine({
         title: string,
         value: string | (() => string),
         show?: boolean
-    }>
+    }>,
+    maxWidth?: number
 }) {
     const res: string[] = [];
     const items: string[] = [];
@@ -23,12 +28,15 @@ export function printInfoLine({
             if (show === false)
                 continue;
 
-            items.push(`${chalk.yellow(title + ":")} ${value instanceof Function ? value() : value}`);
+            if (title == null || title === "")
+                items.push(value instanceof Function ? value() : value);
+            else
+                items.push(`${chalk.yellow(title + ":")} ${value instanceof Function ? value() : value}`);
         }
 
         const itemPrefix = `${chalk.dim("|")} `;
         res.push(itemPrefix + items.join("\n" + itemPrefix));
-        console.info(res.join("\n") + "\n");
+        return res.join("\n") + "\n";
     } else {
         if (title != null && title.length > 0)
             res.push(chalk.yellowBright(`${title.padEnd(padTitle, " ")}`));
@@ -37,12 +45,15 @@ export function printInfoLine({
             if (show === false)
                 continue;
 
-            items.push(chalk.bgGray(` ${chalk.yellow(title + ":")} ${value instanceof Function ? value() : value} `));
+            if (title == null || title === "")
+                items.push(chalk.bgGray(` ${value instanceof Function ? value() : value} `));
+            else
+                items.push(chalk.bgGray(` ${chalk.yellow(title + ":")} ${value instanceof Function ? value() : value} `));
         }
 
         const startPad = stripAnsi(res.join(" ")).length + (res.length > 0 ? " ".length : 0);
-        res.push(splitItemsIntoLines(items, process.stdout.columns - 1 - startPad).join("\n" + " ".repeat(startPad)));
-        console.info(res.join(" "));
+        res.push(splitItemsIntoLines(items, maxWidth - startPad).join("\n" + " ".repeat(startPad)));
+        return res.join(" ");
     }
 }
 

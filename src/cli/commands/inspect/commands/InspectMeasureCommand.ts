@@ -241,7 +241,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                                 : bytes(result.contextVramUsage),
                             contextEstimationDiff: contextVramEstimationDiffText,
                             totalVramUsage: ((result.totalVramUsage / totalVram) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.grey("(" + bytes(result.totalVramUsage) + "/" + bytes(totalVram) + ")")
+                                chalk.gray("(" + bytes(result.totalVramUsage) + "/" + bytes(totalVram) + ")")
                         });
                     }
                 }

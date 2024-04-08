@@ -112,7 +112,7 @@ export class ConsoleInteraction {
             });
 
             console.log();
-            process.stdout.write(question + " " + chalk.grey("(Y/n) "));
+            process.stdout.write(question + " " + chalk.gray("(Y/n) "));
             interaction.start();
         });
     }

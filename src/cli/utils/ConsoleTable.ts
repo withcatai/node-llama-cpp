@@ -8,7 +8,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
     private readonly _drawHeaderRowSeparator: boolean;
 
     public constructor(columns: T, {
-        columnSeparator = chalk.grey(" | "),
+        columnSeparator = chalk.gray(" | "),
         drawHeaderRowSeparator = true
     }: {
         columnSeparator?: string,
@@ -46,7 +46,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
 
             const moreText = "...";
             if (stripAnsi(title).length > columnSize)
-                title = sliceAnsi(title, 0, columnSize - moreText.length) + chalk.grey(moreText);
+                title = sliceAnsi(title, 0, columnSize - moreText.length) + chalk.gray(moreText);
 
             title = title + " ".repeat(Math.max(0, columnSize - stripAnsi(title).length));
             title = sliceAnsi(title, 0, columnSize);
@@ -60,7 +60,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
         console.info(logLine);
 
         if (drawRowSeparator)
-            console.info(chalk.grey("-".repeat(stripAnsi(logLine).length)));
+            console.info(chalk.gray("-".repeat(stripAnsi(logLine).length)));
     }
 
     public logLine(data: {[key in T[number]["key"]]?: string}) {
@@ -97,7 +97,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
 
             const moreText = "...";
             if (valueWithoutAnsi.length > columnSize)
-                value = sliceAnsi(value, 0, columnSize - moreText.length) + chalk.grey(moreText);
+                value = sliceAnsi(value, 0, columnSize - moreText.length) + chalk.gray(moreText);
 
             value = value + " ".repeat(Math.max(0, columnSize - valueWithoutAnsi.length));
             value = sliceAnsi(value, 0, columnSize);
@@ -128,5 +128,5 @@ function getColumnWidth(column: ConsoleTableColumn) {
 }
 
 function toOneLine(text: string) {
-    return text.replaceAll("\n", chalk.grey("\\n"));
+    return text.replaceAll("\n", chalk.gray("\\n"));
 }
