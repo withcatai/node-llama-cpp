@@ -42,7 +42,7 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
             .option("nodeTarget", {
                 alias: "t",
                 type: "string",
-                description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
+                description: "The Node.js version to compile llama.cpp for. Example: `v18.0.0`"
             })
             .option("gpu", {
                 type: "string",

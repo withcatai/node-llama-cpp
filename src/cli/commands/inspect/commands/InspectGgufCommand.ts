@@ -9,9 +9,11 @@ import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/pre
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {isUrl} from "../../../../utils/isUrl.js";
+import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 
 type InspectGgufCommand = {
-    path: string,
+    modelPath: string,
+    header?: string[],
     fullTensorInfo: boolean,
     fullMetadataArrays: boolean,
     plainJson: boolean,
@@ -19,14 +21,22 @@ type InspectGgufCommand = {
 };
 
 export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
-    command: "gguf [path]",
+    command: "gguf [modelPath]",
     describe: "Inspect a GGUF file",
     builder(yargs) {
         return yargs
-            .option("path", {
+            .option("modelPath", {
+                alias: ["m", "model", "path", "url"],
                 type: "string",
                 demandOption: true,
-                description: "The path or URL of the GGUF file to inspect. If a URL is provided, the metadata will be read from the remote file without downloading the entire file."
+                description: "The path or URL of the GGUF file to inspect. If a URL is provided, the metadata will be read from the remote file without downloading the entire file.",
+                group: "Required:"
+            })
+            .option("header", {
+                alias: ["H"],
+                type: "string",
+                array: true,
+                description: "Headers to use when reading a model file from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
             })
             .option("fullTensorInfo", {
                 alias: "t",
@@ -36,7 +46,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 group: "Optional:"
             })
             .option("fullMetadataArrays", {
-                alias: "m",
+                alias: "ma",
                 type: "boolean",
                 default: false,
                 description: "Print the full arrays in the metadata. Caution: those arrays can be extremely large and cover the entire terminal screen. Use with caution.",
@@ -54,11 +64,15 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 group: "Optional:"
             });
     },
-    async handler({path: ggufPath, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile}: InspectGgufCommand) {
+    async handler({
+        modelPath: ggufPath, header: headerArg, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
+    }: InspectGgufCommand) {
         const isPathUrl = isUrl(ggufPath);
         const resolvedGgufPath = isPathUrl
             ? normalizeGgufDownloadUrl(ggufPath)
             : path.resolve(ggufPath);
+
+        const headers = resolveHeaderFlag(headerArg);
 
         if (!plainJson) {
             if (isPathUrl)
@@ -67,7 +81,9 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
         }
 
-        const parsedMetadata = await readGgufFileInfo(ggufPath);
+        const parsedMetadata = await readGgufFileInfo(ggufPath, {
+            fetchHeaders: isPathUrl ? headers : undefined
+        });
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {

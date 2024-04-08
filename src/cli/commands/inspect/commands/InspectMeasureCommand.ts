@@ -14,9 +14,11 @@ import {LlamaModel} from "../../../../evaluator/LlamaModel.js";
 import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {ConsoleTable, ConsoleTableColumn} from "../../../utils/ConsoleTable.js";
 import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";
+import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 
 type InspectMeasureCommand = {
-    path?: string,
+    modelPath?: string,
+    header?: string[],
     minLayers: number,
     maxLayers?: number,
     minContextSize: number,
@@ -28,86 +30,87 @@ type InspectMeasureCommand = {
 };
 
 export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand> = {
-    command: "measure [path]",
+    command: "measure [modelPath]",
     describe: "Measure VRAM consumption of a GGUF model file with all possible combinations of gpu layers and context sizes",
     builder(yargs) {
         return yargs
-            .option("path", {
+            .option("modelPath", {
+                alias: ["m", "model", "path", "url"],
                 type: "string",
-                description: "The path of the GGUF model file to measure"
+                description: "The path of the GGUF model file to measure. Can be a path to a local file or a URL of a model file to download"
+            })
+            .option("header", {
+                alias: ["H"],
+                type: "string",
+                array: true,
+                description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
             })
             .option("minLayers", {
                 alias: "mnl",
                 type: "number",
                 default: 1,
-                description: "Minimum number of layers to offload to the GPU",
-                group: "Optional:"
+                description: "Minimum number of layers to offload to the GPU"
             })
             .option("maxLayers", {
                 alias: "mxl",
                 type: "number",
                 default: -1,
                 defaultDescription: "All layers",
-                description: "Maximum number of layers to offload to the GPU",
-                group: "Optional:"
+                description: "Maximum number of layers to offload to the GPU"
             })
             .option("minContextSize", {
                 alias: "mncs",
                 type: "number",
                 default: 512,
-                description: "Minimum context size",
-                group: "Optional:"
+                description: "Minimum context size"
             })
             .option("maxContextSize", {
                 alias: "mxcs",
                 type: "number",
                 default: -1,
                 defaultDescription: "Train context size",
-                description: "Maximum context size",
-                group: "Optional:"
+                description: "Maximum context size"
             })
             .option("measures", {
-                alias: "m",
+                alias: "n",
                 type: "number",
                 default: 10,
-                description: "Number of context size measures to take for each gpu layers count",
-                group: "Optional:"
+                description: "Number of context size measures to take for each gpu layers count"
             })
             .option("printHeaderBeforeEachLayer", {
                 alias: "ph",
                 type: "boolean",
                 default: true,
-                description: "Print header before each layer's measures",
-                group: "Optional:"
+                description: "Print header before each layer's measures"
             })
             .option("evaluateText", {
                 alias: ["evaluate", "et"],
                 type: "string",
-                description: "Text to evaluate with the model",
-                group: "Optional:"
+                description: "Text to evaluate with the model"
             })
             .option("repeatEvaluateText", {
                 alias: ["repeatEvaluate", "ret"],
                 type: "number",
                 default: 1,
-                description: "Number of times to repeat the evaluation text before sending it for evaluation, in order to make it longer",
-                group: "Optional:"
+                description: "Number of times to repeat the evaluation text before sending it for evaluation, in order to make it longer"
             });
     },
     async handler({
-        path: ggufPath, minLayers, maxLayers, minContextSize, maxContextSize, measures = 10, printHeaderBeforeEachLayer = true,
-        evaluateText, repeatEvaluateText
+        modelPath: ggufPath, header: headerArg, minLayers, maxLayers, minContextSize, maxContextSize, measures = 10,
+        printHeaderBeforeEachLayer = true, evaluateText, repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
         if (maxContextSize === -1) maxContextSize = undefined;
         if (minLayers < 1) minLayers = 1;
+
+        const headers = resolveHeaderFlag(headerArg);
 
         // ensure a llama build is available
         const llama = await getLlama("lastBuild", {
             logLevel: LlamaLogLevel.error
         });
 
-        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama);
+        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers);
 
         console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
         console.info();

@@ -21,7 +21,7 @@ import {consolePromptQuestion} from "./consolePromptQuestion.js";
 import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendationFileOptions.js";
 import {splitAnsiToLines} from "./splitAnsiToLines.js";
 
-export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama) {
+export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>) {
     if (ggufPath == null)
         ggufPath = await interactiveChooseModel(llama);
 
@@ -47,12 +47,13 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
     const downloader = await downloadFile({
         url: ggufPath,
         directory: cliModelsDirectory,
-        cliProgress: true
+        cliProgress: true,
+        headers: fetchHeaders
     });
 
-    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloader.status.fileName);
+    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloader.fileName);
 
-    if (downloader.status.fileName == null || downloader.status.fileName === "")
+    if (downloader.fileName == null || downloader.fileName === "")
         throw new Error("Failed to get the file name from the URL");
 
     if (await fs.pathExists(destFilePath)) {
@@ -60,20 +61,20 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
         if (downloader.status.totalBytes === fileStats.size) {
             console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            downloader.pause();
+            await downloader.close();
 
             return destFilePath;
         }
 
         const res = await ConsoleInteraction.yesNoQuestion(
-            `There's already an local ${chalk.blue(downloader.status.fileName)} file that's different from the remote one.\n` +
+            `There's already an local ${chalk.blue(downloader.fileName)} file that's different from the remote one.\n` +
             "Download it and override the existing file?"
         );
 
         if (!res) {
             console.info("Loading the existing file");
             console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            downloader.pause();
+            await downloader.close();
 
             return destFilePath;
         }
@@ -83,7 +84,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
     const consoleInteraction = new ConsoleInteraction();
     consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
-        downloader.pause();
+        await downloader.close();
         consoleInteraction.stop();
         process.exit(0);
     });

@@ -218,7 +218,7 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
         }
 
         if (option.type != null) {
-            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape(option.type)}<span style="opacity: 0.4">)</span></code>`);
+            optionDescription.push(`<code><span style="opacity: 0.4">(</span>${htmlEscape(option.type + (option.array ? "[]" : ""))}<span style="opacity: 0.4">)</span></code>`);
         }
 
         if (option.demandOption) {
