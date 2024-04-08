@@ -15,6 +15,7 @@ import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
 import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../../src/state.js";
 import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
+import {htmlEscapeWithCodeMarkdown} from "../../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
 
 export default {
     async load() {
@@ -71,7 +72,7 @@ function buildIndexTable(commands: [pageLink: string, command: CommandModule<any
 
                 return [
                     `<a href="${pageLink}"><code>` + htmlEscape(cliName + " " + command.command) + "</code></a>",
-                    htmlEscape(String(command.describe ?? ""))
+                    htmlEscapeWithCodeMarkdown(String(command.describe ?? ""))
                 ];
             })
             .filter((row): row is string[] => row != null)

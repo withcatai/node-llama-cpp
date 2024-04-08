@@ -3,6 +3,7 @@ import {htmlEscape} from "./htmlEscape.js";
 import {cliBinName, npxRunPrefix} from "../../src/config.js";
 import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
+import {htmlEscapeWithCodeMarkdown} from "./htmlEscapeWithCodeMarkdown.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     cliName = cliBinName,
@@ -45,7 +46,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
 
                     return [
                         `<a href="${subCommandsParentPageLink != null ? (subCommandsParentPageLink + "/") : ""}${commandPageLink}"><code>` + htmlEscape(cliName + " " + cliCommand) + "</code></a>",
-                        htmlEscape(String(subCommand.describe ?? ""))
+                        htmlEscapeWithCodeMarkdown(String(subCommand.describe ?? ""))
                     ];
                 })
                 .filter((row): row is string[] => row != null)
@@ -61,7 +62,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
             for (const group of optionGroups) {
                 let groupName = group.name;
                 if (groupName !== "default") {
-                    res += buildHtmlHeading("h3", htmlEscape(groupName), encodeURIComponent(groupName.toLowerCase()));
+                    res += buildHtmlHeading("h3", htmlEscapeWithCodeMarkdown(groupName), encodeURIComponent(groupName.toLowerCase()));
                 }
 
                 res += renderOptionsGroupOptionsTable(group.options) + "\n";
@@ -207,7 +208,7 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
             }
         }
 
-        let optionDescription: string[] = option.description != null ? [htmlEscape(option.description)] : [];
+        let optionDescription: string[] = option.description != null ? [htmlEscapeWithCodeMarkdown(option.description)] : [];
 
         const hasDefaultDescription = option.defaultDescription != null && option.defaultDescription.trim().length > 0;
         if (option.default != null || hasDefaultDescription) {
