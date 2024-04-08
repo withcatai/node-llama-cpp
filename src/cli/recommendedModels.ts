@@ -59,44 +59,6 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
-    name: "Gemma 1.1 7B",
-    abilities: ["chat", "complete"],
-    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
-        "This is the 7 billion parameters version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "ggml-org/gemma-1.1-7b-it-Q8_0-GGUF",
-            branch: "main",
-            file: "gemma-1.1-7b-it.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "ggml-org/gemma-1.1-7b-it-Q4_K_M-GGUF",
-            branch: "main",
-            file: "gemma-1.1-7b-it.Q4_K_M.gguf"
-        }
-    }]
-}, {
-    name: "Gemma 1.1 2B",
-    abilities: ["chat", "complete"],
-    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
-        "This is the 2 billion parameters version of the model and is significantly less powerful than the 7B version.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF",
-            branch: "main",
-            file: "gemma-1.1-2b-it.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "ggml-org/gemma-1.1-2b-it-Q4_K_M-GGUF",
-            branch: "main",
-            file: "gemma-1.1-2b-it.Q4_K_M.gguf"
-        }
-    }]
-}, {
     name: "Mixtral 8x7B MoE",
     abilities: ["chat", "complete"],
     description: "Mixtral models were created by Mistal AI and are general purpose models that utilize a Mixture of Experts architecture.\n" +
@@ -156,6 +118,107 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
+    name: "Functionary Medium v2.4",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
+        "This is the medium version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "meetkai/functionary-medium-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-medium-v2.4.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-medium-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-medium-v2.4.Q4_0.gguf"
+        }
+    }]
+}, {
+    name: "Functionary Small v2.4",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
+        "This is the small version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.f16.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "meetkai/functionary-small-v2.4-GGUF",
+            branch: "main",
+            file: "functionary-small-v2.4.Q4_0.gguf"
+        }
+    }]
+}, {
+    name: "Gemma 1.1 7B",
+    abilities: ["chat", "complete"],
+    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
+        "This is the 7 billion parameters version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "ggml-org/gemma-1.1-7b-it-Q8_0-GGUF",
+            branch: "main",
+            file: "gemma-1.1-7b-it.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "ggml-org/gemma-1.1-7b-it-Q4_K_M-GGUF",
+            branch: "main",
+            file: "gemma-1.1-7b-it.Q4_K_M.gguf"
+        }
+    }]
+}, {
+    name: "Gemma 1.1 2B",
+    abilities: ["chat", "complete"],
+    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
+        "This is the 2 billion parameters version of the model and is significantly less powerful than the 7B version.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF",
+            branch: "main",
+            file: "gemma-1.1-2b-it.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "ggml-org/gemma-1.1-2b-it-Q4_K_M-GGUF",
+            branch: "main",
+            file: "gemma-1.1-2b-it.Q4_K_M.gguf"
+        }
+    }]
+}, {
+    name: "Orca 2 13B",
+    abilities: ["chat", "complete"],
+    description: "Orca 2 model was created by Microsoft and is optimized for reasoning over given data, reading comprehensions, math problem solving and text summarization.\n" +
+        "This is the 13 billion parameters version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "TheBloke/Orca-2-13B-GGUF",
+            branch: "main",
+            file: "orca-2-13b.Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "TheBloke/Orca-2-13B-GGUF",
+            branch: "main",
+            file: "orca-2-13b.Q4_K_M.gguf"
+        }
+    }]
+}, {
     name: "Code Llama 7B",
     abilities: ["chat", "complete", "infill"],
     description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
@@ -211,69 +274,6 @@ export const recommendedModels: ModelRecommendation[] = [{
             model: "TheBloke/CodeLlama-34B-GGUF",
             branch: "main",
             file: "codellama-34b.Q4_K_M.gguf"
-        }
-    }]
-}, {
-    name: "Orca 2 13B",
-    abilities: ["chat", "complete"],
-    description: "Orca 2 model was created by Microsoft and is optimized for reasoning over given data, reading comprehensions, math problem solving and text summarization.\n" +
-        "This is the 13 billion parameters version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "TheBloke/Orca-2-13B-GGUF",
-            branch: "main",
-            file: "orca-2-13b.Q5_K_M.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "TheBloke/Orca-2-13B-GGUF",
-            branch: "main",
-            file: "orca-2-13b.Q4_K_M.gguf"
-        }
-    }]
-}, {
-    name: "Functionary Medium v2.4",
-    abilities: ["chat", "complete", "functionCalling"],
-    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
-        "This is the medium version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "meetkai/functionary-medium-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-medium-v2.4.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-medium-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-medium-v2.4.Q4_0.gguf"
-        }
-    }]
-}, {
-    name: "Functionary Small v2.4",
-    abilities: ["chat", "complete", "functionCalling"],
-    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
-        "This is the small version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.4.f16.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.4.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.4.Q4_0.gguf"
         }
     }]
 }, {
