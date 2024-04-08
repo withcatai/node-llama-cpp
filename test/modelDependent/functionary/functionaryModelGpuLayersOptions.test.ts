@@ -551,8 +551,8 @@ describe("functionary", () => {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
-                    expect(res.gpuLayers).to.toMatchInlineSnapshot("26");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("4819");
+                    expect(res.gpuLayers).to.toMatchInlineSnapshot("25");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("5647");
                     expect(res.contextSize).to.be.gte(contextSize);
                 }
                 {
