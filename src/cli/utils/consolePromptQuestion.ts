@@ -36,6 +36,7 @@ export async function consolePromptQuestion(question: string, {
                 clearLastLines(linesUsed);
 
                 if (exitOnCtrlC) {
+                    rl.close();
                     process.exit(0);
                 } else
                     accept(null);

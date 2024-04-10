@@ -7,6 +7,7 @@ import logSymbols from "log-symbols";
 import prettyMilliseconds from "pretty-ms";
 import {useCiLogs} from "../config.js";
 import {clockChar} from "../consts.js";
+import {ConsoleInteraction, ConsoleInteractionKey} from "../cli/utils/ConsoleInteraction.js";
 import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 import withOra from "./withOra.js";
 
@@ -24,7 +25,8 @@ export async function withProgressLog<T>({
     etaUpdateInterval = 1000,
     noProgress = false,
     progressFractionDigits = true,
-    noSuccessLiveStatus = false
+    noSuccessLiveStatus = false,
+    liveCtrlCSendsAbortSignal = false
 }: {
     loadingText: string,
     successText: string,
@@ -39,12 +41,15 @@ export async function withProgressLog<T>({
     etaUpdateInterval?: number,
     noProgress?: boolean,
     progressFractionDigits?: boolean,
-    noSuccessLiveStatus?: boolean
+    noSuccessLiveStatus?: boolean,
+    liveCtrlCSendsAbortSignal?: boolean
 }, callback: (progressUpdater: ProgressUpdater) => Promise<T>): Promise<T> {
     const shouldLiveUpdate = !useCiLogs && liveUpdates;
     const startTime = Date.now();
+    const abortController = new AbortController();
     let currentProgress = initialPercentage;
     let currentProgressBarText = initialProgressBarText;
+    let isAborted = false;
 
     const getEta = () => {
         const now = Date.now();
@@ -185,7 +190,9 @@ export async function withProgressLog<T>({
                 barStyle: chalk.black.bgWhiteBright,
                 backgroundStyle: chalk.bgGray
             }),
-            chalk.gray(getEta() ?? "")
+            isAborted
+                ? chalk.red("Aborted")
+                : chalk.gray(getEta() ?? "")
         ].join(" ");
     }
 
@@ -204,17 +211,42 @@ export async function withProgressLog<T>({
             currentProgress = progress;
             currentProgressBarText = progressText;
 
-            updateProgressBar();
+            if (!isAborted)
+                updateProgressBar();
 
             return progressUpdater;
-        }
+        },
+        abortSignal: liveCtrlCSendsAbortSignal
+            ? abortController.signal
+            : undefined
     };
 
     updateManager.hook();
+    const consoleInteraction = new ConsoleInteraction();
     let moveCursorUpAfterUnhook = false;
+
+    consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, () => {
+        isAborted = true;
+
+        if (liveCtrlCSendsAbortSignal) {
+            abortController.abort();
+            consoleInteraction.stop();
+
+            updateProgressBar();
+
+            updateManager.unhook(true);
+        } else {
+            consoleInteraction.stop();
+            updateManager.unhook(true);
+            updateProgressBar();
+
+            process.exit(0);
+        }
+    });
 
     try {
         updateProgressBar();
+        consoleInteraction.start();
 
         const res = await callback(progressUpdater);
 
@@ -244,6 +276,7 @@ export async function withProgressLog<T>({
 
         throw err;
     } finally {
+        consoleInteraction.stop();
         updateManager.unhook(true);
 
         if (moveCursorUpAfterUnhook)
@@ -252,7 +285,8 @@ export async function withProgressLog<T>({
 }
 
 type ProgressUpdater = {
-    setProgress(percentage: number, progressText?: string): ProgressUpdater
+    setProgress(percentage: number, progressText?: string): ProgressUpdater,
+    abortSignal?: AbortSignal
 };
 
 function renderProgressBar({
