@@ -85,5 +85,5 @@ export function printCommonInfoLines({
 }
 
 function toOneLine(text: string) {
-    return text.replaceAll("\n", chalk.grey("\\n"));
+    return text.replaceAll("\n", chalk.gray("\\n"));
 }

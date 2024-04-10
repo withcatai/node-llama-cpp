@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import logSymbols from "log-symbols";
+import {clockChar} from "../consts.js";
 import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 
-const clockChar = "\u25f7";
 
 export default async function withStatusLogs<T>(
     messageAndOptions: string | {

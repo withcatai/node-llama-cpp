@@ -1,7 +1,7 @@
 import {describe, expect, test} from "vitest";
 import bytes from "bytes";
 import {getModelFile} from "../../../utils/modelFiles.js";
-import {GgufInsights, GgufInsightsResourceRequirements} from "../../../../src/gguf/GgufInsights.js";
+import {GgufInsights, GgufInsightsResourceRequirements} from "../../../../src/gguf/insights/GgufInsights.js";
 import {getTestLlama} from "../../../utils/getTestLlama.js";
 import {readGgufFileInfo} from "../../../../src/gguf/readGgufFileInfo.js";
 

@@ -1,12 +1,10 @@
 import {describe, expect, it} from "vitest";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
-import {LlamaModelOptions, resolveModelGpuLayersOption} from "../../../src/evaluator/LlamaModel.js";
-import {readGgufFileInfo} from "../../../src/gguf/readGgufFileInfo.js";
-import {GgufInsights} from "../../../src/gguf/GgufInsights.js";
-import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
+import {LlamaModelOptions, readGgufFileInfo} from "../../../src/index.js";
+import {GgufInsights} from "../../../src/gguf/insights/GgufInsights.js";
 import {BuildGpu} from "../../../src/bindings/types.js";
-import {resolveContextContextSizeOption} from "../../../src/evaluator/LlamaContext/LlamaContext.js";
+import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
 
 describe("stableCode", () => {
     describe("model options", () => {
@@ -24,8 +22,7 @@ describe("stableCode", () => {
             }: {
                 totalVram: number, freeVram: number, ignoreMemorySafetyChecks?: boolean, llamaGpu?: BuildGpu
             }) {
-                const resolvedGpuLayers = resolveModelGpuLayersOption(gpuLayers, {
-                    ggufInsights,
+                const resolvedGpuLayers = ggufInsights.configurationResolver.resolveModelGpuLayers(gpuLayers, {
                     ignoreMemorySafetyChecks,
                     getVramState: () => ({
                         total: llamaGpu === false ? 0 : totalVram,
@@ -42,11 +39,9 @@ describe("stableCode", () => {
                     }).gpuVram;
 
                     try {
-                        return resolveContextContextSizeOption({
-                            contextSize: "auto",
+                        return ggufInsights.configurationResolver.resolveContextContextSize("auto", {
                             batchSize: undefined,
                             sequences: 1,
-                            modelFileInsights: ggufInsights,
                             modelGpuLayers: resolvedGpuLayers,
                             modelTrainContextSize: ggufInsights.trainContextSize ?? 4096,
                             getVramState: () => ({
@@ -104,7 +99,7 @@ describe("stableCode", () => {
                         freeVram: s1GB * 3
                     });
                     expect(res.gpuLayers).to.eql(16);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("8652");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("8687");
                 }
                 try {
                     resolveGpuLayers(16, {
@@ -346,7 +341,7 @@ describe("stableCode", () => {
                         freeVram: s1GB * 0.8
                     });
                     expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("3308");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("3287");
                 }
                 {
                     const res = resolveGpuLayers("auto", {
@@ -354,7 +349,7 @@ describe("stableCode", () => {
                         freeVram: s1GB * 1.4
                     });
                     expect(res.gpuLayers).to.toMatchInlineSnapshot("9");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("4467");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("4478");
                 }
                 {
                     const res = resolveGpuLayers("auto", {
@@ -496,7 +491,7 @@ describe("stableCode", () => {
                         freeVram: s1GB * 4
                     });
                     expect(res.gpuLayers).to.eql(16);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("13133");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("13167");
                 }
                 try {
                     resolveGpuLayers({min: 16}, {
@@ -524,7 +519,7 @@ describe("stableCode", () => {
                     expect(res.gpuLayers).to.be.gte(16);
                     expect(res.gpuLayers).to.be.lte(24);
                     expect(res.gpuLayers).to.toMatchInlineSnapshot("24");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("8410");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("8405");
                 }
                 {
                     const res = resolveGpuLayers({min: 16, max: 24}, {
@@ -534,7 +529,7 @@ describe("stableCode", () => {
                     expect(res.gpuLayers).to.be.gte(16);
                     expect(res.gpuLayers).to.be.lte(24);
                     expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("8079");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("8112");
                 }
             });
 
@@ -566,8 +561,8 @@ describe("stableCode", () => {
                         totalVram: s1GB * 2,
                         freeVram: s1GB * 1
                     });
-                    expect(res.gpuLayers).to.toMatchInlineSnapshot("5");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("4295");
+                    expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("5127");
                     expect(res.contextSize).to.be.gte(contextSize);
                 }
                 {
@@ -576,8 +571,8 @@ describe("stableCode", () => {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
-                    expect(res.gpuLayers).to.toMatchInlineSnapshot("24");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("8410");
+                    expect(res.gpuLayers).to.toMatchInlineSnapshot("23");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("8867");
                     expect(res.contextSize).to.be.gte(contextSize);
                 }
                 {

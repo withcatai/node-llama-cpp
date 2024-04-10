@@ -12,9 +12,12 @@ import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
 import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
+import {withProgressLog} from "../../utils/withProgressLog.js";
+import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 
 type InfillCommand = {
-    model: string,
+    modelPath?: string,
+    header?: string[],
     systemInfo: boolean,
     prefix?: string,
     prefixFile?: string,
@@ -44,159 +47,141 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     describe: "Generate an infill completion for a given suffix and prefix texts",
     builder(yargs) {
         return yargs
-            .option("model", {
-                alias: ["m", "modelPath"],
+            .option("modelPath", {
+                alias: ["m", "model", "path", "url"],
                 type: "string",
-                demandOption: true,
-                description: "Llama model file to use for the infill",
-                group: "Required:"
+                description: "Llama model file to use for the infill. Can be a path to a local file or a URL of a model file to download"
+            })
+            .option("header", {
+                alias: ["H"],
+                type: "string",
+                array: true,
+                description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
             })
             .option("systemInfo", {
                 alias: "i",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp system info",
-                group: "Optional:"
+                description: "Print llama.cpp system info"
             })
             .option("prefix", {
                 type: "string",
-                description: "First prefix text to automatically load",
-                group: "Optional:"
+                description: "First prefix text to automatically load"
             })
             .option("prefixFile", {
                 type: "string",
-                description: "Path to a file to load prefix text from automatically",
-                group: "Optional:"
+                description: "Path to a file to load prefix text from automatically"
             })
             .option("suffix", {
                 type: "string",
-                description: "First suffix text to automatically load. Requires `prefix` or `prefixFile` to be set",
-                group: "Optional:"
+                description: "First suffix text to automatically load. Requires `prefix` or `prefixFile` to be set"
             })
             .option("suffixFile", {
                 type: "string",
-                description: "Path to a file to load suffix text from automatically. Requires `prefix` or `prefixFile` to be set",
-                group: "Optional:"
+                description: "Path to a file to load suffix text from automatically. Requires `prefix` or `prefixFile` to be set"
             })
             .option("contextSize", {
                 alias: "c",
                 type: "number",
                 description: "Context size to use for the model context",
                 default: -1,
-                defaultDescription: "Automatically determined based on the available VRAM",
-                group: "Optional:"
+                defaultDescription: "Automatically determined based on the available VRAM"
             })
             .option("batchSize", {
                 alias: "b",
                 type: "number",
-                description: "Batch size to use for the model context. The default value is the context size",
-                group: "Optional:"
+                description: "Batch size to use for the model context. The default value is the context size"
             })
             .option("threads", {
                 type: "number",
                 default: 6,
-                description: "Number of threads to use for the evaluation of tokens",
-                group: "Optional:"
+                description: "Number of threads to use for the evaluation of tokens"
             })
             .option("temperature", {
                 alias: "t",
                 type: "number",
                 default: 0,
-                description: "Temperature is a hyperparameter that controls the randomness of the generated text. It affects the probability distribution of the model's output tokens. A higher temperature (e.g., 1.5) makes the output more random and creative, while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative. The suggested temperature is 0.8, which provides a balance between randomness and determinism. At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run. Set to `0` to disable.",
-                group: "Optional:"
+                description: "Temperature is a hyperparameter that controls the randomness of the generated text. It affects the probability distribution of the model's output tokens. A higher temperature (e.g., 1.5) makes the output more random and creative, while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative. The suggested temperature is 0.8, which provides a balance between randomness and determinism. At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run. Set to `0` to disable."
             })
             .option("minP", {
                 alias: "mp",
                 type: "number",
                 default: 0,
-                description: "From the next token candidates, discard the percentage of tokens with the lowest probability. For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded. This is useful for generating more high-quality results when using a high temperature. Set to a value between `0` and `1` to enable. Only relevant when `temperature` is set to a value greater than `0`.",
-                group: "Optional:"
+                description: "From the next token candidates, discard the percentage of tokens with the lowest probability. For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded. This is useful for generating more high-quality results when using a high temperature. Set to a value between `0` and `1` to enable. Only relevant when `temperature` is set to a value greater than `0`."
             })
             .option("topK", {
                 alias: "k",
                 type: "number",
                 default: 40,
-                description: "Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation. An integer number between `1` and the size of the vocabulary. Set to `0` to disable (which uses the full vocabulary). Only relevant when `temperature` is set to a value greater than 0.",
-                group: "Optional:"
+                description: "Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation. An integer number between `1` and the size of the vocabulary. Set to `0` to disable (which uses the full vocabulary). Only relevant when `temperature` is set to a value greater than 0."
             })
             .option("topP", {
                 alias: "p",
                 type: "number",
                 default: 0.95,
-                description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`.",
-                group: "Optional:"
+                description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`."
             })
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
                 default: -1,
-                defaultDescription: "Automatically determined based on the available VRAM",
-                group: "Optional:"
+                defaultDescription: "Automatically determined based on the available VRAM"
             })
             .option("repeatPenalty", {
                 alias: "rp",
                 type: "number",
                 default: 1.1,
-                description: "Prevent the model from repeating the same token too much. Set to `1` to disable.",
-                group: "Optional:"
+                description: "Prevent the model from repeating the same token too much. Set to `1` to disable."
             })
             .option("lastTokensRepeatPenalty", {
                 alias: "rpn",
                 type: "number",
                 default: 64,
-                description: "Number of recent tokens generated by the model to apply penalties to repetition of",
-                group: "Optional:"
+                description: "Number of recent tokens generated by the model to apply penalties to repetition of"
             })
             .option("penalizeRepeatingNewLine", {
                 alias: "rpnl",
                 type: "boolean",
                 default: true,
-                description: "Penalize new line tokens. set \"--no-penalizeRepeatingNewLine\" or \"--no-rpnl\" to disable",
-                group: "Optional:"
+                description: "Penalize new line tokens. set `--no-penalizeRepeatingNewLine` or `--no-rpnl` to disable"
             })
             .option("repeatFrequencyPenalty", {
                 alias: "rfp",
                 type: "number",
-                description: "For n time a token is in the `punishTokens` array, lower its probability by `n * repeatFrequencyPenalty`. Set to a value between `0` and `1` to enable.",
-                group: "Optional:"
+                description: "For n time a token is in the `punishTokens` array, lower its probability by `n * repeatFrequencyPenalty`. Set to a value between `0` and `1` to enable."
             })
             .option("repeatPresencePenalty", {
                 alias: "rpp",
                 type: "number",
-                description: "Lower the probability of all the tokens in the `punishTokens` array by `repeatPresencePenalty`. Set to a value between `0` and `1` to enable.",
-                group: "Optional:"
+                description: "Lower the probability of all the tokens in the `punishTokens` array by `repeatPresencePenalty`. Set to a value between `0` and `1` to enable."
             })
             .option("maxTokens", {
                 alias: "mt",
                 type: "number",
                 default: 0,
-                description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size",
-                group: "Optional:"
+                description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size"
             })
             .option("debug", {
                 alias: "d",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp info and debug logs",
-                group: "Optional:"
+                description: "Print llama.cpp info and debug logs"
             })
             .option("meter", {
                 type: "boolean",
                 default: false,
-                description: "Log how many tokens were used as input and output for each response",
-                group: "Optional:"
+                description: "Log how many tokens were used as input and output for each response"
             })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp timings after each response",
-                group: "Optional:"
+                description: "Print llama.cpp timings after each response"
             });
     },
     async handler({
-        model, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
+        modelPath, header, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
         threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
@@ -204,7 +189,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     }) {
         try {
             await RunInfill({
-                model, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
+                modelPath, header, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
                 threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 debug, meter, printTimings
@@ -219,7 +204,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 
 async function RunInfill({
-    model: modelArg, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
+    modelPath: modelArg, header: headerArg, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
     threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
@@ -227,10 +212,10 @@ async function RunInfill({
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
 
+    const headers = resolveHeaderFlag(headerArg);
+
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
-
-    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
 
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
@@ -239,6 +224,8 @@ async function RunInfill({
         logLevel: llamaLogLevel
     });
     const logBatchSize = batchSize != null;
+
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers);
 
     if (systemInfo)
         console.log(llama.systemInfo);
@@ -270,16 +257,25 @@ async function RunInfill({
     let initialPrefix = prefix ?? null;
     let initialSuffix = suffix ?? null;
 
-    const model = await withOra({
-        loading: chalk.blue("Loading model"),
-        success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model"),
-        useStatusLogs: debug
-    }, async () => {
+    const model = await withProgressLog({
+        loadingText: chalk.blue.bold("Loading model"),
+        successText: chalk.blue("Model loaded"),
+        failText: chalk.blue("Failed to load model"),
+        liveUpdates: !debug,
+        noProgress: debug
+    }, async (progressUpdater) => {
         try {
             return await llama.loadModel({
                 modelPath: resolvedModelPath,
-                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+                gpuLayers: gpuLayers != null
+                    ? gpuLayers
+                    : contextSize != null
+                        ? {fitContext: {contextSize}}
+                        : undefined,
+                ignoreMemorySafetyChecks: gpuLayers != null,
+                onLoadProgress(loadProgress: number) {
+                    progressUpdater.setProgress(loadProgress);
+                }
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {
@@ -298,7 +294,8 @@ async function RunInfill({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads
+                threads,
+                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {

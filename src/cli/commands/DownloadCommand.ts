@@ -50,12 +50,12 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             .option("repo", {
                 type: "string",
                 default: defaultLlamaCppGitHubRepo,
-                description: "The GitHub repository to download a release of llama.cpp from. Can also be set via the NODE_LLAMA_CPP_REPO environment variable"
+                description: "The GitHub repository to download a release of llama.cpp from. Can also be set via the `NODE_LLAMA_CPP_REPO` environment variable"
             })
             .option("release", {
                 type: "string",
                 default: isInDocumentationMode ? "<current build>" : defaultLlamaCppRelease,
-                description: "The tag of the llama.cpp release to download. Set to \"latest\" to download the latest release. Can also be set via the NODE_LLAMA_CPP_REPO_RELEASE environment variable"
+                description: "The tag of the llama.cpp release to download. Set to `latest` to download the latest release. Can also be set via the `NODE_LLAMA_CPP_REPO_RELEASE` environment variable"
             })
             .option("arch", {
                 alias: "a",
@@ -66,7 +66,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
             .option("nodeTarget", {
                 alias: "t",
                 type: "string",
-                description: "The Node.js version to compile llama.cpp for. Example: v18.0.0"
+                description: "The Node.js version to compile llama.cpp for. Example: `v18.0.0`"
             })
             .option("gpu", {
                 type: "string",
@@ -159,7 +159,6 @@ export async function DownloadLlamaCppCommand({
         await fs.remove(llamaCppDirectoryInfoFilePath);
     });
 
-    console.log(chalk.blue("Cloning llama.cpp"));
     await cloneLlamaCppRepo(githubOwner, githubRepo, githubReleaseTag!, useBundle);
 
     if (!skipBuild) {

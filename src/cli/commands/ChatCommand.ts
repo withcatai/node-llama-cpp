@@ -22,9 +22,12 @@ import {
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
+import {withProgressLog} from "../../utils/withProgressLog.js";
+import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 
 type ChatCommand = {
-    model: string,
+    modelPath?: string,
+    header?: string[],
     systemInfo: boolean,
     systemPrompt: string,
     systemPromptFile?: string,
@@ -63,19 +66,22 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         const isInDocumentationMode = getIsInDocumentationMode();
 
         return yargs
-            .option("model", {
-                alias: ["m", "modelPath"],
+            .option("modelPath", {
+                alias: ["m", "model", "path", "url"],
                 type: "string",
-                demandOption: true,
-                description: "Llama model file to use for the chat",
-                group: "Required:"
+                description: "Llama model file to use for the chat. Can be a path to a local file or a URL of a model file to download"
+            })
+            .option("header", {
+                alias: ["H"],
+                type: "string",
+                array: true,
+                description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
             })
             .option("systemInfo", {
                 alias: "i",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp system info",
-                group: "Optional:"
+                description: "Print llama.cpp system info"
             })
             .option("systemPrompt", {
                 alias: "s",
@@ -84,192 +90,164 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 defaultDescription: " ",
                 description:
                     "System prompt to use against the model" +
-                    (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]")),
-                group: "Optional:"
+                    (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
             })
             .option("systemPromptFile", {
                 type: "string",
-                description: "Path to a file to load text from and use as as the model system prompt",
-                group: "Optional:"
+                description: "Path to a file to load text from and use as as the model system prompt"
             })
             .option("prompt", {
                 type: "string",
-                description: "First prompt to automatically send to the model when starting the chat",
-                group: "Optional:"
+                description: "First prompt to automatically send to the model when starting the chat"
             })
             .option("promptFile", {
                 type: "string",
-                description: "Path to a file to load text from and use as a first prompt to automatically send to the model when starting the chat",
-                group: "Optional:"
+                description: "Path to a file to load text from and use as a first prompt to automatically send to the model when starting the chat"
             })
             .option("wrapper", {
                 alias: "w",
                 type: "string",
                 default: "auto" as ChatCommand["wrapper"],
                 choices: ["auto", ...specializedChatWrapperTypeNames] as const,
-                description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token",
-                group: "Optional:"
+                description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token"
             })
             .option("noJinja", {
                 type: "boolean",
                 default: false,
-                description: "Don't use a Jinja wrapper, even if it's the best option for the model",
-                group: "Optional:"
+                description: "Don't use a Jinja wrapper, even if it's the best option for the model"
             })
             .option("contextSize", {
                 alias: "c",
                 type: "number",
                 description: "Context size to use for the model context",
                 default: -1,
-                defaultDescription: "Automatically determined based on the available VRAM",
-                group: "Optional:"
+                defaultDescription: "Automatically determined based on the available VRAM"
             })
             .option("batchSize", {
                 alias: "b",
                 type: "number",
-                description: "Batch size to use for the model context. The default value is the context size",
-                group: "Optional:"
+                description: "Batch size to use for the model context. The default value is the context size"
             })
             .option("noTrimWhitespace", {
                 type: "boolean",
                 alias: ["noTrim"],
                 default: false,
-                description: "Don't trim whitespaces from the model response",
-                group: "Optional:"
+                description: "Don't trim whitespaces from the model response"
             })
             .option("grammar", {
                 alias: "g",
                 type: "string",
                 default: "text" as ChatCommand["grammar"],
                 choices: ["text", "json", "list", "arithmetic", "japanese", "chess"] satisfies ChatCommand["grammar"][],
-                description: "Restrict the model response to a specific grammar, like JSON for example",
-                group: "Optional:"
+                description: "Restrict the model response to a specific grammar, like JSON for example"
             })
             .option("jsonSchemaGrammarFile", {
                 alias: ["jsgf"],
                 type: "string",
-                description: "File path to a JSON schema file, to restrict the model response to only generate output that conforms to the JSON schema",
-                group: "Optional:"
+                description: "File path to a JSON schema file, to restrict the model response to only generate output that conforms to the JSON schema"
             })
             .option("threads", {
                 type: "number",
                 default: 6,
-                description: "Number of threads to use for the evaluation of tokens",
-                group: "Optional:"
+                description: "Number of threads to use for the evaluation of tokens"
             })
             .option("temperature", {
                 alias: "t",
                 type: "number",
                 default: 0,
-                description: "Temperature is a hyperparameter that controls the randomness of the generated text. It affects the probability distribution of the model's output tokens. A higher temperature (e.g., 1.5) makes the output more random and creative, while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative. The suggested temperature is 0.8, which provides a balance between randomness and determinism. At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run. Set to `0` to disable.",
-                group: "Optional:"
+                description: "Temperature is a hyperparameter that controls the randomness of the generated text. It affects the probability distribution of the model's output tokens. A higher temperature (e.g., 1.5) makes the output more random and creative, while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative. The suggested temperature is 0.8, which provides a balance between randomness and determinism. At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run. Set to `0` to disable."
             })
             .option("minP", {
                 alias: "mp",
                 type: "number",
                 default: 0,
-                description: "From the next token candidates, discard the percentage of tokens with the lowest probability. For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded. This is useful for generating more high-quality results when using a high temperature. Set to a value between `0` and `1` to enable. Only relevant when `temperature` is set to a value greater than `0`.",
-                group: "Optional:"
+                description: "From the next token candidates, discard the percentage of tokens with the lowest probability. For example, if set to `0.05`, 5% of the lowest probability tokens will be discarded. This is useful for generating more high-quality results when using a high temperature. Set to a value between `0` and `1` to enable. Only relevant when `temperature` is set to a value greater than `0`."
             })
             .option("topK", {
                 alias: "k",
                 type: "number",
                 default: 40,
-                description: "Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation. An integer number between `1` and the size of the vocabulary. Set to `0` to disable (which uses the full vocabulary). Only relevant when `temperature` is set to a value greater than 0.",
-                group: "Optional:"
+                description: "Limits the model to consider only the K most likely next tokens for sampling at each step of sequence generation. An integer number between `1` and the size of the vocabulary. Set to `0` to disable (which uses the full vocabulary). Only relevant when `temperature` is set to a value greater than 0."
             })
             .option("topP", {
                 alias: "p",
                 type: "number",
                 default: 0.95,
-                description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`.",
-                group: "Optional:"
+                description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`."
             })
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
                 description: "number of layers to store in VRAM",
                 default: -1,
-                defaultDescription: "Automatically determined based on the available VRAM",
-                group: "Optional:"
+                defaultDescription: "Automatically determined based on the available VRAM"
             })
             .option("repeatPenalty", {
                 alias: "rp",
                 type: "number",
                 default: 1.1,
-                description: "Prevent the model from repeating the same token too much. Set to `1` to disable.",
-                group: "Optional:"
+                description: "Prevent the model from repeating the same token too much. Set to `1` to disable."
             })
             .option("lastTokensRepeatPenalty", {
                 alias: "rpn",
                 type: "number",
                 default: 64,
-                description: "Number of recent tokens generated by the model to apply penalties to repetition of",
-                group: "Optional:"
+                description: "Number of recent tokens generated by the model to apply penalties to repetition of"
             })
             .option("penalizeRepeatingNewLine", {
                 alias: "rpnl",
                 type: "boolean",
                 default: true,
-                description: "Penalize new line tokens. set \"--no-penalizeRepeatingNewLine\" or \"--no-rpnl\" to disable",
-                group: "Optional:"
+                description: "Penalize new line tokens. set `--no-penalizeRepeatingNewLine` or `--no-rpnl` to disable"
             })
             .option("repeatFrequencyPenalty", {
                 alias: "rfp",
                 type: "number",
-                description: "For n time a token is in the `punishTokens` array, lower its probability by `n * repeatFrequencyPenalty`. Set to a value between `0` and `1` to enable.",
-                group: "Optional:"
+                description: "For n time a token is in the `punishTokens` array, lower its probability by `n * repeatFrequencyPenalty`. Set to a value between `0` and `1` to enable."
             })
             .option("repeatPresencePenalty", {
                 alias: "rpp",
                 type: "number",
-                description: "Lower the probability of all the tokens in the `punishTokens` array by `repeatPresencePenalty`. Set to a value between `0` and `1` to enable.",
-                group: "Optional:"
+                description: "Lower the probability of all the tokens in the `punishTokens` array by `repeatPresencePenalty`. Set to a value between `0` and `1` to enable."
             })
             .option("maxTokens", {
                 alias: "mt",
                 type: "number",
                 default: 0,
-                description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size",
-                group: "Optional:"
+                description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size"
             })
             .option("noHistory", {
                 alias: "nh",
                 type: "boolean",
                 default: false,
-                description: "Don't load or save chat history",
-                group: "Optional:"
+                description: "Don't load or save chat history"
             })
             .option("environmentFunctions", {
                 alias: "ef",
                 type: "boolean",
                 default: false,
-                description: "Provide access to environment functions like `getDate` and `getTime`",
-                group: "Optional:"
+                description: "Provide access to environment functions like `getDate` and `getTime`"
             })
             .option("debug", {
                 alias: "d",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp info and debug logs",
-                group: "Optional:"
+                description: "Print llama.cpp info and debug logs"
             })
             .option("meter", {
                 type: "boolean",
                 default: false,
-                description: "Log how many tokens were used as input and output for each response",
-                group: "Optional:"
+                description: "Print how many tokens were used as input and output for each response"
             })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp timings after each response",
-                group: "Optional:"
+                description: "Print llama.cpp timings after each response"
             });
     },
     async handler({
-        model, systemInfo, systemPrompt, systemPromptFile, prompt,
+        modelPath, header, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
@@ -278,7 +256,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     }) {
         try {
             await RunChat({
-                model, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
+                modelPath, header, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
                 noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers,
                 lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 noHistory, environmentFunctions, debug, meter, printTimings
@@ -293,20 +271,19 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    model: modelArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
-    noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK, topP,
-    gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
+    modelPath: modelArg, header: headerArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
+    batchSize, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK,
+    topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
 
+    const headers = resolveHeaderFlag(headerArg);
     const trimWhitespace = !noTrimWhitespace;
 
     if (debug)
         console.info(`${chalk.yellow("Log level:")} debug`);
-
-    const resolvedModelPath = await resolveCommandGgufPath(modelArg);
 
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
@@ -315,6 +292,8 @@ async function RunChat({
         logLevel: llamaLogLevel
     });
     const logBatchSize = batchSize != null;
+
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers);
 
     if (systemInfo)
         console.log(llama.systemInfo);
@@ -339,16 +318,25 @@ async function RunChat({
     }
 
     let initialPrompt = prompt ?? null;
-    const model = await withOra({
-        loading: chalk.blue("Loading model"),
-        success: chalk.blue("Model loaded"),
-        fail: chalk.blue("Failed to load model"),
-        useStatusLogs: debug
-    }, async () => {
+    const model = await withProgressLog({
+        loadingText: chalk.blue.bold("Loading model"),
+        successText: chalk.blue("Model loaded"),
+        failText: chalk.blue("Failed to load model"),
+        liveUpdates: !debug,
+        noProgress: debug
+    }, async (progressUpdater) => {
         try {
             return await llama.loadModel({
                 modelPath: resolvedModelPath,
-                gpuLayers: gpuLayers != null ? gpuLayers : undefined
+                gpuLayers: gpuLayers != null
+                    ? gpuLayers
+                    : contextSize != null
+                        ? {fitContext: {contextSize}}
+                        : undefined,
+                ignoreMemorySafetyChecks: gpuLayers != null,
+                onLoadProgress(loadProgress: number) {
+                    progressUpdater.setProgress(loadProgress);
+                }
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {
@@ -367,7 +355,8 @@ async function RunChat({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads
+                threads,
+                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {

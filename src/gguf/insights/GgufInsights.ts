@@ -1,9 +1,10 @@
-import {Llama} from "../bindings/Llama.js";
-import {getLlamaWithoutBackend} from "../bindings/utils/getLlamaWithoutBackend.js";
-import {getDefaultContextBatchSize, getDefaultContextSequences} from "../evaluator/LlamaContext/LlamaContext.js";
-import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
-import {GgufTensorInfo} from "./types/GgufTensorInfoTypes.js";
-import {GgufArchitectureType} from "./types/GgufMetadataTypes.js";
+import {Llama} from "../../bindings/Llama.js";
+import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
+import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
+import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
+import {GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
+import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
+import {GgufInsightsConfigurationResolver} from "./GgufInsightsConfigurationResolver.js";
 
 export type GgufInsightsResourceRequirements = {
     cpuRam: number,
@@ -11,26 +12,36 @@ export type GgufInsightsResourceRequirements = {
 };
 
 export class GgufInsights {
-    /** @internal */ private readonly _llama: Llama;
+    /** @internal */ public readonly _llama: Llama;
     /** @internal */ private readonly _modelSize: number;
     /** @internal */ private _totalLayers: number | null = null;
-    public readonly ggufFileInfo: GgufFileInfo;
+    /** @internal */ private readonly _ggufFileInfo: GgufFileInfo;
+    /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
 
     private constructor(ggufFileInfo: GgufFileInfo, llama: Llama) {
         this._llama = llama;
-        this.ggufFileInfo = ggufFileInfo;
+        this._ggufFileInfo = ggufFileInfo;
 
         this._modelSize = calculateTensorsSize(ggufFileInfo.tensorInfo ?? [], llama);
+        this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
+    }
+
+    public get ggufFileInfo(): GgufFileInfo {
+        return this._ggufFileInfo;
+    }
+
+    public get configurationResolver() {
+        return this._configurationResolver;
     }
 
     /** The context size the model was trained on */
     public get trainContextSize() {
-        return this.ggufFileInfo.architectureMetadata.context_length;
+        return this._ggufFileInfo.architectureMetadata.context_length;
     }
 
     /** The size of an embedding vector the model can produce */
     public get embeddingVectorSize() {
-        return this.ggufFileInfo.architectureMetadata.embedding_length;
+        return this._ggufFileInfo.architectureMetadata.embedding_length;
     }
 
     public get totalLayers() {
@@ -75,9 +86,9 @@ export class GgufInsights {
         const totalLayers = this.totalLayers;
         const finalGpuLayers = Math.max(0, Math.min(modelGpuLayers ?? totalLayers, totalLayers));
         const finalCpuLayers = totalLayers - finalGpuLayers;
-        const llmData = this.ggufFileInfo.architectureMetadata;
+        const llmData = this._ggufFileInfo.architectureMetadata;
 
-        const vocabularySize = llmData.vocab_size ?? this.ggufFileInfo.metadata.tokenizer.ggml.tokens.length;
+        const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer.ggml.tokens.length;
         const logitsSize = vocabularySize * batchSize;
         const embedSize = isEmbeddingContext
             ? (llmData.embedding_length ?? 0) * batchSize
@@ -103,7 +114,7 @@ export class GgufInsights {
         const sKvUsed = uint32TBytes;
         const sKv = 2 * int32TBytes * modelGpuLayers * this._llama._consts.ggmlTensorOverhead;
         const sKvCell = this._llama._consts.llamaPosSize + sizeTBytes + this._llama._consts.llamaSeqIdSize;
-        const kvSelfLength = this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const kvSelfLength = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
             ? Math.max(1, sequences)
             : actualContextSize;
         const sKvCells = kvSelfLength * sKvCell;
@@ -129,26 +140,26 @@ export class GgufInsights {
         // If you read this line and have better insights on how to estimate this memory, please open a PR to improve it :)
         const estimateGraphOverheadMemory = () => {
             const s1MB = Math.pow(1024, 2);
-            const tensorInfo = this.ggufFileInfo.tensorInfo ?? [];
+            const tensorInfo = this._ggufFileInfo.tensorInfo ?? [];
 
             let defaultCalculationAdjustment = 0;
 
             if (batchSize == null)
                 return 0;
 
-            if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.llama) {
-                const expertCount = this.ggufFileInfo.architectureMetadata.expert_count ?? 0;
-                const headCount = this.ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
+            if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.llama) {
+                const expertCount = this._ggufFileInfo.architectureMetadata.expert_count ?? 0;
+                const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
                 const embeddingLength = llmData.embedding_length ?? 0;
 
                 if (expertCount > 0) {
-                    const expertsUsedCount = this.ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
+                    const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
                     return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (actualContextSize * headCount));
                 }
 
                 return int32TBytes * batchSize * (embeddingLength + (actualContextSize * headCount));
-            } else if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.qwen2) {
+            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.qwen2) {
                 if (modelGpuLayers === this.totalLayers) {
                     defaultCalculationAdjustment -= (s1MB * 340) * (
                         this.trainContextSize == null
@@ -164,7 +175,7 @@ export class GgufInsights {
                         )
                     );
                 }
-            } else if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.gemma) {
+            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.gemma) {
                 // only works properly when all layers are on the GPU, which is why it's commented out:
                 // return int32TBytes * batchSize * ((llmData.embedding_length ?? 0));
 
@@ -185,8 +196,8 @@ export class GgufInsights {
                         )
                     );
                 }
-            } else if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.stablelm) {
-                const headCount = this.ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
+            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.stablelm) {
+                const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
 
                 return (int32TBytes * batchSize * actualContextSize * headCount) - (50 * s1MB);
 
@@ -263,7 +274,7 @@ export class GgufInsights {
         cpu: GgufTensorInfo[],
         gpu: GgufTensorInfo[]
     } {
-        const tensorInfo = this.ggufFileInfo.tensorInfo ?? [];
+        const tensorInfo = this._ggufFileInfo.tensorInfo ?? [];
 
         if (gpuLayers === 0) {
             return {
@@ -272,6 +283,9 @@ export class GgufInsights {
             };
         }
 
+        const fileLayers = this._getFileLayers();
+        const startGpuLayer = Math.max(0, fileLayers - gpuLayers);
+
         const gpuTensors: GgufTensorInfo[] = [];
         const cpuTensors: GgufTensorInfo[] = [];
 
@@ -279,10 +293,10 @@ export class GgufInsights {
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (gpuLayers !== this.totalLayers) {
-                const architecture = this.ggufFileInfo.metadata?.general?.architecture;
+                const architecture = this._ggufFileInfo.metadata?.general?.architecture;
 
                 if (architecture === GgufArchitectureType.qwen2 || architecture === GgufArchitectureType.gemma) {
-                    if (layerNumber != null && layerNumber < gpuLayers)
+                    if (layerNumber != null && layerNumber >= startGpuLayer)
                         gpuTensors.push(singleTensorInfo);
                     else
                         cpuTensors.push(singleTensorInfo);
@@ -291,7 +305,7 @@ export class GgufInsights {
                 }
             }
 
-            if (layerNumber == null || layerNumber < gpuLayers)
+            if (layerNumber == null || layerNumber >= startGpuLayer)
                 gpuTensors.push(singleTensorInfo);
             else
                 cpuTensors.push(singleTensorInfo);
@@ -307,7 +321,7 @@ export class GgufInsights {
     public _determineNumberOfLayersFromTensorInfo(): number {
         const layerNumbers = new Set<number>();
 
-        for (const singleTensorInfo of (this.ggufFileInfo.tensorInfo ?? [])) {
+        for (const singleTensorInfo of (this._ggufFileInfo.tensorInfo ?? [])) {
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (layerNumber != null)
@@ -319,37 +333,37 @@ export class GgufInsights {
 
     /** @internal */
     public _getFileLayers() {
-        return this.ggufFileInfo.architectureMetadata.block_count ?? this._determineNumberOfLayersFromTensorInfo();
+        return this._ggufFileInfo.architectureMetadata.block_count ?? this._determineNumberOfLayersFromTensorInfo();
     }
 
     /** @internal */
     public _estimateKvMemorySizeInBytes(contextSize: number, layers: number) {
         // source: `llama_kv_cache_init` in `llama.cpp`
-        const nHead = this.ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
-        const nEmbd = this.ggufFileInfo.architectureMetadata.embedding_length ?? 0;
-        const nEmbdHeadK = this.ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
-        const nHeadKv = this.ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
+        const nHead = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
+        const nEmbd = this._ggufFileInfo.architectureMetadata.embedding_length ?? 0;
+        const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
+        const nHeadKv = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const modelNEmbdKGqa = nEmbdHeadK * nHeadKv;
 
-        const ssmDConv = this.ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
-        const ssmDInner = this.ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
+        const ssmDConv = this._ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
+        const ssmDInner = this._ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
         const modelNEmbdKS = (ssmDConv > 0 ? (ssmDConv - 1) : 0) * ssmDInner;
 
-        const nEmbdHeadV = this.ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+        const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
         const modelNEmbdVGqa = nEmbdHeadV * nHeadKv;
 
-        const ssmDState = this.ggufFileInfo.architectureMetadata.ssm?.state_size ?? 0;
+        const ssmDState = this._ggufFileInfo.architectureMetadata.ssm?.state_size ?? 0;
         const modelNEmbdVS = ssmDState * ssmDInner;
 
         const totalNEmbdKGqa = modelNEmbdKGqa + modelNEmbdKS;
         const totalNEmbdVGqa = modelNEmbdVGqa + modelNEmbdVS;
 
-        const keyTypeSize = this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const keyTypeSize = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
             // if `type_k` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size
             : this._llama._consts.ggmlTypeF16Size;
-        const valueTypeSize = this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const valueTypeSize = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
             // if `type_v` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size

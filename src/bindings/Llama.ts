@@ -78,7 +78,10 @@ export class Llama {
                 free: Math.max(0, total - used)
             };
         });
-        if (vramPadding instanceof Function)
+
+        if (this._gpu === false || vramPadding === 0)
+            this._vramPadding = this._vramOrchestrator.reserveMemory(0);
+        else if (vramPadding instanceof Function)
             this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding(this._vramOrchestrator.getMemoryState().total));
         else
             this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding);
@@ -179,6 +182,16 @@ export class Llama {
         this._ensureNotDisposed();
 
         return this._bindings.systemInfo();
+    }
+
+    /**
+     * VRAM padding used for memory size calculations, as these calculations are not always accurate.
+     * This is set by default to ensure stability, but can be configured when you call `getLlama`.
+     *
+     * See `vramPadding` on `getLlama` for more information.
+     */
+    public get vramPaddingSize() {
+        return this._vramPadding.size;
     }
 
     public getVramState() {
