@@ -84,6 +84,7 @@ export class ConsoleInteraction {
 
         if (callbacks.length === 0 && key === ConsoleInteractionKey.ctrlC) {
             process.stdout.write("\n");
+            this.stop();
             process.exit(0);
         }
 

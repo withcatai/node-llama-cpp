@@ -7,6 +7,7 @@ import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
 import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
+import {TokenBias} from "../TokenBias.js";
 
 
 export type LlamaChatSessionOptions = {
@@ -96,7 +97,14 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      */
     evaluationPriority?: EvaluationPriority,
 
-    repeatPenalty?: false | LlamaChatSessionRepeatPenalty
+    repeatPenalty?: false | LlamaChatSessionRepeatPenalty,
+
+    /**
+     * Adjust the probability of tokens being generated.
+     * Can be used to bias the model to generate tokens that you want it to lean towards,
+     * or to avoid generating tokens that you want it to avoid.
+     */
+    tokenBias?: TokenBias | (() => TokenBias)
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
@@ -249,14 +257,16 @@ export class LlamaChatSession {
         topP,
         grammar,
         trimWhitespaceSuffix = false,
-        repeatPenalty
+        repeatPenalty,
+        tokenBias
     }: LLamaChatPromptOptions<Functions> = {}) {
         const {responseText} = await this.promptWithMeta<Functions>(prompt, {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
 
-            onToken, signal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty
+            onToken, signal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
+            tokenBias
         });
 
         return responseText;
@@ -279,6 +289,7 @@ export class LlamaChatSession {
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
+        tokenBias,
         evaluationPriority
     }: LLamaChatPromptOptions<Functions> = {}) {
         this._ensureNotDisposed();
@@ -325,6 +336,7 @@ export class LlamaChatSession {
                     minP,
                     topK,
                     topP,
+                    tokenBias,
                     maxTokens,
                     temperature,
                     trimWhitespaceSuffix,

@@ -238,7 +238,8 @@ async function RunCompletion({
         successText: chalk.blue("Model loaded"),
         failText: chalk.blue("Failed to load model"),
         liveUpdates: !debug,
-        noProgress: debug
+        noProgress: debug,
+        liveCtrlCSendsAbortSignal: true
     }, async (progressUpdater) => {
         try {
             return await llama.loadModel({
@@ -251,8 +252,14 @@ async function RunCompletion({
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
-                }
+                },
+                loadSignal: progressUpdater.abortSignal
             });
+        } catch (err) {
+            if (err === progressUpdater.abortSignal?.reason)
+                process.exit(0);
+
+            throw err;
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {
                 await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing

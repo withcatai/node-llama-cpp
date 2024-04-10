@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
+#include <unordered_map>
 
 #include "common.h"
 #include "common/grammar-parser.h"
@@ -1334,6 +1335,8 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         float repeat_penalty_presence_penalty = 0.00f;  // 0.0 = disabled
         float repeat_penalty_frequency_penalty = 0.00f;  // 0.0 = disabled
         std::vector<llama_token> repeat_penalty_tokens;
+        std::unordered_map<llama_token, float> tokenBiases;
+        bool useTokenBiases = false;
         bool use_repeat_penalty = false;
 
         AddonContextSampleTokenWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
@@ -1376,6 +1379,19 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                     }
 
                     use_repeat_penalty = true;
+                }
+
+                if (options.Has("tokenBiasKeys") && options.Has("tokenBiasValues")) {
+                    Napi::Uint32Array tokenBiasKeys = options.Get("tokenBiasKeys").As<Napi::Uint32Array>();
+                    Napi::Float32Array tokenBiasValues = options.Get("tokenBiasValues").As<Napi::Float32Array>();
+
+                    if (tokenBiasKeys.ElementLength() == tokenBiasValues.ElementLength()) {
+                        for (size_t i = 0; i < tokenBiasKeys.ElementLength(); i++) {
+                            tokenBiases[static_cast<llama_token>(tokenBiasKeys[i])] = tokenBiasValues[i];
+                        }
+
+                        useTokenBiases = true;
+                    }
                 }
 
                 if (options.Has("repeatPenaltyPresencePenalty")) {
@@ -1426,17 +1442,32 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             // Select the best prediction.
             auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
             auto n_vocab = llama_n_vocab(ctx->model->model);
+            auto eos_token = llama_token_eos(ctx->model->model);
 
             std::vector<llama_token_data> candidates;
             candidates.reserve(n_vocab);
 
             for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                candidates.emplace_back(llama_token_data { token_id, logits[token_id], 0.0f });
+                auto logit = logits[token_id];
+
+                if (useTokenBiases) {
+                    bool hasTokenBias = tokenBiases.find(token_id) != tokenBiases.end();
+                    if (hasTokenBias) {
+                        auto logitBias = tokenBiases.at(token_id);
+                        if (logitBias == -INFINITY || logitBias < -INFINITY) {
+                            if (token_id != eos_token) {
+                                logit = -INFINITY;
+                            }
+                        } else {
+                            logit += logitBias;
+                        }
+                    }
+                }
+
+                candidates.emplace_back(llama_token_data { token_id, logit, 0.0f });
             }
 
             llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
-
-            auto eos_token = llama_token_eos(ctx->model->model);
 
             if (use_repeat_penalty && !repeat_penalty_tokens.empty()) {
                 llama_sample_repetition_penalties(
@@ -1452,6 +1483,13 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             if (use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
                 llama_sample_grammar(ctx->ctx, &candidates_p, (grammar_evaluation_state)->grammar);
+
+                if ((candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) && useTokenBiases) {
+                    // logit biases caused grammar sampling to fail, so sampling again without logit biases
+                    useTokenBiases = false;
+                    SampleToken();
+                    return;
+                }
             }
 
             if (temperature <= 0) {

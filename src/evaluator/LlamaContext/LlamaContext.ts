@@ -6,6 +6,7 @@ import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
 import {TokenMeter} from "../TokenMeter.js";
+import {TokenBias} from "../TokenBias.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
@@ -781,6 +782,7 @@ export class LlamaContextSequence {
         topP = 0.95,
         grammarEvaluationState,
         repeatPenalty,
+        tokenBias,
         evaluationPriority = 5,
         contextShift: {
             size: contextShiftSize = this._contextShift.size,
@@ -791,6 +793,13 @@ export class LlamaContextSequence {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
+
+        /**
+         * Adjust the probability of tokens being generated.
+         * Can be used to bias the model to generate tokens that you want it to lean towards,
+         * or to avoid generating tokens that you want it to avoid.
+         */
+        tokenBias?: TokenBias | (() => TokenBias),
 
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
@@ -820,6 +829,7 @@ export class LlamaContextSequence {
             topP,
             grammarEvaluationState,
             repeatPenalty,
+            tokenBias,
             evaluationPriority,
             contextShiftOptions: {
                 size: contextShiftSize,
@@ -880,6 +890,7 @@ export class LlamaContextSequence {
         topP = 0.95,
         grammarEvaluationState,
         repeatPenalty,
+        tokenBias,
         evaluationPriority = 5,
         generateNewTokens = true,
         contextShiftOptions,
@@ -887,8 +898,9 @@ export class LlamaContextSequence {
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
-        repeatPenalty?: LlamaContextSequenceRepeatPenalty, evaluationPriority?: EvaluationPriority,
-        generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>, yieldEosToken?: boolean
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
+        evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
+        yieldEosToken?: boolean
     }): AsyncGenerator<Token, void> {
         this._ensureNotDisposed();
 
@@ -920,6 +932,8 @@ export class LlamaContextSequence {
                     if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
                         throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
+                    const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias);
+
                     return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
                         temperature,
                         minP,
@@ -931,6 +945,8 @@ export class LlamaContextSequence {
                             : undefined,
                         repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
                         repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+                        tokenBiasKeys,
+                        tokenBiasValues,
                         grammarEvaluationState: resolvedGrammarEvaluationState?._state
                     }));
                 }
@@ -1091,6 +1107,37 @@ type CurrentBatchItem = {
     queuedDecode: InternalQueuedDecode,
     processAmount: number
 };
+
+function getTokenBiasesForAddon(tokenBias?: TokenBias | (() => TokenBias)) {
+    if (tokenBias == null)
+        return {
+            tokenBiasKeys: undefined,
+            tokenBiasValues: undefined
+        };
+
+    if (tokenBias instanceof Function)
+        tokenBias = tokenBias();
+
+    const tokenBiasKeys: Token[] = [];
+    const tokenBiasValues: number[] = [];
+
+    for (const [token, bias] of tokenBias._biases) {
+        tokenBiasKeys.push(token);
+        tokenBiasValues.push(bias);
+    }
+
+    if (tokenBiasKeys.length === 0 || tokenBiasValues.length === 0) {
+        return {
+            tokenBiasKeys: undefined,
+            tokenBiasValues: undefined
+        };
+    }
+
+    return {
+        tokenBiasKeys: Uint32Array.from(tokenBiasKeys),
+        tokenBiasValues: Float32Array.from(tokenBiasValues)
+    };
+}
 
 function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {
     const context = contextRef.deref();
