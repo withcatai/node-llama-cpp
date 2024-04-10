@@ -17,6 +17,7 @@ import {
     type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
     type ContextTokensDeleteRange, type EvaluationPriority
 } from "./evaluator/LlamaContext/types.js";
+import {TokenBias} from "./evaluator/TokenBias.js";
 import {
     LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
     type LLamaChatPromptOptions, type LlamaChatSessionRepeatPenalty
@@ -103,6 +104,7 @@ export {
     type ContextTokensDeleteRange,
     type EvaluationPriority,
     type LlamaContextSequenceRepeatPenalty,
+    TokenBias,
     LlamaEmbeddingContext,
     type LlamaEmbeddingContextOptions,
     LlamaEmbedding,

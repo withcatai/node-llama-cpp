@@ -12,6 +12,7 @@ import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
 import {LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
+import {TokenBias} from "./TokenBias.js";
 
 export type LlamaCompletionOptions = {
     contextSequence: LlamaContextSequence,
@@ -75,6 +76,13 @@ export type LlamaCompletionGenerationOptions = {
     trimWhitespaceSuffix?: boolean,
 
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
+
+    /**
+     * Adjust the probability of tokens being generated.
+     * Can be used to bias the model to generate tokens that you want it to lean towards,
+     * or to avoid generating tokens that you want it to avoid.
+     */
+    tokenBias?: TokenBias | (() => TokenBias),
 
     /**
      * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
@@ -195,6 +203,7 @@ export class LlamaCompletion {
             topP,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            tokenBias,
             evaluationPriority = 5,
             grammar,
             stopGenerationTriggers,
@@ -274,6 +283,7 @@ export class LlamaCompletion {
                 topP,
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                tokenBias,
                 evaluationPriority,
                 grammar,
                 contextShiftSize,
@@ -326,6 +336,7 @@ export class LlamaCompletion {
             topP,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            tokenBias,
             evaluationPriority = 5,
             grammar,
             contextShiftSize = defaultContextShiftSize,
@@ -455,6 +466,7 @@ export class LlamaCompletion {
                 topP,
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                tokenBias,
                 evaluationPriority,
                 grammar,
                 contextShiftSize,
@@ -489,6 +501,7 @@ export class LlamaCompletion {
             topP,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            tokenBias,
             evaluationPriority = 5,
             grammar,
             contextShiftSize = defaultContextShiftSize,
@@ -603,6 +616,7 @@ export class LlamaCompletion {
                     frequencyPenalty,
                     presencePenalty
                 },
+                tokenBias,
                 evaluationPriority,
                 yieldEosToken: true
             }));

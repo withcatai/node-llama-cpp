@@ -14,6 +14,7 @@ import {UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
+import {TokenBias} from "../TokenBias.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -84,6 +85,13 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     trimWhitespaceSuffix?: boolean,
 
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
+
+    /**
+     * Adjust the probability of tokens being generated.
+     * Can be used to bias the model to generate tokens that you want it to lean towards,
+     * or to avoid generating tokens that you want it to avoid.
+     */
+    tokenBias?: TokenBias | (() => TokenBias),
 
     /**
      * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
@@ -249,6 +257,7 @@ export class LlamaChat {
             grammar,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            tokenBias,
             evaluationPriority = 5,
             functions,
             documentFunctionParams,
@@ -532,6 +541,7 @@ export class LlamaChat {
                     frequencyPenalty,
                     presencePenalty
                 },
+                tokenBias,
                 evaluationPriority,
                 yieldEosToken: true
             }));

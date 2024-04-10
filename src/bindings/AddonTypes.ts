@@ -108,7 +108,9 @@ export type AddonContext = {
         repeatPenaltyTokens?: Uint32Array,
         repeatPenaltyPresencePenalty?: number, // alpha_presence
         repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
-        grammarEvaluationState?: AddonGrammarEvaluationState
+        grammarEvaluationState?: AddonGrammarEvaluationState,
+        tokenBiasKeys?: Uint32Array,
+        tokenBiasValues?: Float32Array
     }): Promise<Token>,
     disposeSequence(sequenceId: number): void,
 
