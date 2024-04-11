@@ -221,7 +221,9 @@ export function resolveChatWrapper({
                     return createSpecializedChatWrapper(LlamaChatWrapper);
 
                 return createSpecializedChatWrapper(GeneralChatWrapper);
-            } else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
+            } else if (lowercaseName === "codellama")
+                return createSpecializedChatWrapper(GeneralChatWrapper);
+            else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
                 return createSpecializedChatWrapper(LlamaChatWrapper);
             else if (lowercaseName === "orca")
                 return createSpecializedChatWrapper(ChatMLChatWrapper);
@@ -248,7 +250,7 @@ export function resolveChatWrapper({
         const arch = fileInfo.metadata.general?.architecture;
 
         if (arch === "llama")
-            return createSpecializedChatWrapper(LlamaChatWrapper);
+            return createSpecializedChatWrapper(GeneralChatWrapper);
         else if (arch === "falcon")
             return createSpecializedChatWrapper(FalconChatWrapper);
     }
