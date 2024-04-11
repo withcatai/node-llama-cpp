@@ -1092,7 +1092,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                 return info.Env().Undefined();
             }
 
-            return Napi::Number::From(info.Env(), llama_get_state_size(ctx));
+            return Napi::Number::From(info.Env(), llama_state_get_size(ctx));
         }
 
         Napi::Value PrintTimings(const Napi::CallbackInfo& info) {
@@ -1220,7 +1220,7 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
         }
         void OnOK() {
             if (context->contextLoaded) {
-                uint64_t contextMemorySize = llama_get_state_size(context->ctx);
+                uint64_t contextMemorySize = llama_state_get_size(context->ctx);
                 adjustNapiExternalMemoryAdd(Env(), contextMemorySize);
                 context->loadedContextMemorySize = contextMemorySize;
             }

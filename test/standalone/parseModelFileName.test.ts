@@ -28,6 +28,18 @@ describe("parseModelFileName", () => {
             });
     });
 
+    test("codellama-7b.Q5_K_M.gguf", () => {
+        expect(parseModelFileName("codellama-7b.Q5_K_M.gguf"))
+            .toEqual({
+                name: "codellama",
+                subType: "",
+                quantization: "Q5_K_M",
+                fileType: "gguf",
+                parameters: "7B",
+                otherInfo: []
+            });
+    });
+
     test("phind-codellama-34b-v2.Q4_K_M.gguf", () => {
         expect(parseModelFileName("phind-codellama-34b-v2.Q4_K_M.gguf"))
             .toEqual({
