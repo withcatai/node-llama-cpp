@@ -32,8 +32,9 @@ export class LlamaGrammar {
 
     /**
      * > GBNF files are supported.
-     * > More info here: [github:ggerganov/llama.cpp:grammars/README.md](
-     * > https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
+     * > More info here: [
+     * github:ggerganov/llama.cpp:grammars/README.md
+     * ](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
      * @param options
      */
     public constructor({
