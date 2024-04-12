@@ -65,6 +65,10 @@ async function logGpuVramUsage(gpu: BuildGpu) {
         });
         const gpuName = getPrettyBuildGpuName(gpu);
         const vramStatus = llama.getVramState();
+        const gpuDeviceNames = llama.getGpuDeviceNames();
+
+        if (gpuDeviceNames.length > 0)
+            console.info(`${chalk.yellow(`${gpuName} device${gpuDeviceNames.length > 1 ? "s" : ""}:`)} ${gpuDeviceNames.join(", ")}`);
 
         console.info(`${chalk.yellow(`${gpuName} used VRAM:`)} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.used) + "/" + bytes(vramStatus.total) + ")")}`);
         console.info(`${chalk.yellow(`${gpuName} free VRAM:`)} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.free) + "/" + bytes(vramStatus.total) + ")")}`);
@@ -75,6 +79,16 @@ async function logRamUsage() {
     const totalMemory = os.totalmem();
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;
+    const cpuDeviceNames = Array.from(
+        new Set(
+            os.cpus()
+                .map((cpu) => (cpu.model?.trim?.() ?? ""))
+                .filter((deviceName) => deviceName.length > 0)
+        )
+    );
+
+    if (cpuDeviceNames.length > 0)
+        console.info(`${chalk.yellow("CPU model" + (cpuDeviceNames.length > 1 ? "s" : "") + ":")} ${cpuDeviceNames.join(", ")}`);
 
     console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
     console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);
