@@ -50,7 +50,8 @@ body:
     attributes:
       label: My Environment
       description: >-
-        Please add any other relevant dependencies to this table at the end.
+        Please include the result of the command `npx --yes node-llama-cpp inspect gpu`.
+        Please also add any other relevant dependencies to this table at the end.
         For example: Electron, Bun, Webpack.
       value: |
         | Dependency               | Version             |
