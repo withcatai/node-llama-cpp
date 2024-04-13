@@ -17,9 +17,11 @@ You should see an output like this:
 ```ansi
 [33mVulkan:[39m [32mavailable[39m
 
+[33mVulkan device:[39m Apple M1 Max[39m
 [33mVulkan used VRAM:[39m 0% [90m(64KB/21.33GB)[39m
 [33mVulkan free VRAM:[39m 99.99% [90m(21.33GB/21.33GB)[39m
 
+[33mCPU model:[39m Apple M1 Max[39m
 [33mUsed RAM:[39m 97.37% [90m(31.16GB/32GB)[39m
 [33mFree RAM:[39m 2.62% [90m(860.72MB/32GB)[39m
 ```

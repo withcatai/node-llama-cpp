@@ -932,7 +932,7 @@ export class LlamaContextSequence {
                     if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
                         throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
-                    const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias);
+                    const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
 
                     return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
                         temperature,
@@ -1108,7 +1108,7 @@ type CurrentBatchItem = {
     processAmount: number
 };
 
-function getTokenBiasesForAddon(tokenBias?: TokenBias | (() => TokenBias)) {
+function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenBias), currentModel: LlamaModel) {
     if (tokenBias == null)
         return {
             tokenBiasKeys: undefined,
@@ -1117,6 +1117,12 @@ function getTokenBiasesForAddon(tokenBias?: TokenBias | (() => TokenBias)) {
 
     if (tokenBias instanceof Function)
         tokenBias = tokenBias();
+
+    if (tokenBias._model !== currentModel)
+        throw new Error(
+            "This TokenBias instance was created with a different model than the one used by this context. " +
+            "Make sure you use the model instance of the context sequence for the TokenBias you use it with."
+        );
 
     const tokenBiasKeys: Token[] = [];
     const tokenBiasValues: number[] = [];

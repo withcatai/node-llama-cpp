@@ -4,7 +4,7 @@ import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {LlamaModel} from "./LlamaModel.js";
 
 export class TokenBias {
-    /** @internal */ private readonly _model: LlamaModel;
+    /** @internal */ public readonly _model: LlamaModel;
     /** @internal */ public readonly _biases = new Map<Token, number>();
 
     public constructor(model: LlamaModel) {
