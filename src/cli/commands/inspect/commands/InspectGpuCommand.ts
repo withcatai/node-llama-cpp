@@ -7,6 +7,7 @@ import {detectAvailableComputeLayers} from "../../../../bindings/utils/detectAva
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {BuildGpu, LlamaLogLevel} from "../../../../bindings/types.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
+import {getModuleVersion} from "../../../../utils/getModuleVersion.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -20,6 +21,29 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         const arch = process.arch;
         const availableComputeLayers = await detectAvailableComputeLayers({platform});
         const gpusToLogVramUsageOf: BuildGpu[] = [];
+
+        console.info(`${chalk.yellow("OS:")} ${os.type()} ${os.release()} ${chalk.dim("(" + os.arch() + ")")}`);
+
+        if (process.versions.node != null)
+            console.info(`${chalk.yellow("Node:")} ${process.versions.node} ${chalk.dim("(" + arch + ")")}`);
+
+        if (process.versions.bun != null)
+            console.info(`${chalk.yellow("Bun:")} ${process.versions.bun}`);
+
+        const typeScriptVersion = await getInstalledTypescriptVersion();
+        if (typeScriptVersion != null)
+            console.info(`${chalk.yellow("TypeScript:")} ${typeScriptVersion}`);
+
+        try {
+            const moduleVersion = await getModuleVersion();
+
+            if (moduleVersion != null)
+                console.info(`${chalk.yellow("node-llama-cpp:")} ${moduleVersion}`);
+        } catch (err) {
+            // do nothing
+        }
+
+        console.info();
 
         if (platform === "mac" && arch === "arm64") {
             console.info(`${chalk.yellow("Metal:")} ${chalk.green("available")}`);
@@ -99,6 +123,20 @@ function getPercentageString(amount: number, total: number) {
         return "0";
 
     return String(Math.floor((amount / total) * 100 * 100) / 100);
+}
+
+async function getInstalledTypescriptVersion() {
+    try {
+        const ts = await import("typescript");
+        const version = ts?.version ?? ts?.default?.version;
+
+        if (version != null && typeof version === "string" && version.length > 0)
+            return version;
+
+        return null;
+    } catch (err) {
+        return null;
+    }
 }
 
 // // simple script to copy console logs as ansi to clipboard. Used to update the documentation
