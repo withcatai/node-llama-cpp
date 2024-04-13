@@ -22,10 +22,10 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         const availableComputeLayers = await detectAvailableComputeLayers({platform});
         const gpusToLogVramUsageOf: BuildGpu[] = [];
 
-        console.info(`${chalk.yellow("OS:")} ${os.type()} ${os.release()}`);
+        console.info(`${chalk.yellow("OS:")} ${os.type()} ${os.release()} ${chalk.dim("(" + os.arch() + ")")}`);
 
         if (process.versions.node != null)
-            console.info(`${chalk.yellow("Node:")} ${process.versions.node}`);
+            console.info(`${chalk.yellow("Node:")} ${process.versions.node} ${chalk.dim("(" + arch + ")")}`);
 
         if (process.versions.bun != null)
             console.info(`${chalk.yellow("Bun:")} ${process.versions.bun}`);
