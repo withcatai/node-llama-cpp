@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import {ChatHistoryItem, LlamaChatWrapper} from "../../../src/index.js";
+import {ChatHistoryItem, Llama2ChatWrapper} from "../../../src/index.js";
 import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
-describe("LlamaChatWrapper", () => {
+describe("Llama2ChatWrapper", () => {
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",
         text: defaultChatSystemPrompt
@@ -32,7 +32,7 @@ describe("LlamaChatWrapper", () => {
     }];
 
     test("should generate valid context text", () => {
-        const chatWrapper = new LlamaChatWrapper();
+        const chatWrapper = new Llama2ChatWrapper();
         const {contextText} = chatWrapper.generateContextText(conversationHistory);
 
         expect(contextText.values).toMatchInlineSnapshot(`
@@ -64,7 +64,7 @@ describe("LlamaChatWrapper", () => {
           ]
         `);
 
-        const chatWrapper2 = new LlamaChatWrapper();
+        const chatWrapper2 = new Llama2ChatWrapper();
         const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
 
         expect(contextText2.values).toMatchInlineSnapshot(`
@@ -114,7 +114,7 @@ describe("LlamaChatWrapper", () => {
           ]
         `);
 
-        const chatWrapper3 = new LlamaChatWrapper();
+        const chatWrapper3 = new Llama2ChatWrapper();
         const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
         const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
             ...conversationHistory,

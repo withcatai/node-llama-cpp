@@ -3,8 +3,8 @@ import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
-export class LlamaChatWrapper extends ChatWrapper {
-    public readonly wrapperName: string = "LlamaChat";
+export class Llama2ChatWrapper extends ChatWrapper {
+    public readonly wrapperName: string = "Llama2Chat";
 
     /** @internal */ private readonly _addSpaceBeforeEos: boolean;
 

@@ -1,7 +1,7 @@
 import {describe, expect, test} from "vitest";
 import {
-    AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper, LlamaChatWrapper,
-    resolveChatWrapper
+    AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper,
+    Llama2ChatWrapper, resolveChatWrapper
 } from "../../../../src/index.js";
 
 
@@ -202,6 +202,6 @@ describe("resolveChatWrapper", () => {
             },
             fallbackToOtherWrappersOnJinjaError: false
         });
-        expect(chatWrapper).to.be.instanceof(LlamaChatWrapper);
+        expect(chatWrapper).to.be.instanceof(Llama2ChatWrapper);
     });
 });

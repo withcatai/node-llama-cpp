@@ -35,7 +35,7 @@ import {UnsupportedError} from "./utils/UnsupportedError.js";
 import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
 import {ChatWrapper, type ChatWrapperSettings} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
-import {LlamaChatWrapper} from "./chatWrappers/LlamaChatWrapper.js";
+import {Llama2ChatWrapper} from "./chatWrappers/Llama2ChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
 import {ChatMLChatWrapper} from "./chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
@@ -134,7 +134,7 @@ export {
     ChatWrapper,
     type ChatWrapperSettings,
     EmptyChatWrapper,
-    LlamaChatWrapper,
+    Llama2ChatWrapper,
     GeneralChatWrapper,
     ChatMLChatWrapper,
     FalconChatWrapper,
