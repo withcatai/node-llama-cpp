@@ -222,17 +222,9 @@ describe("Llama3ChatWrapper", () => {
 
           ",
             },
-            "Hello!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            "Hello!
 
           ",
-            },
           ]
         `);
     });
