@@ -42,12 +42,12 @@ The [`LlamaChatSession`](/api/classes/LlamaChatSession) class allows you to chat
 
 To do that, it uses a chat prompt wrapper to handle the unique format of the model you use.
 
-For example, to chat with a LLama model, you can use [LlamaChatWrapper](/api/classes/LlamaChatWrapper):
+For example, to chat with a LLama model, you can use [Llama3ChatWrapper](/api/classes/Llama3ChatWrapper):
 
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession, LlamaChatWrapper} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession, Llama3ChatWrapper} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,7 +57,7 @@ const model = new LlamaModel({
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({
     context,
-    chatWrapper: new LlamaChatWrapper() // by default, "auto" is used
+    chatWrapper: new Llama3ChatWrapper() // by default, "auto" is used
 });
 
 
