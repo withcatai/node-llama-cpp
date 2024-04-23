@@ -71,7 +71,7 @@ export class LlamaEmbeddingContext {
     }
 
     public async getEmbeddingFor(input: Token[] | string | LlamaText) {
-        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenize);
+        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenizer);
 
         if (resolvedInput.length > this._llamaContext.contextSize)
             throw new Error(

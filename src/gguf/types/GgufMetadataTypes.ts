@@ -189,7 +189,11 @@ export type GgufMetadataTokenizer = {
         readonly add_bos_token?: boolean,
         readonly add_eos_token?: boolean,
         readonly add_space_prefix?: boolean,
-        readonly added_tokens?: readonly string[]
+        readonly added_tokens?: readonly string[],
+        readonly prefix_token_id?: number,
+        readonly suffix_token_id?: number,
+        readonly middle_token_id?: number,
+        readonly eot_token_id?: number
     },
     readonly huggingface?: {
         readonly json?: string

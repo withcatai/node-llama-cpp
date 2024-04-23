@@ -45,7 +45,7 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
         return false;
 
     try {
-        const convertSystemMessagesToUserMessagesTemplate = "System: {{message}}";
+        const convertSystemMessagesToUserMessagesTemplate = "### System message\n\n{{message}}\n\n----";
         const jinjaChatWrapper = new JinjaTemplateChatWrapper({
             ...jinjaTemplateWrapperOptions,
             convertUnsupportedSystemMessagesToUserMessages: {

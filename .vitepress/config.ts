@@ -18,6 +18,7 @@ const hostname = "https://withcatai.github.io/node-llama-cpp/";
 
 const chatWrappersOrder = [
     "GeneralChatWrapper",
+    "Llama3ChatWrapper",
     "Llama2ChatWrapper",
     "ChatMLChatWrapper",
     "FalconChatWrapper"

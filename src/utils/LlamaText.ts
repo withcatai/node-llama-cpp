@@ -87,6 +87,30 @@ export class SpecialTokensText {
         return tokenizer(this.value, true, trimLeadingSpace ? "trimLeadingSpace" : undefined);
     }
 
+    public tokenizeSpecialTokensOnly(tokenizer: Tokenizer): (string | Token)[] {
+        const tokens = this.tokenize(tokenizer, true);
+        const res: (string | Token)[] = [];
+        let currentText = "";
+
+        for (const token of tokens) {
+            if (tokenizer.isSpecialToken(token)) {
+                if (currentText !== "") {
+                    res.push(currentText);
+                    currentText = "";
+                }
+
+                res.push(token);
+            } else {
+                currentText += tokenizer.detokenize([token], false);
+            }
+        }
+
+        if (currentText !== "")
+            res.push(currentText);
+
+        return res;
+    }
+
     public toJSON(): LlamaTextSpecialTokensTextJSON {
         return {
             type: "specialTokensText",
@@ -116,7 +140,7 @@ export class SpecialTokensText {
     }
 }
 
-export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL";
+export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL" | "EOT";
 export class SpecialToken {
     public readonly value: BuiltinSpecialTokenValue;
 

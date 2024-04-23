@@ -76,7 +76,10 @@ export class FunctionCallGrammar<const Functions extends ChatModelFunctions> ext
         const functionSchema = this._functions[functionName];
 
         const callSuffix = this._chatWrapper.settings.functions.call.suffix;
-        const callSuffixIndex = (callText + "\n".repeat(4)).lastIndexOf(callSuffix + "\n".repeat(4));
+        let callSuffixIndex = callText.lastIndexOf(callSuffix + "\n".repeat(4));
+
+        if (callSuffixIndex < 0)
+            callSuffixIndex = (callText + "\n".repeat(4)).lastIndexOf(callSuffix + "\n".repeat(4));
 
         if (callSuffixIndex < 0 || callSuffixIndex < paramsPrefixIndex + this._chatWrapper.settings.functions.call.paramsPrefix.length)
             throw new LlamaFunctionCallValidationError(

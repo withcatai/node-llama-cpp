@@ -468,6 +468,11 @@ export class LlamaContext {
     }
 
     /** @internal */
+    public _canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
+        return this._ctx.canBeNextTokenForGrammarEvaluationState(grammarEvaluationState._state, token);
+    }
+
+    /** @internal */
     private _popSequenceId(): number | null {
         if (this._unusedSequenceIds.length > 0)
             return this._unusedSequenceIds.shift()!;
@@ -788,7 +793,7 @@ export class LlamaContextSequence {
             size: contextShiftSize = this._contextShift.size,
             strategy: contextShiftStrategy = this._contextShift.strategy
         } = {},
-        yieldEosToken = false
+        yieldEogToken = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
@@ -816,12 +821,12 @@ export class LlamaContextSequence {
         contextShift?: ContextShiftOptions,
 
         /**
-         * Yield the EOS token when it's generated.
-         * When `false` the generation will stop when the EOS token is generated and the EOS token won't be yielded.
+         * Yield an EOG (End Of Generation) token (like EOS and EOT) when it's generated.
+         * When `false` the generation will stop when an EOG token is generated and the token won't be yielded.
          * Defaults to `false`.
          */
-        yieldEosToken?: boolean
-    } = {}): AsyncGenerator<Token, void> {
+        yieldEogToken?: boolean
+    } = {}): AsyncGenerator<Token, void | Token> {
         return this._evaluate(tokens, {
             temperature,
             minP,
@@ -835,7 +840,7 @@ export class LlamaContextSequence {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
             },
-            yieldEosToken
+            yieldEogToken
         });
     }
 
@@ -894,14 +899,14 @@ export class LlamaContextSequence {
         evaluationPriority = 5,
         generateNewTokens = true,
         contextShiftOptions,
-        yieldEosToken = false
+        yieldEogToken = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
-        yieldEosToken?: boolean
-    }): AsyncGenerator<Token, void> {
+        yieldEogToken?: boolean
+    }): AsyncGenerator<Token, void | Token> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens;
@@ -956,13 +961,16 @@ export class LlamaContextSequence {
                 return;
 
             // the model finished generating text
-            if (!yieldEosToken && nextToken === this._context.model.tokens.eos)
+            if (!yieldEogToken && this._context.model.isEogToken(nextToken))
                 break;
 
-            yield nextToken;
+            const replacementToken = (yield nextToken) as undefined | Token;
 
-            // Create tokens for the next eval.
-            evalTokens = [nextToken];
+            // set the tokens for the next evaluation
+            if (replacementToken != null)
+                evalTokens = [replacementToken];
+            else
+                evalTokens = [nextToken];
         }
     }
 

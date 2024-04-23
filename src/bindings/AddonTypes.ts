@@ -67,7 +67,7 @@ export type AddonModel = {
     abortActiveModelLoad(): void,
     dispose(): Promise<void>,
     tokenize(text: string, specialTokens: boolean): Uint32Array,
-    detokenize(tokens: Uint32Array): string,
+    detokenize(tokens: Uint32Array, specialTokens?: boolean): string,
     getTrainContextSize(): number,
     getEmbeddingVectorSize(): number,
     getTotalSize(): number,
@@ -82,6 +82,7 @@ export type AddonModel = {
     eotToken(): Token,
     getTokenString(token: number): string,
     getTokenType(token: Token): number,
+    isEogToken(token: Token): boolean,
     getVocabularyType(): number,
     shouldPrependBosToken(): boolean,
     getModelSize(): number
@@ -121,6 +122,7 @@ export type AddonContext = {
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
     acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
+    canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean,
     getEmbedding(inputTokensLength: number): Float64Array,
     getStateSize(): number,
     printTimings(): void

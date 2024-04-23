@@ -2,7 +2,7 @@ import process from "process";
 import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../utils/removeNullFields.js";
-import {Token} from "../types.js";
+import {Token, Tokenizer} from "../types.js";
 import {AddonModel, ModelTypeDescription} from "../bindings/AddonTypes.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
 import {LlamaLocks, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../bindings/types.js";
@@ -98,6 +98,7 @@ export class LlamaModel {
     /** @internal */ private _embeddingVectorSize?: number;
     /** @internal */ private _vocabularyType?: LlamaVocabularyType;
 
+    public readonly tokenizer: Tokenizer;
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
@@ -160,6 +161,11 @@ export class LlamaModel {
 
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
+        this.isSpecialToken = this.isSpecialToken.bind(this);
+
+        (this.tokenize as Tokenizer).detokenize = this.detokenize;
+        (this.tokenize as Tokenizer).isSpecialToken = this.isSpecialToken;
+        this.tokenizer = this.tokenize as Tokenizer;
     }
 
     public async dispose() {
@@ -235,6 +241,7 @@ export class LlamaModel {
                 case "BOS": return this.tokens.bos == null ? [] : [this.tokens.bos];
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
+                case "EOT": return this.tokens.infill.eot == null ? [] : [this.tokens.infill.eot];
             }
 
             void (builtinToken satisfies never);
@@ -249,7 +256,9 @@ export class LlamaModel {
                         ? [this.tokens.eos, this.tokens.eosString]
                         : (this.tokens.nl != null && this.tokens.nlString != null)
                             ? [this.tokens.nl, this.tokens.nlString]
-                            : [null, null];
+                            : (this.tokens.infill.eot != null && this.tokens.infill.eotString != null)
+                                ? [this.tokens.infill.eot, this.tokens.infill.eotString]
+                                : [null, null];
 
                 if (workaroundToken != null && workaroundTokenString != null) {
                     const tokens = Array.from(this._model.tokenize(workaroundTokenString + text, true)) as Token[];
@@ -278,14 +287,20 @@ export class LlamaModel {
         return Array.from(this._model.tokenize(text, specialTokens)) as Token[];
     }
 
-    /** Transform tokens into text */
-    public detokenize(tokens: readonly Token[]): string {
+    /**
+     * Transform tokens into text
+     * @param tokens - the tokens to detokenize.
+     * @param [specialTokens] - if set to `true`, special tokens will be detokenized to their corresponding token text representation.
+     * Recommended for debugging purposes only.
+     * Defaults to `false`.
+     */
+    public detokenize(tokens: readonly Token[], specialTokens: boolean = false): string {
         this._ensureNotDisposed();
 
         if (tokens.length === 0)
             return "";
 
-        return this._model.detokenize(Uint32Array.from(tokens));
+        return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
     }
 
     public getTokenType(token: Token): GgufMetadataTokenizerTokenType | null {
@@ -293,6 +308,21 @@ export class LlamaModel {
             return null;
 
         return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
+    }
+
+    /** Check whether the given token is a special token (a control-type token) */
+    public isSpecialToken(token: Token): boolean {
+        const tokenType = this.getTokenType(token);
+
+        return tokenType === GgufMetadataTokenizerTokenType.control;
+    }
+
+    /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */
+    public isEogToken(token: Token): boolean {
+        if (token == null)
+            return false;
+
+        return token === this.tokens.eos || token === this.tokens.infill.eot || this._model.isEogToken(token);
     }
 
     public async createContext(options: LlamaContextOptions = {}) {
