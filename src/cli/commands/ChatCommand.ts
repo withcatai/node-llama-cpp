@@ -387,7 +387,7 @@ async function RunChat({
         bosString: model.tokens.bosString,
         filename: model.filename,
         fileInfo: model.fileInfo,
-        tokenizer: model.tokenize,
+        tokenizer: model.tokenizer,
         noJinja
     }) ?? new GeneralChatWrapper();
     const contextSequence = context.getSequence();
