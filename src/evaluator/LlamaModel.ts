@@ -11,6 +11,7 @@ import {readGgufFileInfo} from "../gguf/readGgufFileInfo.js";
 import {GgufInsights} from "../gguf/insights/GgufInsights.js";
 import {GgufMetadataTokenizerTokenType} from "../gguf/types/GgufMetadataTypes.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
+import {Writable} from "../utils/utilTypes.js";
 import {LlamaContextOptions} from "./LlamaContext/types.js";
 import {LlamaContext} from "./LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
@@ -163,7 +164,7 @@ export class LlamaModel {
         this.detokenize = this.detokenize.bind(this);
         this.isSpecialToken = this.isSpecialToken.bind(this);
 
-        (this.tokenize as Tokenizer).detokenize = this.detokenize;
+        (this.tokenize as Tokenizer as Writable<Tokenizer>).detokenize = this.detokenize;
         (this.tokenize as Tokenizer).isSpecialToken = this.isSpecialToken;
         this.tokenizer = this.tokenize as Tokenizer;
     }

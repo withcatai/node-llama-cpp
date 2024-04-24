@@ -12,7 +12,7 @@ export type Tokenizer = {
     tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[],
     tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[]
 }["tokenize"] & {
-    detokenize: Detokenizer,
+    readonly detokenize: Detokenizer,
     isSpecialToken(token: Token): boolean
 };
 
