@@ -5,7 +5,9 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import {getLlama} from "../../bindings/getLlama.js";
-import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
+import {
+    BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption
+} from "../../bindings/types.js";
 import {LlamaCompletion} from "../../evaluator/LlamaCompletion.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
@@ -18,6 +20,7 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 type CompleteCommand = {
     modelPath?: string,
     header?: string[],
+    gpu?: BuildGpu | "auto",
     systemInfo: boolean,
     text?: string,
     textFile?: string,
@@ -55,6 +58,20 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 type: "string",
                 array: true,
                 description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+            })
+            .option("gpu", {
+                type: "string",
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: nodeLlamaCppGpuOptions as any as Exclude<typeof nodeLlamaCppGpuOptions[number], false>[],
+                coerce: (value) => {
+                    if (value == null || value == "")
+                        return undefined;
+
+                    return parseNodeLlamaCppGpuOption(value);
+                },
+                defaultDescription: "Uses the latest local build, and fallbacks to \"auto\"",
+                description: "Compute layer implementation type to use for llama.cpp. If omitted, uses the latest local build, and fallbacks to \"auto\""
             })
             .option("systemInfo", {
                 alias: "i",
@@ -171,7 +188,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
             });
     },
     async handler({
-        modelPath, header, systemInfo, text, textFile, contextSize, batchSize,
+        modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
         threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
@@ -179,7 +196,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     }) {
         try {
             await RunCompletion({
-                modelPath, header, systemInfo, text, textFile, contextSize, batchSize,
+                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
                 threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 debug, meter, printTimings
@@ -194,7 +211,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
 
 
 async function RunCompletion({
-    modelPath: modelArg, header: headerArg, systemInfo, text, textFile, contextSize, batchSize,
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize,
     threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
@@ -210,9 +227,14 @@ async function RunCompletion({
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
         : LlamaLogLevel.warn;
-    const llama = await getLlama("lastBuild", {
-        logLevel: llamaLogLevel
-    });
+    const llama = gpu == null
+        ? await getLlama("lastBuild", {
+            logLevel: llamaLogLevel
+        })
+        : await getLlama({
+            gpu,
+            logLevel: llamaLogLevel
+        });
     const logBatchSize = batchSize != null;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers);
