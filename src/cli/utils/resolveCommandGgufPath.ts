@@ -59,6 +59,18 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
     else
         resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
 
+    if (resolvedGgufPath instanceof Array && resolvedGgufPath.length === 1)
+        resolvedGgufPath = resolvedGgufPath[0];
+
+    if (resolvedGgufPath instanceof Array) {
+        // disable due to a bug with multi-part downloads in the downloader, will be enabled in a future release
+
+        // workaround for TypeScript types to keep the exiting handling of the array type of `resolvedGgufPath`
+        const supported = false;
+        if (supported)
+            throw new Error("Multi-part downloads are not supported yet");
+    }
+
     await fs.ensureDir(cliModelsDirectory);
 
     const downloader = resolvedGgufPath instanceof Array
