@@ -19,23 +19,23 @@ export class StopGenerationDetector<T extends string = string> {
         this._activeChecks = new Set();
 
         for (const check of currentActiveChecks) {
-            let lockUsed = false;
+            let checkKept = false;
 
             if (text.length > 0)
-                lockUsed ||= this._checkTriggerPart(check, text);
+                this._checkTriggerPart(check, text);
             else {
                 this._activeChecks.add(check);
-                lockUsed = true;
+                checkKept = true;
             }
 
             if (tokens.length > 0)
-                lockUsed ||= this._checkTriggerPart(check, tokens);
+                this._checkTriggerPart(check, tokens);
             else {
                 this._activeChecks.add(check);
-                lockUsed = true;
+                checkKept = true;
             }
 
-            if (!lockUsed)
+            if (!checkKept)
                 check.queuedTokenReleaseLock?.dispose();
         }
 
@@ -53,10 +53,9 @@ export class StopGenerationDetector<T extends string = string> {
                 queuedTokenReleaseLock: queuedTokenRelease?.createTextIndexLock(i),
                 currentPart
             };
-            const lockUsed = this._checkTriggerPart(textCheck, text.slice(i + 1));
+            this._checkTriggerPart(textCheck, text.slice(i + 1));
 
-            if (!lockUsed)
-                textCheck.queuedTokenReleaseLock?.dispose();
+            textCheck.queuedTokenReleaseLock?.dispose();
         }
 
         for (let i = 0; i < tokens.length; i++) {
@@ -70,10 +69,9 @@ export class StopGenerationDetector<T extends string = string> {
                 queuedTokenReleaseLock: queuedTokenRelease?.createTokenIndexLock(i),
                 currentPart
             };
-            const lockUsed =  this._checkTriggerPart(tokenCheck, tokens.slice(i + 1));
+            this._checkTriggerPart(tokenCheck, tokens.slice(i + 1));
 
-            if (!lockUsed)
-                tokenCheck.queuedTokenReleaseLock?.dispose();
+            tokenCheck.queuedTokenReleaseLock?.dispose();
         }
     }
 
@@ -196,7 +194,7 @@ export class StopGenerationDetector<T extends string = string> {
             const item = value[i];
 
             if (part.next == null) {
-                this._addFoundStop(part, value.slice(i), check.queuedTokenReleaseLock);
+                this._addFoundStop(part, value.slice(i), check.queuedTokenReleaseLock?.duplicate?.());
                 return true;
             }
 
@@ -212,12 +210,13 @@ export class StopGenerationDetector<T extends string = string> {
             return false;
 
         if (part.next == null) {
-            this._addFoundStop(part, undefined, check.queuedTokenReleaseLock);
+            this._addFoundStop(part, undefined, check.queuedTokenReleaseLock?.duplicate?.());
             return true;
         } else {
             this._activeChecks.add({
                 ...check,
-                currentPart: part
+                currentPart: part,
+                queuedTokenReleaseLock: check.queuedTokenReleaseLock?.duplicate?.()
             });
             return true;
         }
@@ -227,12 +226,14 @@ export class StopGenerationDetector<T extends string = string> {
         stopTriggers: readonly (StopGenerationTrigger | LlamaText)[],
         tokenizer: Tokenizer
     ) {
-        return stopTriggers.map((stopTrigger) => {
-            if (isLlamaText(stopTrigger))
-                return StopGenerationDetector.resolveLlamaTextTrigger(stopTrigger, tokenizer);
-            else
-                return simplifyStopTrigger(stopTrigger);
-        });
+        return stopTriggers
+            .map((stopTrigger) => {
+                if (isLlamaText(stopTrigger))
+                    return StopGenerationDetector.resolveLlamaTextTrigger(stopTrigger, tokenizer);
+                else
+                    return simplifyStopTrigger(stopTrigger);
+            })
+            .filter((stopTrigger) => stopTrigger.length > 0);
     }
 
     public static resolveLlamaTextTrigger(
@@ -248,7 +249,7 @@ export class StopGenerationDetector<T extends string = string> {
                     else if (value instanceof SpecialToken)
                         return value.tokenize(tokenizer);
                     else if (value instanceof SpecialTokensText)
-                        return value.tokenize(tokenizer, true);
+                        return value.tokenizeSpecialTokensOnly(tokenizer);
 
                     return value satisfies never;
                 })

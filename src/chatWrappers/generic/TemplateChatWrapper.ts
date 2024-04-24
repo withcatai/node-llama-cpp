@@ -1,6 +1,6 @@
-import {ChatHistoryItem, ChatModelFunctions} from "../../types.js";
+import {ChatHistoryItem, ChatModelFunctions, ChatWrapperSettings} from "../../types.js";
 import {SpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
-import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
+import {ChatWrapper} from "../../ChatWrapper.js";
 import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 

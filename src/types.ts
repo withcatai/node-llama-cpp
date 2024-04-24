@@ -5,11 +5,32 @@ export type Token = number & {
     __token: never
 };
 
+export type Detokenizer = {
+    detokenize(tokens: readonly Token[], specialTokens?: boolean): string
+}["detokenize"];
 export type Tokenizer = {
     tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[],
     tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[]
-}["tokenize"];
+}["tokenize"] & {
+    readonly detokenize: Detokenizer,
+    isSpecialToken(token: Token): boolean
+};
 
+
+export type ChatWrapperSettings = {
+    readonly functions: {
+        readonly call: {
+            readonly optionalPrefixSpace: boolean,
+            readonly prefix: string,
+            readonly paramsPrefix: string,
+            readonly suffix: string
+        },
+        readonly result: {
+            readonly prefix: string,
+            readonly suffix: string
+        }
+    }
+};
 
 export type ChatHistoryItem = ChatSystemMessage | ChatUserMessage | ChatModelResponse;
 

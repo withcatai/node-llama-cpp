@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import {ChatHistoryItem, LlamaChatWrapper} from "../../../src/index.js";
+import {ChatHistoryItem, Llama3ChatWrapper} from "../../../src/index.js";
 import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
-describe("LlamaChatWrapper", () => {
+describe("Llama3ChatWrapper", () => {
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",
         text: defaultChatSystemPrompt
@@ -32,7 +32,7 @@ describe("LlamaChatWrapper", () => {
     }];
 
     test("should generate valid context text", () => {
-        const chatWrapper = new LlamaChatWrapper();
+        const chatWrapper = new Llama3ChatWrapper();
         const {contextText} = chatWrapper.generateContextText(conversationHistory);
 
         expect(contextText.values).toMatchInlineSnapshot(`
@@ -43,28 +43,38 @@ describe("LlamaChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "[INST] <<SYS>>
+              "value": "<|start_header_id|>system<|end_header_id|>
+
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": "
-          <</SYS>>
+              "value": "<|start_header_id|>user<|end_header_id|>
 
           ",
             },
             "Hi there!",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": " [/INST] ",
+              "value": "<|start_header_id|>assistant<|end_header_id|>
+
+          ",
             },
             "Hello!",
           ]
         `);
 
-        const chatWrapper2 = new LlamaChatWrapper();
+        const chatWrapper2 = new Llama3ChatWrapper();
         const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
 
         expect(contextText2.values).toMatchInlineSnapshot(`
@@ -75,46 +85,60 @@ describe("LlamaChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "[INST] <<SYS>>
+              "value": "<|start_header_id|>system<|end_header_id|>
+
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": "
-          <</SYS>>
+              "value": "<|start_header_id|>user<|end_header_id|>
 
           ",
             },
             "Hi there!",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": " [/INST] ",
+              "value": "<|start_header_id|>assistant<|end_header_id|>
+
+          ",
             },
             "Hello!",
             {
               "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
+              "value": "EOT",
             },
             {
               "type": "specialTokensText",
-              "value": "[INST] ",
+              "value": "<|start_header_id|>user<|end_header_id|>
+
+          ",
             },
             "How are you?",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": " [/INST] ",
+              "value": "<|start_header_id|>assistant<|end_header_id|>
+
+          ",
             },
             "I'm good, how are you?",
           ]
         `);
 
-        const chatWrapper3 = new LlamaChatWrapper();
+        const chatWrapper3 = new Llama3ChatWrapper();
         const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
         const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
             ...conversationHistory,
@@ -132,22 +156,32 @@ describe("LlamaChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "[INST] <<SYS>>
+              "value": "<|start_header_id|>system<|end_header_id|>
+
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": "
-          <</SYS>>
+              "value": "<|start_header_id|>user<|end_header_id|>
 
           ",
             },
             "Hi there!",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": " [/INST] ",
+              "value": "<|start_header_id|>assistant<|end_header_id|>
+
+          ",
             },
             "Hello!",
           ]
@@ -161,22 +195,32 @@ describe("LlamaChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "[INST] <<SYS>>
+              "value": "<|start_header_id|>system<|end_header_id|>
+
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": "
-          <</SYS>>
+              "value": "<|start_header_id|>user<|end_header_id|>
 
           ",
             },
             "Hi there!",
             {
+              "type": "specialToken",
+              "value": "EOT",
+            },
+            {
               "type": "specialTokensText",
-              "value": " [/INST] ",
+              "value": "<|start_header_id|>assistant<|end_header_id|>
+
+          ",
             },
             "Hello!
 

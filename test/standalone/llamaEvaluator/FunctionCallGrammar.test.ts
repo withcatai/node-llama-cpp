@@ -1,12 +1,12 @@
 import {describe, expect, test} from "vitest";
-import {LlamaChatWrapper} from "../../../src/index.js";
+import {Llama2ChatWrapper} from "../../../src/index.js";
 import {FunctionCallGrammar} from "../../../src/evaluator/LlamaChat/utils/FunctionCallGrammar.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
 
 describe("grammar for functions", () => {
     test("object", async () => {
-        const chatWrapper = new LlamaChatWrapper();
+        const chatWrapper = new Llama2ChatWrapper();
         const llama = await getTestLlama();
         const grammar = new FunctionCallGrammar(llama, {
             func1: {

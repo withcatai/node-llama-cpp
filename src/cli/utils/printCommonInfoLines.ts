@@ -36,11 +36,6 @@ export function printCommonInfoLines({
             }, {
                 title: "Name",
                 value: toOneLine(llama.getGpuDeviceNames().join(", "))
-            }, {
-                title: "GPU layers",
-                value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
-                    chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
-                }`
             }]
         });
     }
@@ -53,6 +48,12 @@ export function printCommonInfoLines({
         }, {
             title: "Size",
             value: bytes(model.size)
+        }, {
+            show: llama.gpu !== false,
+            title: "GPU layers",
+            value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
+                chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
+            }`
         }, {
             show: printBos,
             title: "BOS",

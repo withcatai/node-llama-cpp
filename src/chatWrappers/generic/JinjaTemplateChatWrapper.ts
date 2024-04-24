@@ -1,8 +1,8 @@
 import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
-import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage} from "../../types.js";
+import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage, ChatWrapperSettings} from "../../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
-import {ChatWrapper, ChatWrapperSettings} from "../../ChatWrapper.js";
+import {ChatWrapper} from "../../ChatWrapper.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
 export type JinjaTemplateChatWrapperOptions = {
@@ -51,7 +51,7 @@ type ConvertMessageFormatOptions = {
 };
 
 const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: ConvertMessageFormatOptions = {
-    format: "System: {{message}}"
+    format: "### System message\n\n{{message}}\n\n----"
 };
 
 /**
@@ -242,22 +242,26 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         const bosTokenId = idsGenerator.generateId();
         const eosTokenId = idsGenerator.generateId();
+        const eotTokenId = idsGenerator.generateId();
 
         idToContent.set(bosTokenId, new SpecialToken("BOS"));
         idToContent.set(eosTokenId, new SpecialToken("EOS"));
+        idToContent.set(eotTokenId, new SpecialToken("EOT"));
 
         const renderJinjaText = () => {
             try {
                 return this._jinjaTemplate.render({
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
-                    "eos_token": eosTokenId
+                    "eos_token": eosTokenId,
+                    "eot_token": eotTokenId
                 });
             } catch (err) {
                 return this._jinjaTemplate.render({
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
+                    "eot_token": eotTokenId,
                     "add_generation_prompt": true
                 });
             }

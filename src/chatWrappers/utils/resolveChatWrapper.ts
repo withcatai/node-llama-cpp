@@ -1,5 +1,6 @@
 import {parseModelFileName} from "../../utils/parseModelFileName.js";
-import {LlamaChatWrapper} from "../LlamaChatWrapper.js";
+import {Llama3ChatWrapper} from "../Llama3ChatWrapper.js";
+import {Llama2ChatWrapper} from "../Llama2ChatWrapper.js";
 import {ChatMLChatWrapper} from "../ChatMLChatWrapper.js";
 import {GeneralChatWrapper} from "../GeneralChatWrapper.js";
 import {FalconChatWrapper} from "../FalconChatWrapper.js";
@@ -15,7 +16,7 @@ import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llamaChat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "llama3Chat", "llama2Chat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -33,7 +34,8 @@ export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNam
 
 const chatWrappers = {
     "general": GeneralChatWrapper,
-    "llamaChat": LlamaChatWrapper,
+    "llama3Chat": Llama3ChatWrapper,
+    "llama2Chat": Llama2ChatWrapper,
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
@@ -156,7 +158,7 @@ export function resolveChatWrapper({
 
     const modelJinjaTemplate = customWrapperSettings?.jinjaTemplate?.template ?? fileInfo?.metadata?.tokenizer?.chat_template;
 
-    if (!noJinja && modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
+    if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
         const jinjaTemplateChatWrapperOptions: JinjaTemplateChatWrapperOptions = {
             ...(customWrapperSettings?.jinjaTemplate ?? {}),
             template: modelJinjaTemplate
@@ -182,13 +184,15 @@ export function resolveChatWrapper({
             }
         }
 
-        if (!fallbackToOtherWrappersOnJinjaError)
-            return new JinjaTemplateChatWrapper(jinjaTemplateChatWrapperOptions);
+        if (!noJinja) {
+            if (!fallbackToOtherWrappersOnJinjaError)
+                return new JinjaTemplateChatWrapper(jinjaTemplateChatWrapperOptions);
 
-        try {
-            return new JinjaTemplateChatWrapper(jinjaTemplateChatWrapperOptions);
-        } catch (err) {
-            console.error(getConsoleLogPrefix() + "Error creating Jinja template chat wrapper. Falling back to resolve other chat wrappers. Error:", err);
+            try {
+                return new JinjaTemplateChatWrapper(jinjaTemplateChatWrapperOptions);
+            } catch (err) {
+                console.error(getConsoleLogPrefix() + "Error creating Jinja template chat wrapper. Falling back to resolve other chat wrappers. Error:", err);
+            }
         }
     }
 
@@ -198,9 +202,11 @@ export function resolveChatWrapper({
         if (modelJinjaTemplate.includes("<|im_start|>"))
             return createSpecializedChatWrapper(ChatMLChatWrapper);
         else if (modelJinjaTemplate.includes("[INST]"))
-            return createSpecializedChatWrapper(LlamaChatWrapper, {
+            return createSpecializedChatWrapper(Llama2ChatWrapper, {
                 addSpaceBeforeEos: modelJinjaTemplate.includes("' ' + eos_token")
             });
+        else if (modelJinjaTemplate.includes("<|start_header_id|>") && modelJinjaTemplate.includes("<|end_header_id|>"))
+            return createSpecializedChatWrapper(Llama3ChatWrapper);
         else if (modelJinjaTemplate.includes("<start_of_turn>"))
             return createSpecializedChatWrapper(GemmaChatWrapper);
     }
@@ -218,21 +224,21 @@ export function resolveChatWrapper({
 
             if (lowercaseName === "llama") {
                 if (splitLowercaseSubType.includes("chat"))
-                    return createSpecializedChatWrapper(LlamaChatWrapper);
+                    return createSpecializedChatWrapper(Llama2ChatWrapper);
 
                 return createSpecializedChatWrapper(GeneralChatWrapper);
             } else if (lowercaseName === "codellama")
                 return createSpecializedChatWrapper(GeneralChatWrapper);
             else if (lowercaseName === "yarn" && firstSplitLowercaseSubType === "llama")
-                return createSpecializedChatWrapper(LlamaChatWrapper);
+                return createSpecializedChatWrapper(Llama2ChatWrapper);
             else if (lowercaseName === "orca")
                 return createSpecializedChatWrapper(ChatMLChatWrapper);
             else if (lowercaseName === "phind" && lowercaseSubType === "codellama")
-                return createSpecializedChatWrapper(LlamaChatWrapper);
+                return createSpecializedChatWrapper(Llama2ChatWrapper);
             else if (lowercaseName === "mistral")
                 return createSpecializedChatWrapper(GeneralChatWrapper);
             else if (firstSplitLowercaseSubType === "llama")
-                return createSpecializedChatWrapper(LlamaChatWrapper);
+                return createSpecializedChatWrapper(Llama2ChatWrapper);
             else if (lowercaseSubType === "alpaca")
                 return createSpecializedChatWrapper(AlpacaChatWrapper);
             else if (lowercaseName === "functionary")
@@ -259,7 +265,7 @@ export function resolveChatWrapper({
         return null;
 
     if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
-        return createSpecializedChatWrapper(LlamaChatWrapper);
+        return createSpecializedChatWrapper(Llama2ChatWrapper);
     } else if ("<|im_start|>system\n".startsWith(bosString)) {
         return createSpecializedChatWrapper(ChatMLChatWrapper);
     }

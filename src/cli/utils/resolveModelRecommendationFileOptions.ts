@@ -15,15 +15,21 @@ export type ModelRecommendation = {
         huggingFace: {
             model: `${string}/${string}`,
             branch: string,
-            file: `${string}.gguf`
+            file: `${string}.gguf` | `${string}.gguf.part${number}of${number}`[]
         }
     }>
 };
 
 export function resolveModelRecommendationFileOptions(modelRecommendation: ModelRecommendation) {
     return modelRecommendation.fileOptions.map((fileOption) => {
-        return normalizeGgufDownloadUrl(
-            `https://huggingface.co/${fileOption.huggingFace.model}/resolve/${fileOption.huggingFace.branch}/${fileOption.huggingFace.file}`
+        const files = fileOption.huggingFace.file instanceof Array
+            ? fileOption.huggingFace.file
+            : [fileOption.huggingFace.file];
+
+        return files.map((file) =>
+            normalizeGgufDownloadUrl(
+                `https://huggingface.co/${fileOption.huggingFace.model}/resolve/${fileOption.huggingFace.branch}/${file}`
+            )
         );
     });
 }

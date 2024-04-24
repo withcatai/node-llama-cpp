@@ -15,6 +15,7 @@ import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBefor
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -195,7 +196,7 @@ export class LlamaChat {
                     bosString: contextSequence.model.tokens.bosString,
                     filename: contextSequence.model.filename,
                     fileInfo: contextSequence.model.fileInfo,
-                    tokenizer: contextSequence.model.tokenize
+                    tokenizer: contextSequence.model.tokenizer
                 }) ?? new GeneralChatWrapper()
             )
             : chatWrapper;
@@ -291,7 +292,6 @@ export class LlamaChat {
 
         const model = this._sequence.model;
         const context = this._sequence.context;
-        const eosToken = model.tokens.eos;
         const resolvedContextShift = {
             ...defaultContextShiftOptions,
             ...removeNullFields(contextShift)
@@ -435,7 +435,7 @@ export class LlamaChat {
         };
 
         if (grammar != null)
-            StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenize)
+            StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenizer)
                 .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
 
         if (functions != null && Object.keys(functions).length > 0)
@@ -473,12 +473,12 @@ export class LlamaChat {
             ensureNotAborted();
 
             if (generatedTokens === 0) {
-                StopGenerationDetector.resolveStopTriggers(ignoreStartText, model.tokenize)
+                StopGenerationDetector.resolveStopTriggers(ignoreStartText, model.tokenizer)
                     .map((stopTrigger) => ignoreStartTextDetector.addStopTrigger(stopTrigger));
 
                 if (functionsEnabled) {
                     initiallyEngagedFunctionMode = functionCallInitiallyEngaged;
-                    StopGenerationDetector.resolveStopTriggers(disengageInitiallyEngagedFunctionCall, model.tokenize)
+                    StopGenerationDetector.resolveStopTriggers(disengageInitiallyEngagedFunctionCall, model.tokenizer)
                         .map((stopTrigger) => disengageInitiallyEngagedFunctionMode.addStopTrigger(stopTrigger));
 
                     if (initiallyEngagedFunctionMode) {
@@ -503,11 +503,11 @@ export class LlamaChat {
             const contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(contextWindowHistory);
             const contextWindowsRes: Token[] = [];
 
-            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenize)
+            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenizer)
                 .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
 
             if (functionsGrammar != null)
-                StopGenerationDetector.resolveStopTriggers(functionsGrammar.stopGenerationTriggers, model.tokenize)
+                StopGenerationDetector.resolveStopTriggers(functionsGrammar.stopGenerationTriggers, model.tokenizer)
                     .map((stopTrigger) => functionSyntaxEndDetector.addStopTrigger(stopTrigger));
 
             let {firstDifferentIndex} = this._sequence.compareContextTokens(tokens);
@@ -543,10 +543,14 @@ export class LlamaChat {
                 },
                 tokenBias,
                 evaluationPriority,
-                yieldEosToken: true
+                yieldEogToken: true
             }));
 
-            for await (const token of evaluationIterator) {
+            let currentIteration = await evaluationIterator.next();
+            while (currentIteration.done !== true) {
+                const token = currentIteration.value;
+                let replacementToken: Token | undefined = undefined;
+
                 ensureNotAborted();
                 generatedTokens++;
 
@@ -634,7 +638,7 @@ export class LlamaChat {
                     const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                         triggeredStops,
                         partiallyFreeTokens,
-                        model.tokenize
+                        model.tokenizer
                     );
                     pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
@@ -650,12 +654,50 @@ export class LlamaChat {
                                 ? firstRemainingGenerationAfterStop
                                 : model.detokenize(firstRemainingGenerationAfterStop);
 
-                    functionCallTokens.push(...model.tokenize(
-                        this._chatWrapper.settings.functions.call.prefix + remainingTextAfterStop, false, "trimLeadingSpace"
-                    ));
+                    functionCallTokens.push(...model.tokenize(this._chatWrapper.settings.functions.call.prefix, false, "trimLeadingSpace"));
 
                     for (const functionCallToken of functionCallTokens)
                         context._acceptTokenOnGrammarEvaluationState(functionsEvaluationState, functionCallToken);
+
+                    // these tokens have to be verified that they match the function calling syntax grammar before they can be accepted,
+                    // or the context state should be modified to not include the incompatible tokens
+                    const remainingTextTokens = model.tokenize(remainingTextAfterStop, false, "trimLeadingSpace");
+                    let unfitTokens: Token[] = [];
+
+                    for (let i = 0; i < remainingTextTokens.length; i++) {
+                        const remainingToken = remainingTextTokens[i];
+                        const canBeNextToken = context._canBeNextTokenForGrammarEvaluationState(
+                            functionsEvaluationState,
+                            remainingToken
+                        );
+
+                        if (!canBeNextToken) {
+                            unfitTokens = remainingTextTokens.slice(i);
+                            break;
+                        }
+
+                        context._acceptTokenOnGrammarEvaluationState(functionsEvaluationState, remainingToken);
+                        functionCallTokens.push(remainingToken);
+                    }
+
+                    if (unfitTokens.length > 0) {
+                        const unfitTokensText = model.detokenize(unfitTokens); // the current token text must end with it
+                        const currentTokenText = queuedTokenRelease.text;
+                        let replacementTokens: Token[];
+
+                        if (!currentTokenText.endsWith(unfitTokensText)) {
+                            console.warn(getConsoleLogPrefix() + "The current token text does not end with the unfit function call syntax tokens text");
+                            replacementTokens = remainingTextTokens.slice(0, -unfitTokens.length);
+                        } else {
+                            const newCurrentTokensText = currentTokenText.slice(0, -unfitTokensText.length);
+                            replacementTokens = model.tokenize(newCurrentTokensText, false, "trimLeadingSpace");
+                        }
+
+                        if (replacementTokens.length > 0) {
+                            replacementToken = replacementTokens[0];
+                            queuedTokenRelease.modifyTokensAndText(replacementTokens, model.detokenize([replacementToken]));
+                        }
+                    }
                 } else if (inFunctionEvaluationMode) {
                     functionCallTokens.push(...tokens);
                     functionCallTokenSyntaxLocks.push(queuedTokenRelease.createTextIndexLock(0));
@@ -704,14 +746,14 @@ export class LlamaChat {
 
                 removeFoundStartIgnoreTextsFromPendingTokens();
 
-                if (stopGenerationDetector.hasTriggeredStops || token === eosToken) {
+                if (stopGenerationDetector.hasTriggeredStops || model.isEogToken(token)) {
                     const triggeredStops  = stopGenerationDetector.getTriggeredStops();
                     const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
 
                     const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                         triggeredStops,
                         partiallyFreeTokens,
-                        model.tokenize
+                        model.tokenizer
                     );
                     pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
@@ -752,8 +794,8 @@ export class LlamaChat {
                         },
                         metadata: {
                             remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                            stopReason: token === eosToken
-                                ? "eosToken"
+                            stopReason: model.isEogToken(token)
+                                ? "eogToken"
                                 : "stopGenerationTrigger"
                         }
                     };
@@ -814,6 +856,8 @@ export class LlamaChat {
                     shouldContextShift = true;
                     break;
                 }
+
+                currentIteration = await evaluationIterator.next(replacementToken);
             }
 
             isFirstEvaluation = false;
@@ -840,7 +884,7 @@ export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined =
     },
     metadata: {
         remainingGenerationAfterStop?: string | Token[],
-        stopReason: "eosToken" | "stopGenerationTrigger" | "functionCall" | "maxTokens"
+        stopReason: "eogToken" | "stopGenerationTrigger" | "functionCall" | "maxTokens"
     }
 };
 
@@ -1048,7 +1092,7 @@ async function getContextWindow({
             availableFunctions: functions,
             documentFunctionParams
         });
-        const tokens = contextText.tokenize(model.tokenize);
+        const tokens = contextText.tokenize(model.tokenizer);
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize) {
             const {firstDifferentIndex} = sequence.compareContextTokens(tokens);
 
@@ -1083,7 +1127,7 @@ async function getContextWindow({
             contextShiftStrategy: resolvedContextShift.strategy,
             contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
             contextSize: context.contextSize,
-            tokenizer: model.tokenize,
+            tokenizer: model.tokenizer,
             chatWrapper: chatWrapper,
             functions,
             documentFunctionParams
@@ -1097,7 +1141,7 @@ async function getContextWindow({
         return {
             history: compressedHistory,
             stopGenerationTriggers,
-            tokens: contextText.tokenize(model.tokenize),
+            tokens: contextText.tokenize(model.tokenizer),
             newResolvedHistory: resolvedHistory,
             newHistoryCompressionMetadata: metadata,
             ignoreStartText: ignoreStartText ?? [],
@@ -1111,7 +1155,7 @@ async function getContextWindow({
             availableFunctions: functions,
             documentFunctionParams
         });
-        const tokens = contextText.tokenize(model.tokenize);
+        const tokens = contextText.tokenize(model.tokenizer);
 
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize)
             return {
@@ -1144,7 +1188,7 @@ async function getContextWindow({
         contextShiftStrategy: resolvedContextShift.strategy,
         contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
         contextSize: context.contextSize,
-        tokenizer: model.tokenize,
+        tokenizer: model.tokenizer,
         chatWrapper: chatWrapper,
         functions,
         documentFunctionParams
@@ -1158,7 +1202,7 @@ async function getContextWindow({
     return {
         history: compressedHistory,
         stopGenerationTriggers,
-        tokens: contextText.tokenize(model.tokenize),
+        tokens: contextText.tokenize(model.tokenizer),
         newResolvedHistory: resolvedHistory,
         newHistoryCompressionMetadata: metadata,
         ignoreStartText: ignoreStartText ?? [],

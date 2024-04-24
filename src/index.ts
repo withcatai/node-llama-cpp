@@ -33,9 +33,10 @@ import {
 import {TokenMeter, type TokenMeterState} from "./evaluator/TokenMeter.js";
 import {UnsupportedError} from "./utils/UnsupportedError.js";
 import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
-import {ChatWrapper, type ChatWrapperSettings} from "./ChatWrapper.js";
+import {ChatWrapper} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
-import {LlamaChatWrapper} from "./chatWrappers/LlamaChatWrapper.js";
+import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
+import {Llama2ChatWrapper} from "./chatWrappers/Llama2ChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
 import {ChatMLChatWrapper} from "./chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
@@ -49,6 +50,7 @@ import {
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
     type ResolveChatWrapperOptions
 } from "./chatWrappers/utils/resolveChatWrapper.js";
+import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
     LlamaText, SpecialTokensText, SpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
     type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
@@ -60,7 +62,7 @@ import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
     type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
-    type Token, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty
+    type Token, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty, type ChatWrapperSettings
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
@@ -134,7 +136,8 @@ export {
     ChatWrapper,
     type ChatWrapperSettings,
     EmptyChatWrapper,
-    LlamaChatWrapper,
+    Llama3ChatWrapper,
+    Llama2ChatWrapper,
     GeneralChatWrapper,
     ChatMLChatWrapper,
     FalconChatWrapper,
@@ -153,6 +156,7 @@ export {
     type SpecializedChatWrapperTypeName,
     templateChatWrapperTypeNames,
     type TemplateChatWrapperTypeName,
+    ChatModelFunctionsDocumentationGenerator,
     LlamaText,
     SpecialTokensText,
     SpecialToken,

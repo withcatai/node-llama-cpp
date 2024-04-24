@@ -17,19 +17,23 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             .filter((item) => item !== "")
             .join(" | ");
     } else if (isGbnfJsonObjectSchema(schema)) {
-        return Object.entries(schema.properties)
-            .map(([propName, propSchema]) => {
-                const escapedValue = JSON.stringify(propName) ?? "";
-                const keyText = escapedValue.slice(1, -1) === propName ? propName : escapedValue;
-                const valueType = getTypeScriptTypeStringForGbnfJsonSchema(propSchema);
+        return [
+            "{",
+            Object.entries(schema.properties)
+                .map(([propName, propSchema]) => {
+                    const escapedValue = JSON.stringify(propName) ?? "";
+                    const keyText = escapedValue.slice(1, -1) === propName ? propName : escapedValue;
+                    const valueType = getTypeScriptTypeStringForGbnfJsonSchema(propSchema);
 
-                if (keyText === "" || valueType === "")
-                    return "";
+                    if (keyText === "" || valueType === "")
+                        return "";
 
-                return keyText + ": " + valueType;
-            })
-            .filter((item) => item !== "")
-            .join(", ");
+                    return keyText + ": " + valueType;
+                })
+                .filter((item) => item !== "")
+                .join(", "),
+            "}"
+        ].join("");
     } else if (isGbnfJsonArraySchema(schema)) {
         const valuesType = getTypeScriptTypeStringForGbnfJsonSchema(schema.items);
 

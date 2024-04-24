@@ -1,3 +1,4 @@
+import {DisposedError} from "lifecycle-utils";
 import {Token} from "../types.js";
 
 export class TokenStreamRegulator {
@@ -44,13 +45,20 @@ export class TokenStreamRegulator {
 export class QueuedTokenRelease {
     /** @internal */ private readonly _textLocks = new Set<QueuedTokenReleaseLock>();
     /** @internal */ private readonly _tokenLocks = new Set<QueuedTokenReleaseLock>();
-
-    public readonly tokens: readonly Token[];
-    public readonly text: string;
+    /** @internal */ private _tokens: readonly Token[];
+    /** @internal */ private _text: string;
 
     private constructor(tokens: readonly Token[], text: string) {
-        this.tokens = tokens;
-        this.text = text;
+        this._tokens = tokens;
+        this._text = text;
+    }
+
+    public get tokens() {
+        return this._tokens;
+    }
+
+    public get text() {
+        return this._text;
     }
 
     public get isFree() {
@@ -95,6 +103,11 @@ export class QueuedTokenRelease {
         return lock;
     }
 
+    public modifyTokensAndText(tokens: readonly Token[], text: string) {
+        this._tokens = tokens;
+        this._text = text;
+    }
+
     /** @internal */
     public static _create(tokens: Token[], text: string) {
         return new QueuedTokenRelease(tokens, text);
@@ -112,6 +125,17 @@ export class QueuedTokenReleaseLock {
 
     public get index() {
         return this._index;
+    }
+
+    public duplicate() {
+        if (!this._locks.has(this))
+            throw new DisposedError();
+
+        const lock = QueuedTokenReleaseLock._create(this._index, this._locks);
+
+        this._locks.add(lock);
+
+        return lock;
     }
 
     public dispose() {

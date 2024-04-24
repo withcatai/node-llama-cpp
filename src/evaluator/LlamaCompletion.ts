@@ -254,7 +254,7 @@ export class LlamaCompletion {
 
             const resolvedInput = tokenizeInput(
                 input,
-                this._sequence.model.tokenize,
+                this._sequence.model.tokenizer,
                 (shouldPrependBosToken && bosToken != null)
                     ? "trimLeadingSpace"
                     : undefined
@@ -437,8 +437,8 @@ export class LlamaCompletion {
             if (this._sequence == null || this.disposed)
                 throw new DisposedError();
 
-            const resolvedPrefixInputTokens = tokenizeInput(prefixInput, this._sequence.model.tokenize, "trimLeadingSpace");
-            const resolvedSuffixInputTokens = tokenizeInput(suffixInput, this._sequence.model.tokenize, "trimLeadingSpace");
+            const resolvedPrefixInputTokens = tokenizeInput(prefixInput, this._sequence.model.tokenizer, "trimLeadingSpace");
+            const resolvedSuffixInputTokens = tokenizeInput(suffixInput, this._sequence.model.tokenizer, "trimLeadingSpace");
             const resolvedContextShiftSize = await resolveContextShiftSize(contextShiftSize, this._sequence);
             ensureNotAborted();
 
@@ -524,8 +524,6 @@ export class LlamaCompletion {
         const sequence = this._sequence;
         const model = sequence.model;
         const context = sequence.context;
-        const eosToken = model.tokens.eos;
-        const eotToken = model.tokens.infill.eot;
 
         const res: Token[] = [];
         const pendingTokens: Token[] = [];
@@ -551,11 +549,11 @@ export class LlamaCompletion {
         let generatedTokens = 0;
 
         if (grammar != null)
-            StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenize)
+            StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenizer)
                 .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
 
         if (stopGenerationTriggers != null)
-            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenize)
+            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenizer)
                 .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
 
         const ensureNotAborted = () => {
@@ -618,7 +616,7 @@ export class LlamaCompletion {
                 },
                 tokenBias,
                 evaluationPriority,
-                yieldEosToken: true
+                yieldEogToken: true
             }));
 
             for await (const token of evaluationIterator) {
@@ -642,14 +640,14 @@ export class LlamaCompletion {
 
                 pendingTokens.push(...streamRegulator.popFreeChunkTokens());
 
-                if (stopGenerationDetector.hasTriggeredStops || token === eosToken || token === eotToken) {
+                if (stopGenerationDetector.hasTriggeredStops || model.isEogToken(token)) {
                     const triggeredStops  = stopGenerationDetector.getTriggeredStops();
                     const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
 
                     const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                         triggeredStops,
                         partiallyFreeTokens,
-                        model.tokenize
+                        model.tokenizer
                     );
                     pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
@@ -673,8 +671,8 @@ export class LlamaCompletion {
                         response: modelResponse,
                         metadata: {
                             remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                            stopReason: (token === eosToken || token === eotToken)
-                                ? "eosToken" as const
+                            stopReason: model.isEogToken(token)
+                                ? "eogToken" as const
                                 : "stopGenerationTrigger" as const
                         }
                     };

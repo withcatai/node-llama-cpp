@@ -19,7 +19,7 @@ describe("functionary", () => {
                 contextSequence: context.getSequence()
             });
 
-            const res = await chatSession.prompt("What is the second word?", {
+            const promptOptions: Parameters<typeof chatSession.prompt>[1] = {
                 functions: {
                     getNthWord: defineChatSessionFunction({
                         description: "Get an n-th word",
@@ -36,9 +36,18 @@ describe("functionary", () => {
                         }
                     })
                 }
-            });
+            } as const;
+
+            const res = await chatSession.prompt("What is the second word?", promptOptions);
 
             expect(res).to.be.eq('The second word is "secret".');
+
+            const res2 = await chatSession.prompt("Explain what this word means", {
+                ...promptOptions,
+                maxTokens: 40
+            });
+
+            expect(res2.length).to.be.greaterThan(1);
         });
     });
 

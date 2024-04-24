@@ -1,6 +1,77 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "Llama 3 8B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Llama 3 model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+        "This is the 8 billion parameters version of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-8B-Instruct.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-8B-Instruct.Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-8B-Instruct.Q4_K_S.gguf"
+        }
+    }]
+}, {
+    name: "Llama 3 70B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Llama 3 model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+        "This is the 70 billion parameters version of the model. " +
+        "You need a GPU with a lot of VRAM to use this version.",
+
+    fileOptions: [{
+    // disable due to a bug with multi-part downloads in the downloader, will be enabled in a future release
+    //
+    //     huggingFace: {
+    //         model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+    //         branch: "main",
+    //         file: [
+    //             "Meta-Llama-3-70B-Instruct.Q8_0.gguf.part1of2",
+    //             "Meta-Llama-3-70B-Instruct.Q8_0.gguf.part2of2"
+    //         ]
+    //     }
+    // }, {
+    //     huggingFace: {
+    //         model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+    //         branch: "main",
+    //         file: [
+    //             "Meta-Llama-3-70B-Instruct.Q6_K.gguf.part1of2",
+    //             "Meta-Llama-3-70B-Instruct.Q6_K.gguf.part2of2"
+    //         ]
+    //     }
+    // }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-70B-Instruct.Q4_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3-70B-Instruct.Q4_K_S.gguf"
+        }
+    }]
+}, {
     name: "Llama 2 Chat 7B",
     abilities: ["chat", "complete"],
     description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +

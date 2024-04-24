@@ -1,7 +1,7 @@
 import {describe, expect, test} from "vitest";
 import {
-    AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper, LlamaChatWrapper,
-    resolveChatWrapper
+    AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper,
+    Llama2ChatWrapper, Llama3ChatWrapper, resolveChatWrapper
 } from "../../../../src/index.js";
 
 
@@ -98,7 +98,7 @@ const generalJinjaTemplate = `
 {%- endif -%}
 `.slice(1, -1);
 
-const llamaChatJinjaTemplate = `
+const llama2ChatJinjaTemplate = `
 {%- set ns = namespace(found=false) -%}
 {%- for message in messages -%}
     {%- if message['role'] == 'system' -%}
@@ -117,6 +117,18 @@ const llamaChatJinjaTemplate = `
         {{- message['content'] + eos_token + bos_token + '[INST] ' -}}
     {%- endif -%}
 {%- endfor -%}
+`.slice(1, -1);
+
+const llama3ChatJinjaTemplate = `
+{%- set loop_messages = messages -%}
+{%- for message in loop_messages -%}
+    {%- set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n'+ message['content'] | trim + eot_token -%}
+    {%- if loop.index0 == 0 -%}
+        {%- set content = bos_token + content -%}
+    {%- endif -%}
+    {{- content -}}
+{%- endfor -%}
+{{- '<|start_header_id|>assistant<|end_header_id|>\n\n' -}}
 `.slice(1, -1);
 
 
@@ -193,15 +205,27 @@ describe("resolveChatWrapper", () => {
         expect(chatWrapper).to.be.instanceof(GeneralChatWrapper);
     });
 
-    test("should resolve to specialized LlamaChatWrapper", async () => {
+    test("should resolve to specialized Llama2ChatWrapper", async () => {
         const chatWrapper = resolveChatWrapper({
             customWrapperSettings: {
                 jinjaTemplate: {
-                    template: llamaChatJinjaTemplate
+                    template: llama2ChatJinjaTemplate
                 }
             },
             fallbackToOtherWrappersOnJinjaError: false
         });
-        expect(chatWrapper).to.be.instanceof(LlamaChatWrapper);
+        expect(chatWrapper).to.be.instanceof(Llama2ChatWrapper);
+    });
+
+    test("should resolve to specialized Llama3ChatWrapper", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: llama3ChatJinjaTemplate
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+        expect(chatWrapper).to.be.instanceof(Llama3ChatWrapper);
     });
 });

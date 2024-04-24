@@ -9,16 +9,18 @@ import stripAnsi from "strip-ansi";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveCommandGgufPath} from "../../../utils/resolveCommandGgufPath.js";
 import {getLlama} from "../../../../bindings/getLlama.js";
-import {LlamaLogLevel} from "../../../../bindings/types.js";
+import {BuildGpu, LlamaLogLevel, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../../../bindings/types.js";
 import {LlamaModel} from "../../../../evaluator/LlamaModel.js";
 import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {ConsoleTable, ConsoleTableColumn} from "../../../utils/ConsoleTable.js";
 import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
+import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
     header?: string[],
+    gpu?: BuildGpu | "auto",
     minLayers: number,
     maxLayers?: number,
     minContextSize: number,
@@ -44,6 +46,20 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 type: "string",
                 array: true,
                 description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+            })
+            .option("gpu", {
+                type: "string",
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: nodeLlamaCppGpuOptions as any as Exclude<typeof nodeLlamaCppGpuOptions[number], false>[],
+                coerce: (value) => {
+                    if (value == null || value == "")
+                        return undefined;
+
+                    return parseNodeLlamaCppGpuOption(value);
+                },
+                defaultDescription: "Uses the latest local build, and fallbacks to \"auto\"",
+                description: "Compute layer implementation type to use for llama.cpp. If omitted, uses the latest local build, and fallbacks to \"auto\""
             })
             .option("minLayers", {
                 alias: "mnl",
@@ -96,7 +112,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, minLayers, maxLayers, minContextSize, maxContextSize, measures = 10,
+        modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, measures = 10,
         printHeaderBeforeEachLayer = true, evaluateText, repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
@@ -106,13 +122,19 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         const headers = resolveHeaderFlag(headerArg);
 
         // ensure a llama build is available
-        const llama = await getLlama("lastBuild", {
-            logLevel: LlamaLogLevel.error
-        });
+        const llama = gpu == null
+            ? await getLlama("lastBuild", {
+                logLevel: LlamaLogLevel.error
+            })
+            : await getLlama({
+                gpu,
+                logLevel: LlamaLogLevel.error
+            });
 
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers);
 
         console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
+        console.info(`${chalk.yellow("GPU:")} ${getPrettyBuildGpuName(llama.gpu)}${gpu == null ? chalk.gray(" (last build)") : ""}`);
         console.info();
 
         const ggufMetadata = await readGgufFileInfo(resolvedGgufPath, {
@@ -139,6 +161,9 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
             const done = await measureModel({
                 modelPath: resolvedGgufPath,
+                gpu: gpu == null
+                    ? undefined
+                    : llama.gpu,
                 maxGpuLayers: lastGpuLayers,
                 minGpuLayers: minLayers,
                 initialMaxContextSize: previousContextSizeCheck,
@@ -334,9 +359,10 @@ const detectedFileName = path.basename(__filename);
 const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
-    modelPath, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers, evaluateText, onInfo
+    modelPath, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers, evaluateText, onInfo
 }: {
     modelPath: string,
+    gpu?: BuildGpu | "auto",
     tests: number,
     initialMaxContextSize?: number,
     maxContextSize?: number,
@@ -379,7 +405,10 @@ async function measureModel({
         stdio: [null, null, null, "ipc"],
         env: {
             ...process.env,
-            MEASURE_MODEL_CP: "true"
+            MEASURE_MODEL_CP: "true",
+            MEASURE_MODEL_CP_GPU: gpu == null
+                ? undefined
+                : JSON.stringify(gpu)
         }
     });
     let isPlannedExit = false;
@@ -512,9 +541,15 @@ if (process.env.MEASURE_MODEL_CP === "true" && process.send != null) {
 }
 
 async function runTestWorkerLogic() {
-    const llama = await getLlama("lastBuild", {
-        logLevel: LlamaLogLevel.error
-    });
+    const gpuEnvVar = process.env.MEASURE_MODEL_CP_GPU;
+    const llama = (gpuEnvVar == null || gpuEnvVar === "")
+        ? await getLlama("lastBuild", {
+            logLevel: LlamaLogLevel.error
+        })
+        : await getLlama({
+            gpu: JSON.parse(gpuEnvVar),
+            logLevel: LlamaLogLevel.error
+        });
 
     if (process.send == null)
         throw new Error("No IPC channel to parent process");

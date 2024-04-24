@@ -108,12 +108,12 @@ static void adjustNapiExternalMemorySubtract(Napi::Env env, uint64_t size) {
     }
 }
 
-std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token) {
+std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token, bool specialTokens) {
     std::vector<char> result(8, 0);
-    const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size());
+    const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size(), specialTokens);
     if (n_tokens < 0) {
         result.resize(-n_tokens);
-        int check = llama_token_to_piece(model, token, result.data(), result.size());
+        int check = llama_token_to_piece(model, token, result.data(), result.size(), specialTokens);
         GGML_ASSERT(check == -n_tokens);
     } else {
         result.resize(n_tokens);
@@ -378,13 +378,16 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             }
 
             Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
+            bool decodeSpecialTokens = info.Length() > 0
+                ? info[1].As<Napi::Boolean>().Value()
+                : false;
 
             // Create a stringstream for accumulating the decoded string.
             std::stringstream ss;
 
             // Decode each token and accumulate the result.
             for (size_t i = 0; i < tokens.ElementLength(); i++) {
-                const std::string piece = addon_model_token_to_piece(model, (llama_token)tokens[i]);
+                const std::string piece = addon_model_token_to_piece(model, (llama_token)tokens[i], decodeSpecialTokens);
 
                 if (piece.empty()) {
                     continue;
@@ -534,6 +537,20 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
 
             return Napi::Number::From(info.Env(), int32_t(tokenType));
         }
+        Napi::Value IsEogToken(const Napi::CallbackInfo& info) {
+            if (disposed) {
+                Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+                return info.Env().Undefined();
+            }
+
+            if (info[0].IsNumber() == false) {
+                return Napi::Boolean::New(info.Env(), false);
+            }
+
+            int token = info[0].As<Napi::Number>().Int32Value();
+
+            return Napi::Boolean::New(info.Env(), llama_token_is_eog(model, token));
+        }
         Napi::Value GetVocabularyType(const Napi::CallbackInfo& info) {
             if (disposed) {
                 Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
@@ -581,6 +598,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                         InstanceMethod("getTokenType", &AddonModel::GetTokenType),
+                        InstanceMethod("isEogToken", &AddonModel::IsEogToken),
                         InstanceMethod("getVocabularyType", &AddonModel::GetVocabularyType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
                         InstanceMethod("getModelSize", &AddonModel::GetModelSize),
@@ -1054,6 +1072,30 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
             return info.Env().Undefined();
         }
 
+        Napi::Value CanBeNextTokenForGrammarEvaluationState(const Napi::CallbackInfo& info) {
+            AddonGrammarEvaluationState* grammar_evaluation_state =
+                Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
+            llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
+
+            if ((grammar_evaluation_state)->grammar != nullptr) {
+                std::vector<llama_token_data> candidates;
+                candidates.reserve(1);
+                candidates.emplace_back(llama_token_data { tokenId, 1, 0.0f });
+
+                llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
+
+                llama_sample_grammar(ctx, &candidates_p, (grammar_evaluation_state)->grammar);
+
+                if (candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) {
+                    return Napi::Boolean::New(info.Env(), false);
+                }
+
+                return Napi::Boolean::New(info.Env(), true);
+            }
+
+            return Napi::Boolean::New(info.Env(), false);
+        }
+
         Napi::Value GetEmbedding(const Napi::CallbackInfo& info) {
             if (disposed) {
                 Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
@@ -1118,6 +1160,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                         InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                         InstanceMethod("sampleToken", &AddonContext::SampleToken),
                         InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
+                        InstanceMethod("canBeNextTokenForGrammarEvaluationState", &AddonContext::CanBeNextTokenForGrammarEvaluationState),
                         InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                         InstanceMethod("getStateSize", &AddonContext::GetStateSize),
                         InstanceMethod("printTimings", &AddonContext::PrintTimings),
@@ -1442,7 +1485,6 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             // Select the best prediction.
             auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
             auto n_vocab = llama_n_vocab(ctx->model->model);
-            auto eos_token = llama_token_eos(ctx->model->model);
 
             std::vector<llama_token_data> candidates;
             candidates.reserve(n_vocab);
@@ -1455,7 +1497,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                     if (hasTokenBias) {
                         auto logitBias = tokenBiases.at(token_id);
                         if (logitBias == -INFINITY || logitBias < -INFINITY) {
-                            if (token_id != eos_token) {
+                            if (!llama_token_is_eog(ctx->model->model, token_id)) {
                                 logit = -INFINITY;
                             }
                         } else {
@@ -1513,7 +1555,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                 new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
             }
 
-            if (new_token_id != eos_token && use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
+            if (!llama_token_is_eog(ctx->model->model, new_token_id) && use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
                 llama_grammar_accept_token(ctx->ctx, (grammar_evaluation_state)->grammar, new_token_id);
             }
 

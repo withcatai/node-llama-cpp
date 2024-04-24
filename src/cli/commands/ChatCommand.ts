@@ -12,7 +12,9 @@ import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
 import {LlamaJsonSchemaGrammar} from "../../evaluator/LlamaJsonSchemaGrammar.js";
-import {LlamaLogLevel, LlamaLogLevelGreaterThan} from "../../bindings/types.js";
+import {
+    BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption
+} from "../../bindings/types.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
 import {printInfoLine} from "../utils/printInfoLine.js";
@@ -28,6 +30,7 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 type ChatCommand = {
     modelPath?: string,
     header?: string[],
+    gpu?: BuildGpu | "auto",
     systemInfo: boolean,
     systemPrompt: string,
     systemPromptFile?: string,
@@ -76,6 +79,20 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "string",
                 array: true,
                 description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+            })
+            .option("gpu", {
+                type: "string",
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: nodeLlamaCppGpuOptions as any as Exclude<typeof nodeLlamaCppGpuOptions[number], false>[],
+                coerce: (value) => {
+                    if (value == null || value == "")
+                        return undefined;
+
+                    return parseNodeLlamaCppGpuOption(value);
+                },
+                defaultDescription: "Uses the latest local build, and fallbacks to \"auto\"",
+                description: "Compute layer implementation type to use for llama.cpp. If omitted, uses the latest local build, and fallbacks to \"auto\""
             })
             .option("systemInfo", {
                 alias: "i",
@@ -247,7 +264,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             });
     },
     async handler({
-        modelPath, header, systemInfo, systemPrompt, systemPromptFile, prompt,
+        modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
@@ -256,8 +273,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     }) {
         try {
             await RunChat({
-                modelPath, header, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize, batchSize,
-                noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers,
+                modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
+                batchSize, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers,
                 lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 noHistory, environmentFunctions, debug, meter, printTimings
             });
@@ -271,10 +288,10 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 
 async function RunChat({
-    modelPath: modelArg, header: headerArg, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-    batchSize, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature, minP, topK,
-    topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
+    contextSize, batchSize, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature,
+    minP, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
+    repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -288,9 +305,14 @@ async function RunChat({
     const llamaLogLevel = debug
         ? LlamaLogLevel.debug
         : LlamaLogLevel.warn;
-    const llama = await getLlama("lastBuild", {
-        logLevel: llamaLogLevel
-    });
+    const llama = gpu == null
+        ? await getLlama("lastBuild", {
+            logLevel: llamaLogLevel
+        })
+        : await getLlama({
+            gpu,
+            logLevel: llamaLogLevel
+        });
     const logBatchSize = batchSize != null;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers);
@@ -387,7 +409,7 @@ async function RunChat({
         bosString: model.tokens.bosString,
         filename: model.filename,
         fileInfo: model.fileInfo,
-        tokenizer: model.tokenize,
+        tokenizer: model.tokenizer,
         noJinja
     }) ?? new GeneralChatWrapper();
     const contextSequence = context.getSequence();
