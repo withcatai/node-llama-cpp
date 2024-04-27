@@ -4,14 +4,12 @@ import fs from "fs-extra";
 import {fileURLToPath} from "url";
 import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
-import {createTwoslasher as createTwoslasherESLint} from "twoslash-eslint";
 import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 import envVar from "env-var";
 import process from "process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson: typeof import("../package.json") = fs.readJsonSync(path.join(__dirname, "..", "package.json"));
-const eslintConfig = await fs.readJson(path.join(__dirname, "..", ".eslintrc.json"));
 const env = envVar.from(process.env);
 
 const urlBase = env.get("DOCS_URL_BASE").asString();
@@ -150,33 +148,6 @@ export default defineConfig({
                     },
                     tsModule: ts
                 }
-            }),
-            transformerTwoslash({
-                explicitTrigger: false,
-                errorRendering: "hover",
-                twoslasher: createTwoslasherESLint({
-                    eslintConfig: [{
-                        files: ["**"],
-                        rules: {
-                            ...eslintConfig.rules,
-                            ...(eslintConfig.overrides?.[0].rules ?? {})
-                        },
-                        languageOptions: {
-                            ecmaVersion: 2022,
-                            sourceType: "module"
-                        },
-                        settings: eslintConfig.settings,
-                        plugins: {
-                            "@typescript-eslint": (await import("@typescript-eslint/eslint-plugin")).default,
-                            // @ts-ignore
-                            "import": (await import("eslint-plugin-import")).default,
-                            // @ts-ignore
-                            "jsdoc": (await import("eslint-plugin-jsdoc")).default,
-                            // @ts-ignore
-                            "n": (await import("eslint-plugin-n")).default
-                        }
-                    }]
-                })
             })
         ]
     },
