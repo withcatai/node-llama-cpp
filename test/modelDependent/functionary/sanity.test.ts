@@ -10,7 +10,8 @@ describe("functionary", () => {
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
-                modelPath
+                modelPath,
+                checkTensors: true
             });
             const context = await model.createContext();
             const chatSession = new LlamaChatSession({

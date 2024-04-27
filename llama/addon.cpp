@@ -289,6 +289,10 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                     model_params.use_mlock = options.Get("useMlock").As<Napi::Boolean>().Value();
                 }
 
+                if (options.Has("checkTensors")) {
+                    model_params.check_tensors = options.Get("checkTensors").As<Napi::Boolean>().Value();
+                }
+
                 if (options.Has("onLoadProgress")) {
                     auto onLoadProgressJSCallback = options.Get("onLoadProgress").As<Napi::Function>();
                     if (onLoadProgressJSCallback.IsFunction()) {
