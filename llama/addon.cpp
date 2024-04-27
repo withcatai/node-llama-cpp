@@ -167,10 +167,10 @@ class LLAMAContext : public Napi::ObjectWrap<LLAMAContext> {
     }
 
     ctx = llama_new_context_with_model(model->model, context_params);
-    Napi::MemoryManagement::AdjustExternalMemory(Env(), llama_get_state_size(ctx));
+    Napi::MemoryManagement::AdjustExternalMemory(Env(), llama_state_get_size(ctx));
   }
   ~LLAMAContext() {
-    Napi::MemoryManagement::AdjustExternalMemory(Env(), -(int64_t)llama_get_state_size(ctx));
+    Napi::MemoryManagement::AdjustExternalMemory(Env(), -(int64_t)llama_state_get_size(ctx));
     llama_free(ctx);
     model->Unref();
   }
