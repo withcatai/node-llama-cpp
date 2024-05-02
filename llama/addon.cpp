@@ -1487,6 +1487,11 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             llama_token new_token_id = 0;
 
             // Select the best prediction.
+            if (llama_get_logits(ctx->ctx) == nullptr) {
+                SetError("This model does not support token generation");
+                return;
+            }
+
             auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
             auto n_vocab = llama_n_vocab(ctx->model->model);
 

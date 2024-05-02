@@ -9,9 +9,7 @@ import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./evaluator/LlamaGrammarEvaluationState.js";
 import {LlamaContext, LlamaContextSequence} from "./evaluator/LlamaContext/LlamaContext.js";
-import {
-    LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, LlamaEmbedding, type LlamaEmbeddingJSON
-} from "./evaluator/LlamaEmbeddingContext.js";
+import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, type LlamaEmbedding} from "./evaluator/LlamaEmbeddingContext.js";
 import {
     type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
@@ -109,8 +107,7 @@ export {
     TokenBias,
     LlamaEmbeddingContext,
     type LlamaEmbeddingContextOptions,
-    LlamaEmbedding,
-    type LlamaEmbeddingJSON,
+    type LlamaEmbedding,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,

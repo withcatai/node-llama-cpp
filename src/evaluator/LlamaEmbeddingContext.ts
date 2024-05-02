@@ -79,7 +79,10 @@ export class LlamaEmbeddingContext {
                 "Try to increase the context size or use another model that supports longer contexts."
             );
         else if (resolvedInput.length === 0)
-            return new LlamaEmbedding({vector: []});
+            return {
+                type: "embedding",
+                vector: []
+            } as LlamaEmbedding;
 
         return await withLock(this, "evaluate", async () => {
             await this._sequence.eraseContextTokenRanges([{
@@ -87,7 +90,7 @@ export class LlamaEmbeddingContext {
                 end: this._sequence.nextTokenIndex
             }]);
 
-            const iterator = this._sequence.evaluate(resolvedInput);
+            const iterator = this._sequence.evaluate(resolvedInput, {_noSampling: true});
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             for await (const token of iterator) {
                 break; // only generate one token to get embeddings
@@ -96,7 +99,10 @@ export class LlamaEmbeddingContext {
             const embedding = this._llamaContext._ctx.getEmbedding(resolvedInput.length);
             const embeddingVector = Array.from(embedding);
 
-            return new LlamaEmbedding({vector: embeddingVector});
+            return {
+                type: "embedding",
+                vector: embeddingVector
+            } as LlamaEmbedding;
         });
     }
 
@@ -141,33 +147,7 @@ export class LlamaEmbeddingContext {
     }
 }
 
-export type LlamaEmbeddingJSON = {
-    type: "LlamaEmbedding",
+export type LlamaEmbedding = {
+    type: "embedding",
     vector: number[]
 };
-
-export class LlamaEmbedding {
-    public readonly vector: number[];
-
-    public constructor({vector}: {vector: number[]}) {
-        this.vector = vector;
-    }
-
-    public toJSON(): LlamaEmbeddingJSON {
-        return {
-            type: "LlamaEmbedding",
-            vector: this.vector
-        };
-    }
-
-    public static fromJSON(json: LlamaEmbeddingJSON) {
-        if (json == null || json.type !== "LlamaEmbedding" || !(json.vector instanceof Array) ||
-            json.vector.some(v => typeof v !== "number")
-        )
-            throw new Error("Invalid LlamaEmbedding JSON");
-
-        return new LlamaEmbedding({
-            vector: json.vector
-        });
-    }
-}

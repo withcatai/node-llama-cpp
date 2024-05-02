@@ -11,7 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modelsFolder = path.join(__dirname, "..", ".models");
 const supportedModels = {
     "functionary-small-v2.2.q4_0.gguf": "https://huggingface.co/meetkai/functionary-small-v2.2-GGUF/resolve/main/functionary-small-v2.2.q4_0.gguf?download=true",
-    "stable-code-3b.Q5_K_M.gguf": "https://huggingface.co/TheBloke/stable-code-3b-GGUF/resolve/main/stable-code-3b.Q5_K_M.gguf?download=true"
+    "stable-code-3b.Q5_K_M.gguf": "https://huggingface.co/TheBloke/stable-code-3b-GGUF/resolve/main/stable-code-3b.Q5_K_M.gguf?download=true",
+    "bge-small-en-v1.5-q8_0.gguf": "https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf?download=true"
 } as const;
 
 export async function getModelFile(modelName: keyof typeof supportedModels) {

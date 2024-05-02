@@ -793,7 +793,9 @@ export class LlamaContextSequence {
             size: contextShiftSize = this._contextShift.size,
             strategy: contextShiftStrategy = this._contextShift.strategy
         } = {},
-        yieldEogToken = false
+        yieldEogToken = false,
+
+        _noSampling = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
@@ -825,7 +827,10 @@ export class LlamaContextSequence {
          * When `false` the generation will stop when an EOG token is generated and the token won't be yielded.
          * Defaults to `false`.
          */
-        yieldEogToken?: boolean
+        yieldEogToken?: boolean,
+
+        /** @internal */
+        _noSampling?: boolean
     } = {}): AsyncGenerator<Token, void | Token> {
         return this._evaluate(tokens, {
             temperature,
@@ -840,7 +845,9 @@ export class LlamaContextSequence {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
             },
-            yieldEogToken
+            yieldEogToken,
+
+            _noSampling
         });
     }
 
@@ -899,13 +906,16 @@ export class LlamaContextSequence {
         evaluationPriority = 5,
         generateNewTokens = true,
         contextShiftOptions,
-        yieldEogToken = false
+        yieldEogToken = false,
+
+        _noSampling = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
-        yieldEogToken?: boolean
+        yieldEogToken?: boolean,
+        _noSampling?: boolean
     }): AsyncGenerator<Token, void | Token> {
         this._ensureNotDisposed();
 
@@ -926,6 +936,9 @@ export class LlamaContextSequence {
                 this._tokenMeter,
                 contextShiftOptions,
                 (batchLogitIndex) => {
+                    if (_noSampling)
+                        return null;
+
                     const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
                         ? repeatPenalty.punishTokens()
                         : repeatPenalty?.punishTokens;
