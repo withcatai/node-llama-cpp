@@ -27,22 +27,17 @@ import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendatio
 import {splitAnsiToLines} from "./splitAnsiToLines.js";
 import {renderInfoLine} from "./printInfoLine.js";
 
-export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>) {
-    let resolvedGgufPath: undefined | string | string[] = ggufPath;
+export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
+    targetDirectory = cliModelsDirectory
+}: {
+    targetDirectory?: string
+} = {}) {
+    let resolvedGgufPath = ggufPath;
 
-    if (resolvedGgufPath == null) {
-        resolvedGgufPath = await interactiveChooseModel(llama);
+    if (resolvedGgufPath == null)
+        resolvedGgufPath = await interactiveChooseModel(llama, targetDirectory);
 
-        if (resolvedGgufPath.length === 1)
-            resolvedGgufPath = resolvedGgufPath[0];
-    }
-
-    const isPathUrl = resolvedGgufPath instanceof Array || isUrl(resolvedGgufPath);
-
-    if (isPathUrl && !(resolvedGgufPath instanceof Array))
-        resolvedGgufPath = getAllPartUrls(resolvedGgufPath);
-
-    if (!isPathUrl && !(resolvedGgufPath instanceof Array)) {
+    if (!isUrl(resolvedGgufPath)) {
         try {
             const resolvedPath = path.resolve(process.cwd(), resolvedGgufPath);
 
@@ -55,31 +50,18 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         throw new Error(`File does not exist: ${path.resolve(process.cwd(), resolvedGgufPath)}`);
     }
 
-    if (resolvedGgufPath instanceof Array)
-        resolvedGgufPath = resolvedGgufPath.map((url) => normalizeGgufDownloadUrl(url));
-    else
-        resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
+    resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
 
-    if (resolvedGgufPath instanceof Array && resolvedGgufPath.length === 1)
-        resolvedGgufPath = resolvedGgufPath[0];
+    await fs.ensureDir(targetDirectory);
 
-    if (resolvedGgufPath instanceof Array) {
-        // disable due to a bug with multi-part downloads in the downloader, will be enabled in a future release
+    async function getDownloader(resolvedGgufPath: string) {
+        const binarySplitPartUrls = getAllBinarySplitPartUrls(resolvedGgufPath);
 
-        // workaround for TypeScript types to keep the exiting handling of the array type of `resolvedGgufPath`
-        const supported = false;
-        if (supported)
-            throw new Error("Multi-part downloads are not supported yet");
-    }
-
-    await fs.ensureDir(cliModelsDirectory);
-
-    async function getDownloader(resolvedGgufPath: string | string[]) {
-        if (resolvedGgufPath instanceof Array) {
+        if (binarySplitPartUrls instanceof Array) {
             const downloader = await downloadFile({
-                partsURL: resolvedGgufPath,
-                directory: cliModelsDirectory,
-                fileName: getFilenameForPartUrls(resolvedGgufPath),
+                partURLs: binarySplitPartUrls,
+                directory: targetDirectory,
+                fileName: getFilenameForBinarySplitPartUrls(binarySplitPartUrls),
                 cliProgress: true,
                 headers: fetchHeaders,
                 programType: "chunks"
@@ -87,9 +69,10 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
             return {
                 downloader,
-                downloadEntrypointFilename: downloader.fileName,
-                downloadEntrypointFileSize: downloader.status.totalBytes,
-                downloaderFiles: 1
+                entrypointFilename: downloader.fileName,
+                entrypointFileSize: downloader.status.totalBytes,
+                files: 1,
+                binaryParts: binarySplitPartUrls
             };
         }
 
@@ -97,22 +80,23 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         if (splitGgufPartUrls.length === 1) {
             const downloader = await downloadFile({
                 url: splitGgufPartUrls[0],
-                directory: cliModelsDirectory,
+                directory: targetDirectory,
                 cliProgress: true,
                 headers: fetchHeaders
             });
 
             return {
                 downloader,
-                downloadEntrypointFilename: downloader.fileName,
-                downloadEntrypointFileSize: downloader.status.totalBytes,
-                downloaderFiles: 1
+                entrypointFilename: downloader.fileName,
+                entrypointFileSize: downloader.status.totalBytes,
+                files: 1,
+                binaryParts: null
             };
         }
 
         const partDownloads = splitGgufPartUrls.map((url) => downloadFile({
             url,
-            directory: cliModelsDirectory,
+            directory: targetDirectory,
             headers: fetchHeaders
         }));
 
@@ -126,43 +110,39 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
         return {
             downloader,
-            downloadEntrypointFilename: firstDownload.fileName,
-            downloadEntrypointFileSize: null,
-            downloaderFiles: partDownloads.length
+            entrypointFilename: firstDownload.fileName,
+            entrypointFileSize: null,
+            files: partDownloads.length,
+            binaryParts: null
         };
     }
 
-    const {
-        downloader,
-        downloadEntrypointFilename,
-        downloadEntrypointFileSize,
-        downloaderFiles
-    } = await getDownloader(resolvedGgufPath);
+    const downloader = await getDownloader(resolvedGgufPath);
 
-    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloadEntrypointFilename);
+    const destFilePath = path.join(path.resolve(targetDirectory), downloader.entrypointFilename);
 
-    if (downloadEntrypointFilename == null || downloadEntrypointFilename === "")
+    if (downloader.entrypointFilename == null || downloader.entrypointFilename === "")
         throw new Error("Failed to get the file name from the URL");
 
-    if (downloaderFiles === 1 && await fs.pathExists(destFilePath)) {
+    if (downloader.files === 1 && await fs.pathExists(destFilePath)) {
         const fileStats = await fs.stat(destFilePath);
 
-        if (downloadEntrypointFileSize === fileStats.size) {
+        if (downloader.entrypointFileSize === fileStats.size) {
             console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.close();
+            await downloader.downloader.close();
 
             return destFilePath;
         }
 
         const res = await ConsoleInteraction.yesNoQuestion(
-            `There's already an local ${chalk.blue(downloadEntrypointFilename)} file that's different from the remote one.\n` +
+            `There's already an local ${chalk.blue(downloader.entrypointFilename)} file that's different from the remote one.\n` +
             "Download it and override the existing file?"
         );
 
         if (!res) {
             console.info("Loading the existing file");
             console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.close();
+            await downloader.downloader.close();
 
             return destFilePath;
         }
@@ -172,18 +152,18 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
     const consoleInteraction = new ConsoleInteraction();
     consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
-        await downloader.close();
+        await downloader.downloader.close();
         consoleInteraction.stop();
         process.exit(0);
     });
 
-    console.info(`Downloading to ${chalk.yellow(getReadablePath(cliModelsDirectory))}${
-        resolvedGgufPath instanceof Array
-            ? chalk.gray(` (combining ${resolvedGgufPath.length} parts into a single file)`)
+    console.info(`Downloading to ${chalk.yellow(getReadablePath(targetDirectory))}${
+        downloader.binaryParts != null
+            ? chalk.gray(` (combining ${downloader.binaryParts} parts into a single file)`)
             : ""
     }`);
     consoleInteraction.start();
-    await downloader.download();
+    await downloader.downloader.download();
     consoleInteraction.stop();
 
     console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
@@ -204,9 +184,9 @@ type ModelOption = {
     type: "recommendedModel",
     title: string | (() => string),
     description?: string,
-    potentialUrls: string[][],
+    potentialUrls: string[],
     selectedUrl?: {
-        url: string[],
+        url: string,
         ggufInsights: GgufInsights,
         compatibilityScore: ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>
     },
@@ -222,7 +202,7 @@ type ModelOption = {
 
 const vramStateUpdateInterval = 1000;
 
-async function interactiveChooseModel(llama: Llama): Promise<string | string[]> {
+async function interactiveChooseModel(llama: Llama, targetDirectory: string): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
     const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
     const activeInteractionController = new AbortController();
@@ -230,8 +210,8 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
     let lastVramState: {used: number, total: number} = llama.getVramState();
     const canUseGpu = lastVramState.total > 0;
 
-    if (await fs.existsSync(cliModelsDirectory)) {
-        const ggufFileNames = (await fs.readdir(cliModelsDirectory))
+    if (await fs.existsSync(targetDirectory)) {
+        const ggufFileNames = (await fs.readdir(targetDirectory))
             .filter((fileName) => {
                 if (!fileName.endsWith(".gguf"))
                     return false;
@@ -255,7 +235,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
             }, async (progressUpdater) => {
                 localModelFileOptions = await Promise.all(
                     ggufFileNames.map(async (fileName) => {
-                        const filePath = path.join(cliModelsDirectory, fileName);
+                        const filePath = path.join(targetDirectory, fileName);
 
                         let ggufInsights: GgufInsights | undefined = undefined;
                         try {
@@ -339,7 +319,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
                     },
                     {
                         type: "separator",
-                        text: "   " + chalk.bold("Downloaded models") + " " + chalk.dim(`(${getReadablePath(cliModelsDirectory)})`)
+                        text: "   " + chalk.bold("Downloaded models") + " " + chalk.dim(`(${getReadablePath(targetDirectory)})`)
                     },
                     ...localModelFileOptions
                 ] satisfies ModelOption[]
@@ -704,7 +684,7 @@ async function selectFileForModelRecommendation({
                 return;
 
             try {
-                const ggufFileInfo = await readGgufFileInfo(potentialUrl[0], {
+                const ggufFileInfo = await readGgufFileInfo(potentialUrl, {
                     sourceType: "network",
                     signal: abortSignal
                 });
@@ -740,14 +720,14 @@ async function selectFileForModelRecommendation({
     }
 }
 
-const partsRegex = /\.gguf\.part(?<part>\d+)of(?<parts>\d+)$/;
-function getAllPartUrls(ggufUrl: string) {
+const binarySplitPartsRegex = /\.gguf\.part(?<part>\d+)of(?<parts>\d+)$/;
+function getAllBinarySplitPartUrls(ggufUrl: string) {
     const parsedGgufUrl = new URL(ggufUrl);
-    const partsMatch = parsedGgufUrl.pathname.match(partsRegex);
-    if (partsMatch != null) {
-        const partString = partsMatch.groups?.part;
+    const binaryPartsMatch = parsedGgufUrl.pathname.match(binarySplitPartsRegex);
+    if (binaryPartsMatch != null) {
+        const partString = binaryPartsMatch.groups?.part;
         const part = Number(partString);
-        const partsString = partsMatch.groups?.parts;
+        const partsString = binaryPartsMatch.groups?.parts;
         const parts = Number(partsString);
 
         if (partString == null || !Number.isFinite(part) || partsString == null || !Number.isFinite(parts) || part > parts || part === 0 ||
@@ -771,11 +751,11 @@ function getAllPartUrls(ggufUrl: string) {
     return ggufUrl;
 }
 
-function getFilenameForPartUrls(urls: string[]) {
+function getFilenameForBinarySplitPartUrls(urls: string[]) {
     if (urls.length === 0)
         return undefined;
 
-    if (partsRegex.test(urls[0])) {
+    if (binarySplitPartsRegex.test(urls[0])) {
         const ggufIndex = urls[0].indexOf(".gguf");
         const urlWithoutPart = urls[0].slice(0, ggufIndex + ".gguf".length);
 
