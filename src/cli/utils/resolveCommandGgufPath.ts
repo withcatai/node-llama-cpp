@@ -1,7 +1,7 @@
 import path from "path";
 import process from "process";
 import chalk from "chalk";
-import {downloadFile} from "ipull";
+import {downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import bytes from "bytes";
 import logSymbols from "log-symbols";
@@ -18,6 +18,7 @@ import {withProgressLog} from "../../utils/withProgressLog.js";
 import {getReadableContextSize} from "../../utils/getReadableContextSize.js";
 import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {getGgufSplitPartsInfo, resolveSplitGgufParts} from "../../gguf/utils/resolveSplitGgufParts.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
@@ -73,31 +74,80 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
     await fs.ensureDir(cliModelsDirectory);
 
-    const downloader = resolvedGgufPath instanceof Array
-        ? await downloadFile({
-            partsURL: resolvedGgufPath,
+    async function getDownloader(resolvedGgufPath: string | string[]) {
+        if (resolvedGgufPath instanceof Array) {
+            const downloader = await downloadFile({
+                partsURL: resolvedGgufPath,
+                directory: cliModelsDirectory,
+                fileName: getFilenameForPartUrls(resolvedGgufPath),
+                cliProgress: true,
+                headers: fetchHeaders,
+                programType: "chunks"
+            });
+
+            return {
+                downloader,
+                downloadEntrypointFilename: downloader.fileName,
+                downloadEntrypointFileSize: downloader.status.totalBytes,
+                downloaderFiles: 1
+            };
+        }
+
+        const splitGgufPartUrls = resolveSplitGgufParts(resolvedGgufPath);
+        if (splitGgufPartUrls.length === 1) {
+            const downloader = await downloadFile({
+                url: splitGgufPartUrls[0],
+                directory: cliModelsDirectory,
+                cliProgress: true,
+                headers: fetchHeaders
+            });
+
+            return {
+                downloader,
+                downloadEntrypointFilename: downloader.fileName,
+                downloadEntrypointFileSize: downloader.status.totalBytes,
+                downloaderFiles: 1
+            };
+        }
+
+        const partDownloads = splitGgufPartUrls.map((url) => downloadFile({
+            url,
             directory: cliModelsDirectory,
-            fileName: getFilenameForPartUrls(resolvedGgufPath),
-            cliProgress: true,
-            headers: fetchHeaders,
-            programType: "chunks"
-        })
-        : await downloadFile({
-            url: resolvedGgufPath,
-            directory: cliModelsDirectory,
-            cliProgress: true,
             headers: fetchHeaders
-        });
+        }));
 
-    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloader.fileName);
+        const downloader = await downloadSequence(
+            {
+                cliProgress: true
+            },
+            ...partDownloads
+        );
+        const firstDownload = await partDownloads[0];
 
-    if (downloader.fileName == null || downloader.fileName === "")
+        return {
+            downloader,
+            downloadEntrypointFilename: firstDownload.fileName,
+            downloadEntrypointFileSize: null,
+            downloaderFiles: partDownloads.length
+        };
+    }
+
+    const {
+        downloader,
+        downloadEntrypointFilename,
+        downloadEntrypointFileSize,
+        downloaderFiles
+    } = await getDownloader(resolvedGgufPath);
+
+    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloadEntrypointFilename);
+
+    if (downloadEntrypointFilename == null || downloadEntrypointFilename === "")
         throw new Error("Failed to get the file name from the URL");
 
-    if (await fs.pathExists(destFilePath)) {
+    if (downloaderFiles === 1 && await fs.pathExists(destFilePath)) {
         const fileStats = await fs.stat(destFilePath);
 
-        if (downloader.status.totalBytes === fileStats.size) {
+        if (downloadEntrypointFileSize === fileStats.size) {
             console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
             await downloader.close();
 
@@ -105,7 +155,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         }
 
         const res = await ConsoleInteraction.yesNoQuestion(
-            `There's already an local ${chalk.blue(downloader.fileName)} file that's different from the remote one.\n` +
+            `There's already an local ${chalk.blue(downloadEntrypointFilename)} file that's different from the remote one.\n` +
             "Download it and override the existing file?"
         );
 
@@ -181,7 +231,15 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
     const canUseGpu = lastVramState.total > 0;
 
     if (await fs.existsSync(cliModelsDirectory)) {
-        const ggufFileNames = (await fs.readdir(cliModelsDirectory)).filter((fileName) => fileName.endsWith(".gguf"));
+        const ggufFileNames = (await fs.readdir(cliModelsDirectory))
+            .filter((fileName) => {
+                if (!fileName.endsWith(".gguf"))
+                    return false;
+
+                const partsInfo = getGgufSplitPartsInfo(fileName);
+
+                return partsInfo == null || partsInfo.part === 1;
+            });
         let readItems = 0;
         const renderProgress = () => (
             "(" + String(readItems).padStart(String(ggufFileNames.length).length, "0") + "/" + ggufFileNames.length + ")"
@@ -684,7 +742,8 @@ async function selectFileForModelRecommendation({
 
 const partsRegex = /\.gguf\.part(?<part>\d+)of(?<parts>\d+)$/;
 function getAllPartUrls(ggufUrl: string) {
-    const partsMatch = ggufUrl.match(partsRegex);
+    const parsedGgufUrl = new URL(ggufUrl);
+    const partsMatch = parsedGgufUrl.pathname.match(partsRegex);
     if (partsMatch != null) {
         const partString = partsMatch.groups?.part;
         const part = Number(partString);
@@ -696,12 +755,15 @@ function getAllPartUrls(ggufUrl: string) {
         )
             return ggufUrl;
 
-        const ggufIndex = ggufUrl.indexOf(".gguf");
-        const urlWithoutPart = ggufUrl.slice(0, ggufIndex + ".gguf".length);
+        const ggufIndex = parsedGgufUrl.pathname.indexOf(".gguf");
+        const pathnameWithoutPart = parsedGgufUrl.pathname.slice(0, ggufIndex + ".gguf".length);
 
         const res: string[] = [];
-        for (let i = 1; i <= parts; i++)
-            res.push(urlWithoutPart + `.part${String(i).padStart(partString.length, "0")}of${partsString}`);
+        for (let i = 1; i <= parts; i++) {
+            const url = new URL(parsedGgufUrl.href);
+            url.pathname = pathnameWithoutPart + `.part${String(i).padStart(partString.length, "0")}of${partsString}`;
+            res.push(url.href);
+        }
 
         return res;
     }

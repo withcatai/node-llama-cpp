@@ -41,6 +41,11 @@ export async function parseGguf({
         architectureMetadata: architectureMetadata,
         tensorInfo: gguifInfo.tensorInfo,
         metadataSize: gguifInfo.metadataSize,
+        splicedParts: 1,
+        totalTensorInfoSize: gguifInfo.tensorInfoSize,
+        totalTensorCount: gguifInfo.tensorCount,
+        totalMetadataSize: gguifInfo.metadataSize,
+        fullTensorInfo: gguifInfo.tensorInfo,
         tensorInfoSize: gguifInfo.tensorInfoSize
     };
 }

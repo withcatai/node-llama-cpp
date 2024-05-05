@@ -1710,13 +1710,15 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char* text, voi
         }
     }
 
-    if (level == 2) {
-        fputs(text, stderr);
-        fflush(stderr);
-    } else {
-        fputs(text, stdout);
-        fflush(stdout);
-    }
+    if (text != nullptr) {
+        if (level == 2) {
+            fputs(text, stderr);
+            fflush(stderr);
+        } else {
+            fputs(text, stdout);
+            fflush(stdout);
+        }
+    }    
 }
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {
