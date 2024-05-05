@@ -234,6 +234,9 @@ export class LlamaModel {
      * @param [specialTokens] - if set to true, text that correspond to special tokens will be tokenized to those tokens.
      * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
      * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
+     * @param [options] - additional options for tokenization.
+     * If set to `"trimLeadingSpace"`, a leading space will be trimmed from the tokenized output if the output has an
+     * additional space at the beginning.
      */
     public tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[];
     public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];
