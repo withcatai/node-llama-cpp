@@ -1,5 +1,4 @@
 import {describe, expect, test} from "vitest";
-import chalk from "chalk";
 import {Llama3ChatWrapper, LlamaChatSession, Token} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
@@ -64,18 +63,9 @@ describe("llama 3", () => {
             expect(res.responseText.toLowerCase()).to.not.include("llama");
         });
 
+        // disabled due to getting timeout in the CI due to taking too long
         test.skip("context shift works correctly", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            function onToken(chunk: Token[]) {
-                process.stdout.write(model.detokenize(chunk));
-            }
-
-            function onTokenWithCurrentContextLength(chunk: Token[]) {
-                process.stdout.write(model.detokenize(chunk) + chalk.grey(chatSession.sequence.contextTokens.length));
-            }
-
-            function logTitle(title: string) {
-                return console.log("\n\n\n\n# " + chalk.bold(title) + "\n");
-            }
+            const contextSize = 2048;
 
             const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
             const llama = await getTestLlama();
@@ -84,7 +74,7 @@ describe("llama 3", () => {
                 modelPath
             });
             const context = await model.createContext({
-                contextSize: 2048
+                contextSize
             });
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence(),
@@ -96,34 +86,26 @@ describe("llama 3", () => {
 
             const shouldBeOk = await chatSession.prompt(
                 "Remember this fact: Platypuses have venomous spurs on their hind legs. Answer with 'OK' to confirm you understand and remember this fact.",
-                {onToken}
+                {maxTokens: contextSize}
             );
             expect(shouldBeOk.slice(0, "OK".length)).to.eql("OK");
 
-            logTitle("Animal concept");
             await chatSession.prompt(
                 "Create a concept for a new animal." +
                 "Provide a realistic outline of this animal, including its social structures, appearance, habitat, origins and diet.",
-                {onToken}
+                {maxTokens: contextSize}
             );
 
-            logTitle("Social structures");
-            await chatSession.prompt("Elaborate on its social structures", {onToken});
+            await chatSession.prompt("Elaborate on its social structures", {maxTokens: contextSize});
+            await chatSession.prompt("Elaborate on its appearance", {maxTokens: contextSize});
+            await chatSession.prompt("Elaborate on its habitat", {maxTokens: contextSize});
+            await chatSession.prompt("Elaborate on its diet", {maxTokens: contextSize});
+            await chatSession.prompt("Elaborate on its origins", {maxTokens: contextSize});
 
-            logTitle("Appearance");
-            await chatSession.prompt("Elaborate on its appearance", {onToken});
+            await chatSession.prompt("What was the animal fact I asked you to remember earlier?", {maxTokens: contextSize});
 
-            logTitle("Habitat");
-            await chatSession.prompt("Elaborate on its habitat", {onToken});
-
-            logTitle("Diet");
-            await chatSession.prompt("Elaborate on its diet", {onToken: onTokenWithCurrentContextLength});
-
-            logTitle("Origins");
-            await chatSession.prompt("Elaborate on its origins", {onToken: onToken});
-
-            logTitle("What was the first animal");
-            await chatSession.prompt("What was the animal fact I asked you to remember earlier?", {onToken: onToken});
+            const res = await chatSession.prompt("How much is 6+6", {maxTokens: 50});
+            expect(res).to.include("12");
         });
     });
 });
