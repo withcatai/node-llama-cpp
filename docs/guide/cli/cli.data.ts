@@ -1,5 +1,6 @@
 import {CommandModule} from "yargs";
 import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
+import {PullCommand} from "../../../src/cli/commands/PullCommand.js";
 import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
 import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
 import {CompleteCommand} from "../../../src/cli/commands/CompleteCommand.js";
@@ -23,6 +24,7 @@ export default {
 
         return {
             index: buildIndexTable([
+                ["pull", PullCommand],
                 ["chat", ChatCommand],
                 ["complete", CompleteCommand],
                 ["infill", InfillCommand],
@@ -32,6 +34,7 @@ export default {
                 ["clear", ClearCommand]
             ]),
 
+            pull: await getCommandHtmlDoc(PullCommand),
             chat: await getCommandHtmlDoc(ChatCommand),
             complete: await getCommandHtmlDoc(CompleteCommand),
             infill: await getCommandHtmlDoc(InfillCommand),

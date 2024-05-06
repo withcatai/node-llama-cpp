@@ -1,12 +1,10 @@
 import path from "path";
 import process from "process";
 import chalk from "chalk";
-import {downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import bytes from "bytes";
 import logSymbols from "log-symbols";
 import stripAnsi from "strip-ansi";
-import filenamify from "filenamify";
 import {cliModelsDirectory} from "../../config.js";
 import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
@@ -18,7 +16,8 @@ import {withProgressLog} from "../../utils/withProgressLog.js";
 import {getReadableContextSize} from "../../utils/getReadableContextSize.js";
 import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
-import {getGgufSplitPartsInfo, resolveSplitGgufParts} from "../../gguf/utils/resolveSplitGgufParts.js";
+import {getGgufSplitPartsInfo} from "../../gguf/utils/resolveSplitGgufParts.js";
+import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
@@ -52,123 +51,58 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
     resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
 
-    await fs.ensureDir(targetDirectory);
+    const downloader = await createModelDownloader({
+        modelUrl: resolvedGgufPath,
+        dirPath: targetDirectory,
+        headers: fetchHeaders,
+        showCliProgress: true,
+        deleteTempFileOnCancel: false,
+        skipExisting: false
+    });
 
-    async function getDownloader(resolvedGgufPath: string) {
-        const binarySplitPartUrls = getAllBinarySplitPartUrls(resolvedGgufPath);
+    if (downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {
+        const fileStats = await fs.stat(downloader.entrypointFilePath);
 
-        if (binarySplitPartUrls instanceof Array) {
-            const downloader = await downloadFile({
-                partURLs: binarySplitPartUrls,
-                directory: targetDirectory,
-                fileName: getFilenameForBinarySplitPartUrls(binarySplitPartUrls),
-                cliProgress: true,
-                headers: fetchHeaders,
-                programType: "chunks"
-            });
+        if (downloader.totalSize === fileStats.size) {
+            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-            return {
-                downloader,
-                entrypointFilename: downloader.fileName,
-                entrypointFileSize: downloader.status.totalBytes,
-                files: 1,
-                binaryParts: binarySplitPartUrls
-            };
-        }
-
-        const splitGgufPartUrls = resolveSplitGgufParts(resolvedGgufPath);
-        if (splitGgufPartUrls.length === 1) {
-            const downloader = await downloadFile({
-                url: splitGgufPartUrls[0],
-                directory: targetDirectory,
-                cliProgress: true,
-                headers: fetchHeaders
-            });
-
-            return {
-                downloader,
-                entrypointFilename: downloader.fileName,
-                entrypointFileSize: downloader.status.totalBytes,
-                files: 1,
-                binaryParts: null
-            };
-        }
-
-        const partDownloads = splitGgufPartUrls.map((url) => downloadFile({
-            url,
-            directory: targetDirectory,
-            headers: fetchHeaders
-        }));
-
-        const downloader = await downloadSequence(
-            {
-                cliProgress: true
-            },
-            ...partDownloads
-        );
-        const firstDownload = await partDownloads[0];
-
-        return {
-            downloader,
-            entrypointFilename: firstDownload.fileName,
-            entrypointFileSize: null,
-            files: partDownloads.length,
-            binaryParts: null
-        };
-    }
-
-    const downloader = await getDownloader(resolvedGgufPath);
-
-    const destFilePath = path.join(path.resolve(targetDirectory), downloader.entrypointFilename);
-
-    if (downloader.entrypointFilename == null || downloader.entrypointFilename === "")
-        throw new Error("Failed to get the file name from the URL");
-
-    if (downloader.files === 1 && await fs.pathExists(destFilePath)) {
-        const fileStats = await fs.stat(destFilePath);
-
-        if (downloader.entrypointFileSize === fileStats.size) {
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.downloader.close();
-
-            return destFilePath;
+            return downloader.entrypointFilePath;
         }
 
         const res = await ConsoleInteraction.yesNoQuestion(
-            `There's already an local ${chalk.blue(downloader.entrypointFilename)} file that's different from the remote one.\n` +
+            `There's already an local ${chalk.blue(downloader.entrypointFilePath)} file that's different from the remote one.\n` +
             "Download it and override the existing file?"
         );
 
         if (!res) {
             console.info("Loading the existing file");
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.downloader.close();
+            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-            return destFilePath;
+            return downloader.entrypointFilePath;
         }
 
-        await fs.remove(destFilePath);
+        await fs.remove(downloader.entrypointFilePath);
     }
 
     const consoleInteraction = new ConsoleInteraction();
     consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
-        await downloader.downloader.close();
+        await downloader.cancel();
         consoleInteraction.stop();
         process.exit(0);
     });
 
     console.info(`Downloading to ${chalk.yellow(getReadablePath(targetDirectory))}${
-        downloader.binaryParts != null
-            ? chalk.gray(` (combining ${downloader.binaryParts} parts into a single file)`)
+        downloader.splitBinaryParts != null
+            ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
             : ""
     }`);
     consoleInteraction.start();
-    await downloader.downloader.download();
+    await downloader.download();
     consoleInteraction.stop();
 
-    console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
+    console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-    return destFilePath;
+    return downloader.entrypointFilePath;
 }
 
 type ModelOption = {
@@ -718,50 +652,4 @@ async function selectFileForModelRecommendation({
         recommendedModelOption.urlSelectionLoadingState = "done";
         rerenderOption();
     }
-}
-
-const binarySplitPartsRegex = /\.gguf\.part(?<part>\d+)of(?<parts>\d+)$/;
-function getAllBinarySplitPartUrls(ggufUrl: string) {
-    const parsedGgufUrl = new URL(ggufUrl);
-    const binaryPartsMatch = parsedGgufUrl.pathname.match(binarySplitPartsRegex);
-    if (binaryPartsMatch != null) {
-        const partString = binaryPartsMatch.groups?.part;
-        const part = Number(partString);
-        const partsString = binaryPartsMatch.groups?.parts;
-        const parts = Number(partsString);
-
-        if (partString == null || !Number.isFinite(part) || partsString == null || !Number.isFinite(parts) || part > parts || part === 0 ||
-            parts === 0
-        )
-            return ggufUrl;
-
-        const ggufIndex = parsedGgufUrl.pathname.indexOf(".gguf");
-        const pathnameWithoutPart = parsedGgufUrl.pathname.slice(0, ggufIndex + ".gguf".length);
-
-        const res: string[] = [];
-        for (let i = 1; i <= parts; i++) {
-            const url = new URL(parsedGgufUrl.href);
-            url.pathname = pathnameWithoutPart + `.part${String(i).padStart(partString.length, "0")}of${partsString}`;
-            res.push(url.href);
-        }
-
-        return res;
-    }
-
-    return ggufUrl;
-}
-
-function getFilenameForBinarySplitPartUrls(urls: string[]) {
-    if (urls.length === 0)
-        return undefined;
-
-    if (binarySplitPartsRegex.test(urls[0])) {
-        const ggufIndex = urls[0].indexOf(".gguf");
-        const urlWithoutPart = urls[0].slice(0, ggufIndex + ".gguf".length);
-
-        const filename = decodeURIComponent(urlWithoutPart.split("/").slice(-1)[0]);
-        return filenamify(filename);
-    }
-
-    return undefined;
 }

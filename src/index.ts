@@ -56,6 +56,7 @@ import {
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
+import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -209,5 +210,8 @@ export {
     type GgufMetadataMamba,
     type GgufMetadataRWKV,
     GgmlType,
-    isGgufMetadataOfArchitectureType
+    isGgufMetadataOfArchitectureType,
+    createModelDownloader,
+    ModelDownloader,
+    type ModelDownloaderOptions
 };

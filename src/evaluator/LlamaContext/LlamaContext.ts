@@ -166,21 +166,21 @@ export class LlamaContext {
     /**
      * Before calling this method, make sure to call `sequencesLeft` to check if there are any sequences left.
      * When there are no sequences left, this method will throw an error.
-     * @param [options]
      */
-    public getSequence({
-        contextShift: {
-            size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
-            strategy: contextShiftStrategy = "eraseBeginning"
-        } = {},
-
-        _tokenMeter
-    }: {
+    public getSequence(options: {
         contextShift?: ContextShiftOptions,
 
         /** @internal */
         _tokenMeter?: TokenMeter
     } = {}): LlamaContextSequence {
+        const {
+            contextShift: {
+                size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
+                strategy: contextShiftStrategy = "eraseBeginning"
+            } = {},
+
+            _tokenMeter
+        } = options;
         this._ensureNotDisposed();
 
         const nextSequenceId = this._popSequenceId();
@@ -776,27 +776,7 @@ export class LlamaContextSequence {
         });
     }
 
-    /**
-     * @param tokens
-     * @param [options]
-     */
-    public evaluate(tokens: Token[], {
-        temperature = 0,
-        minP = 0,
-        topK = 40,
-        topP = 0.95,
-        grammarEvaluationState,
-        repeatPenalty,
-        tokenBias,
-        evaluationPriority = 5,
-        contextShift: {
-            size: contextShiftSize = this._contextShift.size,
-            strategy: contextShiftStrategy = this._contextShift.strategy
-        } = {},
-        yieldEogToken = false,
-
-        _noSampling = false
-    }: {
+    public evaluate(tokens: Token[], options: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
@@ -832,6 +812,24 @@ export class LlamaContextSequence {
         /** @internal */
         _noSampling?: boolean
     } = {}): AsyncGenerator<Token, void | Token> {
+        const {
+            temperature = 0,
+            minP = 0,
+            topK = 40,
+            topP = 0.95,
+            grammarEvaluationState,
+            repeatPenalty,
+            tokenBias,
+            evaluationPriority = 5,
+            contextShift: {
+                size: contextShiftSize = this._contextShift.size,
+                strategy: contextShiftStrategy = this._contextShift.strategy
+            } = {},
+            yieldEogToken = false,
+
+            _noSampling = false
+        } = options;
+
         return this._evaluate(tokens, {
             temperature,
             minP,

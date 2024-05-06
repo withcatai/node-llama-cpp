@@ -221,6 +221,7 @@ export default defineConfig({
                 collapsed: true,
                 link: "/",
                 items: [
+                    {text: "Pull", link: "/pull"},
                     {text: "Chat", link: "/chat"},
                     {text: "Download", link: "/download"},
                     {text: "Complete", link: "/complete"},

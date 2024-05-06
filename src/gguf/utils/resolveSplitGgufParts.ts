@@ -66,3 +66,10 @@ export function getGgufSplitPartsInfo(ggufPath: string) {
 
     return null;
 }
+
+export function createSplitPartFilename(filename: string, part: number, parts: number) {
+    if (filename.endsWith(".gguf"))
+        filename = filename.slice(0, -".gguf".length);
+
+    return `${filename}-${String(part).padStart(5, "0")}-of-${String(parts).padStart(5, "0")}.gguf`;
+}

@@ -10,6 +10,7 @@ import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js
 import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {isUrl} from "../../../../utils/isUrl.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
+import {getReadablePath} from "../../../utils/getReadablePath.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -86,7 +87,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             if (isPathUrl)
                 console.info(`${chalk.yellow("URL:")} ${resolvedGgufPath}`);
             else
-                console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
+                console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
         }
 
         const parsedMetadata = await readGgufFileInfo(ggufPath, {
