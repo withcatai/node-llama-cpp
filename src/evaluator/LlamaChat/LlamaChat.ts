@@ -34,6 +34,15 @@ export type LlamaChatOptions = {
 export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
     onToken?: (tokens: Token[]) => void,
     signal?: AbortSignal,
+
+    /**
+     * When a response already started being generated and then the signal is aborted,
+     * the generation will stop and the response will be returned as is instead of throwing an error.
+     *
+     * Defaults to `false`.
+     */
+    stopOnAbortSignal?: boolean,
+
     maxTokens?: number,
 
     /**
@@ -100,6 +109,11 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     evaluationPriority?: EvaluationPriority,
 
     contextShift?: LLamaChatContextShiftOptions,
+
+    /**
+     * Custom stop triggers to stop the generation of the response when any of the provided triggers are found.
+     */
+    customStopTriggers?: (LlamaText | string | (string | Token)[])[],
 
     /**
      * The evaluation context window returned from the last evaluation.
@@ -250,6 +264,7 @@ export class LlamaChat {
         {
             onToken,
             signal,
+            stopOnAbortSignal = false,
             maxTokens,
             temperature,
             minP,
@@ -263,6 +278,7 @@ export class LlamaChat {
             functions,
             documentFunctionParams,
             contextShift = defaultContextShiftOptions,
+            customStopTriggers,
             lastEvaluationContextWindow: {
                 history: lastEvaluationContextWindowHistory,
                 minimumOverlapPercentageToPreventContextShift = 0.5
@@ -326,6 +342,7 @@ export class LlamaChat {
             : undefined;
         const streamRegulator = new TokenStreamRegulator();
         const stopGenerationDetector = new StopGenerationDetector();
+        const customStopGenerationTriggersDetector = new StopGenerationDetector();
         const functionSyntaxStartDetector = new StopGenerationDetector();
         const functionSyntaxEndDetector = new StopGenerationDetector();
         const disengageInitiallyEngagedFunctionMode = new StopGenerationDetector();
@@ -341,7 +358,7 @@ export class LlamaChat {
         let lastHistoryCompressionMetadata: object | null | undefined = resolvedContextShift.lastEvaluationMetadata;
 
         const ensureNotAborted = () => {
-            if (signal?.aborted)
+            if (signal?.aborted && (!stopOnAbortSignal || res.length === 0))
                 throw signal.reason;
 
             if (this._sequence == null)
@@ -433,6 +450,10 @@ export class LlamaChat {
                 }
             }
         };
+
+        if (customStopTriggers != null)
+            StopGenerationDetector.resolveStopTriggers(customStopTriggers, model.tokenizer)
+                .map((stopTrigger) => customStopGenerationTriggersDetector.addStopTrigger(stopTrigger));
 
         if (grammar != null)
             StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenizer)
@@ -630,6 +651,8 @@ export class LlamaChat {
 
                         stopGenerationDetector.clearTriggeredStops();
                         stopGenerationDetector.clearInProgressStops();
+                        customStopGenerationTriggersDetector.clearTriggeredStops();
+                        customStopGenerationTriggersDetector.clearInProgressStops();
 
                         pendingTokens.push(...streamRegulator.popFreeChunkTokens());
 
@@ -740,15 +763,21 @@ export class LlamaChat {
                         };
                     }
 
-                    if (!inFunctionEvaluationMode)
+                    if (!inFunctionEvaluationMode) {
                         stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
+                        customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
+                    }
 
                     pendingTokens.push(...streamRegulator.popFreeChunkTokens());
 
                     removeFoundStartIgnoreTextsFromPendingTokens();
 
-                    if (stopGenerationDetector.hasTriggeredStops || model.isEogToken(token)) {
-                        const triggeredStops = stopGenerationDetector.getTriggeredStops();
+                    if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
+                        model.isEogToken(token)
+                    ) {
+                        const triggeredStops = stopGenerationDetector.hasTriggeredStops
+                            ? stopGenerationDetector.getTriggeredStops()
+                            : customStopGenerationTriggersDetector.getTriggeredStops();
                         const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
 
                         const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
@@ -780,24 +809,39 @@ export class LlamaChat {
                             contextWindowModelResponse = contextWindowModelResponse.trimEnd();
                         }
 
+                        const lastEvaluation = {
+                            contextWindow: setLastModelTextResponseInChatHistory(
+                                lastContextWindowHistory,
+                                contextWindowLastModelResponse + contextWindowModelResponse
+                            ),
+                            cleanHistory: setLastModelTextResponseInChatHistory(
+                                resolvedHistory,
+                                lastModelResponse + modelResponse
+                            ),
+                            contextShiftMetadata: lastHistoryCompressionMetadata
+                        };
+                        const isEogToken = model.isEogToken(token);
+
+                        if (isEogToken || stopGenerationDetector.hasTriggeredStops) {
+                            return {
+                                response: modelResponse,
+                                lastEvaluation,
+                                metadata: {
+                                    remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
+                                    stopReason: isEogToken
+                                        ? "eogToken"
+                                        : "stopGenerationTrigger"
+                                }
+                            };
+                        }
+
                         return {
                             response: modelResponse,
-                            lastEvaluation: {
-                                contextWindow: setLastModelTextResponseInChatHistory(
-                                    lastContextWindowHistory,
-                                    contextWindowLastModelResponse + contextWindowModelResponse
-                                ),
-                                cleanHistory: setLastModelTextResponseInChatHistory(
-                                    resolvedHistory,
-                                    lastModelResponse + modelResponse
-                                ),
-                                contextShiftMetadata: lastHistoryCompressionMetadata
-                            },
+                            lastEvaluation,
                             metadata: {
                                 remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                                stopReason: model.isEogToken(token)
-                                    ? "eogToken"
-                                    : "stopGenerationTrigger"
+                                stopReason: "customStopTrigger",
+                                customStopTrigger: triggeredStops[0].stopTrigger
                             }
                         };
                     }
@@ -858,6 +902,36 @@ export class LlamaChat {
                         break;
                     }
 
+                    if (signal?.aborted && stopOnAbortSignal) {
+                        if (res.length === 0)
+                            throw signal.reason;
+
+                        let modelResponse = model.detokenize(res);
+                        let contextWindowModelResponse = model.detokenize(contextWindowsRes);
+
+                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) {
+                            modelResponse = modelResponse.trimEnd();
+                            contextWindowModelResponse = contextWindowModelResponse.trimEnd();
+                        }
+
+                        return {
+                            response: modelResponse,
+                            lastEvaluation: {
+                                contextWindow: setLastModelTextResponseInChatHistory(
+                                    lastContextWindowHistory,
+                                    contextWindowLastModelResponse + contextWindowModelResponse
+                                ),
+                                cleanHistory: setLastModelTextResponseInChatHistory(
+                                    resolvedHistory,
+                                    lastModelResponse + modelResponse
+                                ),
+                                contextShiftMetadata: lastHistoryCompressionMetadata
+                            },
+                            metadata: {
+                                stopReason: "abort"
+                            }
+                        };
+                    }
                     currentIteration = await evaluationIterator.next(replacementToken);
                 }
             } finally {
@@ -888,7 +962,11 @@ export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined =
     },
     metadata: {
         remainingGenerationAfterStop?: string | Token[],
-        stopReason: "eogToken" | "stopGenerationTrigger" | "functionCall" | "maxTokens"
+        stopReason: "eogToken" | "stopGenerationTrigger" | "functionCall" | "maxTokens" | "abort"
+    } | {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "customStopTrigger",
+        customStopTrigger: (string | Token)[]
     }
 };
 

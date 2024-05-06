@@ -8,6 +8,7 @@ import {LlamaGrammar} from "../LlamaGrammar.js";
 import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
+import {LlamaText} from "../../utils/LlamaText.js";
 
 
 export type LlamaChatSessionOptions = {
@@ -41,6 +42,15 @@ export type LlamaChatSessionContextShiftOptions = {
 export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions | undefined = ChatSessionModelFunctions | undefined> = {
     onToken?: (tokens: Token[]) => void,
     signal?: AbortSignal,
+
+    /**
+     * When a response already started being generated and then the signal is aborted,
+     * the generation will stop and the response will be returned as is instead of throwing an error.
+     *
+     * Defaults to `false`.
+     */
+    stopOnAbortSignal?: boolean,
+
     maxTokens?: number,
 
     /**
@@ -104,7 +114,12 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      * Can be used to bias the model to generate tokens that you want it to lean towards,
      * or to avoid generating tokens that you want it to avoid.
      */
-    tokenBias?: TokenBias | (() => TokenBias)
+    tokenBias?: TokenBias | (() => TokenBias),
+
+    /**
+     * Custom stop triggers to stop the generation of the response when any of the provided triggers are found.
+     */
+    customStopTriggers?: (LlamaText | string | (string | Token)[])[]
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
@@ -250,6 +265,7 @@ export class LlamaChatSession {
         documentFunctionParams,
         onToken,
         signal,
+        stopOnAbortSignal = false,
         maxTokens,
         temperature,
         minP,
@@ -258,15 +274,16 @@ export class LlamaChatSession {
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
-        tokenBias
+        tokenBias,
+        customStopTriggers
     }: LLamaChatPromptOptions<Functions> = {}) {
         const {responseText} = await this.promptWithMeta<Functions>(prompt, {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
 
-            onToken, signal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
-            tokenBias
+            onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
+            tokenBias, customStopTriggers
         });
 
         return responseText;
@@ -281,6 +298,7 @@ export class LlamaChatSession {
         documentFunctionParams,
         onToken,
         signal,
+        stopOnAbortSignal = false,
         maxTokens,
         temperature,
         minP,
@@ -290,6 +308,7 @@ export class LlamaChatSession {
         trimWhitespaceSuffix = false,
         repeatPenalty,
         tokenBias,
+        customStopTriggers,
         evaluationPriority
     }: LLamaChatPromptOptions<Functions> = {}) {
         this._ensureNotDisposed();
@@ -332,11 +351,13 @@ export class LlamaChatSession {
                     grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                     onToken,
                     signal,
+                    stopOnAbortSignal,
                     repeatPenalty,
                     minP,
                     topK,
                     topP,
                     tokenBias,
+                    customStopTriggers,
                     maxTokens,
                     temperature,
                     trimWhitespaceSuffix,
@@ -399,12 +420,22 @@ export class LlamaChatSession {
                 this._chatHistory = newChatHistory;
 
                 const lastModelResponseItem = getLastModelResponseItem(newChatHistory);
+                const responseText = lastModelResponseItem.response
+                    .filter((item): item is string => typeof item === "string")
+                    .join("");
+
+                if (metadata.stopReason === "customStopTrigger")
+                    return {
+                        response: lastModelResponseItem.response,
+                        responseText,
+                        stopReason: metadata.stopReason,
+                        customStopTrigger: metadata.customStopTrigger,
+                        remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
+                    };
 
                 return {
                     response: lastModelResponseItem.response,
-                    responseText: lastModelResponseItem.response
-                        .filter((item): item is string => typeof item === "string")
-                        .join(""),
+                    responseText,
                     stopReason: metadata.stopReason,
                     remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
                 };
