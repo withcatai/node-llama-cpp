@@ -155,12 +155,12 @@ export class ModelDownloader {
      * @returns The path to the entrypoint file that should be used to load the model
      */
     public async download({
-        abortSignal
+        signal
     }: {
-        abortSignal?: AbortSignal
+        signal?: AbortSignal
     } = {}) {
-        if (abortSignal?.aborted)
-            throw abortSignal.reason;
+        if (signal?.aborted)
+            throw signal.reason;
 
         if (this._skipExisting) {
             if (this._specificFileDownloaders.length === 1 && await fs.pathExists(this.entrypointFilePath)) {
@@ -174,12 +174,12 @@ export class ModelDownloader {
         }
 
         const onAbort = () => {
-            abortSignal?.removeEventListener("abort", onAbort);
+            signal?.removeEventListener("abort", onAbort);
             this.cancel();
         };
 
-        if (abortSignal != null)
-            abortSignal.addEventListener("abort", onAbort);
+        if (signal != null)
+            signal.addEventListener("abort", onAbort);
 
         try {
             if (this._onProgress)
@@ -187,16 +187,16 @@ export class ModelDownloader {
 
             await this._downloader!.download();
         } catch (err) {
-            if (abortSignal?.aborted)
-                throw abortSignal.reason;
+            if (signal?.aborted)
+                throw signal.reason;
 
             throw err;
         } finally {
             if (this._onProgress)
                 this._downloader!.off("progress", this._onDownloadProgress);
 
-            if (abortSignal != null)
-                abortSignal.removeEventListener("abort", onAbort);
+            if (signal != null)
+                signal.removeEventListener("abort", onAbort);
         }
 
         return this.entrypointFilePath;
