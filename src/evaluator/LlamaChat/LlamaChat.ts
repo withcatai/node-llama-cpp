@@ -460,7 +460,7 @@ export class LlamaChat {
                 resolvedHistory: getResolvedHistoryWithCurrentModelResponse(),
                 resolvedContextShift,
                 lastHistoryCompressionMetadata,
-                pendingTokensCount: pendingTokens.length + queuedChunkTokens.length,
+                pendingTokensCount: ignoredStartTextTokens.length + pendingTokens.length + queuedChunkTokens.length,
                 isFirstEvaluation,
                 chatWrapper: this._chatWrapper,
                 lastEvaluationContextWindowHistory,
@@ -853,7 +853,7 @@ export class LlamaChat {
                         };
                     }
 
-                    if (this._sequence.nextTokenIndex >= context.contextSize) {
+                    if (this._sequence.nextTokenIndex >= context.contextSize - 1) {
                         shouldContextShift = true;
                         break;
                     }
@@ -1127,7 +1127,10 @@ async function getContextWindow({
 
         const {compressedHistory, metadata} = await compressHistoryToFitContextSize({
             history: resolvedHistory,
-            contextShiftSize: Math.max(contextShiftSize, minFreeContextTokens) + pendingTokensCount,
+            contextShiftSize: Math.max(
+                minFreeContextTokens,
+                Math.min(contextShiftSize, context.contextSize - pendingTokensCount)
+            ) + pendingTokensCount,
             contextShiftStrategy: resolvedContextShift.strategy,
             contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
             contextSize: context.contextSize,
@@ -1188,7 +1191,10 @@ async function getContextWindow({
 
     const {compressedHistory, metadata} = await compressHistoryToFitContextSize({
         history: resolvedHistory,
-        contextShiftSize: Math.max(contextShiftSize, minFreeContextTokens) + pendingTokensCount,
+        contextShiftSize: Math.max(
+            minFreeContextTokens,
+            Math.min(contextShiftSize, context.contextSize - pendingTokensCount)
+        ) + pendingTokensCount,
         contextShiftStrategy: resolvedContextShift.strategy,
         contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
         contextSize: context.contextSize,

@@ -62,20 +62,24 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
             compressedChatHistory: latestCompressionAttempt.compressedHistory
         };
 
+    let bestCompressionAttempt = latestCompressionAttempt;
     for (
         let compressionAttempts = 0, decompressionAttempts = 0;
-        latestCompressionAttempt.tokensCount !== tokensCountToFit;
+        bestCompressionAttempt.tokensCount !== tokensCountToFit;
     ) {
         if (compressionAttempts > 0) {
-            currentEstimatedCharactersPerToken =
-                Math.abs(latestCompressionAttempt.characterRemovalCount - firstCompressionAttempt.characterRemovalCount) /
-                Math.abs(latestCompressionAttempt.tokensCount - firstCompressionAttempt.tokensCount);
+            if (latestCompressionAttempt.tokensCount != firstCompressionAttempt.tokensCount &&
+                latestCompressionAttempt.characterRemovalCount != firstCompressionAttempt.characterRemovalCount
+            )
+                currentEstimatedCharactersPerToken =
+                    Math.abs(latestCompressionAttempt.characterRemovalCount - firstCompressionAttempt.characterRemovalCount) /
+                    Math.abs(latestCompressionAttempt.tokensCount - firstCompressionAttempt.tokensCount);
 
-            if (!Number.isFinite(currentEstimatedCharactersPerToken))
+            if (!Number.isFinite(currentEstimatedCharactersPerToken) || currentEstimatedCharactersPerToken === 0)
                 currentEstimatedCharactersPerToken = estimatedCharactersPerToken;
         }
 
-        const tokensLeftToRemove = tokensCountToFit - latestCompressionAttempt.tokensCount;
+        const tokensLeftToRemove = latestCompressionAttempt.tokensCount - tokensCountToFit;
         let additionalCharactersToRemove = Math.round(tokensLeftToRemove * currentEstimatedCharactersPerToken);
 
         if (additionalCharactersToRemove === 0) {
@@ -96,10 +100,24 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
         latestCompressionAttempt = await getResultForCharacterRemovalCount(
             latestCompressionAttempt.characterRemovalCount + additionalCharactersToRemove
         );
+
+        if ((
+            bestCompressionAttempt.tokensCount > tokensCountToFit &&
+            latestCompressionAttempt.tokensCount <= bestCompressionAttempt.tokensCount
+        ) || (
+            bestCompressionAttempt.tokensCount < tokensCountToFit &&
+            latestCompressionAttempt.tokensCount < tokensCountToFit &&
+            latestCompressionAttempt.tokensCount > bestCompressionAttempt.tokensCount
+        ) || (
+            bestCompressionAttempt.tokensCount <= tokensCountToFit &&
+            latestCompressionAttempt.tokensCount <= tokensCountToFit &&
+            latestCompressionAttempt.characterRemovalCount < bestCompressionAttempt.characterRemovalCount
+        ))
+            bestCompressionAttempt = latestCompressionAttempt;
     }
 
     return {
-        removedCharactersCount: latestCompressionAttempt.characterRemovalCount,
-        compressedChatHistory: latestCompressionAttempt.compressedHistory
+        removedCharactersCount: bestCompressionAttempt.characterRemovalCount,
+        compressedChatHistory: bestCompressionAttempt.compressedHistory
     };
 }

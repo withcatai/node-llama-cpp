@@ -1002,11 +1002,11 @@ export class LlamaContextSequence {
             while (tokensLeftToDecode.length > 0) {
                 this._ensureNotDisposed();
 
-                let freeSpace = this._context.contextSize - this._nextTokenIndex;
+                let freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
                 if (freeSpace <= 1) {
                     await this._freeUpSpaceForTokens(contextShiftOptions);
-                    freeSpace = this._context.contextSize - this._nextTokenIndex;
+                    freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
                     if (freeSpace <= 1)
                         throw new Error("Failed to free up space for new tokens");
@@ -1072,7 +1072,7 @@ export class LlamaContextSequence {
 
             await this.eraseContextTokenRanges(ranges);
 
-            if (this.nextTokenIndex >= this._context.contextSize)
+            if (this.nextTokenIndex >= this._context.contextSize - 1)
                 await this.eraseContextTokenRanges([{start: 0, end: size}]);
         }
     }
