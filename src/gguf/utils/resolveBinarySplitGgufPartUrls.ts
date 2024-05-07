@@ -37,12 +37,13 @@ export function getFilenameForBinarySplitGgufPartUrls(urls: string[]) {
     if (urls.length === 0)
         return undefined;
 
-    if (binarySplitGgufPartsRegex.test(urls[0])) {
-        const ggufIndex = urls[0].indexOf(".gguf");
-        const urlWithoutPart = urls[0].slice(0, ggufIndex + ".gguf".length);
+    const firstParsedUrl = new URL(urls[0]);
 
-        const filename = decodeURIComponent(urlWithoutPart.split("/")
-            .slice(-1)[0]);
+    if (binarySplitGgufPartsRegex.test(firstParsedUrl.pathname)) {
+        const ggufIndex = firstParsedUrl.pathname.indexOf(".gguf");
+        const urlWithoutPart = firstParsedUrl.pathname.slice(0, ggufIndex + ".gguf".length);
+
+        const filename = decodeURIComponent(urlWithoutPart.split("/").slice(-1)[0]);
         return filenamify(filename);
     }
 
