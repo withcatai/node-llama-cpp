@@ -162,7 +162,7 @@ describe("stableCode", () => {
             const resPromise = completion.generateCompletion("const arrayFromOneToHundred = [1, 2, 3", {
                 maxTokens: 40
             });
-            const resPromise2 = completion2.generateCompletion("const arrayFromOneHundredToOne = [100, 99, 98, 97, 96", {
+            const resPromise2 = completion2.generateCompletion("const arrayFromOneHundredToOne = [100, 99, 98, 97, 96,", {
                 maxTokens: 40
             });
 
@@ -175,9 +175,9 @@ describe("stableCode", () => {
             ]);
 
             const expectedFullCompletion = ", " + range(4, 100).join(", ");
-            const expectedFullCompletion2 = ", " + range(95, 1).join(", ");
+            const expectedFullCompletion2 = " " + range(95, 1).join(", ");
             expect(res).to.eql(expectedFullCompletion.slice(0, res.length));
-            expect(res2).to.eql(expectedFullCompletion2.slice(0, res2.length));
+            expect(res2.trim()).to.eql(expectedFullCompletion2.trim().slice(0, res2.trim().length));
         });
     });
 });

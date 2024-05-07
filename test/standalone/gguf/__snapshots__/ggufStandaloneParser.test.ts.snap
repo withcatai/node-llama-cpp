@@ -14,6 +14,44 @@ exports[`gguf > parser > should parse remote gguf model 1`] = `
     "feed_forward_length": 59392,
     "tensor_data_layout": "jploski",
   },
+  "fullTensorInfo": [
+    {
+      "dimensions": [
+        14848,
+        59392,
+      ],
+      "ggmlType": 14,
+      "name": "blk.0.ffn_up.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        14848,
+        14848,
+      ],
+      "ggmlType": 14,
+      "name": "blk.0.attn_output.weight",
+      "offset": 723394560,
+    },
+    {
+      "dimensions": [
+        14848,
+        15872,
+      ],
+      "ggmlType": 14,
+      "name": "blk.0.attn_qkv.weight",
+      "offset": 904243200,
+    },
+    {
+      "dimensions": [
+        14848,
+        65024,
+      ],
+      "ggmlType": 14,
+      "name": "token_embd.weight",
+      "offset": 1097564160,
+    },
+  ],
   "metadata": {
     "falcon": {
       "attention": {
@@ -89,6 +127,7 @@ exports[`gguf > parser > should parse remote gguf model 1`] = `
     },
   },
   "metadataSize": 2547826,
+  "splicedParts": 1,
   "tensorCount": 644,
   "tensorInfo": [
     {
@@ -129,6 +168,9 @@ exports[`gguf > parser > should parse remote gguf model 1`] = `
     },
   ],
   "tensorInfoSize": 37648,
+  "totalMetadataSize": 2547826,
+  "totalTensorCount": 644,
+  "totalTensorInfoSize": 37648,
   "version": 2,
 }
 `;
@@ -147,6 +189,7 @@ exports[`gguf > parser > should parse remote gguf model without tensor info 1`] 
     "feed_forward_length": 59392,
     "tensor_data_layout": "jploski",
   },
+  "fullTensorInfo": undefined,
   "metadata": {
     "falcon": {
       "attention": {
@@ -222,9 +265,13 @@ exports[`gguf > parser > should parse remote gguf model without tensor info 1`] 
     },
   },
   "metadataSize": 2547826,
+  "splicedParts": 1,
   "tensorCount": 644,
   "tensorInfo": undefined,
   "tensorInfoSize": undefined,
+  "totalMetadataSize": 2547826,
+  "totalTensorCount": 644,
+  "totalTensorInfoSize": undefined,
   "version": 2,
 }
 `;
