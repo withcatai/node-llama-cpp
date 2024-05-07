@@ -9,6 +9,7 @@ import {
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
 import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../utils/resolveGithubRelease.js";
+import {runningInsideAsar, runningInElectron} from "../utils/runtime.js";
 import {BindingModule} from "./AddonTypes.js";
 import {
     compileLlamaCpp, getLocalBuildBinaryBuildMetadata, getLocalBuildBinaryPath, getPrebuiltBinaryBuildMetadata, getPrebuiltBinaryPath
@@ -28,6 +29,7 @@ import {detectGlibc} from "./utils/detectGlibc.js";
 import {getLinuxDistroInfo, isDistroAlpineLinux} from "./utils/getLinuxDistroInfo.js";
 import {testBindingBinary} from "./utils/testBindingBinary.js";
 import {BinaryPlatformInfo, getPlatformInfo} from "./utils/getPlatformInfo.js";
+import {hasBuildingFromSourceDependenciesInstalled} from "./utils/hasBuildingFromSourceDependenciesInstalled.js";
 
 const require = createRequire(import.meta.url);
 
@@ -68,7 +70,11 @@ export type LlamaOptions = {
      * - **`"forceRebuild"`**: Always build from source.
      * Be cautious with this option, as it will cause the build to fail on Windows when the binaries are in use by another process.
      *
-     * Defaults to "auto".
+     * If running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
+     * To allow building from source in Electron apps, make sure you ship `node-llama-cpp` as an unpacked module.
+     *
+     * Defaults to `"auto"`.
+     * On Electron, defaults to `"never"`.
      */
     build?: "auto" | "never" | "forceRebuild",
 
@@ -158,6 +164,9 @@ export type LastBuildOptions = {
 export const getLlamaFunctionName = "getLlama";
 
 export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 300 * 1024 * 1024));
+const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInElectron
+    ? "never"
+    : "auto";
 
 /**
  * Get a llama.cpp binding.
@@ -214,7 +223,7 @@ export async function getLlamaForOptions({
     gpu = defaultLlamaCppGpuSupport,
     logLevel = defaultLlamaCppDebugLogs,
     logger = Llama.defaultConsoleLogger,
-    build = "auto",
+    build = defaultBuildOption,
     cmakeOptions = {},
     existingPrebuiltBinaryMustMatchBuildOptions = false,
     usePrebuiltBinaries = true,
@@ -233,7 +242,7 @@ export async function getLlamaForOptions({
 
     if (logLevel == null) logLevel = defaultLlamaCppDebugLogs;
     if (logger == null) logger = Llama.defaultConsoleLogger;
-    if (build == null) build = "auto";
+    if (build == null) build = defaultBuildOption;
     if (cmakeOptions == null) cmakeOptions = {};
     if (existingPrebuiltBinaryMustMatchBuildOptions == null) existingPrebuiltBinaryMustMatchBuildOptions = false;
     if (usePrebuiltBinaries == null) usePrebuiltBinaries = true;
@@ -252,6 +261,8 @@ export async function getLlamaForOptions({
         release: clonedLlamaCppRepoReleaseInfo?.tag ?? builtinLlamaCppRelease
     };
     let shouldLogNoGlibcWarningIfNoBuildIsAvailable = false;
+    const canBuild = build !== "never" && !runningInsideAsar &&
+        (!runningInElectron || await hasBuildingFromSourceDependenciesInstalled());
 
     if (canUsePrebuiltBinaries && platform === "linux") {
         if (!(await detectGlibc({platform}))) {
@@ -289,7 +300,7 @@ export async function getLlamaForOptions({
                 fallbackMessage: !isLastItem
                     ? `falling back to using ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}`
                     : (
-                        build !== "never"
+                        canBuild
                             ? "falling back to building from source"
                             : null
                     )
@@ -303,7 +314,7 @@ export async function getLlamaForOptions({
     if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs)
         await logNoGlibcWarning();
 
-    if (build === "never")
+    if (!canBuild)
         throw new NoBinaryFoundError();
 
     const llamaCppRepoCloned = await isLlamaCppRepoCloned();
