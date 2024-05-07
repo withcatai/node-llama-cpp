@@ -218,6 +218,9 @@ export class ModelDownloader {
             else
                 await downloader.close();
         }
+
+        if (this._downloader !== this._specificFileDownloaders[0])
+            await this._downloader?.close();
     }
 
     /** @internal */
