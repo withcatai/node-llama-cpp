@@ -289,6 +289,10 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                     model_params.use_mlock = options.Get("useMlock").As<Napi::Boolean>().Value();
                 }
 
+                if (options.Has("checkTensors")) {
+                    model_params.check_tensors = options.Get("checkTensors").As<Napi::Boolean>().Value();
+                }
+
                 if (options.Has("onLoadProgress")) {
                     auto onLoadProgressJSCallback = options.Get("onLoadProgress").As<Napi::Function>();
                     if (onLoadProgressJSCallback.IsFunction()) {
@@ -1483,6 +1487,11 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             llama_token new_token_id = 0;
 
             // Select the best prediction.
+            if (llama_get_logits(ctx->ctx) == nullptr) {
+                SetError("This model does not support token generation");
+                return;
+            }
+
             auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
             auto n_vocab = llama_n_vocab(ctx->model->model);
 
@@ -1701,13 +1710,15 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char* text, voi
         }
     }
 
-    if (level == 2) {
-        fputs(text, stderr);
-        fflush(stderr);
-    } else {
-        fputs(text, stdout);
-        fflush(stdout);
-    }
+    if (text != nullptr) {
+        if (level == 2) {
+            fputs(text, stderr);
+            fflush(stderr);
+        } else {
+            fputs(text, stdout);
+            fflush(stdout);
+        }
+    }    
 }
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {

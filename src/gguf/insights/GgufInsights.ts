@@ -22,7 +22,7 @@ export class GgufInsights {
         this._llama = llama;
         this._ggufFileInfo = ggufFileInfo;
 
-        this._modelSize = calculateTensorsSize(ggufFileInfo.tensorInfo ?? [], llama);
+        this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama);
         this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
     }
 
@@ -88,7 +88,7 @@ export class GgufInsights {
         const finalCpuLayers = totalLayers - finalGpuLayers;
         const llmData = this._ggufFileInfo.architectureMetadata;
 
-        const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer.ggml.tokens.length;
+        const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer?.ggml?.tokens?.length ?? 0;
         const logitsSize = vocabularySize * batchSize;
         const embedSize = isEmbeddingContext
             ? (llmData.embedding_length ?? 0) * batchSize
@@ -114,7 +114,7 @@ export class GgufInsights {
         const sKvUsed = uint32TBytes;
         const sKv = 2 * int32TBytes * modelGpuLayers * this._llama._consts.ggmlTensorOverhead;
         const sKvCell = this._llama._consts.llamaPosSize + sizeTBytes + this._llama._consts.llamaSeqIdSize;
-        const kvSelfLength = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const kvSelfLength = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
             ? Math.max(1, sequences)
             : actualContextSize;
         const sKvCells = kvSelfLength * sKvCell;
@@ -140,14 +140,14 @@ export class GgufInsights {
         // If you read this line and have better insights on how to estimate this memory, please open a PR to improve it :)
         const estimateGraphOverheadMemory = () => {
             const s1MB = Math.pow(1024, 2);
-            const tensorInfo = this._ggufFileInfo.tensorInfo ?? [];
+            const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
 
             let defaultCalculationAdjustment = 0;
 
             if (batchSize == null)
                 return 0;
 
-            if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.llama) {
+            if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.llama) {
                 const expertCount = this._ggufFileInfo.architectureMetadata.expert_count ?? 0;
                 const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
                 const embeddingLength = llmData.embedding_length ?? 0;
@@ -159,7 +159,7 @@ export class GgufInsights {
                 }
 
                 return int32TBytes * batchSize * (embeddingLength + (actualContextSize * headCount));
-            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.qwen2) {
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen2) {
                 if (modelGpuLayers === this.totalLayers) {
                     defaultCalculationAdjustment -= (s1MB * 340) * (
                         this.trainContextSize == null
@@ -175,7 +175,7 @@ export class GgufInsights {
                         )
                     );
                 }
-            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.gemma) {
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.gemma) {
                 // only works properly when all layers are on the GPU, which is why it's commented out:
                 // return int32TBytes * batchSize * ((llmData.embedding_length ?? 0));
 
@@ -196,7 +196,7 @@ export class GgufInsights {
                         )
                     );
                 }
-            } else if (this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.stablelm) {
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.stablelm) {
                 const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
 
                 return (int32TBytes * batchSize * actualContextSize * headCount) - (50 * s1MB);
@@ -274,7 +274,7 @@ export class GgufInsights {
         cpu: GgufTensorInfo[],
         gpu: GgufTensorInfo[]
     } {
-        const tensorInfo = this._ggufFileInfo.tensorInfo ?? [];
+        const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
 
         if (gpuLayers === 0) {
             return {
@@ -321,7 +321,7 @@ export class GgufInsights {
     public _determineNumberOfLayersFromTensorInfo(): number {
         const layerNumbers = new Set<number>();
 
-        for (const singleTensorInfo of (this._ggufFileInfo.tensorInfo ?? [])) {
+        for (const singleTensorInfo of (this._ggufFileInfo.fullTensorInfo ?? [])) {
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (layerNumber != null)
@@ -358,12 +358,12 @@ export class GgufInsights {
         const totalNEmbdKGqa = modelNEmbdKGqa + modelNEmbdKS;
         const totalNEmbdVGqa = modelNEmbdVGqa + modelNEmbdVS;
 
-        const keyTypeSize = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const keyTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
             // if `type_k` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size
             : this._llama._consts.ggmlTypeF16Size;
-        const valueTypeSize = this._ggufFileInfo.metadata.general.architecture === GgufArchitectureType.mamba
+        const valueTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
             // if `type_v` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size

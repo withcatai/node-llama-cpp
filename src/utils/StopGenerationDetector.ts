@@ -223,13 +223,15 @@ export class StopGenerationDetector<T extends string = string> {
     }
 
     public static resolveStopTriggers(
-        stopTriggers: readonly (StopGenerationTrigger | LlamaText)[],
+        stopTriggers: readonly (string | StopGenerationTrigger | LlamaText)[],
         tokenizer: Tokenizer
     ) {
         return stopTriggers
             .map((stopTrigger) => {
                 if (isLlamaText(stopTrigger))
                     return StopGenerationDetector.resolveLlamaTextTrigger(stopTrigger, tokenizer);
+                else if (typeof stopTrigger === "string")
+                    return simplifyStopTrigger([stopTrigger]);
                 else
                     return simplifyStopTrigger(stopTrigger);
             })

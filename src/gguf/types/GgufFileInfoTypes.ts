@@ -23,7 +23,44 @@ export type GgufFileInfo = {
     readonly tensorInfo?: GgufTensorInfo[],
 
     /** can be null if `readTensorInfo` is set to `false` */
-    readonly tensorInfoSize?: number
+    readonly tensorInfoSize?: number,
+
+    /**
+     * For spliced metadata of multiple file parts,
+     * this will be the number of files parts read and spliced into this metadata.
+     *
+     * Whe no splicing is done, this will be `1`.
+     */
+    readonly splicedParts: number,
+
+    /**
+     * For spliced metadata of multiple file parts, this will be the total tensor count from all the parts
+     *
+     * When no splicing is done, this will be the same as `tensorCount`.
+     */
+    readonly totalTensorCount: number | bigint,
+
+    /**
+     * For spliced metadata of multiple file parts, this will be the total metadata size from all the parts
+     *
+     * When no splicing is done, this will be the same as `metadataSize`.
+     */
+    readonly totalMetadataSize: number,
+
+    /**
+     * For spliced metadata of multiple file parts, this will be the spliced tensorInfo from all the parts.
+     * Can be null if `readTensorInfo` is set to `false`
+     *
+     * When no splicing is done, this will be the same as `tensorInfo`.
+     */
+    readonly fullTensorInfo?: GgufTensorInfo[],
+
+    /**
+     * For spliced metadata of multiple file parts, this will be the total tensor info size from all the parts
+     *
+     * When no splicing is done, this will be the same as `tensorInfoSize`.
+     */
+    readonly totalTensorInfoSize?: number
 };
 
 

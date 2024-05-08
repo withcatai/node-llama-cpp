@@ -11,13 +11,14 @@ export function simplifyGgufInfoForTestSnapshot(ggufFileInfo: GgufFileInfo) {
     shortenArray(ggufFileInfoCopy.metadata.tokenizer.ggml.merges, 10);
 
     shortenArray(ggufFileInfoCopy.tensorInfo, 4);
+    shortenArray(ggufFileInfoCopy.fullTensorInfo, 4);
 
     return ggufFileInfoCopy;
 }
 
-function shortenArray(array?: any[], maxSize: number = 10) {
+function shortenArray(array?: readonly any[], maxSize: number = 10) {
     if (array == null)
         return;
 
-    array.splice(maxSize);
+    (array as any[]).splice(maxSize);
 }

@@ -4,7 +4,7 @@ import {MergeUnionTypes} from "./mergeUnionTypes.js";
 /**
  * Parses a text template into a map of parts and their prefixes and suffixes.
  * This parser assumes each part occurs exactly once in the template, and that all parts must occur in the order they are defined.
- * For example,
+ * @example
  * ```typescript
  * const res = parseTextTemplate(
  *     "Hello, {{name}}! What is the {{thing}}?",
@@ -27,7 +27,7 @@ import {MergeUnionTypes} from "./mergeUnionTypes.js";
  *     }
  * });
  * ```
- *
+ * @example
  * ```typescript
  * const res2 = parseTextTemplate(
  *     "What is the {{thing}}?",

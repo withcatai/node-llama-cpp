@@ -106,17 +106,20 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
 };
 
 
-export async function DownloadLlamaCppCommand({
-    repo = defaultLlamaCppGitHubRepo,
-    release = defaultLlamaCppRelease,
-    arch = undefined,
-    nodeTarget = undefined,
-    gpu = defaultLlamaCppGpuSupport,
-    skipBuild = false,
-    noBundle = false,
-    noUsageExample = false,
-    updateBinariesReleaseMetadataAndSaveGitBundle = false
-}: DownloadCommandArgs) {
+export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
+    const {
+        repo = defaultLlamaCppGitHubRepo,
+        release = defaultLlamaCppRelease,
+        arch = undefined,
+        nodeTarget = undefined,
+        gpu = defaultLlamaCppGpuSupport,
+        skipBuild = false,
+        noBundle = false,
+        noUsageExample = false,
+
+        updateBinariesReleaseMetadataAndSaveGitBundle = false
+    } = args;
+
     const useBundle = noBundle != true;
     const platform = getPlatform();
     const platformInfo = await getPlatformInfo();

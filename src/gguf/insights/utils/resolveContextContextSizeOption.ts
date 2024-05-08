@@ -66,7 +66,9 @@ export function resolveContextContextSizeOption({
                 minAllowedContextSizeInCalculations
             );
 
-        for (let testContextSize = maxContextSize; testContextSize >= minContextSize; testContextSize--) {
+        let highestCompatibleContextSize: number | null = null;
+        let step = -Math.max(1, Math.floor((maxContextSize - minContextSize) / 4));
+        for (let testContextSize = maxContextSize; testContextSize >= minContextSize && testContextSize <= maxContextSize;) {
             const contextVram = modelFileInsights.estimateContextResourceRequirements({
                 contextSize: testContextSize,
                 batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: testContextSize, sequences}),
@@ -75,9 +77,33 @@ export function resolveContextContextSizeOption({
                 isEmbeddingContext
             }).gpuVram;
 
-            if (contextVram <= freeVram)
-                return testContextSize;
+            if (contextVram <= freeVram) {
+                if (highestCompatibleContextSize == null || testContextSize > highestCompatibleContextSize) {
+                    highestCompatibleContextSize = testContextSize;
+
+                    if (step === -1)
+                        break;
+                    else if (step < 0)
+                        step = Math.max(1, Math.floor(-step / 2));
+                }
+            } else if (step > 0)
+                step = -Math.max(1, Math.floor(step / 2));
+
+            if (testContextSize == minContextSize && step === -1)
+                break;
+
+            testContextSize += step;
+            if (testContextSize < minContextSize) {
+                testContextSize = minContextSize;
+                step = Math.max(1, Math.floor(Math.abs(step) / 2));
+            } else if (testContextSize > maxContextSize) {
+                testContextSize = maxContextSize;
+                step = -Math.max(1, Math.floor(Math.abs(step) / 2));
+            }
         }
+
+        if (highestCompatibleContextSize != null)
+            return highestCompatibleContextSize;
 
         if (ignoreMemorySafetyChecks)
             return minContextSize;

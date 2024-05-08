@@ -6,5 +6,5 @@ export function getGgufMetadataArchitectureData<const T extends GgufArchitecture
         ? MergeOptionalUnionTypes<Exclude<GgufMetadata[T], undefined>>
         : GgufMetadata<T>[T]
 ) {
-    return ggufMetadata[ggufMetadata.general.architecture] ?? {} as any;
+    return ggufMetadata[ggufMetadata.general?.architecture] ?? {} as any;
 }

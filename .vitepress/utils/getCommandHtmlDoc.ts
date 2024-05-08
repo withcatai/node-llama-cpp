@@ -213,7 +213,7 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
         const hasDefaultDescription = option.defaultDescription != null && option.defaultDescription.trim().length > 0;
         if (option.default != null || hasDefaultDescription) {
             if (hasDefaultDescription && option.defaultDescription != null)
-                optionDescription.push(`<span style="opacity: 0.72">(${htmlEscape("default: ")}${htmlEscape(option.defaultDescription.trim())})</span>`);
+                optionDescription.push(`<span style="opacity: 0.72">(${htmlEscape("default: ")}${htmlEscapeWithCodeMarkdown(option.defaultDescription.trim())})</span>`);
             else
                 optionDescription.push(`<span style="opacity: 0.72">(${htmlEscape("default: ")}<code>${htmlEscape(option.default)}</code>)</span>`);
         }

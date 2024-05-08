@@ -16,6 +16,7 @@ import {ChatCommand} from "./commands/ChatCommand.js";
 import {CompleteCommand} from "./commands/CompleteCommand.js";
 import {InfillCommand} from "./commands/InfillCommand.js";
 import {InspectCommand} from "./commands/inspect/InspectCommand.js";
+import {PullCommand} from "./commands/PullCommand.js";
 import {DebugCommand} from "./commands/DebugCommand.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,13 +30,14 @@ const yarg = yargs(hideBin(process.argv));
 yarg
     .scriptName(cliBinName)
     .usage("Usage: $0 <command> [options]")
-    .command(DownloadCommand)
-    .command(BuildCommand)
-    .command(ClearCommand)
+    .command(PullCommand)
     .command(ChatCommand)
+    .command(DownloadCommand)
     .command(CompleteCommand)
     .command(InfillCommand)
     .command(InspectCommand)
+    .command(BuildCommand)
+    .command(ClearCommand)
     .command(OnPostInstallCommand)
     .command(DebugCommand)
     .recommendCommands()

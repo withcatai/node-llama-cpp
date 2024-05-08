@@ -40,11 +40,11 @@ export abstract class ChatWrapper {
         const texts = historyWithFunctions
             .map((item) => {
                 if (item.type === "system")
-                    return LlamaText `system: ${item.text}`;
+                    return LlamaText(`system: ${item.text}`);
                 else if (item.type === "user")
-                    return LlamaText `user: ${item.text}`;
+                    return LlamaText(`user: ${item.text}`);
                 else if (item.type === "model")
-                    return LlamaText `model: ${this.generateModelResponseText(item.response)}`;
+                    return LlamaText(`model: ${this.generateModelResponseText(item.response)}`);
 
                 return item satisfies never;
             });

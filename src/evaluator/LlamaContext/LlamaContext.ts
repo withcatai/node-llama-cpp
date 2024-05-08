@@ -166,21 +166,21 @@ export class LlamaContext {
     /**
      * Before calling this method, make sure to call `sequencesLeft` to check if there are any sequences left.
      * When there are no sequences left, this method will throw an error.
-     * @param [options]
      */
-    public getSequence({
-        contextShift: {
-            size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
-            strategy: contextShiftStrategy = "eraseBeginning"
-        } = {},
-
-        _tokenMeter
-    }: {
+    public getSequence(options: {
         contextShift?: ContextShiftOptions,
 
         /** @internal */
         _tokenMeter?: TokenMeter
     } = {}): LlamaContextSequence {
+        const {
+            contextShift: {
+                size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
+                strategy: contextShiftStrategy = "eraseBeginning"
+            } = {},
+
+            _tokenMeter
+        } = options;
         this._ensureNotDisposed();
 
         const nextSequenceId = this._popSequenceId();
@@ -776,25 +776,7 @@ export class LlamaContextSequence {
         });
     }
 
-    /**
-     * @param tokens
-     * @param [options]
-     */
-    public evaluate(tokens: Token[], {
-        temperature = 0,
-        minP = 0,
-        topK = 40,
-        topP = 0.95,
-        grammarEvaluationState,
-        repeatPenalty,
-        tokenBias,
-        evaluationPriority = 5,
-        contextShift: {
-            size: contextShiftSize = this._contextShift.size,
-            strategy: contextShiftStrategy = this._contextShift.strategy
-        } = {},
-        yieldEogToken = false
-    }: {
+    public evaluate(tokens: Token[], options: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
@@ -825,8 +807,29 @@ export class LlamaContextSequence {
          * When `false` the generation will stop when an EOG token is generated and the token won't be yielded.
          * Defaults to `false`.
          */
-        yieldEogToken?: boolean
+        yieldEogToken?: boolean,
+
+        /** @internal */
+        _noSampling?: boolean
     } = {}): AsyncGenerator<Token, void | Token> {
+        const {
+            temperature = 0,
+            minP = 0,
+            topK = 40,
+            topP = 0.95,
+            grammarEvaluationState,
+            repeatPenalty,
+            tokenBias,
+            evaluationPriority = 5,
+            contextShift: {
+                size: contextShiftSize = this._contextShift.size,
+                strategy: contextShiftStrategy = this._contextShift.strategy
+            } = {},
+            yieldEogToken = false,
+
+            _noSampling = false
+        } = options;
+
         return this._evaluate(tokens, {
             temperature,
             minP,
@@ -840,7 +843,9 @@ export class LlamaContextSequence {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
             },
-            yieldEogToken
+            yieldEogToken,
+
+            _noSampling
         });
     }
 
@@ -899,13 +904,16 @@ export class LlamaContextSequence {
         evaluationPriority = 5,
         generateNewTokens = true,
         contextShiftOptions,
-        yieldEogToken = false
+        yieldEogToken = false,
+
+        _noSampling = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
-        yieldEogToken?: boolean
+        yieldEogToken?: boolean,
+        _noSampling?: boolean
     }): AsyncGenerator<Token, void | Token> {
         this._ensureNotDisposed();
 
@@ -926,6 +934,9 @@ export class LlamaContextSequence {
                 this._tokenMeter,
                 contextShiftOptions,
                 (batchLogitIndex) => {
+                    if (_noSampling)
+                        return null;
+
                     const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
                         ? repeatPenalty.punishTokens()
                         : repeatPenalty?.punishTokens;
@@ -991,11 +1002,11 @@ export class LlamaContextSequence {
             while (tokensLeftToDecode.length > 0) {
                 this._ensureNotDisposed();
 
-                let freeSpace = this._context.contextSize - this._nextTokenIndex;
+                let freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
                 if (freeSpace <= 1) {
                     await this._freeUpSpaceForTokens(contextShiftOptions);
-                    freeSpace = this._context.contextSize - this._nextTokenIndex;
+                    freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
                     if (freeSpace <= 1)
                         throw new Error("Failed to free up space for new tokens");
@@ -1061,7 +1072,7 @@ export class LlamaContextSequence {
 
             await this.eraseContextTokenRanges(ranges);
 
-            if (this.nextTokenIndex >= this._context.contextSize)
+            if (this.nextTokenIndex >= this._context.contextSize - 1)
                 await this.eraseContextTokenRanges([{start: 0, end: size}]);
         }
     }

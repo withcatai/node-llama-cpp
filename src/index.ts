@@ -9,9 +9,7 @@ import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./evaluator/LlamaGrammarEvaluationState.js";
 import {LlamaContext, LlamaContextSequence} from "./evaluator/LlamaContext/LlamaContext.js";
-import {
-    LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, LlamaEmbedding, type LlamaEmbeddingJSON
-} from "./evaluator/LlamaEmbeddingContext.js";
+import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, type LlamaEmbedding} from "./evaluator/LlamaEmbeddingContext.js";
 import {
     type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
@@ -58,6 +56,8 @@ import {
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
+import {GgufInsights} from "./gguf/insights/GgufInsights.js";
+import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -109,8 +109,7 @@ export {
     TokenBias,
     LlamaEmbeddingContext,
     type LlamaEmbeddingContextOptions,
-    LlamaEmbedding,
-    type LlamaEmbeddingJSON,
+    type LlamaEmbedding,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,
@@ -212,5 +211,9 @@ export {
     type GgufMetadataMamba,
     type GgufMetadataRWKV,
     GgmlType,
-    isGgufMetadataOfArchitectureType
+    isGgufMetadataOfArchitectureType,
+    GgufInsights,
+    createModelDownloader,
+    ModelDownloader,
+    type ModelDownloaderOptions
 };

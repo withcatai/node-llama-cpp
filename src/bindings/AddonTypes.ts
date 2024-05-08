@@ -9,6 +9,7 @@ export type BindingModule = {
             vocabOnly?: boolean,
             useMmap?: boolean,
             useMlock?: boolean,
+            checkTensors?: boolean,
             onLoadProgress?(loadPercentage: number): void,
             hasLoadAbortSignal?: boolean
         }): AddonModel

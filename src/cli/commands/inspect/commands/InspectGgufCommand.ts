@@ -10,10 +10,12 @@ import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js
 import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {isUrl} from "../../../../utils/isUrl.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
+import {getReadablePath} from "../../../utils/getReadablePath.js";
 
 type InspectGgufCommand = {
     modelPath: string,
     header?: string[],
+    noSplice: boolean,
     fullTensorInfo: boolean,
     fullMetadataArrays: boolean,
     plainJson: boolean,
@@ -37,6 +39,13 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 type: "string",
                 array: true,
                 description: "Headers to use when reading a model file from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+            })
+            .option("noSplice", {
+                alias: "s",
+                type: "boolean",
+                default: false,
+                description: "When split files are detected, it reads the metadata of the first file and splices the tensorInfo from all the parts. Use this flag to disable that behavior and read only the given file",
+                group: "Optional:"
             })
             .option("fullTensorInfo", {
                 alias: "t",
@@ -65,7 +74,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
+        modelPath: ggufPath, header: headerArg, noSplice, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
     }: InspectGgufCommand) {
         const isPathUrl = isUrl(ggufPath);
         const resolvedGgufPath = isPathUrl
@@ -78,23 +87,25 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             if (isPathUrl)
                 console.info(`${chalk.yellow("URL:")} ${resolvedGgufPath}`);
             else
-                console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
+                console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
         }
 
         const parsedMetadata = await readGgufFileInfo(ggufPath, {
-            fetchHeaders: isPathUrl ? headers : undefined
+            fetchHeaders: isPathUrl ? headers : undefined,
+            spliceSplitFiles: !noSplice
         });
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {
             const outputJson = JSON.stringify({
+                splicedParts: parsedMetadata.splicedParts,
                 version: parsedMetadata.version,
                 fileType: fileTypeName,
-                tensorCount: parsedMetadata.tensorCount,
-                metadataSize: parsedMetadata.metadataSize,
-                tensorInfoSize: parsedMetadata.tensorInfoSize,
+                tensorCount: parsedMetadata.totalTensorCount,
+                metadataSize: parsedMetadata.totalMetadataSize,
+                tensorInfoSize: parsedMetadata.totalTensorInfoSize,
                 metadata: parsedMetadata.metadata,
-                tensorInfo: parsedMetadata.tensorInfo
+                tensorInfo: parsedMetadata.fullTensorInfo
             }, undefined, 4);
 
             if (outputToJsonFile != null) {
@@ -125,13 +136,16 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 useGrouping: true
             } as const;
 
+            if (parsedMetadata.splicedParts > 1)
+                console.info(`${chalk.yellow("Spliced parts:")} ${parsedMetadata.splicedParts}`);
+
             console.info(`${chalk.yellow("GGUF version:")} ${parsedMetadata.version}`);
-            console.info(`${chalk.yellow("Tensor count:")} ${parsedMetadata.tensorCount.toLocaleString("en-US", numberLocaleFormattingOptions)}`);
-            console.info(`${chalk.yellow("Metadata size:")} ${bytes(parsedMetadata.metadataSize)}`);
-            console.info(`${chalk.yellow("Tensor info size:")} ${bytes(parsedMetadata.tensorInfoSize!)}`);
+            console.info(`${chalk.yellow("Tensor count:")} ${parsedMetadata.totalTensorCount.toLocaleString("en-US", numberLocaleFormattingOptions)}`);
+            console.info(`${chalk.yellow("Metadata size:")} ${bytes(parsedMetadata.totalMetadataSize)}`);
+            console.info(`${chalk.yellow("Tensor info size:")} ${bytes(parsedMetadata.totalTensorInfoSize!)}`);
             console.info(`${chalk.yellow("File type:")} ${fileTypeName ?? ""} ${chalk.white(`(${parsedMetadata.metadata.general?.file_type})`)}`);
             console.info(`${chalk.yellow("Metadata:")} ${prettyPrintObject(parsedMetadata.metadata, undefined, metadataPrettyPrintOptions)}`);
-            console.info(`${chalk.yellow("Tensor info:")} ${prettyPrintObject(parsedMetadata.tensorInfo, undefined, tensorInfoPrettyPrintOptions)}`);
+            console.info(`${chalk.yellow("Tensor info:")} ${prettyPrintObject(parsedMetadata.fullTensorInfo, undefined, tensorInfoPrettyPrintOptions)}`);
         }
     }
 };

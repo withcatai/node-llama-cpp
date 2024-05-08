@@ -3,7 +3,6 @@ import {CommandModule} from "yargs";
 import bytes from "bytes";
 import chalk from "chalk";
 import {getLlama} from "../../bindings/getLlama.js";
-import {Llama} from "../../bindings/Llama.js";
 import {prettyPrintObject} from "../../utils/prettyPrintObject.js";
 import {logUsedGpuTypeOption} from "../utils/logUsedGpuTypeOption.js";
 
@@ -42,14 +41,15 @@ async function DebugVramFunction() {
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;
 
-    logComputeLayers(llama);
-
     const getPercentageString = (amount: number, total: number) => {
         if (total === 0)
             return "0";
 
         return String(Math.floor((amount / total) * 100 * 100) / 100);
     };
+
+    logUsedGpuTypeOption(llama.gpu);
+    console.info();
 
     console.info(`${chalk.yellow("Used VRAM:")} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.used) + "/" + bytes(vramStatus.total) + ")")}`);
     console.info(`${chalk.yellow("Free VRAM:")} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.free) + "/" + bytes(vramStatus.total) + ")")}`);
@@ -61,12 +61,9 @@ async function DebugVramFunction() {
 async function DebugCmakeOptionsFunction() {
     const llama = await getLlama("lastBuild");
 
-    logComputeLayers(llama);
+    logUsedGpuTypeOption(llama.gpu);
+    console.info();
 
     console.info(`${chalk.yellow("CMake options:")} ${prettyPrintObject(llama.cmakeOptions)}`);
 }
 
-function logComputeLayers(llama: Llama) {
-    logUsedGpuTypeOption(llama.gpu);
-    console.info();
-}

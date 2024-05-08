@@ -65,6 +65,13 @@ export type LlamaModelOptions = {
     useMlock?: boolean,
 
     /**
+     * Check for tensor validity before actually loading the model.
+     * Using it increases the time it takes to load the model.
+     * Defaults to `false`.
+     */
+    checkTensors?: boolean,
+
+    /**
      * Called with the load percentage when the model is being loaded.
      * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
      */
@@ -103,7 +110,7 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, onLoadProgress, loadSignal
+        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal
     }: LlamaModelOptions & {
         gpuLayers: number
     }, {
@@ -129,6 +136,7 @@ export class LlamaModel {
             useMlock: _llama.supportsMlock
                 ? useMlock
                 : undefined,
+            checkTensors: checkTensors ?? false,
             onLoadProgress: onLoadProgress == null
                 ? undefined
                 : (loadPercentage: number) => {
@@ -226,6 +234,9 @@ export class LlamaModel {
      * @param [specialTokens] - if set to true, text that correspond to special tokens will be tokenized to those tokens.
      * For example, `<s>` will be tokenized to the BOS token if `specialTokens` is set to `true`,
      * otherwise it will be tokenized to tokens that corresponds to the plaintext `<s>` string.
+     * @param [options] - additional options for tokenization.
+     * If set to `"trimLeadingSpace"`, a leading space will be trimmed from the tokenized output if the output has an
+     * additional space at the beginning.
      */
     public tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[];
     public tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[];

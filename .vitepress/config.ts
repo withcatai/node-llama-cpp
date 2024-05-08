@@ -1,7 +1,9 @@
-import {defineConfig, DefaultTheme} from "vitepress";
+import {DefaultTheme, defineConfig} from "vitepress";
 import path from "path";
 import fs from "fs-extra";
 import {fileURLToPath} from "url";
+import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
+import ts from "typescript";
 import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 import envVar from "env-var";
 import process from "process";
@@ -126,6 +128,29 @@ export default defineConfig({
             {rel: "canonical", href: canonicalUrl}
         ])
     },
+    markdown: {
+        codeTransformers: [
+            transformerTwoslash({
+                // explicitTrigger: false,
+                twoslashOptions: {
+                    compilerOptions: {
+                        ...(await fs.readJSON(path.join(__dirname, "..", "tsconfig.json"))).compilerOptions,
+                        moduleResolution: undefined,
+                        paths: {
+                            "node-llama-cpp": [path.resolve(__dirname, "..", "src", "index.ts")]
+                        },
+                        typeRoots: [
+                            path.resolve(__dirname, "..", "node_modules"),
+                            path.resolve(__dirname, "..", "node_modules", "@types")
+                        ],
+                        module: ts.ModuleKind.ES2022,
+                        target: ts.ScriptTarget.ES2022
+                    },
+                    tsModule: ts
+                }
+            })
+        ]
+    },
     themeConfig: {
         editLink: {
             pattern: "https://github.com/withcatai/node-llama-cpp/edit/master/docs/:path"
@@ -196,6 +221,7 @@ export default defineConfig({
                 collapsed: true,
                 link: "/",
                 items: [
+                    {text: "Pull", link: "/pull"},
                     {text: "Chat", link: "/chat"},
                     {text: "Download", link: "/download"},
                     {text: "Complete", link: "/complete"},
@@ -216,6 +242,7 @@ export default defineConfig({
             }]
         },
         socialLinks: [
+            {icon: "npm", link: "https://www.npmjs.com/package/node-llama-cpp"},
             {icon: "github", link: "https://github.com/withcatai/node-llama-cpp"}
         ]
     }
@@ -257,8 +284,6 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
                     return item;
 
                 case "Variables":
-                    item.text = "Enums";
-
                     if (item.collapsed)
                         item.collapsed = false;
 
@@ -271,6 +296,7 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 }
 
 function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
+    applyOverrides(sidebar);
     orderClasses(sidebar);
     orderTypes(sidebar);
     orderFunctions(sidebar);
@@ -278,6 +304,23 @@ function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedo
     sortItemsInOrder(sidebar, categoryOrder);
 
     return sidebar;
+}
+
+function applyOverrides(sidebar: typeof typedocSidebar) {
+    const functions = sidebar.find((item) => item.text === "Functions");
+
+    const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
+    if (llamaTextFunction != null) {
+        delete (llamaTextFunction as {link?: string}).link;
+    }
+
+    const classes = sidebar.find((item) => item.text === "Classes");
+    if (classes != null && classes.items instanceof Array && !classes.items.some((item) => item.text === "LlamaText")) {
+        classes.items.push({
+            text: "LlamaText",
+            link: "/api/classes/LlamaText.md"
+        });
+    }
 }
 
 function orderClasses(sidebar: typeof typedocSidebar) {
@@ -322,21 +365,36 @@ function orderClasses(sidebar: typeof typedocSidebar) {
         {moveToEndIfGrouped: false}
     )
 
-    const LlamaTextGroup = {
-        text: "LlamaText",
-        collapsed: true,
-        items: []
-    };
-    (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
-    const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
+    let LlamaTextGroup = classes.items.find((item) => item.text === "LlamaText") as {
+        text: string,
+        collapsed?: boolean,
+        items?: []
+    } | undefined;
+    if (LlamaTextGroup == null) {
+        LlamaTextGroup = {
+            text: "LlamaText",
+            collapsed: true,
+            items: []
+        };
+        (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
+    }
 
-    groupItems(
-        classes.items,
-        (item) => item === LlamaTextGroup,
-        (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
-        {moveToEndIfGrouped: false}
-    )
-    sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
+    if (LlamaTextGroup != null) {
+        LlamaTextGroup.collapsed = true;
+
+        if (LlamaTextGroup.items == null)
+            LlamaTextGroup.items = [];
+
+        const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
+
+        groupItems(
+            classes.items,
+            (item) => item === LlamaTextGroup,
+            (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
+            {moveToEndIfGrouped: false}
+        )
+        sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
+    }
 
     sortItemsInOrder(chatWrapperItems, chatWrappersOrder);
 }

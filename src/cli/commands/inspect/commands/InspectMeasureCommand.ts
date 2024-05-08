@@ -16,6 +16,7 @@ import {ConsoleTable, ConsoleTableColumn} from "../../../utils/ConsoleTable.js";
 import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
+import {getReadablePath} from "../../../utils/getReadablePath.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -133,7 +134,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers);
 
-        console.info(`${chalk.yellow("File:")} ${resolvedGgufPath}`);
+        console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
         console.info(`${chalk.yellow("GPU:")} ${getPrettyBuildGpuName(llama.gpu)}${gpu == null ? chalk.gray(" (last build)") : ""}`);
         console.info();
 

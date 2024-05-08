@@ -1,12 +1,10 @@
 import path from "path";
 import process from "process";
 import chalk from "chalk";
-import {downloadFile} from "ipull";
 import fs from "fs-extra";
 import bytes from "bytes";
 import logSymbols from "log-symbols";
 import stripAnsi from "strip-ansi";
-import filenamify from "filenamify";
 import {cliModelsDirectory} from "../../config.js";
 import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
@@ -18,6 +16,8 @@ import {withProgressLog} from "../../utils/withProgressLog.js";
 import {getReadableContextSize} from "../../utils/getReadableContextSize.js";
 import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
+import {getGgufSplitPartsInfo} from "../../gguf/utils/resolveSplitGgufParts.js";
+import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
@@ -26,22 +26,17 @@ import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendatio
 import {splitAnsiToLines} from "./splitAnsiToLines.js";
 import {renderInfoLine} from "./printInfoLine.js";
 
-export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>) {
-    let resolvedGgufPath: undefined | string | string[] = ggufPath;
+export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
+    targetDirectory = cliModelsDirectory
+}: {
+    targetDirectory?: string
+} = {}) {
+    let resolvedGgufPath = ggufPath;
 
-    if (resolvedGgufPath == null) {
-        resolvedGgufPath = await interactiveChooseModel(llama);
+    if (resolvedGgufPath == null)
+        resolvedGgufPath = await interactiveChooseModel(llama, targetDirectory);
 
-        if (resolvedGgufPath.length === 1)
-            resolvedGgufPath = resolvedGgufPath[0];
-    }
-
-    const isPathUrl = resolvedGgufPath instanceof Array || isUrl(resolvedGgufPath);
-
-    if (isPathUrl && !(resolvedGgufPath instanceof Array))
-        resolvedGgufPath = getAllPartUrls(resolvedGgufPath);
-
-    if (!isPathUrl && !(resolvedGgufPath instanceof Array)) {
+    if (!isUrl(resolvedGgufPath)) {
         try {
             const resolvedPath = path.resolve(process.cwd(), resolvedGgufPath);
 
@@ -54,91 +49,60 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         throw new Error(`File does not exist: ${path.resolve(process.cwd(), resolvedGgufPath)}`);
     }
 
-    if (resolvedGgufPath instanceof Array)
-        resolvedGgufPath = resolvedGgufPath.map((url) => normalizeGgufDownloadUrl(url));
-    else
-        resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
+    resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
 
-    if (resolvedGgufPath instanceof Array && resolvedGgufPath.length === 1)
-        resolvedGgufPath = resolvedGgufPath[0];
+    const downloader = await createModelDownloader({
+        modelUrl: resolvedGgufPath,
+        dirPath: targetDirectory,
+        headers: fetchHeaders,
+        showCliProgress: true,
+        deleteTempFileOnCancel: false,
+        skipExisting: false
+    });
 
-    if (resolvedGgufPath instanceof Array) {
-        // disable due to a bug with multi-part downloads in the downloader, will be enabled in a future release
+    if (downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {
+        const fileStats = await fs.stat(downloader.entrypointFilePath);
 
-        // workaround for TypeScript types to keep the exiting handling of the array type of `resolvedGgufPath`
-        const supported = false;
-        if (supported)
-            throw new Error("Multi-part downloads are not supported yet");
-    }
+        if (downloader.totalSize === fileStats.size) {
+            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-    await fs.ensureDir(cliModelsDirectory);
-
-    const downloader = resolvedGgufPath instanceof Array
-        ? await downloadFile({
-            partsURL: resolvedGgufPath,
-            directory: cliModelsDirectory,
-            fileName: getFilenameForPartUrls(resolvedGgufPath),
-            cliProgress: true,
-            headers: fetchHeaders,
-            programType: "chunks"
-        })
-        : await downloadFile({
-            url: resolvedGgufPath,
-            directory: cliModelsDirectory,
-            cliProgress: true,
-            headers: fetchHeaders
-        });
-
-    const destFilePath = path.join(path.resolve(cliModelsDirectory), downloader.fileName);
-
-    if (downloader.fileName == null || downloader.fileName === "")
-        throw new Error("Failed to get the file name from the URL");
-
-    if (await fs.pathExists(destFilePath)) {
-        const fileStats = await fs.stat(destFilePath);
-
-        if (downloader.status.totalBytes === fileStats.size) {
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.close();
-
-            return destFilePath;
+            return downloader.entrypointFilePath;
         }
 
         const res = await ConsoleInteraction.yesNoQuestion(
-            `There's already an local ${chalk.blue(downloader.fileName)} file that's different from the remote one.\n` +
+            `There's already an local ${chalk.blue(downloader.entrypointFilePath)} file that's different from the remote one.\n` +
             "Download it and override the existing file?"
         );
 
         if (!res) {
             console.info("Loading the existing file");
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
-            await downloader.close();
+            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-            return destFilePath;
+            return downloader.entrypointFilePath;
         }
 
-        await fs.remove(destFilePath);
+        await fs.remove(downloader.entrypointFilePath);
     }
 
     const consoleInteraction = new ConsoleInteraction();
     consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
-        await downloader.close();
+        await downloader.cancel();
         consoleInteraction.stop();
         process.exit(0);
     });
 
-    console.info(`Downloading to ${chalk.yellow(getReadablePath(cliModelsDirectory))}${
-        resolvedGgufPath instanceof Array
-            ? chalk.gray(` (combining ${resolvedGgufPath.length} parts into a single file)`)
+    console.info(`Downloading to ${chalk.yellow(getReadablePath(targetDirectory))}${
+        downloader.splitBinaryParts != null
+            ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
             : ""
     }`);
     consoleInteraction.start();
     await downloader.download();
     consoleInteraction.stop();
 
-    console.info(`${chalk.yellow("File:")} ${getReadablePath(destFilePath)}`);
+    console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
-    return destFilePath;
+    return downloader.entrypointFilePath;
 }
 
 type ModelOption = {
@@ -154,9 +118,9 @@ type ModelOption = {
     type: "recommendedModel",
     title: string | (() => string),
     description?: string,
-    potentialUrls: string[][],
+    potentialUrls: string[],
     selectedUrl?: {
-        url: string[],
+        url: string,
         ggufInsights: GgufInsights,
         compatibilityScore: ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>
     },
@@ -172,7 +136,7 @@ type ModelOption = {
 
 const vramStateUpdateInterval = 1000;
 
-async function interactiveChooseModel(llama: Llama): Promise<string | string[]> {
+async function interactiveChooseModel(llama: Llama, targetDirectory: string): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
     const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
     const activeInteractionController = new AbortController();
@@ -180,8 +144,16 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
     let lastVramState: {used: number, total: number} = llama.getVramState();
     const canUseGpu = lastVramState.total > 0;
 
-    if (await fs.existsSync(cliModelsDirectory)) {
-        const ggufFileNames = (await fs.readdir(cliModelsDirectory)).filter((fileName) => fileName.endsWith(".gguf"));
+    if (await fs.existsSync(targetDirectory)) {
+        const ggufFileNames = (await fs.readdir(targetDirectory))
+            .filter((fileName) => {
+                if (!fileName.endsWith(".gguf"))
+                    return false;
+
+                const partsInfo = getGgufSplitPartsInfo(fileName);
+
+                return partsInfo == null || partsInfo.part === 1;
+            });
         let readItems = 0;
         const renderProgress = () => (
             "(" + String(readItems).padStart(String(ggufFileNames.length).length, "0") + "/" + ggufFileNames.length + ")"
@@ -197,7 +169,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
             }, async (progressUpdater) => {
                 localModelFileOptions = await Promise.all(
                     ggufFileNames.map(async (fileName) => {
-                        const filePath = path.join(cliModelsDirectory, fileName);
+                        const filePath = path.join(targetDirectory, fileName);
 
                         let ggufInsights: GgufInsights | undefined = undefined;
                         try {
@@ -281,7 +253,7 @@ async function interactiveChooseModel(llama: Llama): Promise<string | string[]> 
                     },
                     {
                         type: "separator",
-                        text: "   " + chalk.bold("Downloaded models") + " " + chalk.dim(`(${getReadablePath(cliModelsDirectory)})`)
+                        text: "   " + chalk.bold("Downloaded models") + " " + chalk.dim(`(${getReadablePath(targetDirectory)})`)
                     },
                     ...localModelFileOptions
                 ] satisfies ModelOption[]
@@ -646,7 +618,7 @@ async function selectFileForModelRecommendation({
                 return;
 
             try {
-                const ggufFileInfo = await readGgufFileInfo(potentialUrl[0], {
+                const ggufFileInfo = await readGgufFileInfo(potentialUrl, {
                     sourceType: "network",
                     signal: abortSignal
                 });
@@ -680,46 +652,4 @@ async function selectFileForModelRecommendation({
         recommendedModelOption.urlSelectionLoadingState = "done";
         rerenderOption();
     }
-}
-
-const partsRegex = /\.gguf\.part(?<part>\d+)of(?<parts>\d+)$/;
-function getAllPartUrls(ggufUrl: string) {
-    const partsMatch = ggufUrl.match(partsRegex);
-    if (partsMatch != null) {
-        const partString = partsMatch.groups?.part;
-        const part = Number(partString);
-        const partsString = partsMatch.groups?.parts;
-        const parts = Number(partsString);
-
-        if (partString == null || !Number.isFinite(part) || partsString == null || !Number.isFinite(parts) || part > parts || part === 0 ||
-            parts === 0
-        )
-            return ggufUrl;
-
-        const ggufIndex = ggufUrl.indexOf(".gguf");
-        const urlWithoutPart = ggufUrl.slice(0, ggufIndex + ".gguf".length);
-
-        const res: string[] = [];
-        for (let i = 1; i <= parts; i++)
-            res.push(urlWithoutPart + `.part${String(i).padStart(partString.length, "0")}of${partsString}`);
-
-        return res;
-    }
-
-    return ggufUrl;
-}
-
-function getFilenameForPartUrls(urls: string[]) {
-    if (urls.length === 0)
-        return undefined;
-
-    if (partsRegex.test(urls[0])) {
-        const ggufIndex = urls[0].indexOf(".gguf");
-        const urlWithoutPart = urls[0].slice(0, ggufIndex + ".gguf".length);
-
-        const filename = decodeURIComponent(urlWithoutPart.split("/").slice(-1)[0]);
-        return filenamify(filename);
-    }
-
-    return undefined;
 }

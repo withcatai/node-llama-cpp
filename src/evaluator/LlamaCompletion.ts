@@ -698,7 +698,7 @@ export class LlamaCompletion {
                     };
                 }
 
-                if (sequence.nextTokenIndex >= context.contextSize) {
+                if (sequence.nextTokenIndex >= context.contextSize - 1) {
                     shouldContextShift = true;
                     break;
                 }
