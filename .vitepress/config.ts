@@ -284,8 +284,6 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
                     return item;
 
                 case "Variables":
-                    item.text = "Enums";
-
                     if (item.collapsed)
                         item.collapsed = false;
 
