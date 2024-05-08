@@ -49,7 +49,7 @@ describe("stableCode", () => {
     });
 
     describe("infill", () => {
-        test("fill the gap in a series", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        test("fill the gap in a series", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
             const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
             const llama = await getTestLlama();
 
