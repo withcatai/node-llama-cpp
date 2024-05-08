@@ -12,6 +12,9 @@ export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 class LlamaText {
     public readonly values: readonly LlamaTextValue[];
 
+    /**
+     * Can also be called without `new`
+     */
     public constructor(...values: readonly LlamaTextInputValue[]) {
         // the constructor logic is copied to `LlamaTextConstructor` to make the constructor callable as a normal function
         this.values = createHistoryFromStringsAndValues(values);
@@ -298,7 +301,8 @@ const _LlamaText = LlamaTextConstructor;
 type _LlamaText = LlamaText;
 
 export {
-    _LlamaText as LlamaText
+    _LlamaText as LlamaText,
+    LlamaText as _LlamaText
 };
 
 export class SpecialTokensText {

@@ -19,8 +19,7 @@ type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
 
 /**
  * A chat wrapper based on a simple template.
- *
- * Example usage:
+ * @example
  * ```typescript
  * const chatWrapper = new TemplateChatWrapper({
  *     template: "{{systemPrompt}}\n{{history}}model:{{completion}}\nuser:",

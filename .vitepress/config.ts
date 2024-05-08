@@ -298,6 +298,7 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 }
 
 function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
+    applyOverrides(sidebar);
     orderClasses(sidebar);
     orderTypes(sidebar);
     orderFunctions(sidebar);
@@ -305,6 +306,23 @@ function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedo
     sortItemsInOrder(sidebar, categoryOrder);
 
     return sidebar;
+}
+
+function applyOverrides(sidebar: typeof typedocSidebar) {
+    const functions = sidebar.find((item) => item.text === "Functions");
+
+    const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
+    if (llamaTextFunction != null) {
+        delete (llamaTextFunction as {link?: string}).link;
+    }
+
+    const classes = sidebar.find((item) => item.text === "Classes");
+    if (classes != null && classes.items instanceof Array && !classes.items.some((item) => item.text === "LlamaText")) {
+        classes.items.push({
+            text: "LlamaText",
+            link: "/api/classes/LlamaText.md"
+        });
+    }
 }
 
 function orderClasses(sidebar: typeof typedocSidebar) {
@@ -349,21 +367,36 @@ function orderClasses(sidebar: typeof typedocSidebar) {
         {moveToEndIfGrouped: false}
     )
 
-    const LlamaTextGroup = {
-        text: "LlamaText",
-        collapsed: true,
-        items: []
-    };
-    (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
-    const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
+    let LlamaTextGroup = classes.items.find((item) => item.text === "LlamaText") as {
+        text: string,
+        collapsed?: boolean,
+        items?: []
+    } | undefined;
+    if (LlamaTextGroup == null) {
+        LlamaTextGroup = {
+            text: "LlamaText",
+            collapsed: true,
+            items: []
+        };
+        (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
+    }
 
-    groupItems(
-        classes.items,
-        (item) => item === LlamaTextGroup,
-        (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
-        {moveToEndIfGrouped: false}
-    )
-    sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
+    if (LlamaTextGroup != null) {
+        LlamaTextGroup.collapsed = true;
+
+        if (LlamaTextGroup.items == null)
+            LlamaTextGroup.items = [];
+
+        const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
+
+        groupItems(
+            classes.items,
+            (item) => item === LlamaTextGroup,
+            (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
+            {moveToEndIfGrouped: false}
+        )
+        sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
+    }
 
     sortItemsInOrder(chatWrapperItems, chatWrappersOrder);
 }

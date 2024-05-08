@@ -49,8 +49,7 @@ export type ModelDownloaderOptions = {
  *
  * If the url points to a `.gguf` file that is not split or binary spliced (for example, `model.gguf`),
  * the file will be downloaded to the specified directory.
- *
- * Example usage:
+ * @example
  * ```typescript
  * import {fileURLToPath} from "url";
  * import path from "path";
