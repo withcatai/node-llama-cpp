@@ -192,11 +192,11 @@ function compareContextTexts(text1: LlamaText, text2: LlamaText, tokenizer?: Tok
     const normalizedText1 = removeLeadingBos(trimmedText1);
     const normalizedText2 = removeLeadingBos(trimmedText2);
 
-    const texts1 = (normalizedText1.length !== trimmedText1.length && tokenizer != null)
+    const texts1 = (normalizedText1.values.length !== trimmedText1.values.length && tokenizer != null)
         ? [trimmedText1, normalizedText1]
         : [normalizedText1];
 
-    const texts2 = (normalizedText2.length !== trimmedText2.length && tokenizer != null)
+    const texts2 = (normalizedText2.values.length !== trimmedText2.values.length && tokenizer != null)
         ? [trimmedText2, normalizedText2]
         : [normalizedText2];
 

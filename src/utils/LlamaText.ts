@@ -1,33 +1,7 @@
 import {Token, Tokenizer} from "../types.js";
+import type {InspectOptions, inspect as InspectFunction} from "node:util";
 
-export type LlamaTextClass = {
-    <const V extends LlamaTextValue = LlamaTextValue, const V2 extends LlamaTextValue = LlamaTextValue>(
-        strings: TemplateStringsArray | V | LlamaText<V> | readonly (LlamaText<V> | V)[],
-        ...values: readonly (V | LlamaText<V> | V2 | LlamaText<V2> | number | boolean |
-            readonly (LlamaText<V> | V | LlamaText<V2> | V2)[])[]
-    ): LlamaText<V | V2>,
-    fromJSON(json: LlamaTextJSON): LlamaText,
-    compare(a: LlamaText, b: LlamaText): boolean
-};
-
-export type LlamaText<T extends LlamaTextValue = LlamaTextValue> = {
-    <const V extends LlamaTextValue = LlamaTextValue, const V2 extends LlamaTextValue = LlamaTextValue>(
-        strings: TemplateStringsArray | V | LlamaText | readonly (LlamaText | V)[],
-        ...values: readonly (V | V2| LlamaText | number | boolean | readonly (LlamaText | V | V2)[])[]
-    ): LlamaText<T | V>,
-    readonly type: "LlamaText",
-    readonly values: readonly T[],
-    mapValues<V extends LlamaTextValue = LlamaTextValue>(mapper: (value: T) => V): LlamaText<V>,
-    joinValues<V extends LlamaTextValue = LlamaTextValue>(separator: LlamaText<V> | V): LlamaText<T | V>,
-    toString(): string,
-    toJSON(): LlamaTextJSON,
-    tokenize(tokenizer: Tokenizer, options?: "trimLeadingSpace"): Token[],
-    compare(other: LlamaText): boolean,
-    trimStart(): LlamaText<T>,
-    trimEnd(): LlamaText<T>,
-    includes(value: LlamaText): boolean
-};
-
+type LlamaTextInputValue = LlamaTextValue | LlamaText | number | boolean | readonly LlamaTextInputValue[];
 export type LlamaTextValue = string | SpecialTokensText | SpecialToken;
 
 export type LlamaTextJSON = Array<LlamaTextJSONValue>;
@@ -35,41 +9,296 @@ export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | Llama
 export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: string};
 export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 
-export const LlamaText: LlamaTextClass = function LlamaText(
-    strings: TemplateStringsArray | string | string[] | SpecialTokensText | SpecialToken | LlamaText | LlamaText[],
-    ...values: (SpecialTokensText | SpecialToken | string | string[] | number | boolean | LlamaText | LlamaText[])[]
-) {
-    return createLlamaText(createHistoryFromStringsAndValues(strings, values));
-} as LlamaTextClass;
-LlamaText.fromJSON = function fromJSON(json: LlamaTextJSON) {
-    return createLlamaText(
-        json.map((value) => {
-            if (typeof value === "string")
-                return value;
-            else if (SpecialToken.isSpecialTokenJSON(value))
-                return SpecialToken.fromJSON(value);
-            else if (SpecialTokensText.isSpecialTokensTextJSON(value))
-                return SpecialTokensText.fromJSON(value);
-            else {
-                void (value satisfies never);
-                throw new Error(`Unknown value type: ${value}`);
-            }
-        })
-    );
-};
-LlamaText.compare = function compare(a: LlamaText, b: LlamaText) {
-    if (!isLlamaText(a) || !isLlamaText(b))
-        return false;
+class LlamaText {
+    public readonly values: readonly LlamaTextValue[];
 
-    if (a.values.length !== b.values.length)
-        return false;
-
-    for (let i = 0; i < a.values.length; i++) {
-        if (!compareLlamaTextValues(a.values[i], b.values[i]))
-            return false;
+    public constructor(...values: readonly LlamaTextInputValue[]) {
+        // the constructor logic is copied to `LlamaTextConstructor` to make the constructor callable as a normal function
+        this.values = createHistoryFromStringsAndValues(values);
     }
 
-    return true;
+    public concat(value: LlamaTextInputValue): LlamaText {
+        return new LlamaTextConstructor([...this.values, value]);
+    }
+
+    public mapValues(mapper: (value: LlamaTextValue) => LlamaTextInputValue) {
+        return new LlamaTextConstructor(
+            this.values.map(mapper)
+        );
+    }
+
+    public joinValues(separator: LlamaText | LlamaTextValue) {
+        const newValues: LlamaTextValue[] = [];
+
+        for (let i = 0; i < this.values.length; i++) {
+            newValues.push(this.values[i]);
+
+            if (i !== this.values.length - 1) {
+                if (isLlamaText(separator))
+                    newValues.push(...separator.values);
+                else
+                    newValues.push(separator);
+            }
+        }
+
+        return new LlamaTextConstructor(newValues);
+    }
+
+    public toString() {
+        return this.values
+            .map((value) => {
+                if (value instanceof SpecialToken)
+                    return value.toString();
+                else if (value instanceof SpecialTokensText)
+                    return value.toString();
+                else
+                    return value;
+            })
+            .join("");
+    }
+
+    public toJSON(): LlamaTextJSON {
+        return this.values.map((value) => {
+            if (value instanceof SpecialToken)
+                return value.toJSON() satisfies LlamaTextJSONValue;
+            else if (value instanceof SpecialTokensText)
+                return value.toJSON() satisfies LlamaTextJSONValue;
+            else
+                return value satisfies LlamaTextJSONValue;
+        });
+    }
+
+    public tokenize(tokenizer: Tokenizer, options?: "trimLeadingSpace"): Token[] {
+        let textToTokenize = "";
+        const res: Token[] = [];
+        const hasContent = () => (res.length > 0 || textToTokenize.length > 0);
+        const resolveTokenizerOptions = () => (hasContent() ? "trimLeadingSpace" : options);
+
+        for (const value of this.values) {
+            if (value instanceof SpecialToken) {
+                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer));
+                textToTokenize = "";
+            } else if (value instanceof SpecialTokensText) {
+                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer, hasContent() || options === "trimLeadingSpace"));
+                textToTokenize = "";
+            } else
+                textToTokenize += value;
+        }
+
+        res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()));
+
+        return res;
+    }
+
+    public compare(other: LlamaText): boolean {
+        return LlamaTextConstructor.compare(this, other);
+    }
+
+    public trimStart(): LlamaText {
+        const newValues = this.values.slice();
+
+        while (newValues.length > 0) {
+            const firstValue = newValues[0];
+
+            if (firstValue instanceof SpecialToken)
+                break;
+
+            if (firstValue instanceof SpecialTokensText) {
+                const newValue = firstValue.value.trimStart();
+                if (newValue === "") {
+                    newValues.shift();
+                    continue;
+                } else if (newValue !== firstValue.value) {
+                    newValues[0] = new SpecialTokensText(newValue);
+                    break;
+                }
+
+                break;
+            } else if (typeof firstValue === "string") {
+                const newValue = firstValue.trimStart();
+                if (newValue === "") {
+                    newValues.shift();
+                    continue;
+                } else if (newValue !== firstValue) {
+                    newValues[0] = newValue;
+                    break;
+                }
+
+                break;
+            } else
+                void (firstValue satisfies never);
+        }
+
+        return new LlamaTextConstructor(newValues);
+    }
+
+    public trimEnd(): LlamaText {
+        const newValues = this.values.slice();
+
+        while (newValues.length > 0) {
+            const lastValue = newValues[newValues.length - 1];
+
+            if (lastValue instanceof SpecialToken)
+                break;
+
+            if (lastValue instanceof SpecialTokensText) {
+                const newValue = lastValue.value.trimEnd();
+                if (newValue === "") {
+                    newValues.pop();
+                    continue;
+                } else if (newValue !== lastValue.value) {
+                    newValues[newValues.length - 1] = new SpecialTokensText(newValue);
+                    break;
+                }
+
+                break;
+            } else if (typeof lastValue === "string") {
+                const newValue = lastValue.trimEnd();
+                if (newValue === "") {
+                    newValues.pop();
+                    continue;
+                } else if (newValue !== lastValue) {
+                    newValues[newValues.length - 1] = newValue;
+                    break;
+                }
+
+                break;
+            } else
+                void (lastValue satisfies never);
+        }
+
+        return new LlamaTextConstructor(newValues);
+    }
+
+    public includes(value: LlamaText): boolean {
+        for (let i = 0; i <= this.values.length - value.values.length; i++) {
+            const thisValue = this.values[i];
+
+            let startMatch = compareLlamaTextValues(thisValue, value.values[0]);
+
+            if (!startMatch && thisValue instanceof SpecialTokensText && value.values[0] instanceof SpecialTokensText) {
+                startMatch = value.values.length > 1
+                    ? thisValue.value.endsWith(value.values[0].value)
+                    : thisValue.value.includes(value.values[0].value);
+            }
+
+            if (!startMatch && typeof thisValue === "string" && typeof value.values[0] === "string") {
+                startMatch = value.values.length > 1
+                    ? thisValue.endsWith(value.values[0])
+                    : thisValue.includes(value.values[0]);
+            }
+
+            if (startMatch) {
+                let j = 1;
+                for (; j < value.values.length; j++) {
+                    const thisValue = this.values[i + j];
+                    const valueValue = value.values[j];
+
+                    let endMatch = compareLlamaTextValues(thisValue, valueValue);
+
+                    if (!endMatch && thisValue instanceof SpecialTokensText && valueValue instanceof SpecialTokensText) {
+                        endMatch = value.values.length - 1 === j
+                            ? thisValue.value.startsWith(valueValue.value)
+                            : thisValue.value === valueValue.value;
+                    }
+
+                    if (!endMatch && typeof thisValue === "string" && typeof valueValue === "string") {
+                        endMatch = value.values.length - 1 === j
+                            ? thisValue.startsWith(valueValue)
+                            : thisValue === valueValue;
+                    }
+
+                    if (!endMatch)
+                        break;
+                }
+
+                if (j === value.values.length)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @internal */
+    public [Symbol.for("nodejs.util.inspect.custom")](
+        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+    ) {
+        return "LlamaText(" + inspect(this.values, {
+            ...(inspectOptions ?? {}),
+            depth: depth == null
+                ? undefined
+                : Math.max(0, depth - 1)
+        }) + ")";
+    }
+
+    public static fromJSON(json: LlamaTextJSON): LlamaText {
+        // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        return new LlamaTextConstructor(
+            json.map((value) => {
+                if (typeof value === "string")
+                    return value;
+                else if (SpecialToken.isSpecialTokenJSON(value))
+                    return SpecialToken.fromJSON(value);
+                else if (SpecialTokensText.isSpecialTokensTextJSON(value))
+                    return SpecialTokensText.fromJSON(value);
+                else {
+                    void (value satisfies never);
+                    throw new Error(`Unknown value type: ${value}`);
+                }
+            })
+        );
+    }
+
+    public static compare(a: LlamaText, b: LlamaText): boolean {
+        // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        if (!isLlamaText(a) || !isLlamaText(b))
+            return false;
+
+        if (a.values.length !== b.values.length)
+            return false;
+
+        for (let i = 0; i < a.values.length; i++) {
+            if (!compareLlamaTextValues(a.values[i], b.values[i]))
+                return false;
+        }
+
+        return true;
+    }
+}
+Object.defineProperty(LlamaText.prototype, "_type", {
+    enumerable: false,
+    configurable: false,
+    value: "LlamaText"
+});
+
+type LlamaTextConstructor = Omit<typeof LlamaText, "prototype"> & {
+    new (...values: readonly LlamaTextInputValue[]): LlamaText,
+    (...values: readonly LlamaTextInputValue[]): LlamaText,
+    readonly prototype: typeof LlamaText.prototype
+};
+
+const LlamaTextConstructor: LlamaTextConstructor = function LlamaText(this: LlamaText, ...values: readonly LlamaTextInputValue[]) {
+    // this makes the constructor callable also as a normal function
+    if (new.target == null)
+        return new LlamaTextConstructor(...values);
+
+    (this as Mutable<LlamaText>).values = createHistoryFromStringsAndValues(values);
+    return this;
+} as any;
+
+(LlamaTextConstructor as (() => any)).prototype = Object.create(LlamaText.prototype);
+(LlamaTextConstructor as (() => any)).prototype.constructor = LlamaTextConstructor;
+LlamaTextConstructor.fromJSON = LlamaText.fromJSON;
+LlamaTextConstructor.compare = LlamaText.compare;
+
+const _LlamaText = LlamaTextConstructor;
+type _LlamaText = LlamaText;
+
+export {
+    _LlamaText as LlamaText
 };
 
 export class SpecialTokensText {
@@ -118,6 +347,18 @@ export class SpecialTokensText {
         };
     }
 
+    /** @internal */
+    public [Symbol.for("nodejs.util.inspect.custom")](
+        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+    ) {
+        return "new SpecialTokensText(" + inspect(this.value, {
+            ...(inspectOptions ?? {}),
+            depth: depth == null
+                ? undefined
+                : Math.max(0, depth - 1)
+        }) + ")";
+    }
+
     public static fromJSON(json: LlamaTextSpecialTokensTextJSON): SpecialTokensText {
         if (SpecialTokensText.isSpecialTokensTextJSON(json))
             return new SpecialTokensText(json.value);
@@ -163,6 +404,18 @@ export class SpecialToken {
         };
     }
 
+    /** @internal */
+    public [Symbol.for("nodejs.util.inspect.custom")](
+        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+    ) {
+        return "new SpecialToken(" + inspect(this.value, {
+            ...(inspectOptions ?? {}),
+            depth: depth == null
+                ? undefined
+                : Math.max(0, depth - 1)
+        }) + ")";
+    }
+
     public static fromJSON(json: LlamaTextSpecialTokenJSON): SpecialToken {
         if (SpecialToken.isSpecialTokenJSON(json))
             return new SpecialToken(json.value as BuiltinSpecialTokenValue);
@@ -176,7 +429,11 @@ export class SpecialToken {
 }
 
 export function isLlamaText(value: unknown): value is LlamaText {
-    return typeof value === "function" && "type" in value && value.type === "LlamaText";
+    if (value instanceof LlamaTextConstructor || value instanceof LlamaText)
+        return true;
+
+    // detect a `LlamaText` created from a different module import
+    return value != null && Object.getPrototypeOf(value as LlamaText)?._type === "LlamaText";
 }
 
 export function tokenizeText(text: string | LlamaText, tokenizer: Tokenizer) {
@@ -186,284 +443,45 @@ export function tokenizeText(text: string | LlamaText, tokenizer: Tokenizer) {
         return text.tokenize(tokenizer);
 }
 
-type LlamaTextInputValue<V extends LlamaTextValue = LlamaTextValue> =
-    LlamaTextValue | LlamaText<V> | number | boolean | (LlamaText<V> | LlamaTextValue)[];
-
 type Mutable<T> = { -readonly [P in keyof T]: T[P] };
 
-const LlamaTextPrototypeFunctions: Partial<LlamaText> = {
-    mapValues: function mapValues(this: LlamaText, mapper) {
-        return createLlamaText(
-            this.values.map(mapper)
-        );
-    } as LlamaText["mapValues"],
-    joinValues(this: LlamaText, separator: LlamaText | LlamaTextValue): LlamaText {
-        const newValues: LlamaTextValue[] = [];
-
-        for (let i = 0; i < this.values.length; i++) {
-            newValues.push(this.values[i]);
-
-            if (i !== this.values.length - 1) {
-                if (isLlamaText(separator))
-                    newValues.push(...separator.values);
-                else
-                    newValues.push(separator);
-            }
-        }
-
-        return createLlamaText(newValues);
-    },
-    toString(this: LlamaText) {
-        return this.values
-            .map((value) => {
-                if (value instanceof SpecialToken)
-                    return value.toString();
-                else if (value instanceof SpecialTokensText)
-                    return value.toString();
-                else
-                    return value;
-            })
-            .join("");
-    },
-    tokenize(this: LlamaText, tokenizer, options?: "trimLeadingSpace"): Token[] {
-        let textToTokenize = "";
-        const res: Token[] = [];
-        const hasContent = () => (res.length > 0 || textToTokenize.length > 0);
-        const resolveTokenizerOptions = () => (hasContent() ? "trimLeadingSpace" : options);
-
-        for (const value of this.values) {
-            if (value instanceof SpecialToken) {
-                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer));
-                textToTokenize = "";
-            } else if (value instanceof SpecialTokensText) {
-                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer, hasContent() || options === "trimLeadingSpace"));
-                textToTokenize = "";
-            } else
-                textToTokenize += value;
-        }
-
-        res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()));
-
-        return res;
-    },
-    toJSON(this: LlamaText) {
-        return this.values.map((value) => {
-            if (value instanceof SpecialToken)
-                return value.toJSON() satisfies LlamaTextJSONValue;
-            else if (value instanceof SpecialTokensText)
-                return value.toJSON() satisfies LlamaTextJSONValue;
-            else
-                return value satisfies LlamaTextJSONValue;
-        });
-    },
-    compare(this: LlamaText, other: LlamaText) {
-        return LlamaText.compare(this, other);
-    },
-    trimStart(this: LlamaText) {
-        const newValues = this.values.slice();
-
-        while (newValues.length > 0) {
-            const firstValue = newValues[0];
-
-            if (firstValue instanceof SpecialToken)
-                break;
-
-            if (firstValue instanceof SpecialTokensText) {
-                const newValue = firstValue.value.trimStart();
-                if (newValue === "") {
-                    newValues.shift();
-                    continue;
-                } else if (newValue !== firstValue.value) {
-                    newValues[0] = new SpecialTokensText(newValue);
-                    break;
-                }
-
-                break;
-            } else if (typeof firstValue === "string") {
-                const newValue = firstValue.trimStart();
-                if (newValue === "") {
-                    newValues.shift();
-                    continue;
-                } else if (newValue !== firstValue) {
-                    newValues[0] = newValue;
-                    break;
-                }
-
-                break;
-            } else
-                void (firstValue satisfies never);
-        }
-
-        return createLlamaText(newValues);
-    },
-    trimEnd(this: LlamaText) {
-        const newValues = this.values.slice();
-
-        while (newValues.length > 0) {
-            const lastValue = newValues[newValues.length - 1];
-
-            if (lastValue instanceof SpecialToken)
-                break;
-
-            if (lastValue instanceof SpecialTokensText) {
-                const newValue = lastValue.value.trimEnd();
-                if (newValue === "") {
-                    newValues.pop();
-                    continue;
-                } else if (newValue !== lastValue.value) {
-                    newValues[newValues.length - 1] = new SpecialTokensText(newValue);
-                    break;
-                }
-
-                break;
-            } else if (typeof lastValue === "string") {
-                const newValue = lastValue.trimEnd();
-                if (newValue === "") {
-                    newValues.pop();
-                    continue;
-                } else if (newValue !== lastValue) {
-                    newValues[newValues.length - 1] = newValue;
-                    break;
-                }
-
-                break;
-            } else
-                void (lastValue satisfies never);
-        }
-
-        return createLlamaText(newValues);
-    },
-    includes(this: LlamaText, value: LlamaText) {
-        for (let i = 0; i < this.values.length; i++) {
-            if (compareLlamaTextValues(this.values[i], value.values[0])) {
-                let j = 1;
-                for (; j < value.values.length; j++) {
-                    if (!compareLlamaTextValues(this.values[i + j], value.values[j]))
-                        break;
-                }
-
-                if (j === value.values.length)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-};
-
-function createLlamaText(history: readonly LlamaTextValue[]): LlamaText {
-    const llamaText: Mutable<LlamaText> = function LlamaText<const V extends LlamaTextValue = LlamaTextValue>(
-        strings: TemplateStringsArray | V | LlamaText<V> | readonly (LlamaText<V> | V)[],
-        ...values: LlamaTextInputValue<V>[]
-    ) {
-        return createLlamaText(
-            llamaText.values.concat(
-                createHistoryFromStringsAndValues(strings, values)
-            )
-        );
-    } as LlamaText;
-
-    Object.defineProperties(llamaText, {
-        ["type" satisfies keyof LlamaText]: {
-            value: "LlamaText" satisfies LlamaText["type"],
-            writable: false,
-            configurable: false,
-            enumerable: true
-        },
-        ["values" satisfies keyof LlamaText]: {
-            value: Object.freeze(history.slice()) satisfies LlamaText["values"],
-            writable: false,
-            configurable: false,
-            enumerable: true
-        },
-        ["mapValues" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.mapValues,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["joinValues" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.joinValues,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["toString" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.toString,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["tokenize" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.tokenize,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["toJSON" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.toJSON,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["compare" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.compare,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["trimStart" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.trimStart,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["trimEnd" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.trimEnd,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        },
-        ["includes" satisfies keyof LlamaText]: {
-            value: LlamaTextPrototypeFunctions.includes,
-            writable: false,
-            configurable: false,
-            enumerable: false
-        }
-    });
-
-    return llamaText as LlamaText;
-}
-
-function createHistoryFromStringsAndValues<const V extends LlamaTextValue = LlamaTextValue>(
-    strings: TemplateStringsArray | V | LlamaText<V> | readonly (LlamaText<V> | V)[],
-    values: LlamaTextInputValue<V>[]
-): Array<LlamaTextValue> {
-    function addItemToRes(res: Array<LlamaTextValue>, item: LlamaTextInputValue) {
+function createHistoryFromStringsAndValues(values: readonly LlamaTextInputValue[]): readonly LlamaTextValue[] {
+    function addItemToRes(res: LlamaTextValue[], item: LlamaTextInputValue): LlamaTextValue[] {
         if (item === undefined || item === "" || (item instanceof SpecialTokensText && item.value === ""))
             return res;
-        else if (typeof item === "string" || item instanceof SpecialTokensText || item instanceof SpecialToken)
-            return res.concat([item]);
-        else if (isLlamaText(item))
-            return res.concat(item.values);
-        else if (item instanceof Array) {
-            return res.concat(
-                item.reduce((res, value) => {
-                    if (isLlamaText(value))
-                        return res.concat(value.values);
-                    else if (value === "" || (value instanceof SpecialTokensText && value.value === ""))
-                        return res;
+        else if (typeof item === "string" || item instanceof SpecialTokensText || item instanceof SpecialToken) {
+            res.push(item);
+            return res;
+        } else if (isLlamaText(item)) {
+            for (const value of item.values)
+                res.push(value);
 
-                    return res.concat([value]);
-                }, [] as Array<LlamaTextValue>)
-            );
-        } else if (typeof item === "number" || typeof item === "boolean")
-            return res.concat([String(item)]);
+            return res;
+        } else if (item instanceof Array) {
+            for (const value of item) {
+                if (isLlamaText(value)) {
+                    for (const innerValue of value.values)
+                        res.push(innerValue);
+                } else if (value === "" || (value instanceof SpecialTokensText && value.value === ""))
+                    continue;
+                else if (value instanceof Array)
+                    addItemToRes(res, value);
+                else if (typeof value === "number" || typeof value === "boolean")
+                    res.push(String(value));
+                else
+                    res.push(value);
+            }
+
+            return res;
+        } else if (typeof item === "number" || typeof item === "boolean") {
+            res.push(String(item));
+            return res;
+        }
 
         return item satisfies never;
     }
 
-    function squashAdjacentItems(res: Array<LlamaTextValue>, item: LlamaTextValue) {
+    function squashAdjacentItems(res: LlamaTextValue[], item: LlamaTextValue) {
         if (res.length === 0) {
             res.push(item);
             return res;
@@ -488,29 +506,9 @@ function createHistoryFromStringsAndValues<const V extends LlamaTextValue = Llam
         return res;
     }
 
-    if (!isTemplateStringsArray(strings)) {
-        return ([strings] as LlamaTextInputValue[])
-            .concat(values)
-            .reduce(addItemToRes, [])
-            .reduce(squashAdjacentItems, []);
-    }
-
-
-    let res: Array<LlamaTextValue> = [];
-
-    for (let i = 0; i < strings.length; i++) {
-        res.push(strings[i]);
-
-        if (i < values.length)
-            res = addItemToRes(res, values[i]);
-    }
-
-    return res.reduce(squashAdjacentItems, []);
-}
-
-function isTemplateStringsArray(value: unknown): value is TemplateStringsArray {
-    return value instanceof Array && (value as any as TemplateStringsArray).raw instanceof Array &&
-        value.length === (value as any as TemplateStringsArray).raw.length;
+    return values
+        .reduce(addItemToRes, [])
+        .reduce(squashAdjacentItems, []);
 }
 
 function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
@@ -518,7 +516,7 @@ function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
         return a.value === b.value;
     else if (a instanceof SpecialToken && b instanceof SpecialToken)
         return a.value === b.value;
-    else if (a !== a)
+    else if (a !== b)
         return false;
 
     return true;
