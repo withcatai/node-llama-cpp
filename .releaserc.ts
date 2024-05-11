@@ -40,7 +40,9 @@ export default {
             }
         }],
         "@semantic-release/npm",
-        "@semantic-release/github",
+        ["@semantic-release/github", {
+            "discussionCategoryName": "Releases"
+        }],
         ["@semantic-release/exec", {
             "publishCmd": "echo \"${nextRelease.version}\" > .semanticRelease.npmPackage.deployedVersion.txt"
         }]
