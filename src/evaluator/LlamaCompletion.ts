@@ -642,7 +642,7 @@ export class LlamaCompletion {
 
                 if (stopGenerationDetector.hasTriggeredStops || model.isEogToken(token)) {
                     const triggeredStops  = stopGenerationDetector.getTriggeredStops();
-                    const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
+                    const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
 
                     const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                         triggeredStops,

@@ -27,14 +27,20 @@ export class GbnfWhitespace extends GbnfTerminal {
                         ? ["[\\n]"]
                         : []
                 ),
-                or([
-                    new GbnfVerbatimText(
-                        " ".repeat(this.scopeState.currentNestingScope * this.scopeState.settings.scopePadSpaces)
-                    ).getGrammar(),
-                    new GbnfVerbatimText(
-                        "\t".repeat(this.scopeState.currentNestingScope)
-                    ).getGrammar()
-                ]),
+                ...(
+                    this.scopeState.currentNestingScope === 0
+                        ? []
+                        : [
+                            or([
+                                new GbnfVerbatimText(
+                                    " ".repeat(this.scopeState.currentNestingScope * this.scopeState.settings.scopePadSpaces)
+                                ).getGrammar(),
+                                new GbnfVerbatimText(
+                                    "\t".repeat(this.scopeState.currentNestingScope)
+                                ).getGrammar()
+                            ])
+                        ]
+                ),
                 ...(
                     this.newLine === "after"
                         ? ["[\\n]"]
