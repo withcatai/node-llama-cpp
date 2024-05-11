@@ -11,8 +11,7 @@ export class LlamaJsonSchemaGrammar<const T extends Readonly<GbnfJsonSchema>> ex
     public constructor(llama: Llama, schema: T) {
         const grammar = getGbnfGrammarForGbnfJsonSchema(schema);
 
-        super({
-            llama,
+        super(llama, {
             grammar,
             stopGenerationTriggers: [LlamaText(["\n".repeat(4)])],
             trimWhitespaceSuffix: true

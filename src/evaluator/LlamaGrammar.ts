@@ -8,8 +8,6 @@ import {Llama} from "../bindings/Llama.js";
 
 
 export type LlamaGrammarOptions = {
-    llama: Llama,
-
     /** GBNF grammar */
     grammar: string,
 
@@ -35,10 +33,11 @@ export class LlamaGrammar {
      * > More info here: [
      * github:ggerganov/llama.cpp:grammars/README.md
      * ](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
+     * @param llama
      * @param options
      */
-    public constructor({
-        llama, grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
+    public constructor(llama: Llama, {
+        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
     }: LlamaGrammarOptions) {
         this._llama = llama;
         this._grammar = new this._llama._bindings.AddonGrammar(grammar, {
@@ -69,8 +68,7 @@ export class LlamaGrammar {
 
         if (await fs.pathExists(grammarFile)) {
             const grammar = await fs.readFile(grammarFile, "utf8");
-            return new LlamaGrammar({
-                llama,
+            return new LlamaGrammar(llama, {
                 grammar,
                 stopGenerationTriggers: [LlamaText(["\n".repeat(10)])], // this is a workaround for the model not stopping to generate text,
                 trimWhitespaceSuffix: true

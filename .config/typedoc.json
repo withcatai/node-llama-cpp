@@ -23,5 +23,6 @@
     "propertiesFormat": "list",
     "enumMembersFormat": "table",
     "typeDeclarationFormat": "list",
+    "sort": ["source-order"],
     "docsRoot": "../docs"
 }

@@ -20,8 +20,7 @@ export class FunctionCallGrammar<const Functions extends ChatModelFunctions> ext
     public constructor(llama: Llama, functions: Functions, chatWrapper: ChatWrapper, initialFunctionCallEngaged: boolean) {
         const grammar = getGbnfGrammarForFunctionCalls(functions, chatWrapper, initialFunctionCallEngaged);
 
-        super({
-            llama,
+        super(llama, {
             grammar,
             stopGenerationTriggers: [LlamaText(chatWrapper.settings.functions.call.suffix, "\n".repeat(4))],
             trimWhitespaceSuffix: true
