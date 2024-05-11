@@ -23,6 +23,5 @@
     "propertiesFormat": "list",
     "enumMembersFormat": "table",
     "typeDeclarationFormat": "list",
-    "hideInPageTOC": true,
     "docsRoot": "../docs"
 }

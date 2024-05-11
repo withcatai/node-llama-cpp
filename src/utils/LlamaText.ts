@@ -1,8 +1,8 @@
 import {Token, Tokenizer} from "../types.js";
 import type {InspectOptions, inspect as InspectFunction} from "node:util";
 
-type LlamaTextInputValue = LlamaTextValue | LlamaText | number | boolean | readonly LlamaTextInputValue[];
 export type LlamaTextValue = string | SpecialTokensText | SpecialToken;
+export type LlamaTextInputValue = LlamaTextValue | LlamaText | number | boolean | readonly LlamaTextInputValue[];
 
 export type LlamaTextJSON = Array<LlamaTextJSONValue>;
 export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | LlamaTextSpecialTokenJSON;
