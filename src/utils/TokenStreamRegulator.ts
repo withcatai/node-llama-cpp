@@ -66,7 +66,7 @@ export class QueuedTokenRelease {
     }
 
     public get isPartiallyFree() {
-        return this._textLocks.size !== 0 && this._tokenLocks.size !== 0;
+        return this._textLocks.size !== 0 || this._tokenLocks.size !== 0;
     }
 
     public getFreeTextIndex() {

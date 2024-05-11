@@ -775,9 +775,14 @@ export class LlamaChat {
                     if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
                         model.isEogToken(token)
                     ) {
+                        stopGenerationDetector.clearInProgressStops();
+                        customStopGenerationTriggersDetector.clearInProgressStops();
+                        pendingTokens.push(...streamRegulator.popFreeChunkTokens());
+
                         const triggeredStops = stopGenerationDetector.hasTriggeredStops
                             ? stopGenerationDetector.getTriggeredStops()
                             : customStopGenerationTriggersDetector.getTriggeredStops();
+
                         const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
 
                         const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
