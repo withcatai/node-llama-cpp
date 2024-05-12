@@ -50,8 +50,8 @@ import {
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
-    LlamaText, SpecialTokensText, SpecialToken, isLlamaText, tokenizeText, type LlamaTextJSON, type LlamaTextJSONValue,
-    type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
+    LlamaText, SpecialTokensText, SpecialToken, isLlamaText, tokenizeText, type LlamaTextValue, type LlamaTextInputValue,
+    type LlamaTextJSON, type LlamaTextJSONValue, type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
@@ -62,7 +62,8 @@ import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} fro
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
     type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
-    type Token, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty, type ChatWrapperSettings
+    type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty,
+    type ChatWrapperSettings
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
@@ -161,6 +162,8 @@ export {
     SpecialToken,
     isLlamaText,
     tokenizeText,
+    type LlamaTextValue,
+    type LlamaTextInputValue,
     type LlamaTextJSON,
     type LlamaTextJSONValue,
     type LlamaTextSpecialTokensTextJSON,
@@ -176,6 +179,8 @@ export {
     type ChatSystemMessage,
     type ChatUserMessage,
     type Token,
+    type Tokenizer,
+    type Detokenizer,
     isChatModelResponseFunctionCall,
     type GbnfJsonSchema,
     type GbnfJsonSchemaToType,

@@ -3,6 +3,9 @@ import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
+import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
+import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
+import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaLocks, LlamaLogLevel} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
@@ -227,6 +230,18 @@ export class Llama {
                 preventDisposalHandle.dispose();
             }
         });
+    }
+
+    public async createGrammarForJsonSchema<const T extends Readonly<GbnfJsonSchema>>(schema: T) {
+        return new LlamaJsonSchemaGrammar<T>(this, schema);
+    }
+
+    public async getGrammarFor(type: Parameters<typeof LlamaGrammar.getFor>[1]) {
+        return await LlamaGrammar.getFor(this, type);
+    }
+
+    public async createGrammar(options: LlamaGrammarOptions) {
+        return new LlamaGrammar(this, options);
     }
 
     /** @internal */

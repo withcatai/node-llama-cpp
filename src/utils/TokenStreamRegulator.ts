@@ -1,5 +1,5 @@
 import {DisposedError} from "lifecycle-utils";
-import {Token} from "../types.js";
+import {Token, Tokenizer} from "../types.js";
 
 export class TokenStreamRegulator {
     /** @internal */ private readonly _queue: QueuedTokenRelease[] = [];
@@ -21,13 +21,62 @@ export class TokenStreamRegulator {
         return res;
     }
 
-    public getPartiallyFreeChunk() {
+    public getPartiallyFreeChunk(tokenizer: Tokenizer) {
         if (this._queue.length > 0 && this._queue[0].isPartiallyFree) {
             const queuedRelease = this._queue[0];
 
+            if (queuedRelease.hasTextLocks && !queuedRelease.hasTokenLocks)
+                return {
+                    tokens: [],
+                    text: queuedRelease.text.slice(0, queuedRelease.getFreeTextIndex())
+                };
+            else if (queuedRelease.hasTokenLocks && !queuedRelease.hasTextLocks) {
+                const tokens = queuedRelease.tokens.slice(0, queuedRelease.getFreeTokenIndex());
+                return {
+                    tokens,
+                    text: tokenizer.detokenize(tokens)
+                };
+            }
+
+            const freeTokenIndex = queuedRelease.getFreeTokenIndex();
+            const tokens = queuedRelease.tokens.slice(0, freeTokenIndex);
+            const tokensText = tokenizer.detokenize(tokens);
+
+            const freeTextIndex = queuedRelease.getFreeTextIndex();
+            const text = queuedRelease.text.slice(0, freeTextIndex);
+
+            if (text.length > tokensText.length) {
+                return {
+                    tokens,
+                    text: tokensText
+                };
+            } else if (text.length < tokensText.length) {
+                const resTokens: Token[] = [];
+                let resTokensText = "";
+
+                for (const token of tokens) {
+                    const tokenText = tokenizer.detokenize([token]);
+
+                    if (resTokensText.length + tokenText.length > text.length) {
+                        const remainingText = text.slice(resTokensText.length);
+                        const remainingTokens = tokenizer(remainingText, false, "trimLeadingSpace");
+                        resTokens.push(...remainingTokens);
+                        break;
+                    }
+
+                    resTokens.push(token);
+                    resTokensText += tokenText;
+                }
+
+                return {
+                    tokens: resTokens,
+                    text
+                };
+            }
+
             return {
-                tokens: queuedRelease.tokens.slice(0, queuedRelease.getFreeTokenIndex()),
-                text: queuedRelease.text.slice(0, queuedRelease.getFreeTextIndex())
+                tokens: queuedRelease.tokens.slice(0, freeTokenIndex),
+                text: queuedRelease.text.slice(0, freeTextIndex)
             };
         }
 
@@ -65,8 +114,21 @@ export class QueuedTokenRelease {
         return this._textLocks.size === 0 && this._tokenLocks.size === 0;
     }
 
+    public get hasTextLocks() {
+        return this._textLocks.size > 0;
+    }
+
+    public get hasTokenLocks() {
+        return this._tokenLocks.size > 0;
+    }
+
     public get isPartiallyFree() {
-        return this._textLocks.size !== 0 && this._tokenLocks.size !== 0;
+        if (this.isFree)
+            return true;
+
+        const freeTextIndex = this.getFreeTextIndex();
+        const freeTokenIndex = this.getFreeTokenIndex();
+        return freeTextIndex > 0 && freeTokenIndex > 0;
     }
 
     public getFreeTextIndex() {

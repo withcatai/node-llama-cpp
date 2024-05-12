@@ -63,10 +63,10 @@ describe("stableCode", () => {
                 contextSequence: context.getSequence()
             });
 
-            const res = await completion.generateInfillCompletion("const arrayFromOneToFourteen = [1, 2, 3, ", "10, 11, 12, 13, 14];", {
+            const res = await completion.generateInfillCompletion("const arrayFromOneToFourteen = [1, 2, 3,", "10, 11, 12, 13, 14];", {
                 maxTokens: 20
             });
-            expect(res).to.eql(range(4, 9).join(", ") + ", ");
+            expect(res).to.eql(" " + range(4, 9).join(", ") + ", ");
         });
 
         test("fill expected text", {timeout: 1000 * 60 * 60 * 2}, async () => {

@@ -169,7 +169,7 @@ const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInE
     : "auto";
 
 /**
- * Get a llama.cpp binding.
+ * Get a `llama.cpp` binding.
  * Defaults to prefer a prebuilt binary, and fallbacks to building from source if a prebuilt binary is not found.
  * Pass `"lastCliBuild"` to default to use the last successful build created using the `download` or `build` CLI commands if one exists.
  */

@@ -137,7 +137,10 @@ export default defineConfig({
                         ...(await fs.readJSON(path.join(__dirname, "..", "tsconfig.json"))).compilerOptions,
                         moduleResolution: undefined,
                         paths: {
-                            "node-llama-cpp": [path.resolve(__dirname, "..", "src", "index.ts")]
+                            "node-llama-cpp": [
+                                path.resolve(__dirname, "..", "dist", "index.d.ts"),
+                                path.resolve(__dirname, "..", "src", "index.ts")
+                            ]
                         },
                         typeRoots: [
                             path.resolve(__dirname, "..", "node_modules"),
@@ -157,7 +160,7 @@ export default defineConfig({
         },
         nav: [
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},
-            {text: "API Reference", link: "/api/classes/LlamaModel", activeMatch: "/api/"},
+            {text: "API Reference", link: "/api/functions/getLlama", activeMatch: "/api/"},
             {
                 text: packageVersion,
                 items: [{

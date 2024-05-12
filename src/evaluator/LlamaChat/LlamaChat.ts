@@ -657,7 +657,7 @@ export class LlamaChat {
                         pendingTokens.push(...streamRegulator.popFreeChunkTokens());
 
                         const triggeredStops = functionSyntaxStartDetector.getTriggeredStops();
-                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
+                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
 
                         const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                             triggeredStops,
@@ -775,10 +775,15 @@ export class LlamaChat {
                     if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
                         model.isEogToken(token)
                     ) {
+                        stopGenerationDetector.clearInProgressStops();
+                        customStopGenerationTriggersDetector.clearInProgressStops();
+                        pendingTokens.push(...streamRegulator.popFreeChunkTokens());
+
                         const triggeredStops = stopGenerationDetector.hasTriggeredStops
                             ? stopGenerationDetector.getTriggeredStops()
                             : customStopGenerationTriggersDetector.getTriggeredStops();
-                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk();
+
+                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
 
                         const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
                             triggeredStops,

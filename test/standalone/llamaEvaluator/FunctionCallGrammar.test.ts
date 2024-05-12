@@ -42,16 +42,17 @@ describe("grammar for functions", () => {
         expect(grammar.grammar).toMatchInlineSnapshot(
             `
           "root ::= [ ]? "[[call: " rule10 ")]]" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
-          string-rule ::= "\\"" ( [^"\\\\] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
+          string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
           rule1 ::= "\\"good\\""
           rule2 ::= "\\"bad\\""
           rule3 ::= ( rule1 | rule2 )
           fractional-number-rule ::= ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)?
-          rule0 ::= "{" whitespace-new-lines-rule "\\"message\\"" ":" [ ]? string-rule "," whitespace-new-lines-rule "\\"feeling\\"" ":" [ ]? rule3 "," whitespace-new-lines-rule "\\"words\\"" ":" [ ]? fractional-number-rule whitespace-new-lines-rule "}"
-          rule5 ::= ( string-rule ) ( "," whitespace-new-lines-rule string-rule )*
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)
+          rule0 ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? string-rule "," whitespace-b-1-4-rule "\\"feeling\\"" ":" [ ]? rule3 "," whitespace-b-1-4-rule "\\"words\\"" ":" [ ]? fractional-number-rule whitespace-b-0-4-rule "}"
+          rule5 ::= ( string-rule ) ( "," whitespace-b-1-4-rule string-rule )*
           rule6 ::= ( string-rule )?
-          rule4 ::= "[" whitespace-new-lines-rule ( rule5 | rule6 ) whitespace-new-lines-rule "]"
+          rule4 ::= "[" whitespace-b-1-4-rule ( rule5 | rule6 ) whitespace-b-0-4-rule "]"
           rule7 ::= "func1("
           rule8 ::= "func2(" rule0
           rule9 ::= "func3(" rule4

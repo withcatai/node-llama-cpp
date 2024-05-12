@@ -1,5 +1,5 @@
 import {GbnfJsonSchema, GbnfJsonSchemaToType} from "../utils/gbnfJson/types.js";
-import {getGbnfGrammarForGbnfJsonSchema} from "../utils/getGbnfGrammarForGbnfJsonSchema.js";
+import {getGbnfGrammarForGbnfJsonSchema} from "../utils/gbnfJson/getGbnfGrammarForGbnfJsonSchema.js";
 import {validateObjectAgainstGbnfSchema} from "../utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {Llama} from "../bindings/Llama.js";
@@ -11,8 +11,7 @@ export class LlamaJsonSchemaGrammar<const T extends Readonly<GbnfJsonSchema>> ex
     public constructor(llama: Llama, schema: T) {
         const grammar = getGbnfGrammarForGbnfJsonSchema(schema);
 
-        super({
-            llama,
+        super(llama, {
             grammar,
             stopGenerationTriggers: [LlamaText(["\n".repeat(4)])],
             trimWhitespaceSuffix: true

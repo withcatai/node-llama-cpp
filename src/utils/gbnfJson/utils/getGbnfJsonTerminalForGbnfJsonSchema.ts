@@ -13,12 +13,15 @@ import {
     isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
 } from "../types.js";
 import {getGbnfJsonTerminalForLiteral} from "./getGbnfJsonTerminalForLiteral.js";
+import {GbnfJsonScopeState} from "./GbnfJsonScopeState.js";
 
 
-export function getGbnfJsonTerminalForGbnfJsonSchema(schema: GbnfJsonSchema, grammarGenerator: GbnfGrammarGenerator): GbnfTerminal {
+export function getGbnfJsonTerminalForGbnfJsonSchema(
+    schema: GbnfJsonSchema, grammarGenerator: GbnfGrammarGenerator, scopeState: GbnfJsonScopeState = new GbnfJsonScopeState()
+): GbnfTerminal {
     if (isGbnfJsonOneOfSchema(schema)) {
         const values = schema.oneOf
-            .map((altSchema) => getGbnfJsonTerminalForGbnfJsonSchema(altSchema, grammarGenerator));
+            .map((altSchema) => getGbnfJsonTerminalForGbnfJsonSchema(altSchema, grammarGenerator, scopeState));
 
         return new GbnfOr(values);
     } else if (isGbnfJsonConstSchema(schema)) {
@@ -31,12 +34,13 @@ export function getGbnfJsonTerminalForGbnfJsonSchema(schema: GbnfJsonSchema, gra
                 return {
                     required: true,
                     key: new GbnfStringValue(propName),
-                    value: getGbnfJsonTerminalForGbnfJsonSchema(propSchema, grammarGenerator)
+                    value: getGbnfJsonTerminalForGbnfJsonSchema(propSchema, grammarGenerator, scopeState.getForNewScope())
                 };
-            })
+            }),
+            scopeState
         );
     } else if (isGbnfJsonArraySchema(schema)) {
-        return new GbnfArray(getGbnfJsonTerminalForGbnfJsonSchema(schema.items, grammarGenerator));
+        return new GbnfArray(getGbnfJsonTerminalForGbnfJsonSchema(schema.items, grammarGenerator, scopeState), scopeState);
     }
 
     const terminals: GbnfTerminal[] = [];

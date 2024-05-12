@@ -106,9 +106,9 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-new-lines-rule "\\"message\\"" ":" [ ]? rule0 "," whitespace-new-lines-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? integer-number-rule "," whitespace-new-lines-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule "," whitespace-new-lines-rule "\\"feelingGood\\"" ":" [ ]? boolean-rule "," whitespace-new-lines-rule "\\"feelingOverall\\"" ":" [ ]? rule5 "," whitespace-new-lines-rule "\\"verbsInMessage\\"" ":" [ ]? rule6 whitespace-new-lines-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
-          string-rule ::= "\\"" ( [^"\\\\] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
+          "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? integer-number-rule "," whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule "," whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? boolean-rule "," whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? rule5 "," whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule6 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
+          string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
           null-rule ::= "null"
           rule0 ::= ( string-rule | null-rule )
           integer-number-rule ::= ("-"? ([0-9] | [1-9] [0-9]*))
@@ -119,9 +119,11 @@ describe("grammar for JSON schema", () => {
           rule3 ::= "\\"good\\""
           rule4 ::= "\\"bad\\""
           rule5 ::= ( rule3 | rule4 )
-          rule7 ::= ( string-rule ) ( "," whitespace-new-lines-rule string-rule )*
+          whitespace-b-2-4-rule ::= ([\\n] ("        " | "\\t\\t") | [ ]?)
+          rule7 ::= ( string-rule ) ( "," whitespace-b-2-4-rule string-rule )*
           rule8 ::= ( string-rule )?
-          rule6 ::= "[" whitespace-new-lines-rule ( rule7 | rule8 ) whitespace-new-lines-rule "]""
+          rule6 ::= "[" whitespace-b-2-4-rule ( rule7 | rule8 ) whitespace-b-1-4-rule "]"
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
@@ -210,12 +212,13 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "[" whitespace-new-lines-rule ( rule2 | rule3 ) whitespace-new-lines-rule "]" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
-          string-rule ::= "\\"" ( [^"\\\\] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
-          rule0 ::= "{" whitespace-new-lines-rule "\\"message\\"" ":" [ ]? string-rule whitespace-new-lines-rule "}"
+          "root ::= "[" whitespace-b-1-4-rule ( rule2 | rule3 ) whitespace-b-0-4-rule "]" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
+          string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)
+          rule0 ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? string-rule whitespace-b-0-4-rule "}"
           rule1 ::= ( rule0 | string-rule )
-          rule2 ::= ( rule1 ) ( "," whitespace-new-lines-rule rule1 )*
+          rule2 ::= ( rule1 ) ( "," whitespace-b-1-4-rule rule1 )*
           rule3 ::= ( rule1 )?"
         `);
 
@@ -301,12 +304,13 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-new-lines-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-new-lines-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-new-lines-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-new-lines-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-new-lines-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-new-lines-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-new-lines-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-new-lines-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
           rule1 ::= "\\"Hooray!\\nYes!\\t/\\\\\\""
-          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\"""
+          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\""
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
@@ -379,12 +383,13 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-new-lines-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-new-lines-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-new-lines-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-new-lines-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-new-lines-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-new-lines-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-new-lines-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-new-lines-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
           rule1 ::= "\\"Hooray!\\nYes!\\t/\\\\\\""
-          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\"""
+          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\""
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
@@ -458,12 +463,13 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-new-lines-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-new-lines-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-new-lines-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-new-lines-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-new-lines-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-new-lines-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-new-lines-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-new-lines-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
-          whitespace-new-lines-rule ::= [\\n]? [ \\t]* [\\n]?
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
           rule1 ::= "\\"Hooray!\\nYes!\\t/\\\\\\""
-          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\"""
+          rule2 ::= "\\"The message is \\\\\\"Hi!\\\\\\".\\""
+          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
         `);
 
         const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
