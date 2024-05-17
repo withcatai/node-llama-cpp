@@ -30,7 +30,8 @@ type BuildCommand = {
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
     command: "build",
-    describe: "Compile the currently downloaded llama.cpp",
+    aliases: ["compile"],
+    describe: "Compile the currently downloaded `llama.cpp` source code",
     builder(yargs) {
         return yargs
             .option("arch", {

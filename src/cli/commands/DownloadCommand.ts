@@ -42,7 +42,7 @@ type DownloadCommandArgs = {
 
 export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     command: "download",
-    describe: "Download a release of llama.cpp and compile it",
+    describe: "Download a release of `llama.cpp` and compile it",
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 

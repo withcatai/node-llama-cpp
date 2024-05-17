@@ -38,7 +38,8 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 alias: ["H"],
                 type: "string",
                 array: true,
-                description: "Headers to use when reading a model file from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+                description: "Headers to use when reading a model file from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers.",
+                group: "Optional:"
             })
             .option("noSplice", {
                 alias: "s",
