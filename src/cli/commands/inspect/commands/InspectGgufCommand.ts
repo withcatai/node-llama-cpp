@@ -11,6 +11,8 @@ import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDown
 import {isUrl} from "../../../../utils/isUrl.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {getReadablePath} from "../../../utils/getReadablePath.js";
+import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls} from "../../../../config.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -24,7 +26,10 @@ type InspectGgufCommand = {
 
 export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
     command: "gguf [modelPath]",
-    describe: "Inspect a GGUF file",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Inspect a GGUF file",
+        documentationPageUrls.CLI.Inspect.GGUF
+    ),
     builder(yargs) {
         return yargs
             .option("modelPath", {

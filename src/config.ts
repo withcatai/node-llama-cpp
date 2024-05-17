@@ -90,9 +90,27 @@ export const npxRunPrefix = "npx --no ";
 export const enableRecursiveClone = false;
 
 const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
+const documentationCliUrl = documentationUrl + "/guide/cli";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",
-    Vulkan: documentationUrl + "/guide/vulkan"
+    Vulkan: documentationUrl + "/guide/vulkan",
+    CLI: {
+        index: documentationCliUrl,
+        Pull: documentationCliUrl + "/pull",
+        Chat: documentationCliUrl + "/chat",
+        Init: documentationCliUrl + "/init",
+        Download: documentationCliUrl + "/download",
+        Complete: documentationCliUrl + "/complete",
+        Infill: documentationCliUrl + "/infill",
+        Inspect: {
+            index: documentationCliUrl + "/inspect",
+            GPU: documentationCliUrl + "/inspect/gpu",
+            GGUF: documentationCliUrl + "/inspect/gguf",
+            Measure: documentationCliUrl + "/inspect/measure"
+        },
+        Build: documentationCliUrl + "/build",
+        Clear: documentationCliUrl + "/clear"
+    }
 } as const;
 export const recommendedBaseDockerImage = "node:20";
 export const minAllowedContextSizeInCalculations = 24;

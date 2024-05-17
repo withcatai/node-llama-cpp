@@ -4,7 +4,7 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
-import {chatCommandHistoryFilePath, defaultChatSystemPrompt} from "../../config.js";
+import {chatCommandHistoryFilePath, defaultChatSystemPrompt, documentationPageUrls} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
 import {defineChatSessionFunction} from "../../evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
@@ -26,6 +26,7 @@ import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -64,7 +65,10 @@ type ChatCommand = {
 
 export const ChatCommand: CommandModule<object, ChatCommand> = {
     command: "chat [modelPath]",
-    describe: "Chat with a Llama model",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Chat with a Llama model",
+        documentationPageUrls.CLI.Chat
+    ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 

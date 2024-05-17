@@ -14,12 +14,13 @@ import {interactivelyAskForModel} from "../utils/interactivelyAskForModel.js";
 import {BuildGpu, LlamaLogLevel, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../bindings/types.js";
 import {getLlama} from "../../bindings/getLlama.js";
 import {ProjectTemplate, ProjectTemplateParameter, scaffoldProjectTemplate} from "../utils/projectTemplates.js";
-import {packedProjectTemplatesDirectory} from "../../config.js";
+import {documentationPageUrls, packedProjectTemplatesDirectory} from "../../config.js";
 import {getModuleVersion} from "../../utils/getModuleVersion.js";
 import withOra from "../../utils/withOra.js";
 import {ProjectTemplateOption, projectTemplates} from "../projectTemplates.js";
 import {getReadablePath} from "../utils/getReadablePath.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type InitCommand = {
     name?: string,
@@ -28,7 +29,10 @@ type InitCommand = {
 
 export const InitCommand: CommandModule<object, InitCommand> = {
     command: "init [name]",
-    describe: "Generate a new `node-llama-cpp` project from a template",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Generate a new `node-llama-cpp` project from a template",
+        documentationPageUrls.CLI.Init
+    ),
     builder(yargs) {
         return yargs
             .option("name", {

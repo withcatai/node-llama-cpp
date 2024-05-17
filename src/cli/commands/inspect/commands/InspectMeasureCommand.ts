@@ -17,6 +17,8 @@ import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getReadablePath} from "../../../utils/getReadablePath.js";
+import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls} from "../../../../config.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -34,7 +36,10 @@ type InspectMeasureCommand = {
 
 export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand> = {
     command: "measure [modelPath]",
-    describe: "Measure VRAM consumption of a GGUF model file with all possible combinations of gpu layers and context sizes",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Measure VRAM consumption of a GGUF model file with all possible combinations of gpu layers and context sizes",
+        documentationPageUrls.CLI.Inspect.Measure
+    ),
     builder(yargs) {
         return yargs
             .option("modelPath", {

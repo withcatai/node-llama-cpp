@@ -2,12 +2,13 @@ import process from "process";
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {cliModelsDirectory} from "../../config.js";
+import {cliModelsDirectory, documentationPageUrls} from "../../config.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {getReadablePath} from "../utils/getReadablePath.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type PullCommand = {
     url: string,
@@ -22,7 +23,10 @@ type PullCommand = {
 export const PullCommand: CommandModule<object, PullCommand> = {
     command: "pull [url]",
     aliases: ["get"],
-    describe: "Download a model from a URL",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Download a model from a URL",
+        documentationPageUrls.CLI.Pull
+    ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 

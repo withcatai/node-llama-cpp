@@ -8,6 +8,8 @@ import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {BuildGpu, LlamaLogLevel} from "../../../../bindings/types.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getModuleVersion} from "../../../../utils/getModuleVersion.js";
+import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls} from "../../../../config.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -15,7 +17,10 @@ type InspectGpuCommand = {
 
 export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
     command: "gpu",
-    describe: "Show the detected GPU types and their VRAM usage",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Show the detected GPU types and their VRAM usage",
+        documentationPageUrls.CLI.Inspect.GPU
+    ),
     async handler() {
         const platform = getPlatform();
         const arch = process.arch;

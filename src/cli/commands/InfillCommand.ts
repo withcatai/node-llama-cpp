@@ -16,6 +16,8 @@ import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls} from "../../config.js";
 
 type InfillCommand = {
     modelPath?: string,
@@ -47,7 +49,10 @@ type InfillCommand = {
 
 export const InfillCommand: CommandModule<object, InfillCommand> = {
     command: "infill [modelPath]",
-    describe: "Generate an infill completion for a given suffix and prefix texts",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Generate an infill completion for a given suffix and prefix texts",
+        documentationPageUrls.CLI.Infill
+    ),
     builder(yargs) {
         return yargs
             .option("modelPath", {

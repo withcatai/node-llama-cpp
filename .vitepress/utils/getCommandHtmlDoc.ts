@@ -6,6 +6,7 @@ import {buildHtmlHeading} from "./buildHtmlHeading.js";
 import {htmlEscapeWithCodeMarkdown} from "./htmlEscapeWithCodeMarkdown.js";
 import {getInlineCodeBlockHtml} from "./getInlineCodeBlockHtml.js";
 import {cliBinName, npxRunPrefix} from "../../src/config.js";
+import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     cliName = cliBinName,
@@ -58,7 +59,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
                                     : ""
                             ) + commandPageLink
                         ),
-                        htmlEscapeWithCodeMarkdown(String(subCommand.describe ?? ""))
+                        htmlEscapeWithCodeMarkdown(withoutCliCommandDescriptionDocsUrl(String(subCommand.describe ?? "")))
                     ];
                 })
                 .filter((row): row is string[] => row != null)
@@ -84,7 +85,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
 
     return {
         title,
-        description,
+        description: withoutCliCommandDescriptionDocsUrl(description),
         usage: npxRunPrefix + title,
         usageHtml: markdownRenderer.render("```shell\n" + npxRunPrefix + title + "\n```"),
         options: res
