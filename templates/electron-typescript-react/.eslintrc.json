@@ -5,21 +5,25 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/models"],
+    "ignorePatterns": ["/dist", "/dist-electron", "/release", "/models"],
     "extends": [
         "eslint:recommended",
-        "plugin:jsdoc/recommended"
+        "plugin:jsdoc/recommended",
+        "plugin:react-hooks/recommended"
     ],
     "globals": {
         "Atomics": "readonly",
         "SharedArrayBuffer": "readonly"
     },
     "parserOptions": {
+        "ecmaFeatures": {
+            "jsx": true
+        },
         "ecmaVersion": 2023,
         "sourceType": "module"
     },
     "overrides": [{
-        "files": ["**.ts"],
+        "files": ["**.ts", "**.tsx"],
         "extends": [
             "eslint:recommended",
             "plugin:@typescript-eslint/recommended",
@@ -30,7 +34,7 @@
             "@typescript-eslint",
             "import",
             "jsdoc",
-            "n"
+            "react-refresh"
         ],
         "rules": {
             "@typescript-eslint/explicit-module-boundary-types": ["off"],
@@ -72,7 +76,7 @@
         "@typescript-eslint",
         "import",
         "jsdoc",
-        "n"
+        "react-refresh"
     ],
     "settings": {
         "import/parsers": {
@@ -119,7 +123,6 @@
             "groups": ["builtin", "external","internal", "parent", "sibling", "index", "type", "object", "unknown"],
             "warnOnUnassignedImports": true
         }],
-        "n/file-extension-in-import": ["error", "always"],
         "newline-per-chained-call": ["error", {
             "ignoreChainWithDepth": 2
         }],
@@ -148,6 +151,10 @@
             "code": 140,
             "tabWidth": 4,
             "ignoreStrings": true
-        }]
+        }],
+        "react-refresh/only-export-components": ["warn", {
+            "allowConstantExport": true
+        }],
+        "react-hooks/exhaustive-deps": ["off"]
     }
 }

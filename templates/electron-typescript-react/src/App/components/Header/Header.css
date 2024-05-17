@@ -1,0 +1,89 @@
+.appHeader {
+    display: flex;
+    flex-direction: row;
+    z-index: 10;
+    position: sticky;
+    top: 16px;
+    pointer-events: none;
+
+    > .panel {
+        pointer-events: all;
+        display: flex;
+        flex-direction: row;
+        align-self: start;
+        background-color: var(--panel-background-color);
+        border-radius: 12px;
+        backdrop-filter: blur(8px);
+        box-shadow: var(--panel-box-shadow);
+        overflow: clip;
+        isolation: isolate;
+        color: var(--panel-text-color);
+        z-index: 10;
+
+        > button {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            margin: 8px;
+            background-color: var(--panel-button-background-color);
+            color: var(--panel-text-color);
+            fill: var(--panel-text-color);
+
+            + button {
+                margin-inline-start: 0px;
+            }
+
+            &:hover,
+            &:focus,
+            &:focus-visible {
+                border-color: var(--panel-button-hover-border-color);
+            }
+
+            > .icon {
+                width: 20px;
+                height: 20px;
+            }
+        }
+    }
+
+    > .model {
+        position: relative;
+
+        > .progress {
+            position: absolute;
+            inset-inline-start: 0;
+            top: 0;
+            bottom: 0;
+            background-color: var(--panel-progress-color);
+            width: calc(var(--progress) * 100%);
+            pointer-events: none;
+            z-index: -1;
+
+            --progress: 0;
+
+            &.hide {
+                opacity: 0;
+
+                transition: opacity 0.3s var(--transition-easing);
+            }
+        }
+
+        > .modelName,
+        > .noModel {
+            flex: 1;
+            text-align: start;
+            align-self: center;
+            flex-basis: 400px;
+            padding: 12px 24px;
+
+            margin-inline-end: 48px;
+        }
+    }
+
+    > .spacer {
+        flex-grow: 1;
+    }
+}

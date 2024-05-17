@@ -1,6 +1,6 @@
 import path from "path";
 import {fileURLToPath} from "url";
-import {downloadFile, downloadSequence} from "ipull";
+import {downloadFile, downloadSequence} from "ipull/dist/index.js";
 import fs from "fs-extra";
 import chalk from "chalk";
 import withStatusLogs from "../../src/utils/withStatusLogs.js";
