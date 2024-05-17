@@ -1,0 +1,53 @@
+{
+  "name": "node-llama-cpp-project",
+  "private": true,
+  "version": "0.0.0",
+  "main": "./dist/index.js",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "package.json",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "node": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "_postinstall": "npm run models:pull",
+    "models:pull": "node-llama-cpp pull --dir ./models \"{{modelUrl|escape|escape}}\"",
+    "start": "vite-node ./src/index.ts",
+    "start:build": "node ./dist/index.ts",
+    "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
+    "build": "tsc --build tsconfig.json --force",
+    "lint": "npm run lint:eslint",
+    "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
+    "format": "npm run lint:eslint -- --fix",
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo ./models"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "node-llama-cpp": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.29",
+    "@typescript-eslint/eslint-plugin": "^6.3.0",
+    "@typescript-eslint/parser": "^6.3.0",
+    "eslint": "^8.46.0",
+    "eslint-plugin-import": "^2.28.0",
+    "eslint-plugin-jsdoc": "^46.9.0",
+    "eslint-plugin-n": "^16.3.1",
+    "rimraf": "^5.0.7",
+    "tslib": "^2.6.1",
+    "typescript": "^5.2.2",
+    "vite-node": "^1.4.0"
+  }
+}
