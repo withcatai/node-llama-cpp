@@ -218,6 +218,10 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
 }
 
 static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    if (token < 0) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+
     auto tokenType = llama_token_get_type(model, token);
 
     if (tokenType == LLAMA_TOKEN_TYPE_UNDEFINED || tokenType == LLAMA_TOKEN_TYPE_UNKNOWN) {
@@ -228,6 +232,10 @@ static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* mod
 }
 
 static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    if (token < 0) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+    
     auto tokenType = llama_token_get_type(model, token);
 
     if (tokenType != LLAMA_TOKEN_TYPE_CONTROL && tokenType != LLAMA_TOKEN_TYPE_USER_DEFINED) {
