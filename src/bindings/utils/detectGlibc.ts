@@ -16,7 +16,9 @@ export async function detectGlibc({
             "/lib64",
             "/usr/lib",
             "/usr/lib64",
-            "/usr/lib/x86_64-linux-gnu"
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/usr/lib/armv7l-linux-gnu"
         ];
 
         return await asyncEvery([
@@ -34,7 +36,15 @@ export async function detectGlibc({
                 hasFileInPath("ld-linux-x86-64.so", librarySearchPaths),
                 hasFileInPath("ld-linux-x86-64.so.1", librarySearchPaths),
                 hasFileInPath("ld-linux-x86-64.so.2", librarySearchPaths),
-                hasFileInPath("ld-linux-x86-64.so.3", librarySearchPaths) // for when the next version comes out
+                hasFileInPath("ld-linux-x86-64.so.3", librarySearchPaths), // for when the next version comes out
+                hasFileInPath("ld-linux-aarch64.so", librarySearchPaths),
+                hasFileInPath("ld-linux-aarch64.so.1", librarySearchPaths),
+                hasFileInPath("ld-linux-aarch64.so.2", librarySearchPaths),
+                hasFileInPath("ld-linux-aarch64.so.3", librarySearchPaths), // for when the next version comes out
+                hasFileInPath("ld-linux-armv7l.so", librarySearchPaths),
+                hasFileInPath("ld-linux-armv7l.so.1", librarySearchPaths),
+                hasFileInPath("ld-linux-armv7l.so.2", librarySearchPaths),
+                hasFileInPath("ld-linux-armv7l.so.3", librarySearchPaths) // for when the next version comes out
             ])
         ]);
     }

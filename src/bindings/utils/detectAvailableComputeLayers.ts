@@ -80,6 +80,8 @@ async function detectCudaSupport({
             "/usr/lib",
             "/usr/lib64",
             "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/usr/lib/armv7l-linux-gnu",
             ...cudaLibraryPaths
         ];
 
@@ -148,6 +150,8 @@ async function detectVulkanSupport({
             "/usr/lib",
             "/usr/lib64",
             "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/usr/lib/armv7l-linux-gnu",
             (process.env.PREFIX != null && process.env.PREFIX?.toLowerCase()?.includes?.("termux"))
                 ? `${process.env.PREFIX}/usr/lib`
                 : undefined
