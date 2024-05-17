@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import process from "process";
 import envVar from "env-var";
-import * as uuid from "uuid";
+import {nanoid} from "nanoid";
 import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
 import {
     nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption, nodeLlamaCppGpuOffStringOptions
@@ -23,7 +23,7 @@ export const projectTemplatesDirectory = path.join(__dirname, "..", "templates")
 export const packedProjectTemplatesDirectory = path.join(projectTemplatesDirectory, "packed");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
-export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
+export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", nanoid());
 export const cliHomedirDirectory = path.join(os.homedir(), ".node-llama-cpp");
 export const chatCommandHistoryFilePath = path.join(cliHomedirDirectory, ".chat_repl_history");
 export const cliModelsDirectory = path.join(cliHomedirDirectory, "models");
