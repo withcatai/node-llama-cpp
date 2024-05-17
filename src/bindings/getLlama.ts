@@ -173,8 +173,8 @@ const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInE
  * Defaults to prefer a prebuilt binary, and fallbacks to building from source if a prebuilt binary is not found.
  * Pass `"lastCliBuild"` to default to use the last successful build created using the `download` or `build` CLI commands if one exists.
  */
-export async function getLlama(options?: LlamaOptions): Promise<Llama>;
 export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOptions): Promise<Llama>;
+export async function getLlama(options?: LlamaOptions): Promise<Llama>;
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
         const lastBuildInfo = await getLastBuildInfo();

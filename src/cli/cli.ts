@@ -8,15 +8,16 @@ import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
 import {cliBinName} from "../config.js";
 import {setIsRunningFromCLI} from "../state.js";
-import {DownloadCommand} from "./commands/DownloadCommand.js";
-import {BuildCommand} from "./commands/BuildCommand.js";
-import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
-import {ClearCommand} from "./commands/ClearCommand.js";
+import {PullCommand} from "./commands/PullCommand.js";
 import {ChatCommand} from "./commands/ChatCommand.js";
+import {InitCommand} from "./commands/InitCommand.js";
+import {DownloadCommand} from "./commands/DownloadCommand.js";
 import {CompleteCommand} from "./commands/CompleteCommand.js";
 import {InfillCommand} from "./commands/InfillCommand.js";
 import {InspectCommand} from "./commands/inspect/InspectCommand.js";
-import {PullCommand} from "./commands/PullCommand.js";
+import {BuildCommand} from "./commands/BuildCommand.js";
+import {ClearCommand} from "./commands/ClearCommand.js";
+import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
 import {DebugCommand} from "./commands/DebugCommand.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,7 @@ yarg
     .usage("Usage: $0 <command> [options]")
     .command(PullCommand)
     .command(ChatCommand)
+    .command(InitCommand)
     .command(DownloadCommand)
     .command(CompleteCommand)
     .command(InfillCommand)

@@ -17,6 +17,7 @@ import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../../src/state.js";
 import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
 import {htmlEscapeWithCodeMarkdown} from "../../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
+import {InitCommand} from "../../../src/cli/commands/InitCommand.js";
 
 export default {
     async load() {
@@ -26,6 +27,7 @@ export default {
             index: buildIndexTable([
                 ["pull", PullCommand],
                 ["chat", ChatCommand],
+                ["init", InitCommand],
                 ["complete", CompleteCommand],
                 ["infill", InfillCommand],
                 ["inspect", InspectCommand],
@@ -36,6 +38,7 @@ export default {
 
             pull: await getCommandHtmlDoc(PullCommand),
             chat: await getCommandHtmlDoc(ChatCommand),
+            init: await getCommandHtmlDoc(InitCommand),
             complete: await getCommandHtmlDoc(CompleteCommand),
             infill: await getCommandHtmlDoc(InfillCommand),
             inspect: {

@@ -6,6 +6,7 @@ node_modules
 /dist
 /docs-site
 /docs/api
+/templates/packed
 
 /.env
 /.eslintcache

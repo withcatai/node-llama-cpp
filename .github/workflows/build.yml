@@ -334,6 +334,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      discussions: write
     needs:
       - build
       - build-binaries
@@ -380,6 +381,32 @@ jobs:
         run: |
           if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
             echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
+          fi
+      - name: Prepare `create-node-llama-cpp` module
+        if: steps.set-npm-url.outputs.npm-url != ''
+        run: |
+          export DEPLOYED_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
+          
+          pushd packages/create-node-llama-cpp
+          npm ci --ignore-scripts
+          popd
+          
+          npx --no vite-node ./scripts/prepareCreateNodeLlamaCppModuleForPublish.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION"
+          
+          pushd packages/create-node-llama-cpp
+          npm run build
+      - name: Release `create-node-llama-cpp` module
+        if: steps.set-npm-url.outputs.npm-url != ''
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_RELEASE_REF: ${{ github.ref }}
+        run: |
+          cd packages/create-node-llama-cpp
+          
+          if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
+              npm publish --tag beta
+          else
+              npm publish
           fi
       - name: Generate docs with updated version
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'

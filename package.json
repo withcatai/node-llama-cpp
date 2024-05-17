@@ -6,10 +6,11 @@
   "type": "module",
   "types": "./dist/index.d.ts",
   "bin": {
-    "node-llama-cpp": "./dist/cli/cli.js"
+    "node-llama-cpp": "dist/cli/cli.js"
   },
   "files": [
     "dist/",
+    "templates/packed/",
     "llama/",
     "llamaBins/",
     "package.json",
@@ -42,7 +43,8 @@
   "scripts": {
     "prepare": "[ \"$CI\" = true ] || [ -d '.husky/_' ] || husky install",
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
-    "build": "tsc --build tsconfig.json --force",
+    "build": "tsc --build tsconfig.json --force && npm run build:packTemplates",
+    "build:packTemplates": "vite-node scripts/packTemplates.ts",
     "addPostinstallScript": "npm pkg set scripts.postinstall=\"node ./dist/cli/cli.js postinstall\"",
     "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "watch": "tsc --build tsconfig.json --watch --force",
@@ -55,12 +57,12 @@
     "test:modelDependent:interactive": "vitest watch ./test/modelDependent",
     "test:typescript": "tsc --build tsconfig.json --dry --force",
     "lint": "npm run lint:eslint",
-    "lint:eslint": "eslint --ext .js --ext .ts .",
+    "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",
     "dev:setup:downloadAllTestModels": "vite-node test/utils/scripts/downloadAllTestModels.ts",
     "dev:setup": "npm run build && node ./dist/cli/cli.js download --noUsageExample && npm run docs:generateTypedoc && npm run dev:setup:downloadAllTestModels",
     "dev:build": "npm run build && node ./dist/cli/cli.js build --noUsageExample",
-    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo ./test/.models ./docs/api ./docs/api-overrides",
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo ./test/.models ./docs/api ./docs/api-overrides ./templates/packed",
     "docs:generateTypedoc": "typedoc && rimraf ./docs/api/index.md ./docs/api/globals.md ./docs/api/functions/LlamaText.md && npm run docs:generateTypedoc:overrides",
     "docs:generateTypedoc:overrides": "typedoc --entryPoints ./src/apiDocsOverrides.ts --out ./docs/api-overrides && copyfiles --flat \"./docs/api-overrides/classes/LlamaText.md\" ./docs/api/classes && rimraf ./docs/api-overrides",
     "docs:dev": "npm run docs:generateTypedoc && vitepress dev",
@@ -124,6 +126,7 @@
     "@types/proper-lockfile": "^4.1.4",
     "@types/semver": "^7.5.8",
     "@types/uuid": "^9.0.2",
+    "@types/validate-npm-package-name": "^4.0.2",
     "@types/which": "^3.0.0",
     "@types/yargs": "^17.0.24",
     "@typescript-eslint/eslint-plugin": "^6.3.0",
@@ -161,6 +164,7 @@
     "env-var": "^7.3.1",
     "filenamify": "^6.0.0",
     "fs-extra": "^11.2.0",
+    "ignore": "^5.3.1",
     "ipull": "^3.1.1",
     "is-unicode-supported": "^2.0.0",
     "lifecycle-utils": "^1.4.1",
@@ -176,6 +180,7 @@
     "stdout-update": "^4.0.1",
     "strip-ansi": "^7.1.0",
     "uuid": "^9.0.0",
+    "validate-npm-package-name": "^5.0.1",
     "which": "^4.0.0",
     "yargs": "^17.7.2"
   },
