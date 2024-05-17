@@ -1,4 +1,5 @@
 import {CommandModule} from "yargs";
+import {createMarkdownRenderer} from "vitepress";
 import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
 import {PullCommand} from "../../../src/cli/commands/PullCommand.js";
 import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
@@ -18,13 +19,14 @@ import {setIsInDocumentationMode} from "../../../src/state.js";
 import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
 import {htmlEscapeWithCodeMarkdown} from "../../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
 import {InitCommand} from "../../../src/cli/commands/InitCommand.js";
+import {getInlineCodeBlockHtml} from "../../../.vitepress/utils/getInlineCodeBlockHtml.js";
 
 export default {
     async load() {
         setIsInDocumentationMode(true);
 
         return {
-            index: buildIndexTable([
+            index: await buildIndexTable([
                 ["pull", PullCommand],
                 ["chat", ChatCommand],
                 ["init", InitCommand],
@@ -62,8 +64,9 @@ export default {
     }
 };
 
-function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
+async function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
     let res = "";
+    const markdownRenderer = await createMarkdownRenderer(process.cwd());
 
     res += buildHtmlHeading("h2", htmlEscape("Commands"), "commands");
     res += buildHtmlTable(
@@ -77,7 +80,7 @@ function buildIndexTable(commands: [pageLink: string, command: CommandModule<any
                     return null;
 
                 return [
-                    `<a href="${pageLink}"><code>` + htmlEscape(cliName + " " + command.command) + "</code></a>",
+                    getInlineCodeBlockHtml(markdownRenderer, cliName + " " + command.command, "shell", pageLink),
                     htmlEscapeWithCodeMarkdown(String(command.describe ?? ""))
                 ];
             })
@@ -108,10 +111,13 @@ function buildIndexTable(commands: [pageLink: string, command: CommandModule<any
         ]
     );
 
+    const usage = npxRunPrefix + cliName + " <command> [options]";
+
     return {
         title: "CLI",
         description: null,
-        usage: npxRunPrefix + cliName + " <command> [options]",
+        usage,
+        usageHtml: markdownRenderer.render("```shell\n" + usage + "\n```"),
         options: res
     };
 }

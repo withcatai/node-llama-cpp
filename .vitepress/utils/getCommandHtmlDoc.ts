@@ -1,9 +1,11 @@
 import {Argv, CommandModule, Options} from "yargs";
+import {createMarkdownRenderer} from "vitepress";
 import {htmlEscape} from "./htmlEscape.js";
-import {cliBinName, npxRunPrefix} from "../../src/config.js";
 import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 import {htmlEscapeWithCodeMarkdown} from "./htmlEscapeWithCodeMarkdown.js";
+import {getInlineCodeBlockHtml} from "./getInlineCodeBlockHtml.js";
+import {cliBinName, npxRunPrefix} from "../../src/config.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     cliName = cliBinName,
@@ -19,6 +21,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     const title = cliName + " " + (resolvedParentCommandCliCommand ?? "<command>").replace("<command>", currentCommandCliCommand ?? "");
     const description = command.describe ?? "";
     const {subCommands, optionGroups} = await parseCommandDefinition(command);
+    const markdownRenderer = await createMarkdownRenderer(process.cwd());
 
     let res = "";
 
@@ -45,7 +48,16 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
                         cliCommand = (resolvedParentCommandCliCommand ?? "<command>").replace("<command>", cliCommand);
 
                     return [
-                        `<a href="${subCommandsParentPageLink != null ? (subCommandsParentPageLink + "/") : ""}${commandPageLink}"><code>` + htmlEscape(cliName + " " + cliCommand) + "</code></a>",
+                        getInlineCodeBlockHtml(
+                            markdownRenderer,
+                            cliName + " " + cliCommand,
+                            "shell",
+                            (
+                                subCommandsParentPageLink != null
+                                    ? (subCommandsParentPageLink + "/")
+                                    : ""
+                            ) + commandPageLink
+                        ),
                         htmlEscapeWithCodeMarkdown(String(subCommand.describe ?? ""))
                     ];
                 })
@@ -74,6 +86,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
         title,
         description,
         usage: npxRunPrefix + title,
+        usageHtml: markdownRenderer.render("```shell\n" + npxRunPrefix + title + "\n```"),
         options: res
     };
 }
