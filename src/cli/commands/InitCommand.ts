@@ -24,6 +24,7 @@ import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescripti
 
 type InitCommand = {
     name?: string,
+    template?: string,
     gpu?: BuildGpu | "auto"
 };
 
@@ -38,6 +39,11 @@ export const InitCommand: CommandModule<object, InitCommand> = {
             .option("name", {
                 type: "string",
                 description: "Project name"
+            })
+            .option("template", {
+                type: "string",
+                choices: projectTemplates.map((template) => template.name),
+                description: "Template to use. If omitted, you will be prompted to select one"
             })
             .option("gpu", {
                 type: "string",
@@ -59,17 +65,24 @@ export const InitCommand: CommandModule<object, InitCommand> = {
 
 export const CreateCliCommand: CommandModule<object, InitCommand> = {
     command: "$0",
-    describe: "Scaffold a new `node-llama-cpp` project from a template",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Scaffold a new `node-llama-cpp` project from a template",
+        documentationPageUrls.CLI.Init
+    ),
     builder: InitCommand.builder,
     handler: InitCommandHandler
 };
 
-export async function InitCommandHandler({name, gpu}: InitCommand) {
+export async function InitCommandHandler({name, template, gpu}: InitCommand) {
     const currentDirectory = path.resolve(process.cwd());
     const projectName = (name != null && validateNpmPackageName(name ?? "").validForNewPackages)
         ? name
         : await askForProjectName(currentDirectory);
-    const selectedTemplateOption = await askForTemplate();
+    const selectedTemplateOption = (
+        (template != null && template !== "")
+            ? projectTemplates.find((item) => item.name === template)
+            : undefined
+    ) ?? await askForTemplate();
 
     const llama = gpu == null
         ? await getLlama("lastBuild", {
