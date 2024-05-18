@@ -65,6 +65,7 @@ export type BindingModule = {
 
 export type AddonModel = {
     init(): Promise<boolean>,
+    loadLora(loraFilePath: string, scale: number, threads: number, baseModelPath?: string): Promise<void>,
     abortActiveModelLoad(): void,
     dispose(): Promise<void>,
     tokenize(text: string, specialTokens: boolean): Uint32Array,

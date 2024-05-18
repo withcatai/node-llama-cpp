@@ -54,7 +54,8 @@ export type LlamaModelOptions = {
 
     /**
      * Use mmap if possible.
-     * Enabled by default in llama.cpp.
+     * Defaults to `true`.
+     * If LoRA is used, this will always be set to `false`.
      */
     useMmap?: boolean,
 
@@ -72,7 +73,41 @@ export type LlamaModelOptions = {
     checkTensors?: boolean,
 
     /**
+     * Load the provided LoRA adapters onto the model after loading the model.
+     * LoRA adapters are used to modify the weights of a pretrained model to adapt to new tasks or domains
+     * without the need for extensive retraining from scratch.
+     *
+     * If a string is provided, it will be treated as a path to a single LoRA adapter file.
+     */
+    lora?: string | {
+        adapters: Array<{
+            loraFilePath: string,
+            baseModelPath?: string,
+
+            /**
+             * Defaults to `1`.
+             */
+            scale?: number
+        }>,
+
+        /**
+         * The number of threads to use when loading the LoRA adapters.
+         * set to 0 to use the maximum threads supported by the current machine hardware.
+         *
+         * Defaults to `6`.
+         */
+        threads?: number,
+
+        /**
+         * Called with the LoRA adapters load percentage when the LoRA adapters are being loaded.
+         * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
+         */
+        onLoadProgress?(loadProgress: number): void
+    },
+
+    /**
      * Called with the load percentage when the model is being loaded.
+     * > **Note:** This progress does not include the progress of loading the provided LoRA adapters (when `lora` is used)
      * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
      */
     onLoadProgress?(loadProgress: number): void,
@@ -88,6 +123,10 @@ export type LlamaModelOptions = {
      */
     ignoreMemorySafetyChecks?: boolean
 };
+
+const defaultLoraThreads = 6;
+const defaultLoraScale = 1;
+const defaultUseMmap = true;
 
 export class LlamaModel {
     /** @internal */ public readonly _llama: Llama;
@@ -412,12 +451,36 @@ export class LlamaModel {
     }
 
     /** @internal */
+    private async _loadLora({
+        loraFilePath, baseModelPath, scale, threads
+    }: {
+        loraFilePath: string, baseModelPath?: string, scale?: number, threads: number
+    }) {
+        await this._model.loadLora(
+            path.resolve(process.cwd(), loraFilePath),
+            scale ?? defaultLoraScale,
+            Math.max(0, Math.floor(threads)),
+            baseModelPath == null
+                ? undefined
+                : path.resolve(process.cwd(), baseModelPath)
+        );
+    }
+
+    /** @internal */
     public static async _create(modelOptions: LlamaModelOptions, {
         _llama
     }: {
         _llama: Llama
     }) {
         const {loadSignal} = modelOptions;
+        let useMmap = modelOptions.useMmap ?? defaultUseMmap;
+        const loraOptions: LlamaModelOptions["lora"] = typeof modelOptions.lora === "string"
+            ? {adapters: [{loraFilePath: modelOptions.lora}]}
+            : modelOptions.lora;
+
+        if (loraOptions?.adapters != null && loraOptions.adapters.length > 0)
+            useMmap = false; // using LoRA with nmap crashes the process
+
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
             signal: loadSignal
@@ -428,7 +491,7 @@ export class LlamaModel {
         });
         const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;
 
-        const model = new LlamaModel({...modelOptions, gpuLayers}, {_fileInfo: fileInfo, _fileInsights: ggufInsights, _llama});
+        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {_fileInfo: fileInfo, _fileInsights: ggufInsights, _llama});
         const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
             : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
@@ -455,6 +518,45 @@ export class LlamaModel {
                 throw loadSignal.reason;
             } else if (!modelLoaded)
                 throw new Error("Failed to load model");
+
+            loadSignal?.removeEventListener("abort", onAbort);
+
+            if (loraOptions != null && loraOptions.adapters.length > 0) {
+                const loraThreads = loraOptions.threads ?? defaultLoraThreads;
+                let loadedAdapters = 0;
+
+                for (const adapter of loraOptions.adapters) {
+                    try {
+                        await model._loadLora({
+                            loraFilePath: adapter.loraFilePath,
+                            baseModelPath: adapter.baseModelPath,
+                            scale: adapter.scale,
+                            threads: loraThreads
+                        });
+                        loadedAdapters++;
+
+                        try {
+                            loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    } catch (err) {
+                        await model._model.dispose();
+                        throw err;
+                    }
+
+                    if (loadSignal?.aborted) {
+                        await model._model.dispose();
+                        throw loadSignal.reason;
+                    }
+                }
+            } else if (loraOptions?.onLoadProgress != null) {
+                try {
+                    loraOptions.onLoadProgress(1);
+                } catch (err) {
+                    console.error(err);
+                }
+            }
 
             return model;
         } finally {
