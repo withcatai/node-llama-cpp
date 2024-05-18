@@ -17,7 +17,16 @@ jobs:
         with:
           node-version: "18"
       - name: Install modules
-        run: npm ci
+        run: |
+          npm ci
+
+          pushd templates/node-typescript
+          npm ci
+          popd
+
+          pushd templates/electron-typescript-react
+          npm ci
+          popd
       - name: ESLint
         run: npx eslint --ext .js --ext .ts .
       - name: TypeScript validity
