@@ -42,6 +42,7 @@
   },
   "scripts": {
     "prepare": "[ \"$CI\" = true ] || [ -d '.husky/_' ] || husky install",
+    "postinstall": "cd templates && npm install",
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force && npm run build:packTemplates",
     "build:packTemplates": "vite-node scripts/packTemplates.ts",
