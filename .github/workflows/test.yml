@@ -20,13 +20,8 @@ jobs:
         run: |
           npm ci
 
-          pushd templates/node-typescript
+          cd templates
           npm ci
-          popd
-
-          pushd templates/electron-typescript-react
-          npm ci
-          popd
       - name: ESLint
         run: npx eslint --ext .js --ext .ts .
       - name: TypeScript validity
