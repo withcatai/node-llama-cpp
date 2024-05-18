@@ -34,7 +34,7 @@ export function App() {
                 scrollToBottom();
         });
 
-        document.body.addEventListener("scroll", onScroll, {passive: false});
+        window.addEventListener("scroll", onScroll, {passive: false});
         observer.observe(document.body, {
             box: "border-box"
         });
@@ -43,7 +43,7 @@ export function App() {
 
         return () => {
             observer.disconnect();
-            document.body.removeEventListener("scroll", onScroll);
+            window.removeEventListener("scroll", onScroll);
         };
     }, []);
 
