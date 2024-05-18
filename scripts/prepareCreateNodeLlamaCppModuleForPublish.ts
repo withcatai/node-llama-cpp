@@ -1,7 +1,6 @@
 import path from "path";
 import {fileURLToPath} from "url";
 import yargs from "yargs";
-// eslint-disable-next-line n/file-extension-in-import
 import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
 

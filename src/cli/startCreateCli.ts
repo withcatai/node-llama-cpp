@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import yargs from "yargs";
-// eslint-disable-next-line n/file-extension-in-import
 import {hideBin} from "yargs/helpers";
 import {setIsRunningFromCLI} from "../state.js";
 import {CreateCliCommand} from "./commands/InitCommand.js";

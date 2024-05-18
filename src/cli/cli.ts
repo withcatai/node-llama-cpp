@@ -3,7 +3,6 @@
 import {fileURLToPath} from "url";
 import path from "path";
 import yargs from "yargs";
-// eslint-disable-next-line n/file-extension-in-import
 import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
 import {cliBinName, documentationPageUrls} from "../config.js";

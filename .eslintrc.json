@@ -5,7 +5,7 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/llama", "/docs-site"],
+    "ignorePatterns": ["/dist", "/llama", "/docs-site", "/packages/create-node-llama-cpp/dist"],
     "extends": [
         "eslint:recommended",
         "plugin:jsdoc/recommended"
