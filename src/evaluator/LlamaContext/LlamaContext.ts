@@ -922,7 +922,6 @@ export class LlamaContextSequence {
         if (evalTokens.length === 0)
             return;
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             this._ensureNotDisposed();
 

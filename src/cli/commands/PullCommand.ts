@@ -2,12 +2,13 @@ import process from "process";
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {cliModelsDirectory} from "../../config.js";
+import {cliModelsDirectory, documentationPageUrls} from "../../config.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {getReadablePath} from "../utils/getReadablePath.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type PullCommand = {
     url: string,
@@ -22,7 +23,10 @@ type PullCommand = {
 export const PullCommand: CommandModule<object, PullCommand> = {
     command: "pull [url]",
     aliases: ["get"],
-    describe: "Download a model from a URL",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Download a model from a URL",
+        documentationPageUrls.CLI.Pull
+    ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 
@@ -38,30 +42,35 @@ export const PullCommand: CommandModule<object, PullCommand> = {
                         ? "\n"
                         : " "
                 ),
-                demandOption: true
+                demandOption: true,
+                group: "Required:"
             })
             .option("header", {
                 alias: ["H"],
                 type: "string",
                 array: true,
-                description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers."
+                description: "Headers to use when downloading a model from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers.",
+                group: "Optional:"
             })
             .option("override", {
                 alias: ["o"],
                 type: "boolean",
-                description: "Override the model if it already exists",
-                default: false
+                description: "Override the model file if it already exists",
+                default: false,
+                group: "Optional:"
             })
             .option("noProgress", {
                 type: "boolean",
                 description: "Do not show a progress bar while downloading",
-                default: false
+                default: false,
+                group: "Optional:"
             })
             .option("noTempFile", {
                 alias: ["noTemp"],
                 type: "boolean",
                 description: "Delete the temporary file when canceling the download",
-                default: false
+                default: false,
+                group: "Optional:"
             })
             .option("directory", {
                 alias: ["d", "dir"],
@@ -70,12 +79,14 @@ export const PullCommand: CommandModule<object, PullCommand> = {
                 default: cliModelsDirectory,
                 defaultDescription: isInDocumentationMode
                     ? "`" + getReadablePath(cliModelsDirectory) + "`"
-                    : getReadablePath(cliModelsDirectory)
+                    : getReadablePath(cliModelsDirectory),
+                group: "Optional:"
             })
             .option("filename", {
                 alias: ["n", "name"],
                 type: "string",
-                description: "Filename to save the model as"
+                description: "Filename to save the model as",
+                group: "Optional:"
             });
     },
     async handler({url, header: headerArg, override, noProgress, noTempFile, directory, filename}: PullCommand) {

@@ -15,9 +15,7 @@ If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile
 :::
 
 ## Usage
-```shell-vue
-{{commandDoc.usage}}
-```
+<div v-html="commandDoc.usageHtml"></div>
 <div v-html="commandDoc.options"></div>
 
 

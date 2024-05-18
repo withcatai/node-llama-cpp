@@ -5,7 +5,7 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/llama", "/docs-site"],
+    "ignorePatterns": ["/dist", "/llama", "/docs-site", "/packages/create-node-llama-cpp/dist"],
     "extends": [
         "eslint:recommended",
         "plugin:jsdoc/recommended"
@@ -15,10 +15,7 @@
         "SharedArrayBuffer": "readonly"
     },
     "parserOptions": {
-        "ecmaFeatures": {
-            "jsx": true
-        },
-        "ecmaVersion": 2021,
+        "ecmaVersion": 2023,
         "sourceType": "module"
     },
     "overrides": [{
@@ -148,7 +145,9 @@
         }],
         "keyword-spacing": ["warn"],
         "space-infix-ops": ["warn"],
-        "spaced-comment": ["warn", "always"],
+        "spaced-comment": ["warn", "always", {
+            "markers": ["/"]
+        }],
         "eol-last": ["warn", "always"],
         "max-len": ["warn", {
             "code": 140,

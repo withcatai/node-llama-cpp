@@ -7,11 +7,13 @@ import {splitAnsiToLines} from "./splitAnsiToLines.js";
 export async function consolePromptQuestion(question: string, {
     validate,
     renderSummaryOnExit,
-    exitOnCtrlC = true
+    exitOnCtrlC = true,
+    defaultValue
 }: {
     validate?: (input: string) => string | null | Promise<string | null>,
     renderSummaryOnExit?: (item: string | null) => string,
-    exitOnCtrlC?: boolean
+    exitOnCtrlC?: boolean,
+    defaultValue?: string
 } = {}) {
     let lastErrorText = "";
     let lastResponse = "";
@@ -25,7 +27,7 @@ export async function consolePromptQuestion(question: string, {
             output: process.stdout
         });
 
-        const res = await new Promise<string | null>((accept) => {
+        let res = await new Promise<string | null>((accept) => {
             const initialCursorPosition = rl.getCursorPos();
             function onSigInt() {
                 rl.off("SIGINT", onSigInt);
@@ -67,6 +69,9 @@ export async function consolePromptQuestion(question: string, {
 
             return null;
         }
+
+        if (res === "" && defaultValue != null)
+            res = defaultValue;
 
         lastResponse = res;
 

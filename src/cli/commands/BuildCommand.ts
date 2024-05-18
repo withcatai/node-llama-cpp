@@ -4,7 +4,7 @@ import chalk from "chalk";
 import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
 import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, isCI, defaultLlamaCppGpuSupport} from "../../config.js";
+import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, isCI, defaultLlamaCppGpuSupport, documentationPageUrls} from "../../config.js";
 import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
@@ -17,6 +17,7 @@ import {getGpuTypesToUseForOption} from "../../bindings/utils/getGpuTypesToUseFo
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {getPlatformInfo} from "../../bindings/utils/getPlatformInfo.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type BuildCommand = {
     arch?: typeof process.arch,
@@ -30,7 +31,11 @@ type BuildCommand = {
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
     command: "build",
-    describe: "Compile the currently downloaded llama.cpp",
+    aliases: ["compile"],
+    describe: withCliCommandDescriptionDocsUrl(
+        "Compile the currently downloaded `llama.cpp` source code",
+        documentationPageUrls.CLI.Build
+    ),
     builder(yargs) {
         return yargs
             .option("arch", {

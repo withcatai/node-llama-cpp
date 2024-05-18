@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import process from "process";
 import envVar from "env-var";
-import * as uuid from "uuid";
+import {nanoid} from "nanoid";
 import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
 import {
     nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption, nodeLlamaCppGpuOffStringOptions
@@ -19,9 +19,11 @@ export const llamaToolchainsDirectory = path.join(llamaDirectory, "toolchains");
 export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "llamaBins");
 export const llamaLocalBuildBinsDirectory = path.join(llamaDirectory, "localBuilds");
 export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
+export const projectTemplatesDirectory = path.join(__dirname, "..", "templates");
+export const packedProjectTemplatesDirectory = path.join(projectTemplatesDirectory, "packed");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
-export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", uuid.v4());
+export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", nanoid());
 export const cliHomedirDirectory = path.join(os.homedir(), ".node-llama-cpp");
 export const chatCommandHistoryFilePath = path.join(cliHomedirDirectory, ".chat_repl_history");
 export const cliModelsDirectory = path.join(cliHomedirDirectory, "models");
@@ -62,9 +64,12 @@ export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
                 ))
         )
 );
-export const defaultLlamaCppDebugLogs = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
+export const defaultLlamaCppLogLevel = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
     .default(LlamaLogLevel.warn)
     .asEnum(LlamaLogLevelValues);
+export const defaultLlamaCppDebugMode = env.get("NODE_LLAMA_CPP_DEBUG")
+    .default("false")
+    .asBool();
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();
@@ -88,9 +93,27 @@ export const npxRunPrefix = "npx --no ";
 export const enableRecursiveClone = false;
 
 const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
+const documentationCliUrl = documentationUrl + "/guide/cli";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",
-    Vulkan: documentationUrl + "/guide/vulkan"
+    Vulkan: documentationUrl + "/guide/vulkan",
+    CLI: {
+        index: documentationCliUrl,
+        Pull: documentationCliUrl + "/pull",
+        Chat: documentationCliUrl + "/chat",
+        Init: documentationCliUrl + "/init",
+        Download: documentationCliUrl + "/download",
+        Complete: documentationCliUrl + "/complete",
+        Infill: documentationCliUrl + "/infill",
+        Inspect: {
+            index: documentationCliUrl + "/inspect",
+            GPU: documentationCliUrl + "/inspect/gpu",
+            GGUF: documentationCliUrl + "/inspect/gguf",
+            Measure: documentationCliUrl + "/inspect/measure"
+        },
+        Build: documentationCliUrl + "/build",
+        Clear: documentationCliUrl + "/clear"
+    }
 } as const;
 export const recommendedBaseDockerImage = "node:20";
 export const minAllowedContextSizeInCalculations = 24;

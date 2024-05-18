@@ -1,0 +1,73 @@
+.appInputRow {
+    display: flex;
+    flex-direction: row;
+    position: sticky;
+    bottom: 16px;
+    background-color: var(--panel-background-color);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    box-shadow: var(--panel-box-shadow);
+    overflow: clip;
+    color: var(--panel-text-color);
+    flex-shrink: 0;
+    z-index: 10;
+    align-items: flex-end;
+
+    > .input {
+        flex: 1;
+        border: none;
+        resize: none;
+        box-sizing: border-box;
+        max-height: 160px;
+        height: 55px;
+        outline: none;
+        padding: 12px 24px;
+        background-color: transparent;
+        font: inherit;
+        align-content: center;
+        align-self: stretch;
+        color: var(--panel-text-color);
+
+        &::placeholder {
+            color: var(--panel-text-color);
+            opacity: 0.4;
+        }
+    }
+
+    > .stopGenerationButton,
+    > .sendButton {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        margin: 8px;
+        background-color: var(--panel-button-background-color);
+        color: var(--panel-text-color);
+        fill: var(--panel-text-color);
+
+        + button {
+            margin-inline-start: 0px;
+        }
+
+        &:hover,
+        &:focus,
+        &:focus-visible {
+            border-color: var(--panel-button-hover-border-color);
+        }
+
+        > .icon {
+            width: 20px;
+            height: 20px;
+        }
+    }
+
+    > .stopGenerationButton {
+        transition: border-color 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing);
+
+        &[disabled] {
+            opacity: 0;
+        }
+    }
+}

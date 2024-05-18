@@ -1,10 +1,11 @@
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
+import {documentationPageUrls, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
 import withOra from "../../utils/withOra.js";
 import {clearAllLocalBuilds} from "../../bindings/utils/clearAllLocalBuilds.js";
 import {clearLocalCmake, fixXpackPermissions} from "../../utils/cmake.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type ClearCommand = {
     type: "source" | "builds" | "cmake" | "all"
@@ -13,7 +14,10 @@ type ClearCommand = {
 export const ClearCommand: CommandModule<object, ClearCommand> = {
     command: "clear [type]",
     aliases: ["clean"],
-    describe: "Clear files created by node-llama-cpp",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Clear files created by node-llama-cpp",
+        documentationPageUrls.CLI.Clear
+    ),
     builder(yargs) {
         return yargs
             .option("type", {

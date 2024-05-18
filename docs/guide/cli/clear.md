@@ -11,7 +11,5 @@ const commandDoc = docs.clear;
 {{commandDoc.description}}
 
 ## Usage
-```shell-vue
-{{commandDoc.usage}}
-```
+<div v-html="commandDoc.usageHtml"></div>
 <div v-html="commandDoc.options"></div>

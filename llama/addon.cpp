@@ -218,6 +218,10 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
 }
 
 static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    if (token < 0) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+
     auto tokenType = llama_token_get_type(model, token);
 
     if (tokenType == LLAMA_TOKEN_TYPE_UNDEFINED || tokenType == LLAMA_TOKEN_TYPE_UNKNOWN) {
@@ -228,6 +232,10 @@ static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* mod
 }
 
 static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+    if (token < 0) {
+        return Napi::Number::From(info.Env(), -1);
+    }
+    
     auto tokenType = llama_token_get_type(model, token);
 
     if (tokenType != LLAMA_TOKEN_TYPE_CONTROL && tokenType != LLAMA_TOKEN_TYPE_USER_DEFINED) {
@@ -351,6 +359,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         }
 
         Napi::Value Init(const Napi::CallbackInfo& info);
+        Napi::Value LoadLora(const Napi::CallbackInfo& info);
         Napi::Value AbortActiveModelLoad(const Napi::CallbackInfo& info) {
             abortModelLoad = true;
             return info.Env().Undefined();
@@ -585,6 +594,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                     "AddonModel",
                     {
                         InstanceMethod("init", &AddonModel::Init),
+                        InstanceMethod("loadLora", &AddonModel::LoadLora),
                         InstanceMethod("abortActiveModelLoad", &AddonModel::AbortActiveModelLoad),
                         InstanceMethod("tokenize", &AddonModel::Tokenize),
                         InstanceMethod("detokenize", &AddonModel::Detokenize),
@@ -737,6 +747,76 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
             deferred.Reject(err.Value());
         }
 };
+class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
+    public:
+        AddonModel* model;
+        std::string loraFilePath;
+        float loraScale;
+        int32_t loraThreads;
+        std::string baseModelPath;
+
+        AddonModelLoadLoraWorker(
+            const Napi::Env& env,
+            AddonModel* model,
+            std::string loraFilePath,
+            float loraScale,
+            int32_t loraThreads,
+            std::string baseModelPath
+        )
+            : Napi::AsyncWorker(env, "AddonModelLoadLoraWorker"),
+              model(model),
+              loraFilePath(loraFilePath),
+              loraScale(loraScale),
+              loraThreads(loraThreads),
+              baseModelPath(baseModelPath),
+              deferred(Napi::Promise::Deferred::New(env)) {
+            model->Ref();
+        }
+        ~AddonModelLoadLoraWorker() {
+            model->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                const auto res = llama_model_apply_lora_from_file(
+                    model->model,
+                    loraFilePath.c_str(),
+                    loraScale,
+                    baseModelPath.empty() ? NULL : baseModelPath.c_str(),
+                    loraThreads
+                );
+
+                if (res != 0) {
+                    SetError(
+                        std::string(
+                            std::string("Failed to apply LoRA \"") + loraFilePath + std::string("\"") + (
+                                baseModelPath.empty()
+                                    ? std::string("")
+                                    : (std::string(" with base model \"") + baseModelPath + std::string("\""))
+                            )
+                        )
+                    );
+                }
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_model_apply_lora_from_file\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Env().Undefined());
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
 
 Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -745,6 +825,18 @@ Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
     }
 
     AddonModelLoadModelWorker* worker = new AddonModelLoadModelWorker(this->Env(), this);
+    worker->Queue();
+    return worker->GetPromise();
+}
+Napi::Value AddonModel::LoadLora(const Napi::CallbackInfo& info) {
+    std::string loraFilePath = info[0].As<Napi::String>().Utf8Value();
+    float scale = info[1].As<Napi::Number>().FloatValue();
+    int32_t threads = info[2].As<Napi::Number>().Int32Value();
+    std::string baseModelPath = (info.Length() > 3 && info[3].IsString()) ? info[3].As<Napi::String>().Utf8Value() : std::string("");
+
+    int32_t resolvedThreads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+
+    AddonModelLoadLoraWorker* worker = new AddonModelLoadLoraWorker(this->Env(), this, loraFilePath, scale, threads, baseModelPath);
     worker->Queue();
     return worker->GetPromise();
 }

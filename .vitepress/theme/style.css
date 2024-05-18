@@ -50,6 +50,7 @@
     transition: opacity 0.5s;
     opacity: 0;
     pointer-events: none;
+    z-index: -1;
 }
 
 .VPNavBar:not(.home) .divider-line[class] {
@@ -84,6 +85,7 @@
     content: "";
     transition: opacity 0.5s;
     pointer-events: none;
+    z-index: -1;
 }
 
 .main-badges>p {
@@ -92,6 +94,27 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
+}
+
+.VPSidebarItem .text {
+    word-break: break-word;
+    line-height: 20px;
+    padding: 6px 0px;
+}
+
+a.inlineCodeLink {
+    /*text-decoration: none;*/
+    text-underline-offset: 4px;
+    color: transparent;
+}
+a.inlineCodeLink:hover {
+    color: inherit;
+}
+
+a.inlineCodeLink pre>code {
+    border-radius: 4px;
+    padding: 3px 6px;
+    background-color: var(--vp-code-bg);
 }
 
 img[src$="assets/logo.roundEdges.png"],

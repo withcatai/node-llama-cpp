@@ -18,7 +18,12 @@ export type ModelDownloaderOptions = {
 
     fileName?: string,
     headers?: Record<string, string>,
+
+    /**
+     * Defaults to `false`.
+     */
     showCliProgress?: boolean,
+
     onProgress?: (status: {totalSize: number, downloadedSize: number}) => void,
 
     /**

@@ -4,7 +4,7 @@ import fs from "fs-extra";
 import chalk from "chalk";
 import {
     defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath,
-    defaultLlamaCppGpuSupport
+    defaultLlamaCppGpuSupport, documentationPageUrls
 } from "../../config.js";
 import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../utils/withOra.js";
@@ -25,6 +25,7 @@ import {getGpuTypesToUseForOption} from "../../bindings/utils/getGpuTypesToUseFo
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {getPlatformInfo} from "../../bindings/utils/getPlatformInfo.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -42,7 +43,10 @@ type DownloadCommandArgs = {
 
 export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     command: "download",
-    describe: "Download a release of llama.cpp and compile it",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Download a release of `llama.cpp` and compile it",
+        documentationPageUrls.CLI.Download
+    ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 

@@ -1,5 +1,5 @@
 import {CommandModule} from "yargs";
-import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
+import {createMarkdownRenderer} from "vitepress";
 import {PullCommand} from "../../../src/cli/commands/PullCommand.js";
 import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
 import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
@@ -10,22 +10,27 @@ import {InspectGpuCommand} from "../../../src/cli/commands/inspect/commands/Insp
 import {InspectGgufCommand} from "../../../src/cli/commands/inspect/commands/InspectGgufCommand.js";
 import {DownloadCommand} from "../../../src/cli/commands/DownloadCommand.js";
 import {ClearCommand} from "../../../src/cli/commands/ClearCommand.js";
-import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
+import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
+import {InitCommand} from "../../../src/cli/commands/InitCommand.js";
 import {cliBinName, npxRunPrefix} from "../../../src/config.js";
+import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
+import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
 import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
 import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../../src/state.js";
-import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
 import {htmlEscapeWithCodeMarkdown} from "../../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
+import {getInlineCodeBlockHtml} from "../../../.vitepress/utils/getInlineCodeBlockHtml.js";
+import {withoutCliCommandDescriptionDocsUrl} from "../../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
 export default {
     async load() {
         setIsInDocumentationMode(true);
 
         return {
-            index: buildIndexTable([
+            index: await buildIndexTable([
                 ["pull", PullCommand],
                 ["chat", ChatCommand],
+                ["init", InitCommand],
                 ["complete", CompleteCommand],
                 ["infill", InfillCommand],
                 ["inspect", InspectCommand],
@@ -36,6 +41,7 @@ export default {
 
             pull: await getCommandHtmlDoc(PullCommand),
             chat: await getCommandHtmlDoc(ChatCommand),
+            init: await getCommandHtmlDoc(InitCommand),
             complete: await getCommandHtmlDoc(CompleteCommand),
             infill: await getCommandHtmlDoc(InfillCommand),
             inspect: {
@@ -59,8 +65,9 @@ export default {
     }
 };
 
-function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
+async function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
     let res = "";
+    const markdownRenderer = await createMarkdownRenderer(process.cwd());
 
     res += buildHtmlHeading("h2", htmlEscape("Commands"), "commands");
     res += buildHtmlTable(
@@ -74,8 +81,8 @@ function buildIndexTable(commands: [pageLink: string, command: CommandModule<any
                     return null;
 
                 return [
-                    `<a href="${pageLink}"><code>` + htmlEscape(cliName + " " + command.command) + "</code></a>",
-                    htmlEscapeWithCodeMarkdown(String(command.describe ?? ""))
+                    getInlineCodeBlockHtml(markdownRenderer, cliName + " " + command.command, "shell", pageLink),
+                    htmlEscapeWithCodeMarkdown(withoutCliCommandDescriptionDocsUrl(String(command.describe ?? "")))
                 ];
             })
             .filter((row): row is string[] => row != null)
@@ -105,10 +112,13 @@ function buildIndexTable(commands: [pageLink: string, command: CommandModule<any
         ]
     );
 
+    const usage = npxRunPrefix + cliName + " <command> [options]";
+
     return {
         title: "CLI",
         description: null,
-        usage: npxRunPrefix + cliName + " <command> [options]",
+        usage,
+        usageHtml: markdownRenderer.render("```shell\n" + usage + "\n```"),
         options: res
     };
 }

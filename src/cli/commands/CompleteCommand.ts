@@ -16,6 +16,8 @@ import {printCommonInfoLines} from "../utils/printCommonInfoLines.js";
 import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
+import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls} from "../../config.js";
 
 type CompleteCommand = {
     modelPath?: string,
@@ -45,7 +47,10 @@ type CompleteCommand = {
 
 export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     command: "complete [modelPath]",
-    describe: "Generate a completion for a given text",
+    describe: withCliCommandDescriptionDocsUrl(
+        "Generate a completion for a given text",
+        documentationPageUrls.CLI.Complete
+    ),
     builder(yargs) {
         return yargs
             .option("modelPath", {

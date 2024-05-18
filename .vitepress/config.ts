@@ -226,6 +226,7 @@ export default defineConfig({
                 items: [
                     {text: "Pull", link: "/pull"},
                     {text: "Chat", link: "/chat"},
+                    {text: "Init", link: "/init"},
                     {text: "Download", link: "/download"},
                     {text: "Complete", link: "/complete"},
                     {text: "Infill", link: "/infill"},
