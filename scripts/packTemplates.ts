@@ -15,7 +15,7 @@ async function packTemplates() {
         if (!item.isDirectory())
             continue;
 
-        if (item.name === packedTemplatedDirectoryName)
+        if (item.name === packedTemplatedDirectoryName || item.name === "node_modules")
             continue;
 
         await packTemplate(item.name);
