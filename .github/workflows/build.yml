@@ -29,6 +29,11 @@ jobs:
         with:
           name: "build"
           path: "dist"
+      - name: Upload packed templates artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "build-templates"
+          path: "templates/packed"
       - name: Upload llama.cpp artifact
         uses: actions/upload-artifact@v4
         with:
@@ -367,6 +372,10 @@ jobs:
           rm -f ./llama/gitRelease.bundle
           mv artifacts/llama.cpp/gitRelease.bundle ./llama/gitRelease.bundle
           
+          mv artifacts/build-templates templates/packed/
+          rm -f ./templates/package.json
+          rm -f ./templates/package-lock.json
+          
           echo "Built binaries:"
           ls llamaBins
       - name: Add "postinstall" script to package.json
@@ -402,6 +411,8 @@ jobs:
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           cd packages/create-node-llama-cpp
+          
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           
           if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
               npm publish --tag beta
