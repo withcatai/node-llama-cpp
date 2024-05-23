@@ -362,14 +362,17 @@ export class LlamaModel {
     }
 
     /** Check whether the given token is a special token (a control-type token) */
-    public isSpecialToken(token: Token): boolean {
+    public isSpecialToken(token: Token | undefined): boolean {
+        if (token == null)
+            return false;
+
         const tokenType = this.getTokenType(token);
 
         return tokenType === GgufMetadataTokenizerTokenType.control;
     }
 
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */
-    public isEogToken(token: Token): boolean {
+    public isEogToken(token: Token | undefined): boolean {
         if (token == null)
             return false;
 
