@@ -8,6 +8,7 @@
 #include "common/grammar-parser.h"
 #include "napi.h"
 
+
 class LLAMAModel : public Napi::ObjectWrap<LLAMAModel> {
   public:
     llama_model_params model_params;
