@@ -1,7 +1,9 @@
-import {DisposeAggregator, DisposedError, EventRelay} from "lifecycle-utils";
+import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
-import {ChatHistoryItem, ChatModelFunctions, ChatModelResponse, LLamaContextualRepeatPenalty, Token, Tokenizer} from "../../types.js";
+import {
+    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatUserMessage, LLamaContextualRepeatPenalty, Token, Tokenizer
+} from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
 import {removeNullFields} from "../../utils/removeNullFields.js";
@@ -90,7 +92,8 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
 
     /**
      * Trim whitespace from the end of the generated text
-     * Disabled by default.
+     *
+     * Defaults to `false`.
      */
     trimWhitespaceSuffix?: boolean,
 
@@ -127,6 +130,8 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          * Minimum overlap percentage with existing context sequence state to use the last evaluation context window.
          * If the last evaluation context window is not used, a new context will be generated based on the full history,
          * which will decrease the likelihood of another context shift happening so soon.
+         *
+         * A number between `0` (exclusive) and `1` (inclusive).
          */
         minimumOverlapPercentageToPreventContextShift?: number
     }
@@ -139,6 +144,56 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     functions?: Functions | ChatModelFunctions,
     documentFunctionParams?: boolean
 });
+
+export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
+    /**
+     * Complete the given user prompt without adding it or the completion to the returned context window.
+     */
+    initialUserPrompt?: string,
+
+    /**
+     * When a completion already started being generated and then the signal is aborted,
+     * the generation will stop and the completion will be returned as is instead of throwing an error.
+     *
+     * Defaults to `false`.
+     */
+    stopOnAbortSignal?: boolean,
+
+    onToken?: LLamaChatGenerateResponseOptions<Functions>["onToken"],
+    signal?: LLamaChatGenerateResponseOptions<Functions>["signal"],
+    maxTokens?: LLamaChatGenerateResponseOptions<Functions>["maxTokens"],
+    temperature?: LLamaChatGenerateResponseOptions<Functions>["temperature"],
+    minP?: LLamaChatGenerateResponseOptions<Functions>["minP"],
+    topK?: LLamaChatGenerateResponseOptions<Functions>["topK"],
+    topP?: LLamaChatGenerateResponseOptions<Functions>["topP"],
+    trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
+    repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
+    tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
+    evaluationPriority?: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"],
+    contextShift?: LLamaChatGenerateResponseOptions<Functions>["contextShift"],
+    customStopTriggers?: LLamaChatGenerateResponseOptions<Functions>["customStopTriggers"],
+    lastEvaluationContextWindow?: LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"],
+
+    grammar?: LlamaGrammar,
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same functions that were used for the previous prompt here.
+     */
+    functions?: Functions | ChatModelFunctions,
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same value that was used for the previous prompt here.
+     */
+    documentFunctionParams?: boolean
+};
 
 export type LLamaChatContextShiftOptions = {
     /**
@@ -175,12 +230,15 @@ const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
     lastEvaluationMetadata: null
 };
 const defaultRepeatPenaltyLastTokens = 64;
+const defaultTrimWhitespaceSuffix = false;
+const defaultEvaluationPriority: EvaluationPriority = 5;
 
 
 export class LlamaChat {
     /** @internal */ private readonly _chatWrapper: ChatWrapper;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;
+    /** @internal */ private readonly _chatLock = {};
     /** @internal */ private _sequence: LlamaContextSequence | null;
     public readonly onDispose = new EventRelay<void>();
 
@@ -264,13 +322,7 @@ export class LlamaChat {
         history: ChatHistoryItem[],
         options: LLamaChatGenerateResponseOptions<Functions> = {}
     ): Promise<LlamaChatResponse<Functions>> {
-        return this._generateResponse(history, options);
-    }
-
-    /** @internal */
-    private async _generateResponse<const Functions extends ChatModelFunctions | undefined = undefined>(
-        history: ChatHistoryItem[],
-        {
+        const {
             onToken,
             signal,
             stopOnAbortSignal = false,
@@ -280,10 +332,10 @@ export class LlamaChat {
             topK,
             topP,
             grammar,
-            trimWhitespaceSuffix = false,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
             tokenBias,
-            evaluationPriority = 5,
+            evaluationPriority = defaultEvaluationPriority,
             functions,
             documentFunctionParams,
             contextShift = defaultContextShiftOptions,
@@ -292,8 +344,8 @@ export class LlamaChat {
                 history: lastEvaluationContextWindowHistory,
                 minimumOverlapPercentageToPreventContextShift = 0.5
             } = {}
-        }: LLamaChatGenerateResponseOptions<Functions> = {}
-    ): Promise<LlamaChatResponse<Functions>> {
+        } = options;
+
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -307,7 +359,7 @@ export class LlamaChat {
                 minP,
                 topK,
                 topP,
-                grammar: grammar as never,
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -323,77 +375,263 @@ export class LlamaChat {
             }
         );
 
-        try {
-            generateResponseState.ensureLastHistoryItemIsModel();
+        if (generateResponseState.grammar != null && generateResponseState.functionsEnabled)
+            throw new Error("Using both grammar and functions is not supported yet");
 
-            // eslint-disable-next-line no-constant-condition
-            while (true) {
-                generateResponseState.startTokenLoop();
-                await generateResponseState.loadContextWindow();
+        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatResponse<Functions>> => {
+            try {
+                generateResponseState.ensureLastHistoryItemIsModel();
 
-                if (generateResponseState.generatedTokens === 0) {
-                    generateResponseState.addIgnoreStartTextTriggersFromChatWrapper();
-                    generateResponseState.addFunctionSyntaxEndTriggersFromFunctionsGrammar();
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    generateResponseState.startTokenLoop();
+                    await generateResponseState.loadContextWindow(
+                        generateResponseState.getResolvedHistoryWithCurrentModelResponse(),
+                        false
+                    );
 
-                    if (generateResponseState.functionsEnabled) {
-                        generateResponseState.initFunctions();
+                    if (generateResponseState.generatedTokens === 0) {
+                        generateResponseState.addIgnoreStartTextTriggersFromChatWrapper();
+                        generateResponseState.addFunctionSyntaxEndTriggersFromFunctionsGrammar();
+
+                        if (generateResponseState.functionsEnabled) {
+                            generateResponseState.initFunctions();
+                        }
                     }
+
+                    generateResponseState.addStopGenerationTriggersFromChatWrapper();
+                    await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
+
+                    await generateResponseState.createNewEvaluationIterator();
+                    while (await generateResponseState.iterateEvaluation()) {
+                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+
+                        generateResponseState.trackGenerationForDisengageInitiallyEngagedFunctionMode();
+                        generateResponseState.trackFunctionSyntaxStart();
+
+                        generateResponseState.handleInitiallyEngagedFunctionModeFunctionDetection();
+                        generateResponseState.handleFunctionSyntax();
+
+                        const functionEndSyntaxRes = generateResponseState.detectFunctionEndSyntax();
+                        if (functionEndSyntaxRes != null)
+                            return functionEndSyntaxRes;
+
+                        generateResponseState.recordStopGenerationEvaluation();
+
+                        generateResponseState.popStreamRegulatorFreeTokens();
+                        generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
+
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger();
+                        if (stopGenerationTriggerRes != null)
+                            return stopGenerationTriggerRes;
+
+                        generateResponseState.spliceIgnoreStartTextDetectedTokens();
+
+                        generateResponseState.moveFreePendingTokensToRes();
+
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger();
+                        if (maxTokensTriggerRes != null)
+                            return maxTokensTriggerRes;
+
+                        if (generateResponseState.updateShouldContextShift())
+                            break;
+
+                        const abortRes = generateResponseState.handleAbortTrigger();
+                        if (abortRes != null)
+                            return abortRes;
+                    }
+
+                    generateResponseState.isFirstEvaluation = false;
+
+                    if (generateResponseState.shouldContextShift)
+                        continue;
+
+                    break;
                 }
 
-                generateResponseState.addStopGenerationTriggersFromChatWrapper();
-                await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
-
-                await generateResponseState.createNewEvaluationIterator();
-                while (await generateResponseState.iterateEvaluation()) {
-                    generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
-
-                    generateResponseState.trackGenerationForDisengageInitiallyEngagedFunctionMode();
-                    generateResponseState.trackFunctionSyntaxStart();
-
-                    generateResponseState.handleInitiallyEngagedFunctionModeFunctionDetection();
-                    generateResponseState.handleFunctionSyntax();
-
-                    const functionEndSyntaxRes = generateResponseState.detectFunctionEndSyntax();
-                    if (functionEndSyntaxRes != null)
-                        return functionEndSyntaxRes;
-
-                    generateResponseState.recordStopGenerationEvaluation();
-
-                    generateResponseState.popStreamRegulatorFreeTokens();
-                    generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
-
-                    const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger();
-                    if (stopGenerationTriggerRes != null)
-                        return stopGenerationTriggerRes;
-
-                    generateResponseState.spliceIgnoreStartTextDetectedTokens();
-
-                    generateResponseState.moveFreePendingTokensToRes();
-
-                    const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger();
-                    if (maxTokensTriggerRes != null)
-                        return maxTokensTriggerRes;
-
-                    if (generateResponseState.updateShouldContextShift())
-                        break;
-
-                    const abortRes = generateResponseState.handleAbortTrigger();
-                    if (abortRes != null)
-                        return abortRes;
-                }
-
-                generateResponseState.isFirstEvaluation = false;
-
-                if (generateResponseState.shouldContextShift)
-                    continue;
-
-                break;
+                throw new Error("The context size is too small to generate a response");
+            } finally {
+                generateResponseState.dispose();
             }
+        });
+    }
 
-            throw new Error("The context size is too small to generate a response");
-        } finally {
-            generateResponseState.dispose();
-        }
+    public async loadChatAndCompleteUserMessage<const Functions extends ChatModelFunctions | undefined = undefined>(
+        history: ChatHistoryItem[],
+        options: LLamaChatLoadAndCompleteUserMessageOptions<Functions> = {}
+    ): Promise<LlamaChatLoadAndCompleteUserResponse> {
+        const {
+            initialUserPrompt = "",
+            stopOnAbortSignal = false,
+            onToken,
+            signal,
+            maxTokens = Math.min(256, Math.ceil(this.context.contextSize / 2)),
+            temperature,
+            minP,
+            topK,
+            topP,
+            grammar,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
+            repeatPenalty = {},
+            tokenBias,
+            evaluationPriority = defaultEvaluationPriority,
+            functions,
+            documentFunctionParams,
+            contextShift = defaultContextShiftOptions,
+            customStopTriggers,
+            lastEvaluationContextWindow: {
+                history: lastEvaluationContextWindowHistory,
+                minimumOverlapPercentageToPreventContextShift = 0.8
+            } = {}
+        } = options;
+
+        const generateResponseState = new GenerateResponseState<Functions>(
+            this,
+            this._chatWrapper,
+            history,
+            {
+                onToken,
+                signal,
+                stopOnAbortSignal,
+                maxTokens,
+                temperature,
+                minP,
+                topK,
+                topP,
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                trimWhitespaceSuffix,
+                repeatPenalty,
+                tokenBias,
+                evaluationPriority,
+                functions,
+                documentFunctionParams,
+                contextShift,
+                customStopTriggers,
+                lastEvaluationContextWindow: {
+                    history: lastEvaluationContextWindowHistory,
+                    minimumOverlapPercentageToPreventContextShift
+                }
+            }
+        );
+
+        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
+            try {
+                generateResponseState.ensureLastHistoryItemIsUser();
+                const lastResolvedHistoryItem = generateResponseState.resolvedHistory[generateResponseState.resolvedHistory.length - 1];
+                const initialUserMessage = lastResolvedHistoryItem?.type === "user"
+                    ? lastResolvedHistoryItem.text
+                    : "";
+
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    generateResponseState.startTokenLoop();
+                    const {userTextSuffix} = await generateResponseState.loadContextWindow(
+                        setLastUserTextInChatHistory(
+                            generateResponseState.resolvedHistory,
+                            initialUserMessage + initialUserPrompt + this.model.detokenize(generateResponseState.res)
+                        ),
+                        true
+                    );
+                    generateResponseState.inFunctionEvaluationMode = false;
+
+                    generateResponseState.addStopGenerationTriggersFromChatWrapper();
+
+                    if (userTextSuffix != null && userTextSuffix.values.length > 0)
+                        generateResponseState.stopGenerationDetector.addStopTrigger(
+                            StopGenerationDetector.resolveLlamaTextTrigger(userTextSuffix, this.model.tokenizer)
+                        );
+
+                    await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
+
+                    if (generateResponseState.maxTokens === 0) {
+                        await generateResponseState.evaluateWithoutGeneratingNewTokens();
+
+                        return {
+                            completion: "",
+                            lastEvaluation: {
+                                contextWindow: setLastUserTextInChatHistory(
+                                    generateResponseState.contextWindowHistory,
+                                    initialUserMessage
+                                ),
+                                contextShiftMetadata: generateResponseState.lastHistoryCompressionMetadata
+                            },
+                            metadata: {
+                                stopReason: "maxTokens"
+                            }
+                        };
+                    }
+
+                    await generateResponseState.createNewEvaluationIterator();
+                    while (await generateResponseState.iterateEvaluation()) {
+                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+
+                        generateResponseState.recordStopGenerationEvaluation();
+
+                        generateResponseState.popStreamRegulatorFreeTokens();
+
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger();
+                        if (stopGenerationTriggerRes != null)
+                            return {
+                                completion: stopGenerationTriggerRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.contextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
+                                    ? stopGenerationTriggerRes.metadata
+                                    : stopGenerationTriggerRes.metadata
+                            };
+
+                        generateResponseState.moveFreePendingTokensToRes(false);
+
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger();
+                        if (maxTokensTriggerRes != null)
+                            return {
+                                completion: maxTokensTriggerRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.contextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: maxTokensTriggerRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: maxTokensTriggerRes.metadata
+                            };
+
+                        if (generateResponseState.updateShouldContextShift())
+                            break;
+
+                        const abortRes = generateResponseState.handleAbortTrigger();
+                        if (abortRes != null)
+                            return {
+                                completion: abortRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.contextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: abortRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: abortRes.metadata
+                            };
+                    }
+
+                    generateResponseState.isFirstEvaluation = false;
+
+                    if (generateResponseState.shouldContextShift)
+                        continue;
+
+                    break;
+                }
+
+                throw new Error("The context size is too small to generate a completion");
+            } finally {
+                generateResponseState.dispose();
+            }
+        });
     }
 }
 
@@ -427,6 +665,26 @@ export type LlamaChatResponseFunctionCall<
     functionName: FunctionCallName,
     params: Params,
     raw: string
+};
+
+export type LlamaChatLoadAndCompleteUserResponse = {
+    completion: string,
+    lastEvaluation: {
+        /**
+         * The completion and initial user prompt are not added to this context window result,
+         * but are loaded to the current context sequence state as tokens
+         */
+        contextWindow: ChatHistoryItem[],
+        contextShiftMetadata: any
+    },
+    metadata: {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "eogToken" | "stopGenerationTrigger" | "maxTokens" | "abort"
+    } | {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "customStopTrigger",
+        customStopTrigger: (string | Token)[]
+    }
 };
 
 function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Item): Item {
@@ -559,6 +817,13 @@ function getLastTextModelResponseFromChatHistory(chatHistory: ChatHistoryItem[])
     return "";
 }
 
+function getLastUserTextFromChatHistory(chatHistory: ChatHistoryItem[]) {
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "user")
+        return "";
+
+    return (chatHistory[chatHistory.length - 1] as ChatUserMessage).text;
+}
+
 function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
@@ -585,22 +850,96 @@ function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], t
     return newChatHistory;
 }
 
+function setLastUserTextInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
+    const newChatHistory = chatHistory.slice();
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "user")
+        newChatHistory.push({
+            type: "user",
+            text: ""
+        });
+
+    const lastUserItem = newChatHistory[newChatHistory.length - 1] as ChatUserMessage;
+    const newLastUserItem = {...lastUserItem};
+    newChatHistory[newChatHistory.length - 1] = newLastUserItem;
+
+    newLastUserItem.text = textResponse;
+
+    return newChatHistory;
+}
+
+function generateContextText(
+    endWithUserText: boolean,
+    chatWrapper: ChatWrapper,
+    chatHistory: ChatHistoryItem[],
+    options?: Parameters<typeof chatWrapper.generateContextText>[1]
+): ReturnType<typeof generateContextTextThatEndsWithUserText> {
+    if (endWithUserText)
+        return generateContextTextThatEndsWithUserText(chatWrapper, chatHistory, options);
+
+    return chatWrapper.generateContextText(chatHistory, options);
+}
+
+function generateContextTextThatEndsWithUserText(
+    chatWrapper: ChatWrapper, chatHistory: ChatHistoryItem[], options?: Parameters<typeof chatWrapper.generateContextText>[1]
+): ReturnType<typeof chatWrapper.generateContextText> & {
+    userTextSuffix?: LlamaText
+} {
+    const lastUserText = getLastUserTextFromChatHistory(chatHistory);
+    const randomId = "W" + (Math.random()
+        .toString(36)
+        .slice(2)) + "W";
+    const {contextText, ...rest} = chatWrapper.generateContextText(
+        setLastUserTextInChatHistory(chatHistory, lastUserText + randomId),
+        options
+    );
+    let newContextText = contextText;
+
+    for (let i = 0; i < newContextText.values.length; i++) {
+        const item = newContextText.values[i];
+        if (typeof item !== "string")
+            continue;
+
+        const randomTextIndex = item.indexOf(randomId);
+        if (randomTextIndex < 0)
+            continue;
+
+        const newValue = item.slice(0, randomTextIndex);
+        newContextText = LlamaText([
+            ...newContextText.values.slice(0, i),
+            newValue
+        ]);
+        return {
+            contextText: newContextText,
+            userTextSuffix: LlamaText([
+                item.slice(randomTextIndex + randomId.length),
+                ...newContextText.values.slice(i + 1)
+            ]),
+            ...rest
+        };
+    }
+
+    throw new Error("The random ID was not found in the context text. " +
+        `There might be an issue with the chat wrapper "${chatWrapper.wrapperName}" ` +
+        "where not all user messages are properly added to the the result LlamaText"
+    );
+}
+
 async function getContextWindow({
     resolvedHistory, resolvedContextShift,
     lastHistoryCompressionMetadata, pendingTokensCount = 0, isFirstEvaluation,
     chatWrapper, lastEvaluationContextWindowHistory, minimumOverlapPercentageToPreventContextShift,
-    sequence, minFreeContextTokens = 1, functions, documentFunctionParams
+    sequence, minFreeContextTokens = 1, functions, documentFunctionParams, endWithUserText
 }: {
     resolvedHistory: ChatHistoryItem[], resolvedContextShift: Required<LLamaChatContextShiftOptions>,
     lastHistoryCompressionMetadata: object | null | undefined, pendingTokensCount: number, isFirstEvaluation: boolean,
     chatWrapper: ChatWrapper, lastEvaluationContextWindowHistory?: ChatHistoryItem[], minimumOverlapPercentageToPreventContextShift: number,
     sequence?: LlamaContextSequence, minFreeContextTokens?: number, functions?: ChatModelFunctions,
-    documentFunctionParams?: boolean
+    documentFunctionParams?: boolean, endWithUserText: boolean
 }): Promise<{
     history: ChatHistoryItem[], stopGenerationTriggers: LlamaText[], tokens: Token[],
     newResolvedHistory: ChatHistoryItem[], newHistoryCompressionMetadata: object | null | undefined,
     ignoreStartText: LlamaText[], functionCallInitiallyEngaged: boolean,
-    disengageInitiallyEngagedFunctionCall: LlamaText[]
+    disengageInitiallyEngagedFunctionCall: LlamaText[], userTextSuffix?: LlamaText
 }> {
     if (sequence == null)
         throw new DisposedError();
@@ -617,10 +956,15 @@ async function getContextWindow({
                 response: []
             });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(newContextWindow, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            newContextWindow,
+            {
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
         const tokens = contextText.tokenize(model.tokenizer);
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize) {
             const {firstDifferentIndex} = sequence.compareContextTokens(tokens);
@@ -636,7 +980,8 @@ async function getContextWindow({
                     newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                     ignoreStartText: ignoreStartText ?? [],
                     functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-                    disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+                    disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+                    userTextSuffix
                 };
         }
     }
@@ -665,10 +1010,15 @@ async function getContextWindow({
             documentFunctionParams
         });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(compressedHistory, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            compressedHistory,
+            {
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
 
         return {
             history: compressedHistory,
@@ -678,15 +1028,21 @@ async function getContextWindow({
             newHistoryCompressionMetadata: metadata,
             ignoreStartText: ignoreStartText ?? [],
             functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-            disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+            disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+            userTextSuffix
         };
     }
 
     {
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(resolvedHistory, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            resolvedHistory,
+            {
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
         const tokens = contextText.tokenize(model.tokenizer);
 
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize)
@@ -698,7 +1054,8 @@ async function getContextWindow({
                 newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                 ignoreStartText: ignoreStartText ?? [],
                 functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-                disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+                disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+                userTextSuffix
             };
     }
 
@@ -729,10 +1086,15 @@ async function getContextWindow({
         documentFunctionParams
     });
 
-    const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(compressedHistory, {
-        availableFunctions: functions,
-        documentFunctionParams
-    });
+    const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+        endWithUserText,
+        chatWrapper,
+        compressedHistory,
+        {
+            availableFunctions: functions,
+            documentFunctionParams
+        }
+    );
 
     return {
         history: compressedHistory,
@@ -742,7 +1104,8 @@ async function getContextWindow({
         newHistoryCompressionMetadata: metadata,
         ignoreStartText: ignoreStartText ?? [],
         functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-        disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+        disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+        userTextSuffix
     };
 }
 
@@ -754,12 +1117,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly onToken: LLamaChatGenerateResponseOptions<Functions>["onToken"];
     private readonly signal: LLamaChatGenerateResponseOptions<Functions>["signal"];
     private readonly stopOnAbortSignal: LLamaChatGenerateResponseOptions<Functions>["stopOnAbortSignal"];
-    private readonly maxTokens: LLamaChatGenerateResponseOptions<Functions>["maxTokens"];
+    public readonly maxTokens: LLamaChatGenerateResponseOptions<Functions>["maxTokens"];
     private readonly temperature: LLamaChatGenerateResponseOptions<Functions>["temperature"];
     private readonly minP: LLamaChatGenerateResponseOptions<Functions>["minP"];
     private readonly topK: LLamaChatGenerateResponseOptions<Functions>["topK"];
     private readonly topP: LLamaChatGenerateResponseOptions<Functions>["topP"];
-    private readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
+    public readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
     private readonly trimWhitespaceSuffix: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"];
     private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
     private readonly evaluationPriority: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"];
@@ -782,7 +1145,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private functionsEvaluationState: LlamaGrammarEvaluationState | undefined;
 
     private readonly streamRegulator = new TokenStreamRegulator();
-    private readonly stopGenerationDetector = new StopGenerationDetector();
+    public readonly stopGenerationDetector = new StopGenerationDetector();
     private readonly customStopGenerationTriggersDetector = new StopGenerationDetector();
     private readonly functionSyntaxStartDetector = new StopGenerationDetector();
     private readonly functionSyntaxEndDetector = new StopGenerationDetector();
@@ -845,10 +1208,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             topK,
             topP,
             grammar,
-            trimWhitespaceSuffix = false,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
             tokenBias,
-            evaluationPriority = 5,
+            evaluationPriority = defaultEvaluationPriority,
             functions,
             documentFunctionParams,
             contextShift = defaultContextShiftOptions,
@@ -883,9 +1246,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.minimumOverlapPercentageToPreventContextShift = minimumOverlapPercentageToPreventContextShift;
 
         this.functionsEnabled = (this.functions != null && Object.keys(this.functions).length > 0);
-
-        if (this.grammar != null && this.functionsEnabled)
-            throw new Error("Using both grammar and functions is not supported yet");
 
         if (this.signal?.aborted)
             throw this.signal.reason;
@@ -1061,7 +1421,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.queuedChunkTokens = this.streamRegulator.getAllQueuedChunkTokens();
     }
 
-    public async loadContextWindow() {
+    public async loadContextWindow(resolvedHistory: ChatHistoryItem[], endWithUserText: boolean = false) {
         const {
             history: contextWindowHistory,
             stopGenerationTriggers,
@@ -1070,9 +1430,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             newHistoryCompressionMetadata,
             ignoreStartText,
             functionCallInitiallyEngaged,
-            disengageInitiallyEngagedFunctionCall
+            disengageInitiallyEngagedFunctionCall,
+            userTextSuffix
         } = await getContextWindow({
-            resolvedHistory: this.getResolvedHistoryWithCurrentModelResponse(),
+            resolvedHistory: resolvedHistory,
             resolvedContextShift: this.resolvedContextShift,
             lastHistoryCompressionMetadata: this.lastHistoryCompressionMetadata,
             pendingTokensCount: this.ignoredStartTextTokens.length + this.pendingTokens.length + this.queuedChunkTokens.length,
@@ -1083,7 +1444,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             sequence: this.llamaChat.sequence,
             minFreeContextTokens: 1,
             functions: this.functionsEnabled ? this.functions : undefined,
-            documentFunctionParams: this.documentFunctionParams
+            documentFunctionParams: this.documentFunctionParams,
+            endWithUserText
         });
 
         this.contextWindowHistory = contextWindowHistory;
@@ -1103,6 +1465,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.lastContextWindowHistory = this.contextWindowHistory;
         this.contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(this.contextWindowHistory);
         this.contextWindowsRes = [];
+
+        return {
+            userTextSuffix
+        };
     }
 
     public addIgnoreStartTextTriggersFromChatWrapper() {
@@ -1158,6 +1524,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
     }
 
+    public async evaluateWithoutGeneratingNewTokens() {
+        if (this.evaluationIterator != null)
+            await this.evaluationIterator.return();
+
+        await this.llamaChat.sequence.evaluateWithoutGeneratingNewTokens(this.tokens, removeNullFields({
+            evaluationPriority: this.evaluationPriority
+        }));
+    }
+
     public async createNewEvaluationIterator() {
         if (this.evaluationIterator != null)
             await this.evaluationIterator.return();
@@ -1182,7 +1557,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             },
             tokenBias: this.tokenBias,
             evaluationPriority: this.evaluationPriority,
-            yieldEogToken: true
+            yieldEogToken: true,
         }));
     }
 
@@ -1444,7 +1819,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
     }
 
-    public handleStopGenerationTrigger(): LlamaChatResponse<Functions> | undefined {
+    public handleStopGenerationTrigger() {
         if (this.stopGenerationDetector.hasTriggeredStops || this.customStopGenerationTriggersDetector.hasTriggeredStops ||
             this.llamaChat.model.isEogToken(this.currentToken)
         ) {
@@ -1510,7 +1885,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                             ? "eogToken"
                             : "stopGenerationTrigger"
                     }
-                };
+                } satisfies LlamaChatResponse<Functions>;
             }
 
             return {
@@ -1521,7 +1896,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     stopReason: "customStopTrigger",
                     customStopTrigger: triggeredStops[0].stopTrigger
                 }
-            };
+            } satisfies LlamaChatResponse<Functions>;
         }
 
         return undefined;
@@ -1543,9 +1918,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return this.maxTokens != null && this.maxTokens > 0 && this.generatedTokens >= this.maxTokens;
     }
 
-    public moveFreePendingTokensToRes() {
+    public moveFreePendingTokensToRes(removeFoundStartIgnoreTextsFromPendingTokens: boolean = true) {
         if (this.pendingTokens.length > 0 && (this.isMaxTokensTriggered() || !this.ignoreStartTextDetector.hasInProgressStops)) {
-            this.removeFoundStartIgnoreTextsFromPendingTokens();
+            if (removeFoundStartIgnoreTextsFromPendingTokens)
+                this.removeFoundStartIgnoreTextsFromPendingTokens();
 
             if (this.pendingTokens.length > 0) {
                 this.onToken?.(this.pendingTokens.slice());
@@ -1556,7 +1932,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
     }
 
-    public handleMaxTokensTrigger(): LlamaChatResponse<Functions> | undefined {
+    public handleMaxTokensTrigger() {
         if (this.isMaxTokensTriggered()) {
             let modelResponse = this.llamaChat.model.detokenize(this.res);
             let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
@@ -1582,7 +1958,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 metadata: {
                     stopReason: "maxTokens"
                 }
-            };
+            } satisfies LlamaChatResponse<Functions>;
         }
 
         return undefined;
@@ -1593,7 +1969,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return this.shouldContextShift;
     }
 
-    public handleAbortTrigger(): LlamaChatResponse<Functions> | undefined {
+    public handleAbortTrigger() {
         if (this.signal?.aborted && this.stopOnAbortSignal) {
             if (this.res.length === 0)
                 throw this.signal.reason;
@@ -1622,7 +1998,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 metadata: {
                     stopReason: "abort"
                 }
-            };
+            } satisfies LlamaChatResponse<Functions>;
         }
 
         return undefined;

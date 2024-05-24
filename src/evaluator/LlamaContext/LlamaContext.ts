@@ -861,8 +861,6 @@ export class LlamaContextSequence {
             strategy: contextShiftStrategy = this._contextShift.strategy
         } = {}
     }: {
-        grammarEvaluationState?: LlamaGrammarEvaluationState,
-
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
          * evaluated based on the strategy chosen for the context.

@@ -18,12 +18,12 @@ import {
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
     LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
-    type LLamaChatPromptOptions, type LlamaChatSessionRepeatPenalty
+    type LLamaChatPromptOptions, type LLamaChatPreloadPromptOptions, type LlamaChatSessionRepeatPenalty
 } from "./evaluator/LlamaChatSession/LlamaChatSession.js";
 import {defineChatSessionFunction} from "./evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
-    LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatContextShiftOptions,
-    type LlamaChatResponse, type LlamaChatResponseFunctionCall
+    LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatLoadAndCompleteUserMessageOptions,
+    type LLamaChatContextShiftOptions, type LlamaChatResponse, type LlamaChatResponseFunctionCall, type LlamaChatLoadAndCompleteUserResponse
 } from "./evaluator/LlamaChat/LlamaChat.js";
 import {
     LlamaCompletion, type LlamaCompletionOptions, type LlamaCompletionGenerationOptions, type LlamaInfillGenerationOptions
@@ -116,14 +116,17 @@ export {
     type LlamaChatSessionOptions,
     type LlamaChatSessionContextShiftOptions,
     type LLamaChatPromptOptions,
+    type LLamaChatPreloadPromptOptions,
     type LlamaChatSessionRepeatPenalty,
     LlamaChat,
     type LlamaChatOptions,
     type LLamaChatGenerateResponseOptions,
+    type LLamaChatLoadAndCompleteUserMessageOptions,
     type LLamaChatContextShiftOptions,
     type LLamaContextualRepeatPenalty,
     type LlamaChatResponse,
     type LlamaChatResponseFunctionCall,
+    type LlamaChatLoadAndCompleteUserResponse,
     LlamaCompletion,
     type LlamaCompletionOptions,
     type LlamaCompletionGenerationOptions,

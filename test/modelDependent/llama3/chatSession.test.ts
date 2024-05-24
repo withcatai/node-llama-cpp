@@ -63,6 +63,50 @@ describe("llama 3", () => {
             expect(res.responseText.toLowerCase()).to.not.include("llama");
         });
 
+        test("preloading a prompt works", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize: 2048
+            });
+            const chatSession = new LlamaChatSession({
+                contextSequence: context.getSequence()
+            });
+
+            expect(chatSession.chatWrapper).to.be.an.instanceof(Llama3ChatWrapper);
+
+            const prompt = "Describe the appearance of a llama";
+            await chatSession.preloadPrompt(prompt);
+            expect(model.detokenize(chatSession.sequence.contextTokens).endsWith(prompt)).to.eql(true);
+        });
+
+        test("completing a prompt works", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize: 2048
+            });
+            const chatSession = new LlamaChatSession({
+                contextSequence: context.getSequence()
+            });
+
+            expect(chatSession.chatWrapper).to.be.an.instanceof(Llama3ChatWrapper);
+
+            const prompt = "Describe the appearance of a llama and explain what";
+            const completion = await chatSession.preloadPrompt(prompt, {
+                maxTokens: 40
+            });
+            expect(completion).to.eql(" it is.");
+        });
+
         // disabled due to getting timeout in the CI due to taking too long
         test.skip("context shift works correctly", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const contextSize = 2048;
