@@ -178,10 +178,10 @@ while true; do
     node ./dist/cli/cli.js inspect gpu
 
     echo "Running tests using CUDA..."
-    NODE_LLAMA_CPP_GPU=cuda NODE_LLAMA_CPP_LOG_LEVEL=warn npm run --silent test
+    NODE_LLAMA_CPP_GPU=cuda npm run --silent test
 
     echo "Running tests using Vulkan..."
-    NODE_LLAMA_CPP_GPU=vulkan NODE_LLAMA_CPP_LOG_LEVEL=warn npm run --silent test
+    NODE_LLAMA_CPP_GPU=vulkan npm run --silent test
 
     echo ""
     echo "Done running tests"
