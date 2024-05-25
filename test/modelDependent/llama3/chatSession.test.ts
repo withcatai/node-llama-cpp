@@ -101,7 +101,7 @@ describe("llama 3", () => {
             expect(chatSession.chatWrapper).to.be.an.instanceof(Llama3ChatWrapper);
 
             const prompt = "Describe the appearance of a llama and explain what";
-            const completion = await chatSession.preloadPrompt(prompt, {
+            const completion = await chatSession.completePrompt(prompt, {
                 maxTokens: 40
             });
             expect(completion).to.eql(" it is.");
