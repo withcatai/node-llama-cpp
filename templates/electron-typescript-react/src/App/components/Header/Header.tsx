@@ -12,7 +12,7 @@ export function Header({modelName, onLoadClick, loadPercentage, onResetChatClick
             <div
                 className={classNames("progress", loadPercentage === 1 && "hide")}
                 style={{
-                    "--progress": loadPercentage ?? undefined
+                    "--progress": loadPercentage != null ? (loadPercentage * 100) : undefined
                 } as CSSProperties}
             />
 

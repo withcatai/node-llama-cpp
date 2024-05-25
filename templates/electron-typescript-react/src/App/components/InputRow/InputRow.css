@@ -13,24 +13,90 @@
     z-index: 10;
     align-items: flex-end;
 
-    > .input {
+    > .inputContainer {
         flex: 1;
-        border: none;
-        resize: none;
-        box-sizing: border-box;
-        max-height: 160px;
-        height: 55px;
-        outline: none;
-        padding: 12px 24px;
-        background-color: transparent;
-        font: inherit;
-        align-content: center;
-        align-self: stretch;
-        color: var(--panel-text-color);
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+        position: relative;
+        isolation: isolate;
+        max-height: 400px;
+        min-height: var(--min-height);
+        --min-height: 55px;
 
-        &::placeholder {
+        > .input {
+            flex: 1;
+            border: none;
+            resize: none;
+            box-sizing: border-box;
+            max-height: 160px;
+            min-height: var(--min-height);
+            height: 55px;
+            outline: none;
+            padding: calc((var(--min-height) - 1lh) / 2) 24px;
+            background-color: transparent;
+            font: inherit;
+            align-content: center;
+            align-self: stretch;
             color: var(--panel-text-color);
-            opacity: 0.4;
+            z-index: 2;
+            unicode-bidi: plaintext;
+            overflow: auto;
+
+            &::placeholder {
+                color: var(--panel-text-color);
+                opacity: 0.4;
+            }
+        }
+
+        > .autocomplete {
+            position: absolute;
+            inset: 0px;
+            z-index: 1;
+            display: flex;
+            overflow: hidden;
+            pointer-events: none;
+            user-select: none;
+
+            > .content {
+                flex: 1;
+                flex-shrink: 0;
+                font: inherit;
+                padding: calc((var(--min-height) - 1lh) / 2) 24px;
+                text-align: initial;
+                unicode-bidi: plaintext;
+                overflow: hidden;
+                opacity: 0.36;
+
+                &.hide {
+                    opacity: 0;
+                }
+
+                > .currentText {
+                    opacity: 0;
+                    display: inline;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                > .completion {
+                    display: inline;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                > .pressTab {
+                    display: inline-block;
+                    margin: -1px 8px;
+                    opacity: 0.8;
+                    border: solid 1px color-mix(in srgb, currentColor, transparent 64%);
+                    border-bottom-width: 2px;
+                    border-radius: 8px;
+                    padding: 0.1em 0.4em;
+                    font-size: 0.8em;
+                    vertical-align: top;
+                }
+            }
         }
     }
 

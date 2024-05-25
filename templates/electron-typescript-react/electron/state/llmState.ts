@@ -1,5 +1,5 @@
 import path from "node:path";
-import {getLlama, Llama, LlamaChatSession, LlamaContext, LlamaContextSequence, LlamaModel, Token} from "node-llama-cpp";
+import {getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel, Token} from "node-llama-cpp";
 import {withLock, State} from "lifecycle-utils";
 
 export const llmState = new State<LlmState>({
@@ -18,7 +18,11 @@ export const llmState = new State<LlmState>({
     chatSession: {
         loaded: false,
         generatingResult: false,
-        simplifiedChat: []
+        simplifiedChat: [],
+        draftPrompt: {
+            prompt: "",
+            completion: ""
+        }
     }
 });
 
@@ -45,7 +49,11 @@ export type LlmState = {
     chatSession: {
         loaded: boolean,
         generatingResult: boolean,
-        simplifiedChat: SimplifiedChatItem[]
+        simplifiedChat: SimplifiedChatItem[],
+        draftPrompt: {
+            prompt: string,
+            completion: string
+        }
     }
 };
 
@@ -60,6 +68,7 @@ let context: LlamaContext | null = null;
 let contextSequence: LlamaContextSequence | null = null;
 
 let chatSession: LlamaChatSession | null = null;
+let chatSessionCompletionEngine: LlamaChatSessionPromptCompletionEngine | null = null;
 let promptAbortController: AbortController | null = null;
 const inProgressResponse: Token[] = [];
 
@@ -256,6 +265,7 @@ export const llmFunctions = {
                     try {
                         chatSession.dispose();
                         chatSession = null;
+                        chatSessionCompletionEngine = null;
                     } catch (err) {
                         console.error("Failed to dispose chat session", err);
                     }
@@ -267,32 +277,12 @@ export const llmFunctions = {
                         chatSession: {
                             loaded: false,
                             generatingResult: false,
-                            simplifiedChat: []
+                            simplifiedChat: [],
+                            draftPrompt: llmState.state.chatSession.draftPrompt
                         }
                     };
 
-                    chatSession = new LlamaChatSession({
-                        contextSequence
-                    });
-                    llmState.state = {
-                        ...llmState.state,
-                        chatSession: {
-                            loaded: true,
-                            generatingResult: false,
-                            simplifiedChat: []
-                        }
-                    };
-
-                    chatSession.onDispose.createListener(() => {
-                        llmState.state = {
-                            ...llmState.state,
-                            chatSession: {
-                                loaded: false,
-                                generatingResult: false,
-                                simplifiedChat: []
-                            }
-                        };
-                    });
+                    llmFunctions.chatSession.resetChatHistory();
                 } catch (err) {
                     console.error("Failed to create chat session", err);
                     llmState.state = {
@@ -300,7 +290,8 @@ export const llmFunctions = {
                         chatSession: {
                             loaded: false,
                             generatingResult: false,
-                            simplifiedChat: []
+                            simplifiedChat: [],
+                            draftPrompt: llmState.state.chatSession.draftPrompt
                         }
                     };
                 }
@@ -359,15 +350,65 @@ export const llmFunctions = {
             if (contextSequence == null)
                 return;
 
+            chatSession?.dispose();
             chatSession = new LlamaChatSession({
-                contextSequence
+                contextSequence,
+                autoDisposeSequence: false
+            });
+            chatSessionCompletionEngine = chatSession.createPromptCompletionEngine({
+                onGeneration(prompt, completion) {
+                    if (llmState.state.chatSession.draftPrompt.prompt === prompt) {
+                        llmState.state = {
+                            ...llmState.state,
+                            chatSession: {
+                                ...llmState.state.chatSession,
+                                draftPrompt: {
+                                    prompt,
+                                    completion
+                                }
+                            }
+                        };
+                    }
+                }
             });
 
             llmState.state = {
                 ...llmState.state,
                 chatSession: {
+                    loaded: true,
+                    generatingResult: false,
+                    simplifiedChat: [],
+                    draftPrompt: {
+                        prompt: llmState.state.chatSession.draftPrompt.prompt,
+                        completion: chatSessionCompletionEngine.complete(llmState.state.chatSession.draftPrompt.prompt)
+                    }
+                }
+            };
+
+            chatSession.onDispose.createListener(() => {
+                llmState.state = {
+                    ...llmState.state,
+                    chatSession: {
+                        loaded: false,
+                        generatingResult: false,
+                        simplifiedChat: [],
+                        draftPrompt: llmState.state.chatSession.draftPrompt
+                    }
+                };
+            });
+        },
+        setDraftPrompt(prompt: string) {
+            if (chatSessionCompletionEngine == null)
+                return;
+
+            llmState.state = {
+                ...llmState.state,
+                chatSession: {
                     ...llmState.state.chatSession,
-                    simplifiedChat: []
+                    draftPrompt: {
+                        prompt: prompt,
+                        completion: chatSessionCompletionEngine.complete(prompt)
+                    }
                 }
             };
         }

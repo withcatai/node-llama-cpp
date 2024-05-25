@@ -18,6 +18,10 @@ export const llmState = new State<LlmState>({
     chatSession: {
         loaded: false,
         generatingResult: false,
-        simplifiedChat: []
+        simplifiedChat: [],
+        draftPrompt: {
+            prompt: "",
+            completion: ""
+        }
     }
 });

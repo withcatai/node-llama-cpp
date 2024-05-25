@@ -67,6 +67,10 @@ export function App() {
         void electronLlmRpc.prompt(prompt);
     }, [generatingResult]);
 
+    const onPromptInput = useCallback((currentText: string) => {
+        void electronLlmRpc.setDraftPrompt(currentText);
+    }, []);
+
     const error = state.llama.error ?? state.model.error ?? state.context.error ?? state.contextSequence.error;
     const showMessage = state.selectedModelFilePath == null || error != null || state.chatSession.simplifiedChat.length === 0;
 
@@ -121,9 +125,12 @@ export function App() {
                     ? stopActivePrompt
                     : undefined
             }
+            onPromptInput={onPromptInput}
             sendPrompt={sendPrompt}
             generatingResult={generatingResult}
             contextSequenceLoaded={state.contextSequence.loaded}
+            autocompleteInputDraft={state.chatSession.draftPrompt.prompt}
+            autocompleteCompletion={state.chatSession.draftPrompt.completion}
         />
     </div>;
 }
