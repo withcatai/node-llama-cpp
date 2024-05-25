@@ -1,11 +1,12 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "node-llama-cpp.electron.example",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "node-llama-cpp Electron example",
+  "executableName": "node-llama-cpp-electron-example",
   "directories": {
-    "output": "release/${version}"
+    "output": "release"
   },
   "files": [
     "dist",
@@ -20,32 +21,78 @@
     "node_modules/node-llama-cpp/llama/localBuilds"
   ],
   "mac": {
-    "target": [
-      "dmg"
-    ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "target": [{
+      "target": "dmg",
+      "arch": [
+        "arm64",
+        "x64"
+      ]
+    }, {
+      "target": "zip",
+      "arch": [
+        "arm64",
+        "x64"
+      ]
+    }],
+
+    "artifactName": "${name}.macOS.${version}.${arch}.${ext}"
   },
   "win": {
     "target": [
       {
         "target": "nsis",
         "arch": [
-          "x64"
+          "x64",
+          "arm64"
+        ]
+      },
+      {
+        "target": "appx",
+        "arch": [
+          "x64",
+          "arm64"
         ]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+
+    "artifactName": "${name}.Windows.${version}.${arch}.${ext}"
+  },
+  "appx": {
+    "artifactName": "${name}.Windows.${version}.${arch}.${ext}"
   },
   "nsis": {
-    "oneClick": false,
+    "oneClick": true,
     "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false
+    "allowToChangeInstallationDirectory": false,
+    "deleteAppDataOnUninstall": true
   },
   "linux": {
-    "target": [
-      "AppImage"
-    ],
-    "artifactName": "${productName}-Linux-${version}.${ext}"
+    "target": [{
+      "target": "AppImage",
+      "arch": [
+        "x64",
+        "arm64"
+      ]
+    }, {
+      "target": "snap",
+      "arch": [
+        "x64",
+        "arm64"
+      ]
+    }, {
+      "target": "deb",
+      "arch": [
+        "x64",
+        "arm64"
+      ]
+    }, {
+      "target": "tar.gz",
+      "arch": [
+        "x64",
+        "arm64"
+      ]
+    }],
+
+    "artifactName": "${name}.Linux.${version}.${arch}.${ext}"
   }
 }
