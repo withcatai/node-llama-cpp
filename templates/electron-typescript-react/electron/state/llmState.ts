@@ -306,7 +306,11 @@ export const llmFunctions = {
                     ...llmState.state,
                     chatSession: {
                         ...llmState.state.chatSession,
-                        generatingResult: true
+                        generatingResult: true,
+                        draftPrompt: {
+                            prompt: "",
+                            completion: ""
+                        }
                     }
                 };
                 promptAbortController = new AbortController();
@@ -337,7 +341,11 @@ export const llmFunctions = {
                     chatSession: {
                         ...llmState.state.chatSession,
                         generatingResult: false,
-                        simplifiedChat: getSimplifiedChatHistory(false)
+                        simplifiedChat: getSimplifiedChatHistory(false),
+                        draftPrompt: {
+                            ...llmState.state.chatSession.draftPrompt,
+                            completion: chatSessionCompletionEngine?.complete(llmState.state.chatSession.draftPrompt.prompt) ?? ""
+                        }
                     }
                 };
                 inProgressResponse.length = 0;
@@ -380,7 +388,7 @@ export const llmFunctions = {
                     simplifiedChat: [],
                     draftPrompt: {
                         prompt: llmState.state.chatSession.draftPrompt.prompt,
-                        completion: chatSessionCompletionEngine.complete(llmState.state.chatSession.draftPrompt.prompt)
+                        completion: chatSessionCompletionEngine.complete(llmState.state.chatSession.draftPrompt.prompt) ?? ""
                     }
                 }
             };
@@ -407,7 +415,7 @@ export const llmFunctions = {
                     ...llmState.state.chatSession,
                     draftPrompt: {
                         prompt: prompt,
-                        completion: chatSessionCompletionEngine.complete(prompt)
+                        completion: chatSessionCompletionEngine.complete(prompt) ?? ""
                     }
                 }
             };

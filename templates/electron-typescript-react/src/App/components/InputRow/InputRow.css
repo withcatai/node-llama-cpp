@@ -13,6 +13,10 @@
     z-index: 10;
     align-items: flex-end;
 
+    &.disabled {
+        opacity: 0.48;
+    }
+
     > .inputContainer {
         flex: 1;
         display: flex;

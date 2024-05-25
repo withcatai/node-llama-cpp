@@ -7,7 +7,8 @@ import "./InputRow.css";
 
 
 export function InputRow({
-    stopGeneration, sendPrompt, onPromptInput, autocompleteInputDraft, autocompleteCompletion, generatingResult, contextSequenceLoaded
+    disabled = false, stopGeneration, sendPrompt, onPromptInput, autocompleteInputDraft, autocompleteCompletion, generatingResult,
+    contextSequenceLoaded
 }: InputRowProps) {
     const [inputText, setInputText] = useState<string>("");
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -54,8 +55,8 @@ export function InputRow({
 
         setInputValue("");
         resizeInput();
-        sendPrompt(message);
         onPromptInput?.("");
+        sendPrompt(message);
     }, [setInputValue, generatingResult, resizeInput, sendPrompt, onPromptInput]);
 
     const onInput = useCallback(() => {
@@ -73,7 +74,6 @@ export function InputRow({
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             submitPrompt();
-            resizeInput();
         } else if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
             if (inputRef.current != null && autocompleteText !== "") {
@@ -86,7 +86,7 @@ export function InputRow({
         }
     }, [submitPrompt, setInputValue, onPromptInput, resizeInput, autocompleteText]);
 
-    return <div className="appInputRow">
+    return <div className={classNames("appInputRow", disabled && "disabled")}>
         <div className="inputContainer">
             <textarea
                 ref={inputRef}
@@ -95,7 +95,7 @@ export function InputRow({
                 className="input"
                 autoComplete="off"
                 spellCheck
-                disabled={!contextSequenceLoaded}
+                disabled={disabled || !contextSequenceLoaded}
                 onScroll={resizeInput}
                 placeholder={
                     autocompleteText === ""
@@ -113,14 +113,14 @@ export function InputRow({
         </div>
         <button
             className="stopGenerationButton"
-            disabled={stopGeneration == null || !generatingResult}
+            disabled={disabled || stopGeneration == null || !generatingResult}
             onClick={stopGeneration}
         >
             <AbortIconSVG className="icon" />
         </button>
         <button
             className="sendButton"
-            disabled={!contextSequenceLoaded || inputText === "" || generatingResult}
+            disabled={disabled || !contextSequenceLoaded || inputText === "" || generatingResult}
             onClick={submitPrompt}
         >
             <AddMessageIconSVG className="icon" />
@@ -129,6 +129,7 @@ export function InputRow({
 }
 
 type InputRowProps = {
+    disabled?: boolean,
     stopGeneration?(): void,
     sendPrompt(prompt: string): void,
     onPromptInput?(currentText: string): void,

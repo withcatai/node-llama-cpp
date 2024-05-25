@@ -34,6 +34,86 @@
         }
 
         > .loadModel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 64px;
+            text-align: start;
+
+            > .hint {
+                margin-top: 64px;
+                opacity: 0.6;
+            }
+
+            > .actions {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: var(--actions-block-background-color);
+                border: solid 1px var(--actions-block-border-color);
+                box-shadow: var(--actions-block-box-shadow);
+                padding: 16px 24px;
+                border-radius: 12px;
+                gap: 16px;
+
+                > .starLink {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 8px;
+                    color: var(--star-link-color);
+
+                    &:hover {
+                        color: var(--star-hover-color);
+                    }
+
+                    > .starIcon {
+                        flex-shrink: 0;
+                        fill: currentColor;
+                    }
+                }
+
+                > .links {
+                    display: flex;
+                    flex-direction: row;
+
+                    > a {
+                        display: flex;
+                        flex-direction: row;
+                        align-items: center;
+                        gap: 8px;
+
+                        > .downloadIcon {
+                            flex-shrink: 0;
+                            fill: currentColor;
+                        }
+                    }
+
+                    > .separator {
+                        width: 1px;
+                        background-color: var(--link-color);
+                        opacity: 0.2;
+                        margin: 0px 16px;
+                        height: 0.8lh;
+                        align-self: center;
+                    }
+                }
+
+                > .browseLink {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 8px;
+
+                    > .searchIcon {
+                        flex-shrink: 0;
+                        fill: currentColor;
+                    }
+                }
+            }
+        }
+
+        > .typeMessage {
             opacity: 0.6;
         }
     }
