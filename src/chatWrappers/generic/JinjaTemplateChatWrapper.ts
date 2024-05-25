@@ -102,7 +102,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         this.trimLeadingWhitespaceInResponses = trimLeadingWhitespaceInResponses;
 
         this.settings = {
-            ...super.settings,
+            ...ChatWrapper.defaultSetting,
             functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
         };
 

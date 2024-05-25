@@ -86,7 +86,7 @@ export class TemplateChatWrapper extends ChatWrapper {
         this._parsedChatHistoryTemplate = parseChatHistoryTemplate(historyTemplate);
 
         this.settings = {
-            ...super.settings,
+            ...ChatWrapper.defaultSetting,
             functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
         };
     }

@@ -412,7 +412,7 @@ export class LlamaChat {
                         generateResponseState.handleInitiallyEngagedFunctionModeFunctionDetection();
                         generateResponseState.handleFunctionSyntax();
 
-                        const functionEndSyntaxRes = generateResponseState.detectFunctionEndSyntax();
+                        const functionEndSyntaxRes = generateResponseState.detectFunctionEndSyntax("model");
                         if (functionEndSyntaxRes != null)
                             return functionEndSyntaxRes;
 
@@ -421,7 +421,7 @@ export class LlamaChat {
                         generateResponseState.popStreamRegulatorFreeTokens();
                         generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
 
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger();
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
                         if (stopGenerationTriggerRes != null)
                             return stopGenerationTriggerRes;
 
@@ -429,14 +429,14 @@ export class LlamaChat {
 
                         generateResponseState.moveFreePendingTokensToRes();
 
-                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger();
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("model");
                         if (maxTokensTriggerRes != null)
                             return maxTokensTriggerRes;
 
                         if (generateResponseState.updateShouldContextShift())
                             break;
 
-                        const abortRes = generateResponseState.handleAbortTrigger();
+                        const abortRes = generateResponseState.handleAbortTrigger("model");
                         if (abortRes != null)
                             return abortRes;
                     }
@@ -485,6 +485,13 @@ export class LlamaChat {
             } = {}
         } = options;
 
+        const lastEvaluationContextWindowHistoryItem = lastEvaluationContextWindowHistory == null
+            ? null
+            : lastEvaluationContextWindowHistory[lastEvaluationContextWindowHistory.length - 1];
+        const lastEvaluationContextWindowUserMessage = lastEvaluationContextWindowHistoryItem?.type === "user"
+            ? lastEvaluationContextWindowHistoryItem.text
+            : "";
+
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -508,7 +515,12 @@ export class LlamaChat {
                 contextShift,
                 customStopTriggers,
                 lastEvaluationContextWindow: {
-                    history: lastEvaluationContextWindowHistory,
+                    history: lastEvaluationContextWindowHistory == null
+                        ? undefined
+                        : setLastUserTextInChatHistory(
+                            lastEvaluationContextWindowHistory,
+                            lastEvaluationContextWindowUserMessage + initialUserPrompt
+                        ),
                     minimumOverlapPercentageToPreventContextShift
                 }
             }
@@ -550,7 +562,7 @@ export class LlamaChat {
                             completion: "",
                             lastEvaluation: {
                                 contextWindow: setLastUserTextInChatHistory(
-                                    generateResponseState.contextWindowHistory,
+                                    generateResponseState.lastContextWindowHistory,
                                     initialUserMessage
                                 ),
                                 contextShiftMetadata: generateResponseState.lastHistoryCompressionMetadata
@@ -569,13 +581,13 @@ export class LlamaChat {
 
                         generateResponseState.popStreamRegulatorFreeTokens();
 
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger();
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
                         if (stopGenerationTriggerRes != null)
                             return {
                                 completion: stopGenerationTriggerRes.response,
                                 lastEvaluation: {
                                     contextWindow: setLastUserTextInChatHistory(
-                                        generateResponseState.contextWindowHistory,
+                                        generateResponseState.lastContextWindowHistory,
                                         initialUserMessage
                                     ),
                                     contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
@@ -587,13 +599,13 @@ export class LlamaChat {
 
                         generateResponseState.moveFreePendingTokensToRes(false);
 
-                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger();
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("user");
                         if (maxTokensTriggerRes != null)
                             return {
                                 completion: maxTokensTriggerRes.response,
                                 lastEvaluation: {
                                     contextWindow: setLastUserTextInChatHistory(
-                                        generateResponseState.contextWindowHistory,
+                                        generateResponseState.lastContextWindowHistory,
                                         initialUserMessage
                                     ),
                                     contextShiftMetadata: maxTokensTriggerRes.lastEvaluation.contextShiftMetadata
@@ -604,13 +616,13 @@ export class LlamaChat {
                         if (generateResponseState.updateShouldContextShift())
                             break;
 
-                        const abortRes = generateResponseState.handleAbortTrigger();
+                        const abortRes = generateResponseState.handleAbortTrigger("user");
                         if (abortRes != null)
                             return {
                                 completion: abortRes.response,
                                 lastEvaluation: {
                                     contextWindow: setLastUserTextInChatHistory(
-                                        generateResponseState.contextWindowHistory,
+                                        generateResponseState.lastContextWindowHistory,
                                         initialUserMessage
                                     ),
                                     contextShiftMetadata: abortRes.lastEvaluation.contextShiftMetadata
@@ -850,7 +862,7 @@ function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], t
     return newChatHistory;
 }
 
-function setLastUserTextInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
+function setLastUserTextInChatHistory(chatHistory: ChatHistoryItem[], userText: string) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "user")
         newChatHistory.push({
@@ -862,9 +874,16 @@ function setLastUserTextInChatHistory(chatHistory: ChatHistoryItem[], textRespon
     const newLastUserItem = {...lastUserItem};
     newChatHistory[newChatHistory.length - 1] = newLastUserItem;
 
-    newLastUserItem.text = textResponse;
+    newLastUserItem.text = userText;
 
     return newChatHistory;
+}
+
+function setLastTextInChatHistory(itemType: "user" | "model", chatHistory: ChatHistoryItem[], text: string) {
+    if (itemType === "user")
+        return setLastUserTextInChatHistory(chatHistory, text);
+    else
+        return setLastModelTextResponseInChatHistory(chatHistory, text);
 }
 
 function generateContextText(
@@ -950,7 +969,13 @@ async function getContextWindow({
     if (isFirstEvaluation && lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory) {
         const newContextWindow = lastEvaluationContextWindowHistory.slice();
 
-        if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "model")
+        if (endWithUserText) {
+            if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "user")
+                newContextWindow.push({
+                    type: "user",
+                    text: ""
+                });
+        } else if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "model")
             newContextWindow.push({
                 type: "model",
                 response: []
@@ -1172,7 +1197,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public shouldContextShift = false;
     public queuedChunkTokens: Token[] = [];
 
-    public contextWindowHistory: ChatHistoryItem[] = [];
+    private contextWindowHistory: ChatHistoryItem[] = [];
     public stopGenerationTriggers: LlamaText[] = [];
     public contextWindowTokens: Token[] = [];
     public newResolvedHistory: ChatHistoryItem[] = [];
@@ -1557,7 +1582,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             },
             tokenBias: this.tokenBias,
             evaluationPriority: this.evaluationPriority,
-            yieldEogToken: true,
+            yieldEogToken: true
         }));
     }
 
@@ -1761,7 +1786,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
     }
 
-    public detectFunctionEndSyntax(): LlamaChatResponse<Functions> | undefined {
+    public detectFunctionEndSyntax(lastHistoryItemType: "user" | "model"): LlamaChatResponse<Functions> | undefined {
         if (this.inFunctionEvaluationMode && this.functionSyntaxEndDetector.hasTriggeredStops && this.functionsGrammar != null) {
             const functionCallText = this.llamaChat.model.detokenize(this.functionCallTokens);
             const functionCall = this.functionsGrammar.parseFunctionCall(functionCallText);
@@ -1777,11 +1802,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             return {
                 response: modelResponse,
                 lastEvaluation: {
-                    contextWindow: setLastModelTextResponseInChatHistory(
+                    contextWindow: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.lastContextWindowHistory,
                         this.contextWindowLastModelResponse + contextWindowModelResponse
                     ),
-                    cleanHistory: setLastModelTextResponseInChatHistory(
+                    cleanHistory: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.resolvedHistory,
                         this.lastModelResponse + modelResponse
                     ),
@@ -1819,7 +1846,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
     }
 
-    public handleStopGenerationTrigger() {
+    public handleStopGenerationTrigger(lastHistoryItemType: "user" | "model") {
         if (this.stopGenerationDetector.hasTriggeredStops || this.customStopGenerationTriggersDetector.hasTriggeredStops ||
             this.llamaChat.model.isEogToken(this.currentToken)
         ) {
@@ -1863,11 +1890,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             }
 
             const lastEvaluation = {
-                contextWindow: setLastModelTextResponseInChatHistory(
+                contextWindow: setLastTextInChatHistory(
+                    lastHistoryItemType,
                     this.lastContextWindowHistory,
                     this.contextWindowLastModelResponse + contextWindowModelResponse
                 ),
-                cleanHistory: setLastModelTextResponseInChatHistory(
+                cleanHistory: setLastTextInChatHistory(
+                    lastHistoryItemType,
                     this.resolvedHistory,
                     this.lastModelResponse + modelResponse
                 ),
@@ -1932,7 +1961,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
     }
 
-    public handleMaxTokensTrigger() {
+    public handleMaxTokensTrigger(lastHistoryItemType: "user" | "model") {
         if (this.isMaxTokensTriggered()) {
             let modelResponse = this.llamaChat.model.detokenize(this.res);
             let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
@@ -1945,11 +1974,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             return {
                 response: modelResponse,
                 lastEvaluation: {
-                    contextWindow: setLastModelTextResponseInChatHistory(
+                    contextWindow: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.lastContextWindowHistory,
                         this.contextWindowLastModelResponse + contextWindowModelResponse
                     ),
-                    cleanHistory: setLastModelTextResponseInChatHistory(
+                    cleanHistory: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.resolvedHistory,
                         this.lastModelResponse + modelResponse
                     ),
@@ -1969,7 +2000,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return this.shouldContextShift;
     }
 
-    public handleAbortTrigger() {
+    public handleAbortTrigger(lastHistoryItemType: "user" | "model") {
         if (this.signal?.aborted && this.stopOnAbortSignal) {
             if (this.res.length === 0)
                 throw this.signal.reason;
@@ -1985,11 +2016,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             return {
                 response: modelResponse,
                 lastEvaluation: {
-                    contextWindow: setLastModelTextResponseInChatHistory(
+                    contextWindow: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.lastContextWindowHistory,
                         this.contextWindowLastModelResponse + contextWindowModelResponse
                     ),
-                    cleanHistory: setLastModelTextResponseInChatHistory(
+                    cleanHistory: setLastTextInChatHistory(
+                        lastHistoryItemType,
                         this.resolvedHistory,
                         this.lastModelResponse + modelResponse
                     ),

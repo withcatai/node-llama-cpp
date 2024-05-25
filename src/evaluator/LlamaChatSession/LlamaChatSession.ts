@@ -9,6 +9,10 @@ import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../Lla
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaText} from "../../utils/LlamaText.js";
+import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
+import {
+    LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
+} from "./utils/LlamaChatSessionPromptCompletionEngine.js";
 
 
 export type LlamaChatSessionOptions = {
@@ -130,11 +134,11 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     documentFunctionParams?: boolean
 });
 
-export type LLamaChatPreloadPromptOptions = {
+export type LLamaChatCompletePromptOptions = {
     /**
-     * If set to a value greater than `0`, a completion for the given user prompt will be generated up to the given number of tokens.
+     * Generate a completion for the given user prompt up to the given number of tokens.
      *
-     * Defaults to `0`.
+     * Defaults to `256` or half the context size, whichever is smaller.
      */
     maxTokens?: LLamaChatPromptOptions["maxTokens"],
 
@@ -177,6 +181,13 @@ export type LLamaChatPreloadPromptOptions = {
      * It's best to provide the same value that was used for the previous prompt here.
      */
     documentFunctionParams?: boolean
+};
+
+export type LLamaChatPreloadPromptOptions = {
+    signal?: LLamaChatCompletePromptOptions["signal"],
+    evaluationPriority?: LLamaChatCompletePromptOptions["evaluationPriority"],
+    functions?: LLamaChatCompletePromptOptions["functions"],
+    documentFunctionParams?: LLamaChatCompletePromptOptions["documentFunctionParams"]
 };
 
 export type LlamaChatSessionRepeatPenalty = {
@@ -224,6 +235,8 @@ export class LlamaChatSession {
     /** @internal */ private _chatHistory: ChatHistoryItem[];
     /** @internal */ private _lastEvaluation?: LlamaChatResponse["lastEvaluation"];
     /** @internal */ private _chat: LlamaChat | null;
+    /** @internal */ public _chatHistoryStateRef = {};
+    /** @internal */ public readonly _preloadAndCompleteAbortControllers = new Set<AbortController>();
 
     public readonly onDispose = new EventRelay<void>();
 
@@ -366,8 +379,10 @@ export class LlamaChatSession {
         if (grammar != null && grammar._llama !== this.model._llama)
             throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
+        this._stopAllPreloadAndPromptCompletions();
         return await withLock(this._chatLock, "evaluation", signal, async () => {
             this._ensureNotDisposed();
+            this._stopAllPreloadAndPromptCompletions();
 
             if (this._chat == null)
                 throw new DisposedError();
@@ -468,6 +483,7 @@ export class LlamaChatSession {
 
                 this._lastEvaluation = lastEvaluation;
                 this._chatHistory = newChatHistory;
+                this._chatHistoryStateRef = {};
 
                 const lastModelResponseItem = getLastModelResponseItem(newChatHistory);
                 const responseText = lastModelResponseItem.response
@@ -497,39 +513,51 @@ export class LlamaChatSession {
      * Preload a user prompt into the current context sequence state to make later inference of the model response begin sooner
      * and feel faster.
      *
-     * If `maxTokens` is set to a value greater than `0`,
-     * a completion for the given user prompt will be generated up to the given number of tokens.
+     * > **Note:** Preloading a long user prompt can incur context shifts, so consider limiting the length of prompts you preload
+     * @param prompt - the prompt to preload
+     * @param [options]
+     */
+    public async preloadPrompt(prompt: string, options: LLamaChatPreloadPromptOptions = {}): Promise<void> {
+        await this.completePromptWithMeta(prompt, {
+            ...options,
+            maxTokens: 0
+        });
+    }
+
+    /**
+     * Preload a user prompt into the current context sequence state and generate a completion for it.
      *
      * > **Note:** Preloading a long user prompt and completing a user prompt with a high number of `maxTokens` can incur context shifts,
      * > so consider limiting the length of prompts you preload.
      * >
-     * > Also, it's recommended to limit the number of tokens generated to a reasonable amount.
-     *
-     * Defaults to `0`.
+     * > Also, it's recommended to limit the number of tokens generated to a reasonable amount by configuring `maxTokens`.
      * @param prompt - the prompt to preload
      * @param [options]
      */
-    public async preloadPrompt<const MaxTokens extends number | 0 | undefined = 0>(
-        prompt: string,
-        options: LLamaChatPreloadPromptOptions & {
-            maxTokens?: MaxTokens
-        } = {}
-    ): Promise<0 | undefined extends MaxTokens ? void : string> {
-        const {completion} = await this.preloadPromptWithMeta(prompt, options);
+    public async completePrompt(prompt: string, options: LLamaChatCompletePromptOptions = {}): Promise<string> {
+        const {completion} = await this.completePromptWithMeta(prompt, options);
 
-        if (options?.maxTokens == null || options?.maxTokens === 0)
-            return undefined as (0 | undefined extends MaxTokens ? void : string);
-
-        return completion as (0 | undefined extends MaxTokens ? void : string);
+        return completion;
     }
 
     /**
-     * See `preloadPrompt` for more information.
+     * Create a smart completion engine that caches the prompt completions
+     * and reuses them when the user prompt matches the beginning of the cached prompt or completion.
+     *
+     * All completions are made and cache is used only for the current chat session state.
+     * You can create a single completion engine for an entire chat session.
+     */
+    public createPromptCompletionEngine(options?: LLamaChatPromptCompletionEngineOptions) {
+        return LlamaChatSessionPromptCompletionEngine._create(this, options);
+    }
+
+    /**
+     * See `completePrompt` for more information.
      * @param prompt
      * @param [options]
      */
-    public async preloadPromptWithMeta(prompt: string, {
-        maxTokens = 0,
+    public async completePromptWithMeta(prompt: string, {
+        maxTokens,
         stopOnAbortSignal = false,
 
         functions,
@@ -546,70 +574,77 @@ export class LlamaChatSession {
         tokenBias,
         customStopTriggers,
         evaluationPriority
-    }: LLamaChatPreloadPromptOptions = {}) {
+    }: LLamaChatCompletePromptOptions = {}) {
         this._ensureNotDisposed();
 
         if (grammar != null && grammar._llama !== this.model._llama)
             throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
-        return await withLock(this._chatLock, "evaluation", signal, async () => {
-            this._ensureNotDisposed();
+        const abortController = wrapAbortSignal(signal);
+        this._preloadAndCompleteAbortControllers.add(abortController);
 
-            if (this._chat == null)
-                throw new DisposedError();
+        try {
+            return await withLock(this._chatLock, "evaluation", abortController.signal, async () => {
+                this._ensureNotDisposed();
 
-            const {completion, lastEvaluation, metadata} = await this._chat.loadChatAndCompleteUserMessage(this._chatHistory, {
-                initialUserPrompt: prompt,
-                functions,
-                documentFunctionParams,
-                grammar,
-                onToken,
-                signal,
-                stopOnAbortSignal: true,
-                repeatPenalty,
-                minP,
-                topK,
-                topP,
-                tokenBias,
-                customStopTriggers,
-                maxTokens,
-                temperature,
-                trimWhitespaceSuffix,
-                contextShift: {
-                    ...this._contextShift,
-                    lastEvaluationMetadata: this._lastEvaluation?.contextShiftMetadata
-                },
-                evaluationPriority,
-                lastEvaluationContextWindow: {
-                    history: this._lastEvaluation?.contextWindow,
-                    minimumOverlapPercentageToPreventContextShift: 0.8
-                }
-            });
-            this._ensureNotDisposed();
+                if (this._chat == null)
+                    throw new DisposedError();
 
-            this._lastEvaluation = {
-                cleanHistory: this._chatHistory,
-                contextWindow: lastEvaluation.contextWindow,
-                contextShiftMetadata: lastEvaluation.contextShiftMetadata
-            };
+                const {completion, lastEvaluation, metadata} = await this._chat.loadChatAndCompleteUserMessage(this._chatHistory, {
+                    initialUserPrompt: prompt,
+                    functions,
+                    documentFunctionParams,
+                    grammar,
+                    onToken,
+                    signal: abortController.signal,
+                    stopOnAbortSignal: true,
+                    repeatPenalty,
+                    minP,
+                    topK,
+                    topP,
+                    tokenBias,
+                    customStopTriggers,
+                    maxTokens,
+                    temperature,
+                    trimWhitespaceSuffix,
+                    contextShift: {
+                        ...this._contextShift,
+                        lastEvaluationMetadata: this._lastEvaluation?.contextShiftMetadata
+                    },
+                    evaluationPriority,
+                    lastEvaluationContextWindow: {
+                        history: this._lastEvaluation?.contextWindow,
+                        minimumOverlapPercentageToPreventContextShift: 0.8
+                    }
+                });
+                this._ensureNotDisposed();
 
-            if (!stopOnAbortSignal && metadata.stopReason === "abort" && signal?.aborted)
-                throw signal.reason;
+                this._lastEvaluation = {
+                    cleanHistory: this._chatHistory,
+                    contextWindow: lastEvaluation.contextWindow,
+                    contextShiftMetadata: lastEvaluation.contextShiftMetadata
+                };
 
-            if (metadata.stopReason === "customStopTrigger")
+                if (!stopOnAbortSignal && metadata.stopReason === "abort" && abortController.signal?.aborted)
+                    throw abortController.signal.reason;
+
+                if (metadata.stopReason === "customStopTrigger")
+                    return {
+                        completion: completion,
+                        stopReason: metadata.stopReason,
+                        customStopTrigger: metadata.customStopTrigger,
+                        remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
+                    };
+
                 return {
                     completion: completion,
                     stopReason: metadata.stopReason,
-                    customStopTrigger: metadata.customStopTrigger,
                     remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
                 };
-
-            return {
-                completion: completion,
-                stopReason: metadata.stopReason,
-                remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
-            };
-        });
+            });
+        } finally {
+            this._preloadAndCompleteAbortControllers.delete(abortController);
+        }
     }
 
     public getChatHistory() {
@@ -625,7 +660,16 @@ export class LlamaChatSession {
 
     public setChatHistory(chatHistory: ChatHistoryItem[]) {
         this._chatHistory = structuredClone(chatHistory);
+        this._chatHistoryStateRef = {};
         this._lastEvaluation = undefined;
+    }
+
+    /** @internal */
+    private _stopAllPreloadAndPromptCompletions() {
+        for (const abortController of this._preloadAndCompleteAbortControllers)
+            abortController.abort();
+
+        this._preloadAndCompleteAbortControllers.clear();
     }
 
     /** @internal */
