@@ -1,6 +1,8 @@
 import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
-import {ChatHistoryItem, ChatModelFunctions, ChatUserMessage, ChatWrapperSettings} from "../../types.js";
+import {
+    ChatHistoryItem, ChatUserMessage, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings
+} from "../../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
@@ -102,25 +104,28 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         this.trimLeadingWhitespaceInResponses = trimLeadingWhitespaceInResponses;
 
         this.settings = {
-            ...ChatWrapper.defaultSetting,
-            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
+            ...ChatWrapper.defaultSettings,
+            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSettings.functions
         };
 
         if (this.convertUnsupportedSystemMessagesToUserMessages != null && !this.convertUnsupportedSystemMessagesToUserMessages.format.includes("{{message}}"))
             throw new Error('convertUnsupportedSystemMessagesToUserMessages format must include "{{message}}"');
 
         this._jinjaTemplate = new Template(this.template);
-        this._runSanityTest();
+
+        const {supportsSystemMessages} = this._runSanityTest();
+        this.settings = {
+            ...this.settings,
+            supportsSystemMessages
+        };
     }
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState & {
+        transformedSystemMessagesToUserMessages: boolean
     } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
@@ -153,31 +158,38 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     }): {
         contextText: LlamaText,
         stopGenerationTriggers: LlamaText[],
-        ignoreStartText?: LlamaText[]
+        ignoreStartText?: LlamaText[],
+        transformedSystemMessagesToUserMessages: boolean
     } {
+        let transformedSystemMessagesToUserMessages = false;
         const transformedHistory = convertSystemMessagesToUserMessagesFormat == null
             ? history
             : history.map((item) => {
-                if (item.type === "system")
+                if (item.type === "system") {
+                    transformedSystemMessagesToUserMessages = true;
                     return {
                         type: "user",
-                        text: convertSystemMessagesToUserMessagesFormat.replaceAll("{{message}}", item.text)
+                        text: LlamaText.joinValues(
+                            LlamaText.fromJSON(item.text),
+                            convertSystemMessagesToUserMessagesFormat.split("{{message}}")
+                        ).toString()
                     } satisfies ChatUserMessage;
+                }
 
                 return item;
             });
 
         const resultItems: Array<{
             role: "system" | "user" | "model",
-            content: string
+            content: LlamaText
         }> = [];
 
-        const currentTexts: string[] = [];
+        const currentTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
             if (currentTexts.length > 0 && currentAggregateFocus != null)
-                resultItems.push({role: currentAggregateFocus, content: currentTexts.join("\n\n")});
+                resultItems.push({role: currentAggregateFocus, content: LlamaText.joinValues("\n\n", currentTexts)});
 
             currentTexts.length = 0;
         }
@@ -188,13 +200,13 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                currentTexts.push(item.text);
+                currentTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (!this.joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "user")
                     flush();
 
                 currentAggregateFocus = "user";
-                currentTexts.push(item.text);
+                currentTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 if (!this.joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "model")
                     flush();
@@ -210,7 +222,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         const idsGenerator = new UniqueTemplateId(
             this.template + this.modelRoleName + this.userRoleName + this.systemRoleName +
-            (convertSystemMessagesToUserMessagesFormat ?? "") + resultItems.map(({content}) => content).join("\n\n")
+            (convertSystemMessagesToUserMessagesFormat ?? "") + resultItems.map(({content}) => content.toString()).join("\n\n")
         );
 
         const jinjaItems: Array<{
@@ -222,7 +234,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             user: this.userRoleName,
             model: this.modelRoleName
         } as const;
-        const idToContent = new Map<string, string | SpecialToken>();
+        const idToContent = new Map<string, LlamaText | SpecialToken>();
         const modelMessageIds = new Set<string>();
         const messageIds = new Set<string>();
 
@@ -375,7 +387,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                             )
                         ]
                 )
-            ]
+            ],
+            transformedSystemMessagesToUserMessages
         };
     }
 
@@ -385,9 +398,16 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
      */
     private _runSanityTest() {
         try {
+            let supportsSystemMessages = true;
+
             for (const chatHistory of chatHistoriesForSanityTest) {
-                this.generateContextText(chatHistory);
+                const {transformedSystemMessagesToUserMessages} = this.generateContextState({chatHistory});
+
+                if (transformedSystemMessagesToUserMessages)
+                    supportsSystemMessages = false;
             }
+
+            return {supportsSystemMessages};
         } catch (err) {
             throw new Error("The provided Jinja template failed that sanity test: " + String(err));
         }

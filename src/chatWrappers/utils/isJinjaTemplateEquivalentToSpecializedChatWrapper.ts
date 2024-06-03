@@ -64,14 +64,24 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
                             if (index === 0 && array.length > 1 && array[1].type === "user") {
                                 array[1] = {
                                     type: "user",
-                                    text: convertSystemMessagesToUserMessagesTemplate.replace("{{message}}", item.text) + "\n\n" + array[1].text
+                                    text: LlamaText([
+                                        LlamaText.joinValues(
+                                            LlamaText.fromJSON(item.text),
+                                            convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
+                                        ),
+                                        "\n\n",
+                                        array[1].text
+                                    ]).toString()
                                 } satisfies ChatHistoryItem;
                                 return null;
                             }
 
                             return {
                                 type: "user",
-                                text: convertSystemMessagesToUserMessagesTemplate.replace("{{message}}", item.text)
+                                text: LlamaText.joinValues(
+                                    LlamaText.fromJSON(item.text),
+                                    convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
+                                ).toString()
                             } satisfies ChatHistoryItem;
                         }
 
@@ -111,8 +121,8 @@ function checkEquivalence(
     tokenizer?: Tokenizer
 ): boolean {
     for (const testChatHistory of testChatHistories) {
-        const jinjaRes = jinjaChatWrapper.generateContextText(testChatHistory);
-        const specializedWrapperRes = specializedChatWrapper.generateContextText(testChatHistory);
+        const jinjaRes = jinjaChatWrapper.generateContextState({chatHistory: testChatHistory});
+        const specializedWrapperRes = specializedChatWrapper.generateContextState({chatHistory: testChatHistory});
 
         if (!compareContextTexts(jinjaRes.contextText, specializedWrapperRes.contextText, tokenizer))
             return false;

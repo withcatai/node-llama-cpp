@@ -1,7 +1,8 @@
 import {ChatHistoryItem, Tokenizer} from "../../../../types.js";
 import {findCharacterRemovalCountToFitChatHistoryInContext} from "../../../../utils/findCharacterRemovalCountToFitChatHistoryInContext.js";
-import {truncateTextAndRoundToWords} from "../../../../utils/truncateTextAndRoundToWords.js";
+import {truncateLlamaTextAndRoundToWords, truncateTextAndRoundToWords} from "../../../../utils/truncateTextAndRoundToWords.js";
 import {ChatWrapper} from "../../../../ChatWrapper.js";
+import {LlamaText} from "../../../../utils/LlamaText.js";
 
 export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy({
     chatHistory,
@@ -29,7 +30,7 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
         initialCharactersRemovalCount,
         tokenizer,
         chatWrapper,
-        compressChatHistory({chatHistory, charactersToRemove}) {
+        compressChatHistory({chatHistory, charactersToRemove, estimatedCharactersPerToken}) {
             const res = chatHistory.map(item => structuredClone(item));
             let charactersLeftToRemove = charactersToRemove;
 
@@ -46,16 +47,19 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                         if (typeof item === "string" || item.type !== "functionCall")
                             continue;
 
-                        const originalRawLength = item.raw?.length;
-
-                        if (originalRawLength == null)
+                        if (item.rawCall == null)
                             continue;
 
-                        const newRawText = chatWrapper.generateFunctionCallAndResult(item.name, item.params, item.result);
+                        const originalRawCallTokensLength = LlamaText.fromJSON(item.rawCall).tokenize(tokenizer, "trimLeadingSpace").length;
 
-                        if (newRawText.length < originalRawLength) {
-                            item.raw = newRawText;
-                            charactersLeftToRemove -= originalRawLength - newRawText.length;
+                        const newRawCallText = chatWrapper.generateFunctionCall(item.name, item.params);
+                        const newRawCallTextTokensLength = newRawCallText.tokenize(tokenizer, "trimLeadingSpace").length;
+
+                        if (newRawCallTextTokensLength < originalRawCallTokensLength) {
+                            item.rawCall = newRawCallText.toJSON();
+                            charactersLeftToRemove -= (
+                                (originalRawCallTokensLength - newRawCallTextTokensLength) * estimatedCharactersPerToken
+                            );
                         }
                     }
                 }
@@ -72,15 +76,20 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                         break; // keep the first system message
 
                     if (historyItem.type === "user" || historyItem.type === "system") {
-                        const newText = truncateTextAndRoundToWords(historyItem.text, charactersLeftToRemove);
+                        const newText = truncateLlamaTextAndRoundToWords(LlamaText.fromJSON(historyItem.text), charactersLeftToRemove);
+                        const newTextString = newText.toString();
+                        const historyItemString = LlamaText.fromJSON(historyItem.text).toString();
 
-                        if (newText === "") {
+                        if (newText.values.length === 0) {
                             res.splice(i, 1);
                             i++;
-                            charactersLeftToRemove -= historyItem.text.length;
-                        } else if (newText.length < historyItem.text.length) {
-                            charactersLeftToRemove -= historyItem.text.length - newText.length;
-                            historyItem.text = newText;
+                            charactersLeftToRemove -= historyItemString.length;
+                        } else if (newTextString.length < historyItemString.length) {
+                            charactersLeftToRemove -= historyItemString.length - newTextString.length;
+                            if (historyItem.type === "user")
+                                historyItem.text = newText.toString();
+                            else
+                                historyItem.text = newText.toJSON();
                         }
                     } else {
                         void (historyItem satisfies never);
@@ -117,8 +126,10 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                         } else if (item.type === "functionCall") {
                             historyItem.response.splice(t, 1);
                             t--;
-                            charactersLeftToRemove -= item.raw?.length ??
-                                chatWrapper.generateFunctionCallAndResult(item.name, item.params, item.result).length;
+
+                            const functionCallAndResultTokenUsage = chatWrapper.generateFunctionCallsAndResults([item], true)
+                                .tokenize(tokenizer, "trimLeadingSpace").length;
+                            charactersLeftToRemove -= functionCallAndResultTokenUsage * estimatedCharactersPerToken;
                         }
                     }
 

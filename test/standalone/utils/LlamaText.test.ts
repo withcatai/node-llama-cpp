@@ -36,16 +36,8 @@ describe("utils", () => {
               ]
             `);
 
-            expect(text1.toJSON()).toMatchInlineSnapshot(`
-              [
-                "Hi there!",
-              ]
-            `);
-            expect(text2.toJSON()).toMatchInlineSnapshot(`
-              [
-                "Hi there!",
-              ]
-            `);
+            expect(text1.toJSON()).toMatchInlineSnapshot('"Hi there!"');
+            expect(text2.toJSON()).toMatchInlineSnapshot('"Hi there!"');
         });
 
         test("squash texts", async () => {
@@ -68,6 +60,23 @@ describe("utils", () => {
                   "value": "EOS",
                 },
               ]
+            `);
+        });
+
+        test("empty text", async () => {
+            const text = LlamaText([
+                ""
+            ]);
+            expect(text.values.length).to.eql(0);
+            expect(text).toMatchInlineSnapshot(`
+              LlamaText []
+            `);
+            expect(text.toJSON()).toMatchInlineSnapshot('""');
+            expect(LlamaText.fromJSON("")).toMatchInlineSnapshot(`
+              LlamaText []
+            `);
+            expect(LlamaText.fromJSON([""])).toMatchInlineSnapshot(`
+              LlamaText []
             `);
         });
 
@@ -215,6 +224,7 @@ describe("utils", () => {
                 " Hi"
             ]);
             expect(text1.toString()).toMatchInlineSnapshot('"Hello there!Special textEOS Hi"');
+            expect(text1 + "").toMatchInlineSnapshot('"Hello there!Special textEOS Hi"');
         });
 
         test("toJSON", async () => {

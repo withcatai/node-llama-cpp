@@ -12,7 +12,7 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
     maxDecompressionAttempts = 2
 }: {
     compressChatHistory(options: {
-        chatHistory: readonly ChatHistoryItem[], charactersToRemove: number
+        chatHistory: readonly ChatHistoryItem[], charactersToRemove: number, estimatedCharactersPerToken: number
     }): ChatHistoryItem[] | Promise<ChatHistoryItem[]>,
     chatHistory: ChatHistoryItem[],
     tokensCountToFit: number,
@@ -25,9 +25,11 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
     removedCharactersCount: number,
     compressedChatHistory: ChatHistoryItem[]
 }> {
+    let currentEstimatedCharactersPerToken = estimatedCharactersPerToken;
+
     function getTokensCountForChatHistory(chatHistory: readonly ChatHistoryItem[]) {
-        const {contextText} = chatWrapper.generateContextText(chatHistory);
-        return contextText.tokenize(tokenizer).length;
+        const {contextText} = chatWrapper.generateContextState({chatHistory});
+        return contextText.tokenize(tokenizer, "trimLeadingSpace").length;
     }
 
     async function getResultForCharacterRemovalCount(characterRemovalCount: number) {
@@ -40,7 +42,8 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
 
         const compressedHistory = await compressChatHistory({
             chatHistory,
-            charactersToRemove: characterRemovalCount
+            charactersToRemove: characterRemovalCount,
+            estimatedCharactersPerToken: currentEstimatedCharactersPerToken
         });
 
         return {
@@ -52,7 +55,6 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
 
     let latestCompressionAttempt = await getResultForCharacterRemovalCount(initialCharactersRemovalCount);
     const firstCompressionAttempt = latestCompressionAttempt;
-    let currentEstimatedCharactersPerToken = estimatedCharactersPerToken;
 
     if (latestCompressionAttempt.tokensCount === tokensCountToFit ||
         (latestCompressionAttempt.tokensCount < tokensCountToFit && latestCompressionAttempt.characterRemovalCount === 0)

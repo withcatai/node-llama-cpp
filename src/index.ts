@@ -66,7 +66,7 @@ import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
     type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty,
-    type ChatWrapperSettings
+    type ChatWrapperSettings, type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
@@ -143,6 +143,8 @@ export {
     DisposedError,
     ChatWrapper,
     type ChatWrapperSettings,
+    type ChatWrapperGenerateContextStateOptions,
+    type ChatWrapperGeneratedContextState,
     EmptyChatWrapper,
     Llama3ChatWrapper,
     Llama2ChatWrapper,

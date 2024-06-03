@@ -8,7 +8,7 @@ import {LlamaGrammar} from "../LlamaGrammar.js";
 import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
-import {LlamaText} from "../../utils/LlamaText.js";
+import {LlamaText, LlamaTextJSON} from "../../utils/LlamaText.js";
 import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
 import {
     LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
@@ -22,6 +22,16 @@ export type LlamaChatSessionOptions = {
     chatWrapper?: "auto" | ChatWrapper,
 
     systemPrompt?: string,
+
+    /**
+     * Add the system prompt even on models that don't support a system prompt.
+     *
+     * Each chat wrapper has its own workaround for adding a system prompt to a model that doesn't support it,
+     * but forcing the system prompt on unsupported models may not always work as expected.
+     *
+     * Use with caution.
+     */
+    forceAddSystemPrompt?: boolean,
 
     /** Automatically dispose the sequence when the session is disposed */
     autoDisposeSequence?: boolean,
@@ -127,11 +137,13 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
-    documentFunctionParams?: never
+    documentFunctionParams?: never,
+    maxParallelFunctionCalls?: never
 } | {
     grammar?: never,
     functions?: Functions | ChatSessionModelFunctions,
-    documentFunctionParams?: boolean
+    documentFunctionParams?: boolean,
+    maxParallelFunctionCalls?: number
 });
 
 export type LLamaChatCompletePromptOptions = {
@@ -247,6 +259,7 @@ export class LlamaChatSession {
         contextSequence,
         chatWrapper = "auto",
         systemPrompt = defaultChatSystemPrompt,
+        forceAddSystemPrompt = false,
         autoDisposeSequence = true,
         contextShift
     }: LlamaChatSessionOptions) {
@@ -257,16 +270,21 @@ export class LlamaChatSession {
             throw new DisposedError();
 
         this._contextShift = contextShift;
-        this._chatHistory = [{
-            type: "system",
-            text: systemPrompt
-        }];
 
         this._chat = new LlamaChat({
             autoDisposeSequence,
             chatWrapper,
             contextSequence
         });
+
+        const chatWrapperSupportsSystemMessages = this._chat.chatWrapper.settings.supportsSystemMessages;
+        if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || forceAddSystemPrompt)
+            this._chatHistory = [{
+                type: "system",
+                text: systemPrompt
+            }];
+        else
+            this._chatHistory = [];
 
         this._autoDisposeSequence = autoDisposeSequence;
 
@@ -326,6 +344,7 @@ export class LlamaChatSession {
     public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
         functions,
         documentFunctionParams,
+        maxParallelFunctionCalls,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -344,6 +363,7 @@ export class LlamaChatSession {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
+            maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
             onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
             tokenBias, customStopTriggers
@@ -359,6 +379,7 @@ export class LlamaChatSession {
     public async promptWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
         functions,
         documentFunctionParams,
+        maxParallelFunctionCalls,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -406,13 +427,15 @@ export class LlamaChatSession {
 
             // eslint-disable-next-line no-constant-condition
             while (true) {
+                const initialOutputTokens = this._chat.sequence.tokenMeter.usedOutputTokens;
                 const {
-                    functionCall,
+                    functionCalls,
                     lastEvaluation: currentLastEvaluation,
                     metadata
                 } = await this._chat.generateResponse<Functions>(newChatHistory, {
                     functions,
                     documentFunctionParams,
+                    maxParallelFunctionCalls,
                     grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                     onToken,
                     signal,
@@ -438,43 +461,50 @@ export class LlamaChatSession {
                 });
                 this._ensureNotDisposed();
 
+                if (maxTokens != null)
+                    maxTokens = Math.max(0, maxTokens - (this._chat.sequence.tokenMeter.usedOutputTokens - initialOutputTokens));
+
                 lastEvaluation = currentLastEvaluation;
                 newChatHistory = lastEvaluation.cleanHistory;
 
-                if (functionCall != null) {
-                    const functionDefinition = functions?.[functionCall.functionName];
+                if (functionCalls != null && functionCalls.length > 0) {
+                    const functionCallAndResults = await Promise.all(
+                        functionCalls.map(async (functionCall) => {
+                            const functionDefinition = functions?.[functionCall.functionName];
 
-                    if (functionDefinition == null)
-                        throw new Error(`The model tried to call function "${functionCall.functionName}" which is not defined`);
+                            if (functionDefinition == null)
+                                throw new Error(`The model tried to call function "${functionCall.functionName}" which is not defined`);
 
-                    const functionCallResult = await functionDefinition.handler(functionCall.params);
+                            const functionCallResult = await functionDefinition.handler(functionCall.params);
+                            this._ensureNotDisposed();
+
+                            return [functionCall, functionDefinition, functionCallResult] as const;
+                        })
+                    );
                     this._ensureNotDisposed();
 
-                    newChatHistory = addFunctionCallToChatHistory({
-                        chatHistory: newChatHistory,
-                        functionName: functionCall.functionName,
-                        functionDescription: functionDefinition.description,
-                        callParams: functionCall.params,
-                        callResult: functionCallResult,
-                        raw: functionCall.raw + this._chat.chatWrapper.generateFunctionCallResult(
-                            functionCall.functionName,
-                            functionCall.params,
-                            functionCallResult
-                        )
-                    });
+                    newContextWindowChatHistory = lastEvaluation.contextWindow;
 
-                    newContextWindowChatHistory = addFunctionCallToChatHistory({
-                        chatHistory: lastEvaluation.contextWindow,
-                        functionName: functionCall.functionName,
-                        functionDescription: functionDefinition.description,
-                        callParams: functionCall.params,
-                        callResult: functionCallResult,
-                        raw: functionCall.raw + this._chat.chatWrapper.generateFunctionCallResult(
-                            functionCall.functionName,
-                            functionCall.params,
-                            functionCallResult
-                        )
-                    });
+                    for (const [functionCall, functionDefinition, functionCallResult] of functionCallAndResults) {
+                        newChatHistory = addFunctionCallToChatHistory({
+                            chatHistory: newChatHistory,
+                            functionName: functionCall.functionName,
+                            functionDescription: functionDefinition.description,
+                            callParams: functionCall.params,
+                            callResult: functionCallResult,
+                            rawCall: functionCall.raw
+                        });
+
+                        newContextWindowChatHistory = addFunctionCallToChatHistory({
+                            chatHistory: newContextWindowChatHistory,
+                            functionName: functionCall.functionName,
+                            functionDescription: functionDefinition.description,
+                            callParams: functionCall.params,
+                            callResult: functionCallResult,
+                            rawCall: functionCall.raw
+                        });
+                    }
+
                     lastEvaluation.cleanHistory = newChatHistory;
                     lastEvaluation.contextWindow = newContextWindowChatHistory;
 
@@ -685,14 +715,14 @@ function addFunctionCallToChatHistory({
     functionDescription,
     callParams,
     callResult,
-    raw
+    rawCall
 }: {
     chatHistory: ChatHistoryItem[],
     functionName: string,
     functionDescription?: string,
     callParams: any,
     callResult: any,
-    raw?: string
+    rawCall?: LlamaTextJSON
 }) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
@@ -714,7 +744,7 @@ function addFunctionCallToChatHistory({
         description: functionDescription,
         params: callParams,
         result: callResult,
-        raw
+        rawCall
     });
 
     return newChatHistory;

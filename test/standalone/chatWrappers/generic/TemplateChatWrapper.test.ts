@@ -101,7 +101,7 @@ describe("TemplateChatWrapper", () => {
             userRoleName: "user",
             systemRoleName: "system"
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -126,7 +126,7 @@ describe("TemplateChatWrapper", () => {
           ]
         `);
 
-        const {contextText: contextText2} = chatWrapper.generateContextText(conversationHistory2);
+        const {contextText: contextText2} = chatWrapper.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -163,14 +163,16 @@ describe("TemplateChatWrapper", () => {
           ]
         `);
 
-        const {contextText: contextText3} = chatWrapper.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const {contextText: contextText3} = chatWrapper.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
@@ -220,7 +222,7 @@ describe("TemplateChatWrapper", () => {
           ]
         `);
 
-        const {contextText: contextText4} = chatWrapper.generateContextText(conversationHistory3);
+        const {contextText: contextText4} = chatWrapper.generateContextState({chatHistory: conversationHistory3});
 
         expect(contextText4.values).toMatchInlineSnapshot(`
           [
@@ -259,7 +261,7 @@ describe("TemplateChatWrapper", () => {
             userRoleName: "user",
             systemRoleName: "system"
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -293,7 +295,7 @@ describe("TemplateChatWrapper", () => {
             userRoleName: "user",
             systemRoleName: "system"
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -327,7 +329,8 @@ describe("TemplateChatWrapper", () => {
             userRoleName: "user",
             systemRoleName: "system"
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistory, {
+        const {contextText} = chatWrapper.generateContextState({
+            chatHistory: conversationHistory,
             availableFunctions: exampleFunctions
         });
 
@@ -387,7 +390,8 @@ describe("TemplateChatWrapper", () => {
                 " [[result: {{functionCallResult}}]]"
             ]
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistoryWithFunctionCalls, {
+        const {contextText} = chatWrapper.generateContextState({
+            chatHistory: conversationHistoryWithFunctionCalls,
             availableFunctions: exampleFunctions
         });
 
@@ -427,8 +431,7 @@ describe("TemplateChatWrapper", () => {
               "value": "
           model: ",
             },
-            "Hello!
-          [[call: func2({"message":"Hello","feeling":"good","words":1})]] [[result: {"yes":true,"message":"ok"}]]",
+            "Hello![[call: func2({"message":"Hello","feeling":"good","words":1})]] [[result: {"yes":true,"message":"ok"}]]",
             {
               "type": "specialTokensText",
               "value": "
@@ -456,7 +459,8 @@ describe("TemplateChatWrapper", () => {
                 "\nFunction result: {{functionCallResult}}\n"
             ]
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistoryWithFunctionCalls, {
+        const {contextText} = chatWrapper.generateContextState({
+            chatHistory: conversationHistoryWithFunctionCalls,
             availableFunctions: exampleFunctions
         });
 
@@ -498,7 +502,6 @@ describe("TemplateChatWrapper", () => {
           model: ",
             },
             "Hello!
-
           Call function: func2 with params {"message":"Hello","feeling":"good","words":1}.
           Function result: {"yes":true,"message":"ok"}
           ",

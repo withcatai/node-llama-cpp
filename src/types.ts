@@ -1,5 +1,5 @@
 import {GbnfJsonSchema, GbnfJsonSchemaToType} from "./utils/gbnfJson/types.js";
-import {BuiltinSpecialTokenValue} from "./utils/LlamaText.js";
+import {LlamaText, BuiltinSpecialTokenValue, LlamaTextJSON} from "./utils/LlamaText.js";
 
 export type Token = number & {
     __token: never
@@ -18,17 +18,82 @@ export type Tokenizer = {
 
 
 export type ChatWrapperSettings = {
+    readonly supportsSystemMessages: boolean,
     readonly functions: {
         readonly call: {
             readonly optionalPrefixSpace: boolean,
-            readonly prefix: string,
-            readonly paramsPrefix: string,
-            readonly suffix: string
+            readonly prefix: string | LlamaText,
+            readonly paramsPrefix: string | LlamaText,
+            readonly suffix: string | LlamaText
         },
+
         readonly result: {
-            readonly prefix: string,
-            readonly suffix: string
+            /**
+             * Supported template parameters:
+             * - `{{functionName}}`
+             * - `{{functionParams}}`
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of supported values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of unsupported values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
+            readonly prefix: string | LlamaText,
+
+            /**
+             * Supported template parameters:
+             * - `{{functionName}}`
+             * - `{{functionParams}}`
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of **supported** values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of **unsupported** values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
+            readonly suffix: string | LlamaText
+        },
+
+        /** If this field is present, parallel function calling is supported */
+        readonly parallelism?: {
+            readonly call: {
+                readonly sectionPrefix: string | LlamaText,
+                readonly betweenCalls?: string | LlamaText,
+                readonly sectionSuffix?: string | LlamaText
+            },
+            readonly result?: {
+                readonly sectionPrefix?: string | LlamaText,
+                readonly betweenResults?: string | LlamaText,
+                readonly sectionSuffix?: string | LlamaText
+            }
         }
+    }
+};
+
+export type ChatWrapperGenerateContextStateOptions = {
+    chatHistory: readonly ChatHistoryItem[],
+    availableFunctions?: ChatModelFunctions,
+    documentFunctionParams?: boolean
+};
+
+export type ChatWrapperGeneratedContextState = {
+    contextText: LlamaText,
+    stopGenerationTriggers: LlamaText[],
+    ignoreStartText?: LlamaText[],
+    functionCall?: {
+        initiallyEngaged: boolean,
+        disengageInitiallyEngaged: LlamaText[]
     }
 };
 
@@ -36,7 +101,7 @@ export type ChatHistoryItem = ChatSystemMessage | ChatUserMessage | ChatModelRes
 
 export type ChatSystemMessage = {
     type: "system",
-    text: string
+    text: string | LlamaTextJSON
 };
 export type ChatUserMessage = {
     type: "user",
@@ -52,7 +117,7 @@ export type ChatModelFunctionCall = {
     description?: string,
     params: any,
     result: any,
-    raw?: string
+    rawCall?: LlamaTextJSON
 };
 
 export type ChatModelFunctions = {

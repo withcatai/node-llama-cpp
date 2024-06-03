@@ -1,4 +1,4 @@
-import {ChatHistoryItem, ChatModelFunctions, ChatWrapperSettings} from "../../types.js";
+import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings} from "../../types.js";
 import {SpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
@@ -86,39 +86,35 @@ export class TemplateChatWrapper extends ChatWrapper {
         this._parsedChatHistoryTemplate = parseChatHistoryTemplate(historyTemplate);
 
         this.settings = {
-            ...ChatWrapper.defaultSetting,
-            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
+            ...ChatWrapper.defaultSettings,
+            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSettings.functions
         };
     }
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            system: string,
-            user: string,
-            model: string
+            system: LlamaText,
+            user: LlamaText,
+            model: LlamaText
         }> = [];
 
-        const systemTexts: string[] = [];
-        const userTexts: string[] = [];
-        const modelTexts: string[] = [];
+        const systemTexts: LlamaText[] = [];
+        const userTexts: LlamaText[] = [];
+        const modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
                 resultItems.push({
-                    system: systemTexts.join("\n\n"),
-                    user: userTexts.join("\n\n"),
-                    model: modelTexts.join("\n\n")
+                    system: LlamaText.joinValues("\n\n", systemTexts),
+                    user: LlamaText.joinValues("\n\n", userTexts),
+                    model: LlamaText.joinValues("\n\n", modelTexts)
                 });
 
             systemTexts.length = 0;
@@ -132,13 +128,13 @@ export class TemplateChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (!this.joinAdjacentMessagesOfTheSameType || (currentAggregateFocus !== "system" && currentAggregateFocus !== "user"))
                     flush();
 
                 currentAggregateFocus = "user";
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 if (!this.joinAdjacentMessagesOfTheSameType)
                     flush();
@@ -151,7 +147,7 @@ export class TemplateChatWrapper extends ChatWrapper {
 
         flush();
 
-        const getHistoryItem = (role: "system" | "user" | "model", text: string, prefix?: string | null) => {
+        const getHistoryItem = (role: "system" | "user" | "model", text: LlamaText, prefix?: string | null) => {
             const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
             return LlamaText([
                 new SpecialTokensText((prefix ?? "") + roleNamePrefix + role + messagePrefix),
@@ -167,7 +163,7 @@ export class TemplateChatWrapper extends ChatWrapper {
 
                 const res = LlamaText([
                     isFirstItem
-                        ? system.length === 0
+                        ? system.values.length === 0
                             ? new SpecialTokensText(
                                 (this._parsedChatTemplate.systemPromptPrefix ?? "") + this._parsedChatTemplate.historyPrefix
                             )
@@ -178,16 +174,16 @@ export class TemplateChatWrapper extends ChatWrapper {
                                     new SpecialTokensText(this._parsedChatTemplate.historyPrefix)
                                 ])
                                 : getHistoryItem("system", system, this._parsedChatTemplate.historyPrefix)
-                        : system.length === 0
+                        : system.values.length === 0
                             ? LlamaText([])
                             : getHistoryItem("system", system),
 
 
-                    user.length === 0
+                    user.values.length === 0
                         ? LlamaText([])
                         : getHistoryItem("user", user),
 
-                    model.length === 0
+                    model.values.length === 0
                         ? LlamaText([])
                         : !isLastItem
                             ? getHistoryItem("model", model)

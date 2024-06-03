@@ -651,10 +651,7 @@ export class LlamaCompletion {
                     );
                     pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
-                    const [firstRemainingGenerationAfterStop] = triggeredStops
-                        .map((stopTrigger) => stopTrigger.remainingGenerations)
-                        .filter((remainingGenerations) => remainingGenerations.length > 0)
-                        .flat(1);
+                    const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
                     if (pendingTokens.length > 0)
                         onToken?.(pendingTokens.slice());

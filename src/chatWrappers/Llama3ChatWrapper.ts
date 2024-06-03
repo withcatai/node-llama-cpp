@@ -1,5 +1,7 @@
 import {ChatWrapper} from "../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
+import {
+    ChatModelFunctions, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings
+} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 
@@ -8,7 +10,8 @@ import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctio
 export class Llama3ChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Llama3Chat";
 
-    public override readonly settings = {
+    public override readonly settings: ChatWrapperSettings = {
+        supportsSystemMessages: true,
         functions: {
             call: {
                 optionalPrefixSpace: true,
@@ -23,27 +26,22 @@ export class Llama3ChatWrapper extends ChatWrapper {
         }
     };
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[],
-        ignoreStartText?: LlamaText[]
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            system: string | null,
-            user: string | null,
-            model: string | null
+            system: LlamaText | null,
+            user: LlamaText | null,
+            model: LlamaText | null
         }> = [];
 
-        let systemTexts: string[] = [];
-        let userTexts: string[] = [];
-        let modelTexts: string[] = [];
+        let systemTexts: LlamaText[] = [];
+        let userTexts: LlamaText[] = [];
+        let modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
@@ -51,13 +49,13 @@ export class Llama3ChatWrapper extends ChatWrapper {
                 resultItems.push({
                     system: systemTexts.length === 0
                         ? null
-                        : systemTexts.join("\n\n"),
+                        : LlamaText.joinValues("\n\n", systemTexts),
                     user: userTexts.length === 0
                         ? null
-                        : userTexts.join("\n\n"),
+                        : LlamaText.joinValues("\n\n", userTexts),
                     model: modelTexts.length === 0
                         ? null
-                        : modelTexts.join("\n\n")
+                        : LlamaText.joinValues("\n\n", modelTexts)
                 });
 
             systemTexts = [];
@@ -71,13 +69,13 @@ export class Llama3ChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (currentAggregateFocus !== "user")
                     flush();
 
                 currentAggregateFocus = "user";
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 if (currentAggregateFocus !== "model")
                     flush();
@@ -150,9 +148,9 @@ export class Llama3ChatWrapper extends ChatWrapper {
         const functionsDocumentationGenerator = new ChatModelFunctionsDocumentationGenerator(availableFunctions);
 
         if (!functionsDocumentationGenerator.hasAnyFunctions)
-            return "";
+            return LlamaText([]);
 
-        return [
+        return LlamaText.joinValues("\n", [
             "The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.",
             "To fulfill a request, the assistant calls relevant functions in advance when needed before responding to the request, and does not tell the user prior to calling a function.",
             "Provided functions:",
@@ -164,6 +162,6 @@ export class Llama3ChatWrapper extends ChatWrapper {
             this.generateFunctionCall("functionName", {someKey: "someValue"}),
             "",
             "After calling a function the raw result is written afterwards, and a natural language version of the result is written afterwards."
-        ].join("\n");
+        ]);
     }
 }
