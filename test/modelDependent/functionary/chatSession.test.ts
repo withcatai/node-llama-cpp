@@ -6,7 +6,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("functionary", () => {
     describe("chat session", () => {
         test("restore chat history", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -23,7 +23,7 @@ describe("functionary", () => {
 
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("The sum of 6 and 6 is 12.");
+            expect(res).to.eql("6 + 6 = 12.");
 
             const chatHistory = chatSession.getChatHistory();
 
@@ -35,11 +35,11 @@ describe("functionary", () => {
 
             const res2 = await chatSession2.prompt("Repeat your answer");
 
-            expect(res2).to.eql("The sum of 6 and 6 is 12.");
+            expect(res2).to.eql("6 + 6 = 12.");
         });
 
         test("disposing a context sequences removes the current state", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -58,12 +58,12 @@ describe("functionary", () => {
 
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("The sum of 6 and 6 is 12.");
+            expect(res).to.eql("6 + 6 = 12.");
             const tokenMeterState = contextSequence.tokenMeter.getState();
             expect(tokenMeterState).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 96,
-                "usedOutputTokens": 14,
+                "usedInputTokens": 80,
+                "usedOutputTokens": 9,
                 "usedRestoreStateTokens": 0,
               }
             `);
@@ -81,8 +81,8 @@ describe("functionary", () => {
             const tokenMeterState2 = contextSequence2.tokenMeter.getState();
             expect(tokenMeterState2).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 98,
-                "usedOutputTokens": 15,
+                "usedInputTokens": 82,
+                "usedOutputTokens": 14,
                 "usedRestoreStateTokens": 0,
               }
             `);
@@ -91,7 +91,7 @@ describe("functionary", () => {
         });
 
         test("reusing a context sequences utilizes existing state", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -110,12 +110,12 @@ describe("functionary", () => {
 
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("The sum of 6 and 6 is 12.");
+            expect(res).to.eql("6 + 6 = 12.");
             const tokenMeterState = contextSequence.tokenMeter.getState();
             expect(tokenMeterState).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 96,
-                "usedOutputTokens": 14,
+                "usedInputTokens": 80,
+                "usedOutputTokens": 9,
                 "usedRestoreStateTokens": 0,
               }
             `);
@@ -130,8 +130,8 @@ describe("functionary", () => {
             const tokenMeterStateDiff = contextSequence.tokenMeter.diff(tokenMeterState);
             expect(tokenMeterStateDiff).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 10,
-                "usedOutputTokens": 15,
+                "usedInputTokens": 6,
+                "usedOutputTokens": 14,
                 "usedRestoreStateTokens": 0,
               }
             `);

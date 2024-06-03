@@ -6,7 +6,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("functionary", () => {
     describe("sanity", () => {
         test("How much is 6+6", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -20,18 +20,18 @@ describe("functionary", () => {
 
             const res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("The sum of 6 and 6 is 12.");
+            expect(res).to.eql("6 + 6 = 12.");
         });
 
         test("text is tokenized with special tokens when appropriate", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
                 modelPath
             });
 
-            const text = "<|from|>system\n<|recipient|>all\n<|content|>How much is 6+6\n";
+            const text = "<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
 
             const tokensWithSpecialTokens = model.tokenize(text, true);
             const tokensWithoutSpecialTokens = model.tokenize(text);
@@ -40,56 +40,69 @@ describe("functionary", () => {
 
             expect(tokensWithSpecialTokens).to.toMatchInlineSnapshot(`
               [
-                32002,
-                6574,
-                13,
-                32001,
-                455,
-                13,
-                32000,
-                5660,
-                1188,
-                349,
-                28705,
-                28784,
-                28806,
-                28784,
-                13,
+                128006,
+                9125,
+                128007,
+                271,
+                4438,
+                1790,
+                374,
+                220,
+                21,
+                10,
+                21,
+                198,
               ]
             `);
             expect(tokensWithoutSpecialTokens).to.toMatchInlineSnapshot(`
               [
-                523,
-                28766,
-                3211,
-                28766,
-                28767,
-                6574,
-                13,
-                28789,
-                28766,
-                3354,
-                508,
-                722,
-                28766,
-                28767,
-                455,
-                13,
-                28789,
-                28766,
-                3789,
-                28766,
-                28767,
-                5660,
-                1188,
-                349,
-                28705,
-                28784,
-                28806,
-                28784,
-                13,
+                27,
+                91,
+                2527,
+                8932,
+                851,
+                91,
+                29,
+                9125,
+                27,
+                91,
+                408,
+                8932,
+                851,
+                91,
+                1363,
+                4438,
+                1790,
+                374,
+                220,
+                21,
+                10,
+                21,
+                198,
               ]
             `);
+        });
+
+        test("tokenizing text and then detokenizing it arrive at the same text", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+
+            const text = "<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+            const tokensWithSpecialTokens = model.tokenize(text, true);
+            const tokensNoSpecialTokens = model.tokenize(text, false);
+
+            expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+
+            const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+            const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+            expect(textWithSpecialTokens).to.eql(text);
+            expect(textNoSpecialTokens).to.eql(text);
         });
     });
 });

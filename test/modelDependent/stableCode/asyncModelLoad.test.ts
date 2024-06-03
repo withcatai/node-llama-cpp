@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("stableCode", () => {
     describe("async model load", () => {
         test("load asynchronously", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             let loopIterationsBeforeLoad = 0;
@@ -52,7 +52,7 @@ describe("stableCode", () => {
         });
 
         test("load progress emitted", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             let loopIterationsBeforeLoad = 0;
@@ -89,7 +89,7 @@ describe("stableCode", () => {
         });
 
         test("abort model load works", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             class CustomError extends Error {}

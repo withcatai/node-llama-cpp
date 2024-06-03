@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("functionary", () => {
     describe("embedding", () => {
         test("deterministic", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -28,7 +28,7 @@ describe("functionary", () => {
         });
 
         test("deterministic between runs", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
