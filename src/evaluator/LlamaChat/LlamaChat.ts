@@ -430,6 +430,7 @@ export class LlamaChat {
                         generateResponseState.detectAndHandleFunctionStartSyntax();
                         if (generateResponseState.functionEvaluationMode !== false) {
                             generateResponseState.canAvoidReloadingHistory = false;
+                            generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
                             const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
                                 loadContextWindowForFunctionCallingLoop
                             );
@@ -1217,6 +1218,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private functionEvaluationFunctionName: string = "";
     private currentFunctionCallPreviousPartLeftoverText: string = "";
     private removedStartTextToIgnore: boolean = false;
+    private releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax: boolean = false;
 
     public generatedTokens = 0;
     public isFirstEvaluation = true;
@@ -1746,6 +1748,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             } else if (this.functionEvaluationMode === "functionName") {
                 const functionNameGenerationDoneDetector = new StopGenerationDetector();
 
+                this.stopGenerationDetector.clearInProgressStops();
+                this.customStopGenerationTriggersDetector.clearInProgressStops();
                 this.currentFunctionCallPreviousText = LlamaText(this.chatWrapper.settings.functions.call.prefix);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
                 const functionNameGrammar = this.functionNameGrammar ?? new FunctionCallNameGrammar(
@@ -1791,10 +1795,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 }
 
                 for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
-                    if (stopGenerationTriggerRes != null)
-                        return stopGenerationTriggerRes;
-
                     this.currentFunctionCallCurrentPartTokens.push(token);
 
                     functionNameGenerationDoneDetector.recordGeneration({
@@ -1852,10 +1852,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
 
                     for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                        const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
-                        if (stopGenerationTriggerRes != null)
-                            return stopGenerationTriggerRes;
-
                         this.currentFunctionCallCurrentPartTokens.push(token);
 
                         functionParamsGenerationDoneDetector.recordGeneration({
@@ -1923,10 +1919,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
 
                 for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
-                    if (stopGenerationTriggerRes != null)
-                        return stopGenerationTriggerRes;
-
                     this.currentFunctionCallCurrentPartTokens.push(token);
 
                     sectionSuffixDetector.recordGeneration({
@@ -1962,29 +1954,40 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return undefined;
     }
 
+    public releasePartiallyFreeTokensBeforeFunctionCallStart() {
+        if (this.releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax)
+            return;
+
+        this.stopGenerationDetector.clearInProgressStops();
+        this.customStopGenerationTriggersDetector.clearInProgressStops();
+        this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+
+        const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
+        const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
+        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+            triggeredStops,
+            partiallyFreeTokens,
+            this.llamaChat.model.tokenizer
+        );
+        this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+
+        this.removeFoundStartIgnoreTextsFromPendingTokens(true);
+
+        if (this.pendingTokens.length > 0)
+            this.onToken?.(this.pendingTokens.slice());
+
+        this.res.push(...this.pendingTokens);
+        this.contextWindowsRes.push(...this.pendingTokens);
+        this.pendingTokens.length = 0;
+
+        this.streamRegulator.clearQueue();
+
+        this.releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax = true;
+    }
+
     public returnFunctionCallResults(): LlamaChatResponse<Functions> | undefined {
         if (this.resFunctionCalls.length > 0) {
-            this.stopGenerationDetector.clearInProgressStops();
-            this.customStopGenerationTriggersDetector.clearInProgressStops();
-            this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
-
-            const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
-            const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
-            const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
-                triggeredStops,
-                partiallyFreeTokens,
-                this.llamaChat.model.tokenizer
-            );
-            this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
-
-            this.removeFoundStartIgnoreTextsFromPendingTokens(true);
-
-            if (this.pendingTokens.length > 0)
-                this.onToken?.(this.pendingTokens.slice());
-
-            this.res.push(...this.pendingTokens);
-            this.contextWindowsRes.push(...this.pendingTokens);
-            this.pendingTokens.length = 0;
+            this.releasePartiallyFreeTokensBeforeFunctionCallStart();
 
             let modelResponse = this.llamaChat.model.detokenize(this.res);
             let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);

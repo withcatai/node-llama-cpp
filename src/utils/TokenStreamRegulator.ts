@@ -89,6 +89,10 @@ export class TokenStreamRegulator {
     public getAllQueuedChunkTokens() {
         return this._queue.flatMap((queuedRelease) => queuedRelease.tokens);
     }
+
+    public clearQueue() {
+        this._queue.length = 0;
+    }
 }
 
 export class QueuedTokenRelease {
