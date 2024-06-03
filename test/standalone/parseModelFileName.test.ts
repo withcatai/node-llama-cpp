@@ -77,6 +77,17 @@ describe("parseModelFileName", () => {
             });
     });
 
+    test("functionary-small-v2.5.Q4_0.gguf", () => {
+        expect(parseModelFileName("functionary-small-v2.5.Q4_0.gguf"))
+            .toEqual({
+                name: "functionary",
+                subType: "small-v2.5",
+                quantization: "Q4_0",
+                fileType: "gguf",
+                otherInfo: []
+            });
+    });
+
     test("claude2-alpaca-13b.Q5_K_M.gguf", () => {
         expect(parseModelFileName("claude2-alpaca-13b.Q5_K_M.gguf"))
             .toEqual({

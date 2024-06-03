@@ -164,7 +164,11 @@ export function resolveChatWrapper({
             template: modelJinjaTemplate
         };
 
-        for (const specializedChatWrapperTypeName of specializedChatWrapperTypeNames) {
+        const chatWrapperNamesToCheck = orderChatWrapperNamesByAssumedCompatibilityWithModel(
+            specializedChatWrapperTypeNames,
+            {filename, fileInfo}
+        );
+        for (const specializedChatWrapperTypeName of chatWrapperNamesToCheck) {
             const Wrapper = chatWrappers[specializedChatWrapperTypeName];
             const wrapperSettings = customWrapperSettings?.[specializedChatWrapperTypeName];
 
@@ -284,4 +288,47 @@ export function isTemplateChatWrapperType(type: string): type is TemplateChatWra
 // this is needed because TypeScript guards don't work automatically with class references
 function isClassReference<T>(value: any, classReference: T): value is T {
     return value === classReference;
+}
+
+function orderChatWrapperNamesByAssumedCompatibilityWithModel<T extends ResolvableChatWrapperTypeName>(chatWrapperNames: readonly T[], {
+    filename, fileInfo
+}: {
+    filename?: string,
+    fileInfo?: GgufFileInfo
+}): readonly T[] {
+    const rankPoints = {
+        modelName: 3,
+        modelNamePosition: 4,
+        fileName: 2,
+        fileNamePosition: 3
+    } as const;
+
+    function getPointsForTextMatch(pattern: string, fullText: string | undefined, existsPoints: number, positionPoints: number) {
+        if (fullText == null)
+            return 0;
+
+        const index = fullText.toLowerCase().indexOf(pattern.toLowerCase());
+
+        if (index >= 0)
+            return existsPoints + ((index / fullText.length) * positionPoints);
+
+        return 0;
+    }
+
+    const modelName = fileInfo?.metadata?.general?.name;
+
+    return chatWrapperNames
+        .slice()
+        .sort((a, b) => {
+            let aPoints = 0;
+            let bPoints = 0;
+
+            aPoints += getPointsForTextMatch(a, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
+            bPoints += getPointsForTextMatch(b, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
+
+            aPoints += getPointsForTextMatch(a, filename, rankPoints.fileName, rankPoints.fileNamePosition);
+            bPoints += getPointsForTextMatch(b, filename, rankPoints.fileName, rankPoints.fileNamePosition);
+
+            return bPoints - aPoints;
+        });
 }

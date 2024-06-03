@@ -6,43 +6,220 @@ import {
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 
+type FunctionaryChatWrapperVariation = "v2" | "v2.llama3";
+
 // source: https://github.com/MeetKai/functionary/blob/main/tests/prompt_test_v2.txt
 export class FunctionaryChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Functionary";
+    public readonly variation: FunctionaryChatWrapperVariation;
 
-    public override readonly settings = {
-        supportsSystemMessages: true,
-        functions: {
-            call: {
-                optionalPrefixSpace: true,
-                prefix: LlamaText(new SpecialTokensText("\n<|from|>assistant\n<|recipient|>")),
-                paramsPrefix: LlamaText(new SpecialTokensText("\n<|content|>")),
-                suffix: ""
-            },
-            result: {
-                prefix: LlamaText([
-                    new SpecialTokensText("\n<|from|>"),
-                    "{{functionName}}",
-                    new SpecialTokensText("\n<|recipient|>all\n<|content|>")
-                ]),
-                suffix: ""
-            },
-            parallelism: {
-                call: {
-                    sectionPrefix: "",
-                    betweenCalls: "\n",
-                    sectionSuffix: LlamaText(new SpecialTokensText("<|stop|>"))
-                },
-                result: {
-                    sectionPrefix: "",
-                    betweenResults: "",
-                    sectionSuffix: ""
+    public override readonly settings: ChatWrapperSettings;
+
+    public constructor({
+        variation = "v2.llama3"
+    }: {
+        variation?: FunctionaryChatWrapperVariation
+    } = {}) {
+        super();
+
+        this.variation = variation;
+
+        if (variation === "v2.llama3")
+            this.settings = {
+                supportsSystemMessages: true,
+                functions: {
+                    call: {
+                        optionalPrefixSpace: true,
+                        prefix: LlamaText(new SpecialTokensText("<|reserved_special_token_249|>")),
+                        paramsPrefix: LlamaText(new SpecialTokensText("\n")),
+                        suffix: ""
+                    },
+                    result: {
+                        prefix: LlamaText([
+                            new SpecialTokensText("<|start_header_id|>tool<|end_header_id|>\n\nname="),
+                            "{{functionName}}",
+                            new SpecialTokensText("\n")
+                        ]),
+                        suffix: LlamaText(new SpecialToken("EOT"))
+                    },
+                    parallelism: {
+                        call: {
+                            sectionPrefix: "",
+                            betweenCalls: "",
+                            sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                        },
+                        result: {
+                            sectionPrefix: "",
+                            betweenResults: "",
+                            sectionSuffix: ""
+                        }
+                    }
                 }
-            }
-        }
-    } satisfies ChatWrapperSettings;
-
+            };
+        else
+            this.settings = {
+                supportsSystemMessages: true,
+                functions: {
+                    call: {
+                        optionalPrefixSpace: true,
+                        prefix: LlamaText(new SpecialTokensText("\n<|from|>assistant\n<|recipient|>")),
+                        paramsPrefix: LlamaText(new SpecialTokensText("\n<|content|>")),
+                        suffix: ""
+                    },
+                    result: {
+                        prefix: LlamaText([
+                            new SpecialTokensText("\n<|from|>"),
+                            "{{functionName}}",
+                            new SpecialTokensText("\n<|recipient|>all\n<|content|>")
+                        ]),
+                        suffix: ""
+                    },
+                    parallelism: {
+                        call: {
+                            sectionPrefix: "",
+                            betweenCalls: "\n",
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|stop|>"))
+                        },
+                        result: {
+                            sectionPrefix: "",
+                            betweenResults: "",
+                            sectionSuffix: ""
+                        }
+                    }
+                }
+            };
+    }
     public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        if (this.variation === "v2.llama3")
+            return this._generateContextStateV2Llama3({chatHistory, availableFunctions, documentFunctionParams});
+
+        return this._generateContextStateV2({chatHistory, availableFunctions, documentFunctionParams});
+    }
+
+    /** @internal */
+    private _generateContextStateV2Llama3({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
+            documentParams: documentFunctionParams
+        });
+
+        const contextText = LlamaText(
+            new SpecialToken("BOS"),
+            historyWithFunctions.map((item, index) => {
+                const isLastItem = index === historyWithFunctions.length - 1;
+
+                if (item.type === "system") {
+                    if (item.text.length === 0)
+                        return "";
+
+                    return LlamaText([
+                        new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
+                        LlamaText.fromJSON(item.text),
+                        new SpecialToken("EOT")
+                    ]);
+                } else if (item.type === "user") {
+                    return LlamaText([
+                        new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
+                        item.text,
+                        new SpecialToken("EOT")
+                    ]);
+                } else if (item.type === "model") {
+                    if (isLastItem && item.response.length === 0)
+                        return LlamaText([
+                            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n")
+                        ]);
+
+                    const res: LlamaText[] = [];
+                    const pendingFunctionCalls: LlamaText[] = [];
+                    const pendingFunctionResults: LlamaText[] = [];
+
+                    const addPendingFunctions = () => {
+                        if (pendingFunctionResults.length === 0)
+                            return;
+
+                        res.push(LlamaText(pendingFunctionCalls));
+                        res.push(LlamaText(new SpecialToken("EOT")));
+                        res.push(LlamaText(pendingFunctionResults));
+
+                        pendingFunctionResults.length = 0;
+                    };
+
+                    for (let index = 0; index < item.response.length; index++) {
+                        const response = item.response[index];
+                        const isLastResponse = index === item.response.length - 1;
+
+                        if (typeof response === "string") {
+                            addPendingFunctions();
+                            res.push(
+                                LlamaText([
+                                    new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"),
+                                    response,
+                                    (isLastItem && isLastResponse)
+                                        ? LlamaText([])
+                                        : new SpecialToken("EOT")
+                                ])
+                            );
+                        } else if (isChatModelResponseFunctionCall(response)) {
+                            pendingFunctionCalls.push(
+                                response.rawCall != null
+                                    ? LlamaText.fromJSON(response.rawCall)
+                                    : LlamaText([
+                                        new SpecialTokensText("<|reserved_special_token_249|>"),
+                                        response.name,
+                                        new SpecialTokensText("\n"),
+                                        response.params === undefined
+                                            ? ""
+                                            : JSON.stringify(response.params)
+                                    ])
+                            );
+                            pendingFunctionResults.push(
+                                LlamaText([
+                                    new SpecialTokensText("<|start_header_id|>tool<|end_header_id|>\n\nname="),
+                                    response.name,
+                                    new SpecialTokensText("\n"),
+                                    response.result === undefined
+                                        ? "" // "void"
+                                        : JSON.stringify(response.result),
+                                    new SpecialToken("EOT")
+                                ])
+                            );
+                        } else
+                            void (response satisfies never);
+                    }
+
+                    addPendingFunctions();
+
+                    if (isLastItem && (res.length === 0 || typeof item.response[item.response.length - 1] !== "string"))
+                        res.push(
+                            LlamaText([
+                                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n")
+                            ])
+                        );
+
+                    return LlamaText(res);
+                }
+
+                void (item satisfies never);
+                return "";
+            })
+        );
+
+        return {
+            contextText,
+            stopGenerationTriggers: [
+                LlamaText(new SpecialToken("EOS")),
+                LlamaText(new SpecialToken("EOT")),
+                LlamaText("<|eot_id|>"),
+                LlamaText("<|end_of_text|>")
+            ]
+        };
+    }
+
+    /** @internal */
+    private _generateContextStateV2({
         chatHistory, availableFunctions, documentFunctionParams
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
         const hasFunctions = Object.keys(availableFunctions ?? {}).length > 0;
@@ -312,5 +489,14 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             });
 
         return res;
+    }
+
+    /** @internal */
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+        return [{
+            variation: "v2.llama3"
+        }, {
+            variation: "v2"
+        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
     }
 }
