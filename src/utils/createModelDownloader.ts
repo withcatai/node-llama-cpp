@@ -38,7 +38,14 @@ export type ModelDownloaderOptions = {
      *
      * Defaults to `true`.
      */
-    deleteTempFileOnCancel?: boolean
+    deleteTempFileOnCancel?: boolean,
+
+    /**
+     * The number of parallel downloads to use when downloading split files.
+     *
+     * Defaults to `4`.
+     */
+    parallelDownloads?: number
 };
 
 /**
@@ -89,6 +96,7 @@ export class ModelDownloader {
     /** @internal */ private readonly _onProgress?: ModelDownloaderOptions["onProgress"];
     /** @internal */ private readonly _deleteTempFileOnCancel: boolean;
     /** @internal */ private readonly _skipExisting: boolean;
+    /** @internal */ private readonly _parallelDownloads: number;
 
     /** @internal */ private _downloader?: DownloadEngineMultiDownload | DownloadEngineNodejs;
     /** @internal */ private _specificFileDownloaders: DownloadEngineNodejs[] = [];
@@ -98,7 +106,7 @@ export class ModelDownloader {
 
     private constructor({
         modelUrl, dirPath = cliModelsDirectory, fileName, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
-        skipExisting = true
+        skipExisting = true, parallelDownloads = 4
     }: ModelDownloaderOptions) {
         if (modelUrl == null || dirPath == null)
             throw new Error("modelUrl and dirPath cannot be null");
@@ -111,6 +119,7 @@ export class ModelDownloader {
         this._onProgress = onProgress;
         this._deleteTempFileOnCancel = deleteTempFileOnCancel;
         this._skipExisting = skipExisting;
+        this._parallelDownloads = parallelDownloads;
     }
 
     /**
@@ -291,7 +300,8 @@ export class ModelDownloader {
 
         this._downloader = await downloadSequence(
             {
-                cliProgress: this._showCliProgress
+                cliProgress: this._showCliProgress,
+                parallelDownloads: this._parallelDownloads
             },
             ...partDownloads
         );

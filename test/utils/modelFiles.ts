@@ -85,7 +85,8 @@ export async function downloadAllModels() {
     if (pendingDownloads.length > 0) {
         console.info(`Downloading ${pendingDownloads.length} model${pendingDownloads.length === 1 ? "" : "s"}`);
         const downloader = await downloadSequence({
-            cliProgress: true
+            cliProgress: true,
+            parallelDownloads: 4
         }, ...pendingDownloads);
         await downloader.download();
     }
