@@ -257,6 +257,11 @@ export class Llama {
     }
 
     /** @internal */
+    public _log(level: LlamaLogLevel, message: string) {
+        this._onAddonLog(LlamaLogLevelToAddonLogLevel.get(level) ?? defaultLogLevel, message + "\n");
+    }
+
+    /** @internal */
     private _onAddonLog(level: number, message: string) {
         const llamaLogLevel = addonLogLevelToLlamaLogLevel.get(level) ?? LlamaLogLevel.fatal;
 
