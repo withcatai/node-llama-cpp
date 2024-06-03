@@ -16,5 +16,5 @@ export function getGbnfGrammarForGbnfJsonSchema(schema: GbnfJsonSchema, {
     const rootTerminal = getGbnfJsonTerminalForGbnfJsonSchema(schema, grammarGenerator, scopeState);
     const rootGrammar = rootTerminal.getGrammar(grammarGenerator);
 
-    return grammarGenerator.generateGbnfFile(rootGrammar + " [\\n]".repeat(4) + " [\\n]*");
+    return grammarGenerator.generateGbnfFile(rootGrammar + ` "${"\\n".repeat(4)}"` + " [\\n]*");
 }
