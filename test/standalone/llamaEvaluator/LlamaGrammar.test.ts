@@ -106,7 +106,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? integer-number-rule "," whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule "," whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? boolean-rule "," whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? rule5 "," whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule6 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? integer-number-rule "," whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule "," whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? boolean-rule "," whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? rule5 "," whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule6 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
           whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
           null-rule ::= "null"
@@ -212,7 +212,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "[" whitespace-b-1-4-rule ( rule2 | rule3 ) whitespace-b-0-4-rule "]" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          "root ::= "[" whitespace-b-1-4-rule ( rule2 | rule3 ) whitespace-b-0-4-rule "]" "\\n\\n\\n\\n" [\\n]*
           whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
           whitespace-b-0-4-rule ::= ([\\n] | [ ]?)
@@ -304,7 +304,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
           whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
@@ -383,7 +383,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
           whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
@@ -463,7 +463,7 @@ describe("grammar for JSON schema", () => {
         };
 
         expect(grammar.grammar).toMatchInlineSnapshot(`
-          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" [\\n] [\\n] [\\n] [\\n] [\\n]*
+          "root ::= "{" whitespace-b-1-4-rule "\\"onlyPositiveText\\"" ":" [ ]? "true" "," whitespace-b-1-4-rule "\\"onlyNegativeText\\"" ":" [ ]? "false" "," whitespace-b-1-4-rule "\\"onlyVibe\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"onlyNumber\\"" ":" [ ]? "10" "," whitespace-b-1-4-rule "\\"worstThing\\"" ":" [ ]? null-rule "," whitespace-b-1-4-rule "\\"withNewLine\\"" ":" [ ]? rule1 "," whitespace-b-1-4-rule "\\"withQuotes\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
           whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
           rule0 ::= "\\"good\\""
           null-rule ::= "null"
