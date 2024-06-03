@@ -175,7 +175,10 @@ export const enum GgufMetadataTokenizerTokenType {
 
 export type GgufMetadataTokenizer = {
     readonly ggml: {
-        readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | "replit" | "rwkv" | string,
+        readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | string,
+        readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "mpt" |
+            "starcoder" | "gpt-2" | "jina-es" | "jina-de" | "jina-v2-es" | "jina-v2-de" | "refact" | "command-r" | "qwen2" | "stablelm2" |
+            "olmo" | "dbrx" | "smaug-bpe" | string,
         readonly tokens: readonly string[],
         readonly token_type: GgufMetadataTokenizerTokenType[],
         readonly token_type_count?: number,

@@ -130,7 +130,7 @@ export class LlamaChatSessionPromptCompletionEngine {
         const existingCompletion = completionCache.getCompletion(prompt);
         const promptToComplete = prompt + (existingCompletion ?? "");
 
-        const currentPromptTokens = this._chatSession.model.tokenize(promptToComplete).length;
+        const currentPromptTokens = this._chatSession.model.tokenize(promptToComplete, false, "trimLeadingSpace").length;
         const leftTokens = Math.max(0, this._maxPreloadTokens - currentPromptTokens);
 
         if (leftTokens === 0)

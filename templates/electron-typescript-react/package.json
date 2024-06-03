@@ -14,7 +14,7 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",
-    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./models"
+    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
   },
   "dependencies": {
     "birpc": "^0.2.17",
