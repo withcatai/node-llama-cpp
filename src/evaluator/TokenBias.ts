@@ -1,7 +1,7 @@
 import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
-import {LlamaModel} from "./LlamaModel.js";
+import {LlamaModel} from "./LlamaModel/LlamaModel.js";
 
 export class TokenBias {
     /** @internal */ public readonly _model: LlamaModel;

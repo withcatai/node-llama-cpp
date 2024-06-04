@@ -1,6 +1,6 @@
 import os from "os";
 import {BuildGpu} from "../../bindings/types.js";
-import {LlamaModelOptions} from "../../evaluator/LlamaModel.js";
+import {LlamaModelOptions} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
 import {getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {resolveModelGpuLayersOption} from "./utils/resolveModelGpuLayersOption.js";

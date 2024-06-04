@@ -1,23 +1,23 @@
 import process from "process";
 import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {removeNullFields} from "../utils/removeNullFields.js";
-import {Token, Tokenizer} from "../types.js";
-import {AddonModel, ModelTypeDescription} from "../bindings/AddonTypes.js";
-import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
-import {LlamaLocks, LlamaLogLevel, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../bindings/types.js";
-import {GgufFileInfo} from "../gguf/types/GgufFileInfoTypes.js";
-import {readGgufFileInfo} from "../gguf/readGgufFileInfo.js";
-import {GgufInsights} from "../gguf/insights/GgufInsights.js";
-import {GgufMetadataTokenizerTokenType} from "../gguf/types/GgufMetadataTypes.js";
-import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
-import {Writable} from "../utils/utilTypes.js";
-import {getReadablePath} from "../cli/utils/getReadablePath.js";
-import {LlamaContextOptions} from "./LlamaContext/types.js";
-import {LlamaContext} from "./LlamaContext/LlamaContext.js";
-import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
-import type {Llama} from "../bindings/Llama.js";
-import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
+import {removeNullFields} from "../../utils/removeNullFields.js";
+import {Token, Tokenizer} from "../../types.js";
+import {AddonModel, ModelTypeDescription} from "../../bindings/AddonTypes.js";
+import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
+import {LlamaLocks, LlamaLogLevel, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../../bindings/types.js";
+import {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
+import {readGgufFileInfo} from "../../gguf/readGgufFileInfo.js";
+import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {Writable} from "../../utils/utilTypes.js";
+import {getReadablePath} from "../../cli/utils/getReadablePath.js";
+import {LlamaContextOptions} from "../LlamaContext/types.js";
+import {LlamaContext} from "../LlamaContext/LlamaContext.js";
+import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
+import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
+import type {Llama} from "../../bindings/Llama.js";
+import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
 
 export type LlamaModelOptions = {
     /** path to the model on the filesystem */
@@ -357,11 +357,11 @@ export class LlamaModel {
         return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
     }
 
-    public getTokenType(token: Token): GgufMetadataTokenizerTokenType | null {
+    public getTokenAttributes(token: Token): TokenAttributes {
         if (this.vocabularyType === LlamaVocabularyType.none)
-            return null;
+            return TokenAttributes._create(token, TokenAttribute.undefined);
 
-        return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
+        return TokenAttributes._create(token, this._model.getTokenAttributes(token));
     }
 
     /** Check whether the given token is a special token (a control-type token) */
@@ -369,9 +369,7 @@ export class LlamaModel {
         if (token == null)
             return false;
 
-        const tokenType = this.getTokenType(token);
-
-        return tokenType === GgufMetadataTokenizerTokenType.control;
+        return this.getTokenAttributes(token).control;
     }
 
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */

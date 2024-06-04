@@ -83,7 +83,7 @@ export type AddonModel = {
     suffixToken(): Token,
     eotToken(): Token,
     getTokenString(token: number): string,
-    getTokenType(token: Token): number,
+    getTokenAttributes(token: Token): number,
     isEogToken(token: Token): boolean,
     getVocabularyType(): number,
     shouldPrependBosToken(): boolean,

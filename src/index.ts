@@ -3,7 +3,8 @@ import {Llama} from "./bindings/Llama.js";
 import {getLlama, LlamaOptions} from "./bindings/getLlama.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType} from "./bindings/types.js";
-import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel.js";
+import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
+import {TokenAttributes} from "./evaluator/LlamaModel/utils/TokenAttributes.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./evaluator/LlamaGrammar.js";
 import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
@@ -91,6 +92,7 @@ export {
     LlamaModel,
     LlamaModelTokens,
     LlamaModelInfillTokens,
+    TokenAttributes,
     type LlamaModelOptions,
     LlamaGrammar,
     type LlamaGrammarOptions,

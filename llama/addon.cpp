@@ -222,9 +222,9 @@ static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* mod
         return Napi::Number::From(info.Env(), -1);
     }
 
-    auto tokenType = llama_token_get_type(model, token);
+    auto tokenAttributes = llama_token_get_attr(model, token);
 
-    if (tokenType == LLAMA_TOKEN_TYPE_UNDEFINED || tokenType == LLAMA_TOKEN_TYPE_UNKNOWN) {
+    if (tokenAttributes & LLAMA_TOKEN_ATTR_UNDEFINED || tokenAttributes & LLAMA_TOKEN_ATTR_UNKNOWN) {
         return Napi::Number::From(info.Env(), -1);
     }
 
@@ -236,9 +236,9 @@ static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_mod
         return Napi::Number::From(info.Env(), -1);
     }
     
-    auto tokenType = llama_token_get_type(model, token);
+    auto tokenAttributes = llama_token_get_attr(model, token);
 
-    if (tokenType != LLAMA_TOKEN_TYPE_CONTROL && tokenType != LLAMA_TOKEN_TYPE_USER_DEFINED) {
+    if (!(tokenAttributes & LLAMA_TOKEN_ATTR_CONTROL) && !(tokenAttributes & LLAMA_TOKEN_ATTR_UNDEFINED)) {
         return Napi::Number::From(info.Env(), -1);
     }
 
@@ -535,20 +535,20 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
             return Napi::String::New(info.Env(), ss.str());
         }
 
-        Napi::Value GetTokenType(const Napi::CallbackInfo& info) {
+        Napi::Value GetTokenAttributes(const Napi::CallbackInfo& info) {
             if (disposed) {
                 Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
                 return info.Env().Undefined();
             }
 
             if (info[0].IsNumber() == false) {
-                return Napi::Number::From(info.Env(), int32_t(LLAMA_TOKEN_TYPE_UNDEFINED));
+                return Napi::Number::From(info.Env(), int32_t(LLAMA_TOKEN_ATTR_UNDEFINED));
             }
 
             int token = info[0].As<Napi::Number>().Int32Value();
-            auto tokenType = llama_token_get_type(model, token);
+            auto tokenAttributes = llama_token_get_attr(model, token);
 
-            return Napi::Number::From(info.Env(), int32_t(tokenType));
+            return Napi::Number::From(info.Env(), int32_t(tokenAttributes));
         }
         Napi::Value IsEogToken(const Napi::CallbackInfo& info) {
             if (disposed) {
@@ -611,7 +611,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                         InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                         InstanceMethod("eotToken", &AddonModel::EotToken),
                         InstanceMethod("getTokenString", &AddonModel::GetTokenString),
-                        InstanceMethod("getTokenType", &AddonModel::GetTokenType),
+                        InstanceMethod("getTokenAttributes", &AddonModel::GetTokenAttributes),
                         InstanceMethod("isEogToken", &AddonModel::IsEogToken),
                         InstanceMethod("getVocabularyType", &AddonModel::GetVocabularyType),
                         InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),

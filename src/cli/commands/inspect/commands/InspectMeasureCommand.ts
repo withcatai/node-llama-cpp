@@ -10,7 +10,7 @@ import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveCommandGgufPath} from "../../../utils/resolveCommandGgufPath.js";
 import {getLlama} from "../../../../bindings/getLlama.js";
 import {BuildGpu, LlamaLogLevel, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../../../bindings/types.js";
-import {LlamaModel} from "../../../../evaluator/LlamaModel.js";
+import {LlamaModel} from "../../../../evaluator/LlamaModel/LlamaModel.js";
 import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {ConsoleTable, ConsoleTableColumn} from "../../../utils/ConsoleTable.js";
 import {GgufInsights} from "../../../../gguf/insights/GgufInsights.js";

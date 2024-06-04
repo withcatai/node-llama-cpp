@@ -13,7 +13,7 @@ import {
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import type {Llama} from "../../bindings/Llama.js";
-import type {LlamaModel} from "../LlamaModel.js";
+import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 
 
 export class LlamaContext {
