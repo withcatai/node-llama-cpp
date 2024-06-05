@@ -1,15 +1,18 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {defaultChatSystemPrompt} from "../../config.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelResponse, ChatSessionModelFunctions, Token} from "../../types.js";
+import {
+    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions, Token
+} from "../../types.js";
 import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToChatHistory.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
-import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse} from "../LlamaChat/LlamaChat.js";
+import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse, LlamaChatResponseFunctionCall} from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaText, LlamaTextJSON} from "../../utils/LlamaText.js";
 import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
+import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {
     LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
 } from "./utils/LlamaChatSessionPromptCompletionEngine.js";
@@ -408,6 +411,7 @@ export class LlamaChatSession {
             if (this._chat == null)
                 throw new DisposedError();
 
+            const abortController = wrapAbortSignal(signal);
             let lastEvaluation = this._lastEvaluation;
             let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
             let newContextWindowChatHistory = lastEvaluation?.contextWindow == null
@@ -427,9 +431,15 @@ export class LlamaChatSession {
 
             // eslint-disable-next-line no-constant-condition
             while (true) {
+                const functionCallsAndResults: Array<Promise<null | {
+                    functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>,
+                    functionDefinition: ChatSessionModelFunction<any>,
+                    functionCallResult: any
+                }>> = [];
+                let canThrowFunctionCallingErrors = false;
+
                 const initialOutputTokens = this._chat.sequence.tokenMeter.usedOutputTokens;
                 const {
-                    functionCalls,
                     lastEvaluation: currentLastEvaluation,
                     metadata
                 } = await this._chat.generateResponse<Functions>(newChatHistory, {
@@ -437,8 +447,8 @@ export class LlamaChatSession {
                     documentFunctionParams,
                     maxParallelFunctionCalls,
                     grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
-                    onToken,
-                    signal,
+                    onToken: safeEventCallback(onToken),
+                    signal: abortController.signal,
                     stopOnAbortSignal,
                     repeatPenalty,
                     minP,
@@ -457,9 +467,40 @@ export class LlamaChatSession {
                     lastEvaluationContextWindow: {
                         history: newContextWindowChatHistory,
                         minimumOverlapPercentageToPreventContextShift: 0.5
+                    },
+                    onFunctionCall: async(functionCall) => {
+                        functionCallsAndResults.push(
+                            (async () => {
+                                try {
+                                    const functionDefinition = functions?.[functionCall.functionName];
+
+                                    if (functionDefinition == null)
+                                        throw new Error(
+                                            `The model tried to call function "${functionCall.functionName}" which is not defined`
+                                        );
+
+                                    const functionCallResult = await functionDefinition.handler(functionCall.params);
+
+                                    return {
+                                        functionCall,
+                                        functionDefinition,
+                                        functionCallResult
+                                    };
+                                } catch (err) {
+                                    abortController.abort(err);
+
+                                    if (canThrowFunctionCallingErrors)
+                                        throw err;
+
+                                    return null;
+                                }
+                            })()
+                        );
                     }
                 });
                 this._ensureNotDisposed();
+                if (abortController.signal.aborted)
+                    throw abortController.signal.reason;
 
                 if (maxTokens != null)
                     maxTokens = Math.max(0, maxTokens - (this._chat.sequence.tokenMeter.usedOutputTokens - initialOutputTokens));
@@ -467,25 +508,31 @@ export class LlamaChatSession {
                 lastEvaluation = currentLastEvaluation;
                 newChatHistory = lastEvaluation.cleanHistory;
 
-                if (functionCalls != null && functionCalls.length > 0) {
-                    const functionCallAndResults = await Promise.all(
-                        functionCalls.map(async (functionCall) => {
-                            const functionDefinition = functions?.[functionCall.functionName];
+                if (functionCallsAndResults.length > 0) {
+                    canThrowFunctionCallingErrors = true;
+                    const functionCallResultsPromise = Promise.all(functionCallsAndResults);
+                    await Promise.race([
+                        functionCallResultsPromise,
+                        new Promise((_, reject) => {
+                            abortController.signal.addEventListener("abort", () => {
+                                reject(abortController.signal.reason);
+                            });
 
-                            if (functionDefinition == null)
-                                throw new Error(`The model tried to call function "${functionCall.functionName}" which is not defined`);
-
-                            const functionCallResult = await functionDefinition.handler(functionCall.params);
-                            this._ensureNotDisposed();
-
-                            return [functionCall, functionDefinition, functionCallResult] as const;
+                            if (abortController.signal.aborted)
+                                reject(abortController.signal.reason);
                         })
-                    );
+                    ])
+
+                    const functionCallResults = (await functionCallResultsPromise)
+                        .filter((result): result is Exclude<typeof result, null> => result != null);;
+
                     this._ensureNotDisposed();
+                    if (abortController.signal.aborted)
+                        throw abortController.signal.reason;
 
                     newContextWindowChatHistory = lastEvaluation.contextWindow;
 
-                    for (const [functionCall, functionDefinition, functionCallResult] of functionCallAndResults) {
+                    for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
                         newChatHistory = addFunctionCallToChatHistory({
                             chatHistory: newChatHistory,
                             functionName: functionCall.functionName,

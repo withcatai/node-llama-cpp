@@ -8,6 +8,7 @@ import {QueuedTokenReleaseLock, TokenStreamRegulator} from "../utils/TokenStream
 import {StopGenerationDetector, StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
 import {UNKNOWN_UNICODE_CHAR} from "../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeStopTrigger.js";
+import {safeEventCallback} from "../utils/safeEventCallback.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
@@ -274,7 +275,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
-                onToken,
+                onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
                 temperature,
@@ -457,7 +458,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
-                onToken,
+                onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
                 temperature,

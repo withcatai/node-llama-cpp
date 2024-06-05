@@ -17,6 +17,7 @@ import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBefor
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
+import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -139,12 +140,16 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     grammar?: LlamaGrammar,
     functions?: never,
     documentFunctionParams?: never,
-    maxParallelFunctionCalls?: never
+    maxParallelFunctionCalls?: never,
+    onFunctionCall?: never
 } | {
     grammar?: never,
     functions?: Functions | ChatModelFunctions,
     documentFunctionParams?: boolean,
-    maxParallelFunctionCalls?: number
+    maxParallelFunctionCalls?: number,
+    onFunctionCall?: (
+        functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>
+    ) => void
 });
 
 export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
@@ -339,6 +344,7 @@ export class LlamaChat {
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
+            onFunctionCall,
             documentFunctionParams,
             maxParallelFunctionCalls,
             contextShift = defaultContextShiftOptions,
@@ -368,6 +374,7 @@ export class LlamaChat {
                 tokenBias,
                 evaluationPriority,
                 functions,
+                onFunctionCall,
                 documentFunctionParams,
                 maxParallelFunctionCalls,
                 contextShift,
@@ -1174,6 +1181,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
     private readonly evaluationPriority: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"];
     private readonly functions: LLamaChatGenerateResponseOptions<Functions>["functions"];
+    private readonly onFunctionCall: LLamaChatGenerateResponseOptions<Functions>["onFunctionCall"];
     private readonly documentFunctionParams: LLamaChatGenerateResponseOptions<Functions>["documentFunctionParams"];
     private readonly maxParallelFunctionCalls: LLamaChatGenerateResponseOptions<Functions>["maxParallelFunctionCalls"];
     private readonly contextShift: LLamaChatGenerateResponseOptions<Functions>["contextShift"];
@@ -1270,6 +1278,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
+            onFunctionCall,
             documentFunctionParams,
             maxParallelFunctionCalls,
             contextShift = defaultContextShiftOptions,
@@ -1284,7 +1293,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.chatWrapper = chatWrapper;
 
         this.history = history;
-        this.onToken = onToken;
+        this.onToken = safeEventCallback(onToken);
         this.signal = signal;
         this.stopOnAbortSignal = stopOnAbortSignal;
         this.maxTokens = maxTokens;
@@ -1297,6 +1306,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.tokenBias = tokenBias;
         this.evaluationPriority = evaluationPriority;
         this.functions = functions;
+        this.onFunctionCall = safeEventCallback(onFunctionCall);
         this.documentFunctionParams = documentFunctionParams;
         this.maxParallelFunctionCalls = maxParallelFunctionCalls;
         this.contextShift = contextShift;
@@ -1884,6 +1894,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     functionName: this.functionEvaluationFunctionName,
                     params,
                     raw: functionCallText
+                });
+                this.onFunctionCall?.({
+                    functionName: this.functionEvaluationFunctionName,
+                    params: structuredClone(params),
+                    raw: functionCallText.toJSON()
                 });
                 this.currentFunctionCallPreviousText = LlamaText([]);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
