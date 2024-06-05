@@ -304,6 +304,15 @@ export class LlamaModel {
 
         if (options === "trimLeadingSpace") {
             if (specialTokens) {
+                const countLeadingSpaces = (text: string) => {
+                    let count = 0;
+                    for (; count < text.length; count++) {
+                        if (text[count] !== " ")
+                            break;
+                    }
+                    return count;
+                };
+                const textLeadingSpaces = countLeadingSpaces(text);
                 const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
                     ? [this.tokens.bos, this.tokens.bosString]
                     : (this.tokens.eos != null && this.tokens.eosString != null)
@@ -321,12 +330,39 @@ export class LlamaModel {
                     // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
                     if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
                         tokens.splice(0, workaroundTokenIndex + 1);
-                        return tokens;
+
+                        if (countLeadingSpaces(this.detokenize(tokens, true)) === textLeadingSpaces)
+                            return tokens;
                     }
                 }
-            } else {
-                const workaroundTokens = Array.from(this._model.tokenize("\n", false)) as Token[];
+
                 const workaroundTokensString = "\n";
+                const workaroundTokens = Array.from(this._model.tokenize(workaroundTokensString, true)) as Token[];
+
+                if (text.startsWith(workaroundTokensString)) {
+                    const tokens = Array.from(this._model.tokenize(text, true)) as Token[];
+                    if (this.detokenize(tokens, true).startsWith(workaroundTokensString))
+                        return tokens;
+                }
+
+                const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, true)) as Token[];
+
+                // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                if (workaroundTokens.length > 0 && workaroundTokens.every((token, index) => tokens[index] === token)) {
+                    tokens.splice(0, workaroundTokens.length);
+
+                    if (countLeadingSpaces(this.detokenize(tokens, true)) === textLeadingSpaces)
+                        return tokens;
+                }
+            } else {
+                const workaroundTokensString = "\n";
+                const workaroundTokens = Array.from(this._model.tokenize(workaroundTokensString, false)) as Token[];
+
+                if (text.startsWith(workaroundTokensString)) {
+                    const tokens = Array.from(this._model.tokenize(text, false)) as Token[];
+                    if (this.detokenize(tokens, false).startsWith(workaroundTokensString))
+                        return tokens;
+                }
 
                 const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, false)) as Token[];
 

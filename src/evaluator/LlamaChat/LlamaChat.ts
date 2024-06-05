@@ -1581,9 +1581,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.lastHistoryCompressionMetadata = newHistoryCompressionMetadata;
             this.lastContextWindowHistory = contextWindowHistory;
             this.contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(contextWindowHistory);
+            this.contextWindowsRes = [];
 
             this.canAvoidReloadingHistory = true;
-            this.contextWindowsRes = [];
         }
 
         this.tokens = [
