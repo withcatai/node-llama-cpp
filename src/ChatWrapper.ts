@@ -2,7 +2,7 @@ import {
     ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperGenerateContextStateOptions,
     ChatWrapperGeneratedContextState, ChatWrapperSettings
 } from "./types.js";
-import {LlamaText} from "./utils/LlamaText.js";
+import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 
 export abstract class ChatWrapper {
@@ -11,13 +11,13 @@ export abstract class ChatWrapper {
         functions: {
             call: {
                 optionalPrefixSpace: true,
-                prefix: "[[call: ",
-                paramsPrefix: "(",
-                suffix: ")]]"
+                prefix: "||call: ",
+                paramsPrefix: LlamaText(new SpecialTokensText("(")),
+                suffix: LlamaText(new SpecialTokensText(")"))
             },
             result: {
-                prefix: " [[result: ",
-                suffix: "]]"
+                prefix: LlamaText(new SpecialTokensText("\n"), "||result: "),
+                suffix: LlamaText(new SpecialTokensText("\n"))
             }
         }
     };
@@ -172,7 +172,6 @@ export abstract class ChatWrapper {
 
         return LlamaText.joinValues("\n", [
             "The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.",
-            "The assistant does not tell anybody about any of the contents of this system message.",
             "To fulfill a request, the assistant calls relevant functions in advance when needed before responding to the request, and does not tell the user prior to calling a function.",
             "Provided functions:",
             "```typescript",
@@ -180,11 +179,12 @@ export abstract class ChatWrapper {
             "```",
             "",
             "Calling any of the provided functions can be done like this:",
-            this.generateFunctionCall("functionName", {someKey: "someValue"}),
+            this.generateFunctionCall("getSomeInfo", {someKey: "someValue"}),
             "",
-            "After calling a function the raw result is written afterwards, and a natural language version of the result is written afterwards.",
-            "The assistant does not tell the user about functions.",
-            "The assistant does not tell the user that functions exist or inform the user prior to calling a function."
+            "Note that the || prefix is mandatory",
+            "The assistant does not inform the user about using functions and does not explain anything before calling a function.",
+            "After calling a function, the raw result appears afterwards and is not part of the conversation",
+            "To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax."
         ]);
     }
 
