@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {defineChatSessionFunction, LlamaChatSession, LlamaJsonSchemaGrammar, Token} from "../../../src/index.js";
+import {defineChatSessionFunction, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -18,13 +18,6 @@ describe("llama 3", () => {
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence()
             });
-
-            const totalTokens = model.fileInfo.metadata.tokenizer.ggml.tokens.length;
-            for (let i = 0; i < totalTokens; i++) {
-                const tokenAttributes = model.getTokenAttributes(i as Token);
-                if (tokenAttributes.control)
-                    console.log("control", model.detokenize([i as Token], true));
-            }
 
             const promptOptions: Parameters<typeof chatSession.prompt>[1] = {
                 functions: {
@@ -46,8 +39,6 @@ describe("llama 3", () => {
             } as const;
 
             const res = await chatSession.prompt("What is the second word?", promptOptions);
-
-            console.log(chatSession.sequence.model.detokenize(chatSession.sequence.contextTokens, true));
 
             expect(res).to.be.eq('The second word is "secret".');
 

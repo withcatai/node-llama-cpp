@@ -10,24 +10,66 @@ import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctio
 export class Llama3ChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Llama3Chat";
 
-    public override readonly settings: ChatWrapperSettings = {
-        supportsSystemMessages: true,
-        functions: {
-            call: {
-                optionalPrefixSpace: true,
-                prefix: "||call:",
-                paramsPrefix: LlamaText(new SpecialTokensText("(")),
-                suffix: LlamaText(new SpecialTokensText(")"))
-            },
-            result: {
-                prefix: LlamaText([
-                    LlamaText(new SpecialToken("EOT")),
-                    new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")
-                ]),
-                suffix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
-            }
-        }
-    };
+    public override readonly settings: ChatWrapperSettings;
+
+    public constructor({
+        parallelFunctionCalls = true
+    }: {
+        parallelFunctionCalls?: boolean
+    }) {
+        super();
+
+        if (parallelFunctionCalls)
+            this.settings = {
+                supportsSystemMessages: true,
+                functions: {
+                    call: {
+                        optionalPrefixSpace: true,
+                        prefix: "||call:",
+                        paramsPrefix: LlamaText(new SpecialTokensText("(")),
+                        suffix: LlamaText(new SpecialTokensText(")"))
+                    },
+                    result: {
+                        prefix: LlamaText(new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")),
+                        suffix: LlamaText(new SpecialToken("EOT"))
+                    },
+                    parallelism: {
+                        call: {
+                            sectionPrefix: "",
+                            betweenCalls: "\n",
+                            sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                        },
+                        result: {
+                            sectionPrefix: "",
+                            betweenResults: "",
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
+                        }
+                    }
+                }
+            };
+        else
+            this.settings = {
+                supportsSystemMessages: true,
+                functions: {
+                    call: {
+                        optionalPrefixSpace: true,
+                        prefix: "||call:",
+                        paramsPrefix: LlamaText(new SpecialTokensText("(")),
+                        suffix: LlamaText(new SpecialTokensText(")"))
+                    },
+                    result: {
+                        prefix: LlamaText([
+                            LlamaText(new SpecialToken("EOT")),
+                            new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")
+                        ]),
+                        suffix: LlamaText([
+                            new SpecialToken("EOT"),
+                            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n")
+                        ])
+                    }
+                }
+            };
+    }
 
     public override generateContextState({
         chatHistory, availableFunctions, documentFunctionParams
@@ -167,7 +209,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
             "Note that the || prefix is mandatory",
             "The assistant does not inform the user about using functions and does not explain anything before calling a function.",
             "After calling a function, the raw result appears afterwards and is not part of the conversation",
-            "To make information be part of the conversation, the paraphrases and repeats the information without the function syntax."
+            "To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax."
         ]);
     }
 }
