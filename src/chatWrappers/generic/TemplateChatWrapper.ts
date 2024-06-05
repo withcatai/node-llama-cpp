@@ -27,10 +27,10 @@ type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
  *     modelRoleName: "model",
  *     userRoleName: "user",
  *     systemRoleName: "system", // optional
- *     // functionCallMessageTemplate: [ // optional
- *     //     "[[call: {{functionName}}({{functionParams}})]]",
- *     //     " [[result: {{functionCallResult}}]]"
- *     // ]
+ *     // functionCallMessageTemplate: { // optional
+ *     //     call: "[[call: {{functionName}}({{functionParams}})]]",
+ *     //     result: " [[result: {{functionCallResult}}]]"
+ *     // }
  * });
  * ```
  *

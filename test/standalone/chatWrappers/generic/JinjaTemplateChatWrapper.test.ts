@@ -581,10 +581,10 @@ describe("JinjaTemplateChatWrapper", () => {
     test("functions template", () => {
         const chatWrapper = new JinjaTemplateChatWrapper({
             template: template3,
-            functionCallMessageTemplate: [
-                "[[call: {{functionName}}({{functionParams}})]]",
-                " [[result: {{functionCallResult}}]]"
-            ]
+            functionCallMessageTemplate: {
+                call: "[[call: {{functionName}}({{functionParams}})]]",
+                result: " [[result: {{functionCallResult}}]]"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({
             chatHistory: conversationHistoryWithFunctionCalls,
@@ -659,10 +659,10 @@ describe("JinjaTemplateChatWrapper", () => {
     test("functions template 2", () => {
         const chatWrapper = new JinjaTemplateChatWrapper({
             template: template3,
-            functionCallMessageTemplate: [
-                "\nCall function: {{functionName}} with params {{functionParams}}.",
-                "\nFunction result: {{functionCallResult}}\n"
-            ]
+            functionCallMessageTemplate: {
+                call: "\nCall function: {{functionName}} with params {{functionParams}}.",
+                result: "\nFunction result: {{functionCallResult}}\n"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({
             chatHistory: conversationHistoryWithFunctionCalls,
