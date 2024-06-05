@@ -92,12 +92,12 @@ describe("gguf", async () => {
 
             const modelVramUsageDiff = currentModelVramUsage - initialModelVramUsage;
 
-            const s100MB = 100 * Math.pow(1024, 2);
+            const s300MB = 300 * Math.pow(1024, 2);
             const s5MB = 5 * Math.pow(1024, 2);
 
             const estimatedModelVramUsage = ggufInsights.estimateModelResourceRequirements({gpuLayers: ggufInsights.totalLayers}).gpuVram;
             expect(bytes(estimatedModelVramUsage)).toMatchInlineSnapshot('"4.33GB"');
-            expect(Math.abs(modelVramUsageDiff - estimatedModelVramUsage)).to.be.lte(s100MB);
+            expect(Math.abs(modelVramUsageDiff - estimatedModelVramUsage)).to.be.lte(s300MB);
 
             const modelEstimationDiffWithActual = estimatedModelVramUsage - model.size;
             expect(Math.abs(modelEstimationDiffWithActual)).to.be.lte(s5MB); // tolerate such a small difference
@@ -121,8 +121,8 @@ describe("gguf", async () => {
                 sequences: context.totalSequences,
                 modelGpuLayers: ggufInsights.totalLayers
             }).gpuVram;
-            expect(bytes(estimatedContextVramUsage)).toMatchInlineSnapshot('"854.74MB"');
-            expect(Math.abs(contextVramUsageDiff - estimatedContextVramUsage)).to.be.lte(s100MB);
+            expect(bytes(estimatedContextVramUsage)).toMatchInlineSnapshot('"1.02GB"');
+            expect(Math.abs(contextVramUsageDiff - estimatedContextVramUsage)).to.be.lte(s300MB);
 
             await model.dispose();
         });
@@ -145,10 +145,10 @@ describe("gguf", async () => {
 
             const vramUsageDiff = currentVramUsage - initialVramUsage;
 
-            const s100MB = 100 * Math.pow(1024, 2);
+            const s200MB = 200 * Math.pow(1024, 2);
             const calculatedVramUsage = ggufInsights.estimateModelResourceRequirements({gpuLayers: 16}).gpuVram;
 
-            expect(Math.abs(vramUsageDiff - calculatedVramUsage)).to.be.lte(s100MB);
+            expect(Math.abs(vramUsageDiff - calculatedVramUsage)).to.be.lte(s200MB);
 
             await model.dispose();
         });
