@@ -524,7 +524,7 @@ export class LlamaChatSession {
                     ]);
 
                     const functionCallResults = (await functionCallResultsPromise)
-                        .filter((result): result is Exclude<typeof result, null> => result != null);;
+                        .filter((result): result is Exclude<typeof result, null> => result != null);
 
                     this._ensureNotDisposed();
                     if (abortController.signal.aborted)

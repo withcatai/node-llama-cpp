@@ -9,11 +9,13 @@ export function safeEventCallback<const Params extends any[]>(
 ): ((...args: Params) => void);
 export function safeEventCallback(callback?: undefined | void | never, message?: string): undefined;
 export function safeEventCallback<const Params extends any[] = any[]>(
-    callback?: undefined | void | never | ((...args: Params) => void) | ((...args: Params) => Promise<void>) | ((...args: Params) => void | Promise<void>),
+    callback?: undefined | void | never | ((...args: Params) => void) | ((...args: Params) => Promise<void>) |
+        ((...args: Params) => void | Promise<void>),
     message?: string
 ): undefined | ((...args: Params) => void);
 export function safeEventCallback<const Params extends any[] = any[]>(
-    callback?: undefined | void | never | ((...args: Params) => void) | ((...args: Params) => Promise<void>) | ((...args: Params) => void | Promise<void>),
+    callback?: undefined | void | never | ((...args: Params) => void) | ((...args: Params) => Promise<void>) |
+        ((...args: Params) => void | Promise<void>),
     message?: string
 ): undefined | ((...args: Params) => void) {
     if (callback == null)
