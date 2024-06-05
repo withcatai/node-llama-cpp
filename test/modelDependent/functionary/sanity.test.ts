@@ -91,18 +91,90 @@ describe("functionary", () => {
                 modelPath
             });
 
-            const text = "<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+            {
+                const text = "<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
 
-            const tokensWithSpecialTokens = model.tokenize(text, true);
-            const tokensNoSpecialTokens = model.tokenize(text, false);
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
 
-            expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = " <|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
 
-            const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
-            const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
 
-            expect(textWithSpecialTokens).to.eql(text);
-            expect(textNoSpecialTokens).to.eql(text);
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = "  <|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = "\n<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = "\n\n<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = " \n<|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
+            {
+                const text = "\n <|start_header_id|>system<|end_header_id|>\n\nHow much is 6+6\n";
+
+                const tokensWithSpecialTokens = model.tokenize(text, true);
+                const tokensNoSpecialTokens = model.tokenize(text, false);
+                const textWithSpecialTokens = model.detokenize(tokensWithSpecialTokens, true);
+                const textNoSpecialTokens = model.detokenize(tokensNoSpecialTokens, false);
+
+                expect(tokensWithSpecialTokens).to.not.eql(tokensNoSpecialTokens);
+                expect(textWithSpecialTokens).to.eql(text);
+                expect(textNoSpecialTokens).to.eql(text);
+            }
         });
     });
 });
