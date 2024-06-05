@@ -15,13 +15,16 @@ export class Llama3ChatWrapper extends ChatWrapper {
         functions: {
             call: {
                 optionalPrefixSpace: true,
-                prefix: "[[call: ",
-                paramsPrefix: "(",
-                suffix: ")]]"
+                prefix: "||call:",
+                paramsPrefix: LlamaText(new SpecialTokensText("(")),
+                suffix: LlamaText(new SpecialTokensText(")"))
             },
             result: {
-                prefix: " [[result: ",
-                suffix: "]]"
+                prefix: LlamaText([
+                    LlamaText(new SpecialToken("EOT")),
+                    new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")
+                ]),
+                suffix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
             }
         }
     };
@@ -159,9 +162,12 @@ export class Llama3ChatWrapper extends ChatWrapper {
             "```",
             "",
             "Calling any of the provided functions can be done like this:",
-            this.generateFunctionCall("functionName", {someKey: "someValue"}),
+            this.generateFunctionCall("getSomeInfo", {someKey: "someValue"}),
             "",
-            "After calling a function the raw result is written afterwards, and a natural language version of the result is written afterwards."
+            "Note that the || prefix is mandatory",
+            "The assistant does not inform the user about using functions and does not explain anything before calling a function.",
+            "After calling a function, the raw result appears afterwards and is not part of the conversation",
+            "To make information be part of the conversation, the paraphrases and repeats the information without the function syntax."
         ]);
     }
 }

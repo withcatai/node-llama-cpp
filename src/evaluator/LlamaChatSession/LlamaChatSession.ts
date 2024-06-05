@@ -521,7 +521,7 @@ export class LlamaChatSession {
                             if (abortController.signal.aborted)
                                 reject(abortController.signal.reason);
                         })
-                    ])
+                    ]);
 
                     const functionCallResults = (await functionCallResultsPromise)
                         .filter((result): result is Exclude<typeof result, null> => result != null);;
