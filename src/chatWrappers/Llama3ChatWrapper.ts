@@ -13,13 +13,16 @@ export class Llama3ChatWrapper extends ChatWrapper {
     public override readonly settings: ChatWrapperSettings;
 
     public constructor({
-        parallelFunctionCalls = true
+        parallelFunctionCalling = true
     }: {
-        parallelFunctionCalls?: boolean
-    }) {
+        /**
+         * Defaults to `true`
+         */
+        parallelFunctionCalling?: boolean
+    } = {}) {
         super();
 
-        if (parallelFunctionCalls)
+        if (parallelFunctionCalling)
             this.settings = {
                 supportsSystemMessages: true,
                 functions: {

@@ -437,6 +437,7 @@ export class LlamaChatSession {
                     functionCallResult: any
                 }>> = [];
                 let canThrowFunctionCallingErrors = false;
+                let abortedOnFunctionCallError = false;
 
                 const initialOutputTokens = this._chat.sequence.tokenMeter.usedOutputTokens;
                 const {
@@ -487,7 +488,10 @@ export class LlamaChatSession {
                                         functionCallResult
                                     };
                                 } catch (err) {
-                                    abortController.abort(err);
+                                    if (!abortController.signal.aborted) {
+                                        abortedOnFunctionCallError = true;
+                                        abortController.abort(err);
+                                    }
 
                                     if (canThrowFunctionCallingErrors)
                                         throw err;
@@ -499,7 +503,7 @@ export class LlamaChatSession {
                     }
                 });
                 this._ensureNotDisposed();
-                if (abortController.signal.aborted)
+                if (abortController.signal.aborted && (abortedOnFunctionCallError || !stopOnAbortSignal))
                     throw abortController.signal.reason;
 
                 if (maxTokens != null)
@@ -513,49 +517,59 @@ export class LlamaChatSession {
                     const functionCallResultsPromise = Promise.all(functionCallsAndResults);
                     await Promise.race([
                         functionCallResultsPromise,
-                        new Promise((_, reject) => {
+                        new Promise<void>((accept, reject) => {
                             abortController.signal.addEventListener("abort", () => {
-                                reject(abortController.signal.reason);
+                                if (abortedOnFunctionCallError || !stopOnAbortSignal)
+                                    reject(abortController.signal.reason);
+                                else
+                                    accept();
                             });
 
-                            if (abortController.signal.aborted)
-                                reject(abortController.signal.reason);
+                            if (abortController.signal.aborted) {
+                                if (abortedOnFunctionCallError || !stopOnAbortSignal)
+                                    reject(abortController.signal.reason);
+                                else
+                                    accept();
+                            }
                         })
                     ]);
-
-                    const functionCallResults = (await functionCallResultsPromise)
-                        .filter((result): result is Exclude<typeof result, null> => result != null);
-
                     this._ensureNotDisposed();
-                    if (abortController.signal.aborted)
-                        throw abortController.signal.reason;
 
-                    newContextWindowChatHistory = lastEvaluation.contextWindow;
+                    if (!abortController.signal.aborted) {
+                        const functionCallResults = (await functionCallResultsPromise)
+                            .filter((result): result is Exclude<typeof result, null> => result != null);
+                        this._ensureNotDisposed();
 
-                    for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
-                        newChatHistory = addFunctionCallToChatHistory({
-                            chatHistory: newChatHistory,
-                            functionName: functionCall.functionName,
-                            functionDescription: functionDefinition.description,
-                            callParams: functionCall.params,
-                            callResult: functionCallResult,
-                            rawCall: functionCall.raw
-                        });
+                        if (abortController.signal.aborted)
+                            throw abortController.signal.reason;
 
-                        newContextWindowChatHistory = addFunctionCallToChatHistory({
-                            chatHistory: newContextWindowChatHistory,
-                            functionName: functionCall.functionName,
-                            functionDescription: functionDefinition.description,
-                            callParams: functionCall.params,
-                            callResult: functionCallResult,
-                            rawCall: functionCall.raw
-                        });
+                        newContextWindowChatHistory = lastEvaluation.contextWindow;
+
+                        for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
+                            newChatHistory = addFunctionCallToChatHistory({
+                                chatHistory: newChatHistory,
+                                functionName: functionCall.functionName,
+                                functionDescription: functionDefinition.description,
+                                callParams: functionCall.params,
+                                callResult: functionCallResult,
+                                rawCall: functionCall.raw
+                            });
+
+                            newContextWindowChatHistory = addFunctionCallToChatHistory({
+                                chatHistory: newContextWindowChatHistory,
+                                functionName: functionCall.functionName,
+                                functionDescription: functionDefinition.description,
+                                callParams: functionCall.params,
+                                callResult: functionCallResult,
+                                rawCall: functionCall.raw
+                            });
+                        }
+
+                        lastEvaluation.cleanHistory = newChatHistory;
+                        lastEvaluation.contextWindow = newContextWindowChatHistory;
+
+                        continue;
                     }
-
-                    lastEvaluation.cleanHistory = newChatHistory;
-                    lastEvaluation.contextWindow = newContextWindowChatHistory;
-
-                    continue;
                 }
 
                 this._lastEvaluation = lastEvaluation;
