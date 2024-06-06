@@ -64,6 +64,25 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
+    name: "Phi 3 3.8B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Phi 3 model was created by Microsoft and is optimized for strong reasoning (especially math and logic).\n" +
+        "This is the smallversion of the model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "microsoft/Phi-3-mini-4k-instruct-gguf",
+            branch: "main",
+            file: "Phi-3-mini-4k-instruct-fp16.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "microsoft/Phi-3-mini-4k-instruct-gguf",
+            branch: "main",
+            file: "Phi-3-mini-4k-instruct-q4.gguf"
+        }
+    }]
+}, {
     name: "Llama 2 Chat 7B",
     abilities: ["chat", "complete"],
     description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
@@ -180,7 +199,7 @@ export const recommendedModels: ModelRecommendation[] = [{
             file: "dolphin-2.5-mixtral-8x7b.Q4_K_M.gguf"
         }
     }]
-}, {
+}, /* {
     name: "Functionary Medium v2.4",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
@@ -199,29 +218,30 @@ export const recommendedModels: ModelRecommendation[] = [{
             file: "functionary-medium-v2.4.Q4_0.gguf"
         }
     }]
-}, {
-    name: "Functionary Small v2.4",
+}, */ {
+    name: "Functionary Small v2.5",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
+        "This model is based on Llama 3.\n" +
         "This is the small version of the model.",
 
     fileOptions: [{
         huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
+            model: "meetkai/functionary-small-v2.5-GGUF",
             branch: "main",
-            file: "functionary-small-v2.4.f16.gguf"
+            file: "functionary-small-v2.5.f16.gguf"
         }
     }, {
         huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
+            model: "meetkai/functionary-small-v2.5-GGUF",
             branch: "main",
-            file: "functionary-small-v2.4.Q8_0.gguf"
+            file: "functionary-small-v2.5.Q8_0.gguf"
         }
     }, {
         huggingFace: {
-            model: "meetkai/functionary-small-v2.4-GGUF",
+            model: "meetkai/functionary-small-v2.5-GGUF",
             branch: "main",
-            file: "functionary-small-v2.4.Q4_0.gguf"
+            file: "functionary-small-v2.5.Q4_0.gguf"
         }
     }]
 }, {
@@ -284,8 +304,8 @@ export const recommendedModels: ModelRecommendation[] = [{
 }, {
     name: "Code Llama 7B",
     abilities: ["chat", "complete", "infill"],
-    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
-        + "This is the 7 billion parameters version of the model.",
+    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n" +
+        "This is the 7 billion parameters version of the model.",
 
     fileOptions: [{
         huggingFace: {
@@ -303,8 +323,8 @@ export const recommendedModels: ModelRecommendation[] = [{
 }, {
     name: "Code Llama 13B",
     abilities: ["chat", "complete", "infill"],
-    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
-        + "This is the 13 billion parameters version of the model.",
+    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n" +
+        "This is the 13 billion parameters version of the model.",
 
     fileOptions: [{
         huggingFace: {
@@ -322,8 +342,8 @@ export const recommendedModels: ModelRecommendation[] = [{
 }, {
     name: "Code Llama 34B",
     abilities: ["chat", "complete", "infill"],
-    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n"
-        + "This is the 34 billion parameters version of the model.\n" +
+    description: "Code Llama model was created by Meta based on Llama 2 and is optimized for coding tasks.\n" +
+        "This is the 34 billion parameters version of the model.\n" +
         "You need a GPU with handful of VRAM to use this version.",
 
     fileOptions: [{
