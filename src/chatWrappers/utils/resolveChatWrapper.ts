@@ -310,7 +310,7 @@ function orderChatWrapperNamesByAssumedCompatibilityWithModel<T extends Resolvab
         const index = fullText.toLowerCase().indexOf(pattern.toLowerCase());
 
         if (index >= 0)
-            return existsPoints + ((index / fullText.length) * positionPoints);
+            return existsPoints + (((index + 1) / fullText.length) * positionPoints);
 
         return 0;
     }

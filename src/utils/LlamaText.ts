@@ -244,9 +244,14 @@ class LlamaText {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "LlamaText(" + inspect(this.values, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "LlamaText(" + inspectFunction(this.values, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined
@@ -467,9 +472,14 @@ export class SpecialTokensText {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "new SpecialTokensText(" + inspect(this.value, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "new SpecialTokensText(" + inspectFunction(this.value, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined
@@ -524,9 +534,14 @@ export class SpecialToken {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "new SpecialToken(" + inspect(this.value, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "new SpecialToken(" + inspectFunction(this.value, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined

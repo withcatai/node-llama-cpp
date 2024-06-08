@@ -2,6 +2,7 @@ import {DisposeAggregator, DisposedError} from "lifecycle-utils";
 import {Token} from "../../../types.js";
 import {getConsoleLogPrefix} from "../../../utils/getConsoleLogPrefix.js";
 import {LruCache} from "../../../utils/LruCache.js";
+import {safeEventCallback} from "../../../utils/safeEventCallback.js";
 import type {LLamaChatCompletePromptOptions, LlamaChatSession} from "../LlamaChatSession.js";
 
 export type LLamaChatPromptCompletionEngineOptions = {
@@ -58,7 +59,7 @@ export class LlamaChatSessionPromptCompletionEngine {
         this._chatSession = chatSession;
         this._maxPreloadTokens = Math.max(1, maxPreloadTokens);
         this._maxCachedCompletions = Math.max(1, maxCachedCompletions);
-        this._onGeneration = onGeneration;
+        this._onGeneration = safeEventCallback(onGeneration);
         this._completionOptions = options;
 
         this.dispose = this.dispose.bind(this);
@@ -154,12 +155,8 @@ export class LlamaChatSessionPromptCompletionEngine {
                     return;
                 }
 
-                try {
-                    if (this._lastPrompt === prompt && this._onGeneration != null)
-                        this._onGeneration(prompt, completion);
-                } catch (err) {
-                    console.error(err);
-                }
+                if (this._lastPrompt === prompt)
+                    this._onGeneration?.(prompt, completion);
             }
         })
             .then(() => {

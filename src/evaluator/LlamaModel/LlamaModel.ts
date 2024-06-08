@@ -400,12 +400,20 @@ export class LlamaModel {
         return TokenAttributes._create(token, this._model.getTokenAttributes(token));
     }
 
-    /** Check whether the given token is a special token (a control-type token) */
+    /** Check whether the given token is a special token (a control-type token or a token with no normal text representation) */
     public isSpecialToken(token: Token | undefined): boolean {
         if (token == null)
             return false;
 
-        return this.getTokenAttributes(token).control;
+        if (this.getTokenAttributes(token).control)
+            return true;
+
+        const normalText = this.detokenize([token], false);
+
+        if (normalText === "")
+            return this.detokenize([token], true) !== "";
+
+        return false;
     }
 
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */

@@ -25,7 +25,7 @@ export class TokenAttributes {
     }
 
     public get undefined() {
-        return this._hasAttribute(TokenAttribute.undefined);
+        return this._attributes === TokenAttribute.undefined;
     }
 
     public get unknown() {

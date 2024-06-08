@@ -212,6 +212,8 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             stopGenerationTriggers: [
                 LlamaText(new SpecialToken("EOS")),
                 LlamaText(new SpecialToken("EOT")),
+                LlamaText(new SpecialTokensText("<|eot_id|>")),
+                LlamaText(new SpecialTokensText("<|end_of_text|>")),
                 LlamaText("<|eot_id|>"),
                 LlamaText("<|end_of_text|>")
             ]

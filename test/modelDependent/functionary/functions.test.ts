@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {defineChatSessionFunction, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {defineChatSessionFunction, FunctionaryChatWrapper, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -18,6 +18,8 @@ describe("functionary", () => {
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence()
             });
+
+            expect(chatSession.chatWrapper).to.be.an.instanceof(FunctionaryChatWrapper);
 
             const promptOptions: Parameters<typeof chatSession.prompt>[1] = {
                 functions: {
