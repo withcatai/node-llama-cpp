@@ -30,7 +30,8 @@ import {
     LlamaChatSessionPromptCompletionEngine, type LLamaChatPromptCompletionEngineOptions
 } from "./evaluator/LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {
-    LlamaCompletion, type LlamaCompletionOptions, type LlamaCompletionGenerationOptions, type LlamaInfillGenerationOptions
+    LlamaCompletion, type LlamaCompletionOptions, type LlamaCompletionGenerationOptions, type LlamaInfillGenerationOptions,
+    type LlamaCompletionResponse
 } from "./evaluator/LlamaCompletion.js";
 import {TokenMeter, type TokenMeterState} from "./evaluator/TokenMeter.js";
 import {UnsupportedError} from "./utils/UnsupportedError.js";
@@ -138,6 +139,7 @@ export {
     type LlamaCompletionOptions,
     type LlamaCompletionGenerationOptions,
     type LlamaInfillGenerationOptions,
+    type LlamaCompletionResponse,
     TokenMeter,
     type TokenMeterState,
     UnsupportedError,

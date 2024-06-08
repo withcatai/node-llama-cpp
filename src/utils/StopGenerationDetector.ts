@@ -302,7 +302,7 @@ export class StopGenerationDetector<T extends string = string> {
     }
 
     public static resolveStopTriggers(
-        stopTriggers: readonly (string | StopGenerationTrigger | LlamaText)[],
+        stopTriggers: readonly (string | Readonly<StopGenerationTrigger> | LlamaText)[],
         tokenizer: Tokenizer
     ) {
         return stopTriggers
@@ -362,7 +362,7 @@ export class StopGenerationDetector<T extends string = string> {
     }
 }
 
-function simplifyStopTrigger(stopTrigger: StopGenerationTrigger): StopGenerationTrigger {
+function simplifyStopTrigger(stopTrigger: Readonly<StopGenerationTrigger>): StopGenerationTrigger {
     let text = "";
     const res: StopGenerationTrigger = [];
 

@@ -117,7 +117,7 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     /**
      * Custom stop triggers to stop the generation of the response when any of the provided triggers are found.
      */
-    customStopTriggers?: (LlamaText | string | (string | Token)[])[],
+    customStopTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
 
     /**
      * The evaluation context window returned from the last evaluation.
