@@ -28,7 +28,7 @@ export type JinjaTemplateChatWrapperOptions = {
      *
      * Defaults to `"auto"`.
      */
-    convertUnsupportedSystemMessagesToUserMessages?: "auto" | boolean | ConvertMessageFormatOptions,
+    convertUnsupportedSystemMessagesToUserMessages?: "auto" | boolean | JinjaTemplateChatWrapperOptionsConvertMessageFormat,
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
 
     /**
@@ -47,12 +47,12 @@ export type JinjaTemplateChatWrapperOptions = {
     trimLeadingWhitespaceInResponses?: boolean
 };
 
-type ConvertMessageFormatOptions = {
+export type JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
     use?: "always" | "ifNeeded",
     format: `${string}{{message}}${string}`
 };
 
-const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: ConvertMessageFormatOptions = {
+const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
     format: "### System message\n\n{{message}}\n\n----"
 };
 
@@ -73,7 +73,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly modelRoleName: string;
     public readonly userRoleName: string;
     public readonly systemRoleName: string;
-    public readonly convertUnsupportedSystemMessagesToUserMessages?: ConvertMessageFormatOptions;
+    public readonly convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptionsConvertMessageFormat;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
     public readonly trimLeadingWhitespaceInResponses: boolean;
 
@@ -443,7 +443,7 @@ class UniqueTemplateId {
 
 function resolveConvertUnsupportedSystemMessagesToUserMessagesOption(
     convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptions["convertUnsupportedSystemMessagesToUserMessages"]
-): ConvertMessageFormatOptions | undefined {
+): JinjaTemplateChatWrapperOptionsConvertMessageFormat | undefined {
     if (convertUnsupportedSystemMessagesToUserMessages === false)
         return undefined;
 

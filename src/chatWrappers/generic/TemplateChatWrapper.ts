@@ -5,17 +5,14 @@ import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
 export type TemplateChatWrapperOptions = {
-    template: ChatTemplate,
-    historyTemplate: ChatHistoryTemplate,
+    template: `${"" | `${string}{{systemPrompt}}`}${string}{{history}}${string}{{completion}}${string}`,
+    historyTemplate: `${string}{{roleName}}${string}{{message}}${string}`,
     modelRoleName: string,
     userRoleName: string,
     systemRoleName?: string,
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
     joinAdjacentMessagesOfTheSameType?: boolean
 };
-
-type ChatTemplate = `${`${string}{{systemPrompt}}` | ""}${string}{{history}}${string}{{completion}}${string}`;
-type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
 
 /**
  * A chat wrapper based on a simple template.
@@ -34,14 +31,14 @@ type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
  * });
  * ```
  *
- * **`{{systemPrompt}}`** is optional and is replaced with the first system message
+ * **<span v-pre>`{{systemPrompt}}`</span>** is optional and is replaced with the first system message
  * (when is does, that system message is not included in the history).
  *
- * **`{{history}}`** is replaced with the chat history.
+ * **<span v-pre>`{{history}}`</span>** is replaced with the chat history.
  * Each message in the chat history is converted using template passed to `historyTemplate`, and all messages are joined together.
  *
- * **`{{completion}}`** is where the model's response is generated.
- * The text that comes after `{{completion}}` is used to determine when the model has finished generating the response,
+ * **<span v-pre>`{{completion}}`</span>** is where the model's response is generated.
+ * The text that comes after <span v-pre>`{{completion}}`</span> is used to determine when the model has finished generating the response,
  * and thus is mandatory.
  *
  * **`functionCallMessageTemplate`** is used to specify the format in which functions can be called by the model and
@@ -51,8 +48,8 @@ export class TemplateChatWrapper extends ChatWrapper {
     public readonly wrapperName = "Template";
     public override readonly settings: ChatWrapperSettings;
 
-    public readonly template: ChatTemplate;
-    public readonly historyTemplate: ChatHistoryTemplate;
+    public readonly template: TemplateChatWrapperOptions["template"];
+    public readonly historyTemplate: TemplateChatWrapperOptions["historyTemplate"];
     public readonly modelRoleName: string;
     public readonly userRoleName: string;
     public readonly systemRoleName: string;
@@ -223,7 +220,7 @@ export class TemplateChatWrapper extends ChatWrapper {
     }
 }
 
-function parseChatTemplate(template: ChatTemplate): {
+function parseChatTemplate(template: TemplateChatWrapperOptions["template"]): {
     systemPromptPrefix: string | null,
     historyPrefix: string,
     completionPrefix: string,
@@ -252,7 +249,7 @@ function parseChatTemplate(template: ChatTemplate): {
     };
 }
 
-function parseChatHistoryTemplate(template: ChatHistoryTemplate): {
+function parseChatHistoryTemplate(template: TemplateChatWrapperOptions["historyTemplate"]): {
     roleNamePrefix: string,
     messagePrefix: string,
     messageSuffix: string

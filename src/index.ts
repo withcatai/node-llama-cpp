@@ -1,6 +1,6 @@
 import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
-import {getLlama, LlamaOptions} from "./bindings/getLlama.js";
+import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/getLlama.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType} from "./bindings/types.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
@@ -19,7 +19,7 @@ import {
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
     LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
-    type LLamaChatPromptOptions, type LLamaChatCompletePromptOptions, type LlamaChatSessionRepeatPenalty
+    type LLamaChatPromptOptions, type LLamaChatCompletePromptOptions, type LlamaChatSessionRepeatPenalty, type LLamaChatPreloadPromptOptions
 } from "./evaluator/LlamaChatSession/LlamaChatSession.js";
 import {defineChatSessionFunction} from "./evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
@@ -47,7 +47,10 @@ import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
 import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
-import {JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
+import {
+    JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
+} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
+import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
@@ -56,12 +59,14 @@ import {
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
     LlamaText, SpecialTokensText, SpecialToken, isLlamaText, tokenizeText, type LlamaTextValue, type LlamaTextInputValue,
-    type LlamaTextJSON, type LlamaTextJSONValue, type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON
+    type LlamaTextJSON, type LlamaTextJSONValue, type LlamaTextSpecialTokensTextJSON, type LlamaTextSpecialTokenJSON,
+    type BuiltinSpecialTokenValue
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
-import {GgufInsights} from "./gguf/insights/GgufInsights.js";
+import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
+import {GgufInsightsConfigurationResolver} from "./gguf/insights/GgufInsightsConfigurationResolver.js";
 import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
 
 import {
@@ -88,6 +93,7 @@ export {
     Llama,
     getLlama,
     type LlamaOptions,
+    type LastBuildOptions,
     LlamaLogLevel,
     NoBinaryFoundError,
     LlamaModel,
@@ -124,6 +130,7 @@ export {
     type LLamaChatPromptOptions,
     type LLamaChatCompletePromptOptions,
     type LlamaChatSessionRepeatPenalty,
+    type LLamaChatPreloadPromptOptions,
     LlamaChat,
     type LlamaChatOptions,
     type LLamaChatGenerateResponseOptions,
@@ -162,6 +169,8 @@ export {
     type TemplateChatWrapperOptions,
     JinjaTemplateChatWrapper,
     type JinjaTemplateChatWrapperOptions,
+    type JinjaTemplateChatWrapperOptionsConvertMessageFormat,
+    type ChatHistoryFunctionCallMessageTemplate,
     resolveChatWrapper,
     type ResolveChatWrapperOptions,
     resolvableChatWrapperTypeNames,
@@ -182,6 +191,7 @@ export {
     type LlamaTextJSONValue,
     type LlamaTextSpecialTokensTextJSON,
     type LlamaTextSpecialTokenJSON,
+    type BuiltinSpecialTokenValue,
     appendUserMessageToChatHistory,
     getModuleVersion,
     type ChatHistoryItem,
@@ -232,6 +242,8 @@ export {
     GgmlType,
     isGgufMetadataOfArchitectureType,
     GgufInsights,
+    type GgufInsightsResourceRequirements,
+    GgufInsightsConfigurationResolver,
     createModelDownloader,
     ModelDownloader,
     type ModelDownloaderOptions

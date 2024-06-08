@@ -6,19 +6,17 @@ import {
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 
-type FunctionaryChatWrapperVariation = "v2" | "v2.llama3";
-
 // source: https://github.com/MeetKai/functionary/blob/main/tests/prompt_test_v2.txt
 export class FunctionaryChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Functionary";
-    public readonly variation: FunctionaryChatWrapperVariation;
+    public readonly variation: "v2" | "v2.llama3";
 
     public override readonly settings: ChatWrapperSettings;
 
     public constructor({
         variation = "v2.llama3"
     }: {
-        variation?: FunctionaryChatWrapperVariation
+        variation?: "v2" | "v2.llama3"
     } = {}) {
         super();
 

@@ -2,9 +2,9 @@ import path from "path";
 import fs from "fs-extra";
 import {getGrammarsFolder} from "../utils/getGrammarsFolder.js";
 import {LlamaText} from "../utils/LlamaText.js";
-import {StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
 import {AddonGrammar} from "../bindings/AddonTypes.js";
 import {Llama} from "../bindings/Llama.js";
+import {Token} from "../types.js";
 
 
 export type LlamaGrammarOptions = {
@@ -15,7 +15,7 @@ export type LlamaGrammarOptions = {
     printGrammar?: boolean,
 
     /** Consider any of these as EOS for the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
-    stopGenerationTriggers?: readonly (StopGenerationTrigger | LlamaText)[],
+    stopGenerationTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
 
     /** Trim whitespace from the end of the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
     trimWhitespaceSuffix?: boolean
@@ -24,7 +24,7 @@ export type LlamaGrammarOptions = {
 export class LlamaGrammar {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _grammar: AddonGrammar;
-    private readonly _stopGenerationTriggers: readonly (StopGenerationTrigger | LlamaText)[];
+    private readonly _stopGenerationTriggers: readonly (LlamaText | string | readonly (string | Token)[])[];
     private readonly _trimWhitespaceSuffix: boolean;
     private readonly _grammarText: string;
 

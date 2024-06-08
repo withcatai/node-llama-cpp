@@ -30,8 +30,8 @@ export type ChatWrapperSettings = {
         readonly result: {
             /**
              * Supported template parameters:
-             * - `{{functionName}}`
-             * - `{{functionParams}}`
+             * - <span v-pre>`{{functionName}}`</span>
+             * - <span v-pre>`{{functionParams}}`</span>
              *
              * Template parameters can only appear in a string or a string in a `LlamaText`.
              *
@@ -48,8 +48,8 @@ export type ChatWrapperSettings = {
 
             /**
              * Supported template parameters:
-             * - `{{functionName}}`
-             * - `{{functionParams}}`
+             * - <span v-pre>`{{functionName}}`</span>
+             * - <span v-pre>`{{functionParams}}`</span>
              *
              * Template parameters can only appear in a string or a string in a `LlamaText`.
              *

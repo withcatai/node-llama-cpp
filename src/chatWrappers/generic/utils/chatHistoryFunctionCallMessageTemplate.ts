@@ -74,7 +74,7 @@ export function parseFunctionCallMessageTemplate(
  * };
  * ```
  *
- * It's mandatory for the call template to have text before `{{functionName}}` in order for the chat wrapper know when
+ * It's mandatory for the call template to have text before <span v-pre>`{{functionName}}`</span> in order for the chat wrapper know when
  * to activate the function calling grammar.
  */
 export type ChatHistoryFunctionCallMessageTemplate = {

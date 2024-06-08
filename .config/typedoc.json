@@ -24,5 +24,6 @@
     "enumMembersFormat": "table",
     "typeDeclarationFormat": "list",
     "sort": ["source-order"],
-    "docsRoot": "../docs"
+    "docsRoot": "../docs",
+    "intentionallyNotExported": ["MergeOptionalUnionTypes", "GbnfJsonSchemaToTSType", "_LlamaText"]
 }

@@ -25,6 +25,9 @@ export type GbnfJsonArraySchema = {
 };
 
 
+/**
+ * Converts a GBNF JSON schema to a TypeScript type
+ */
 export type GbnfJsonSchemaToType<T> = GbnfJsonSchemaToTSType<T>;
 
 export type GbnfJsonSchemaToTSType<T> =
