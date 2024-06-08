@@ -14,23 +14,23 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",
-    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./models"
+    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
   },
   "dependencies": {
     "birpc": "^0.2.17",
     "classnames": "^2.5.1",
     "lifecycle-utils": "^1.4.1",
     "node-llama-cpp": "file:../..",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.2.64",
-    "@types/react-dom": "^18.2.21",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
-    "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^30.0.1",
+    "@vitejs/plugin-react": "^4.3.0",
+    "electron": "^30.0.8",
     "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
@@ -39,8 +39,8 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "rimraf": "^5.0.7",
     "typescript": "^5.2.2",
-    "vite": "^5.1.6",
-    "vite-plugin-electron": "^0.28.6",
+    "vite": "^5.2.11",
+    "vite-plugin-electron": "^0.28.7",
     "vite-plugin-electron-renderer": "^0.14.5"
   }
 }

@@ -10,4 +10,3 @@ export function getConsoleLogPrefix(forcePrefix: boolean = false, padEnd: boolea
 
     return "";
 }
-

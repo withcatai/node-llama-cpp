@@ -1,22 +1,23 @@
 import process from "process";
 import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {removeNullFields} from "../utils/removeNullFields.js";
-import {Token, Tokenizer} from "../types.js";
-import {AddonModel, ModelTypeDescription} from "../bindings/AddonTypes.js";
-import {DisposalPreventionHandle, DisposeGuard} from "../utils/DisposeGuard.js";
-import {LlamaLocks, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../bindings/types.js";
-import {GgufFileInfo} from "../gguf/types/GgufFileInfoTypes.js";
-import {readGgufFileInfo} from "../gguf/readGgufFileInfo.js";
-import {GgufInsights} from "../gguf/insights/GgufInsights.js";
-import {GgufMetadataTokenizerTokenType} from "../gguf/types/GgufMetadataTypes.js";
-import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
-import {Writable} from "../utils/utilTypes.js";
-import {LlamaContextOptions} from "./LlamaContext/types.js";
-import {LlamaContext} from "./LlamaContext/LlamaContext.js";
-import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "./LlamaEmbeddingContext.js";
-import type {Llama} from "../bindings/Llama.js";
-import type {BuiltinSpecialTokenValue} from "../utils/LlamaText.js";
+import {removeNullFields} from "../../utils/removeNullFields.js";
+import {Token, Tokenizer} from "../../types.js";
+import {AddonModel, ModelTypeDescription} from "../../bindings/AddonTypes.js";
+import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
+import {LlamaLocks, LlamaLogLevel, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../../bindings/types.js";
+import {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
+import {readGgufFileInfo} from "../../gguf/readGgufFileInfo.js";
+import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
+import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {Writable} from "../../utils/utilTypes.js";
+import {getReadablePath} from "../../cli/utils/getReadablePath.js";
+import {LlamaContextOptions} from "../LlamaContext/types.js";
+import {LlamaContext} from "../LlamaContext/LlamaContext.js";
+import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
+import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
+import type {Llama} from "../../bindings/Llama.js";
+import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
 
 export type LlamaModelOptions = {
     /** path to the model on the filesystem */
@@ -133,6 +134,7 @@ export class LlamaModel {
     /** @internal */ public readonly _model: AddonModel;
     /** @internal */ public readonly _backendModelDisposeGuard: DisposeGuard;
     /** @internal */ private readonly _tokens: LlamaModelTokens;
+    /** @internal */ private readonly _modelPath: string;
     /** @internal */ private readonly _fileInfo: GgufFileInfo;
     /** @internal */ private readonly _fileInsights: GgufInsights;
     /** @internal */ private readonly _gpuLayers: number;
@@ -163,11 +165,12 @@ export class LlamaModel {
     }) {
         this._llama = _llama;
         this._fileInfo = _fileInfo;
+        this._modelPath = path.resolve(process.cwd(), modelPath);
         this._fileInsights = _fileInsights;
         this._gpuLayers = gpuLayers;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
-        this._model = new this._llama._bindings.AddonModel(path.resolve(process.cwd(), modelPath), removeNullFields({
+        this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
             addonExports: this._llama._bindings,
             gpuLayers,
             vocabOnly,
@@ -301,6 +304,15 @@ export class LlamaModel {
 
         if (options === "trimLeadingSpace") {
             if (specialTokens) {
+                const countLeadingSpaces = (text: string) => {
+                    let count = 0;
+                    for (; count < text.length; count++) {
+                        if (text[count] !== " ")
+                            break;
+                    }
+                    return count;
+                };
+                const textLeadingSpaces = countLeadingSpaces(text);
                 const [workaroundToken, workaroundTokenString] = (this.tokens.bos != null && this.tokens.bosString != null)
                     ? [this.tokens.bos, this.tokens.bosString]
                     : (this.tokens.eos != null && this.tokens.eosString != null)
@@ -318,12 +330,39 @@ export class LlamaModel {
                     // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
                     if (workaroundTokenIndex >= 0 && workaroundTokenIndex <= 1) {
                         tokens.splice(0, workaroundTokenIndex + 1);
-                        return tokens;
+
+                        if (countLeadingSpaces(this.detokenize(tokens, true)) === textLeadingSpaces)
+                            return tokens;
                     }
                 }
-            } else {
-                const workaroundTokens = Array.from(this._model.tokenize("\n", false)) as Token[];
+
                 const workaroundTokensString = "\n";
+                const workaroundTokens = Array.from(this._model.tokenize(workaroundTokensString, true)) as Token[];
+
+                if (text.startsWith(workaroundTokensString)) {
+                    const tokens = Array.from(this._model.tokenize(text, true)) as Token[];
+                    if (this.detokenize(tokens, true).startsWith(workaroundTokensString))
+                        return tokens;
+                }
+
+                const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, true)) as Token[];
+
+                // only use the tokenized output if it can be corrected, otherwise fallback to the default tokenization
+                if (workaroundTokens.length > 0 && workaroundTokens.every((token, index) => tokens[index] === token)) {
+                    tokens.splice(0, workaroundTokens.length);
+
+                    if (countLeadingSpaces(this.detokenize(tokens, true)) === textLeadingSpaces)
+                        return tokens;
+                }
+            } else {
+                const workaroundTokensString = "\n";
+                const workaroundTokens = Array.from(this._model.tokenize(workaroundTokensString, false)) as Token[];
+
+                if (text.startsWith(workaroundTokensString)) {
+                    const tokens = Array.from(this._model.tokenize(text, false)) as Token[];
+                    if (this.detokenize(tokens, false).startsWith(workaroundTokensString))
+                        return tokens;
+                }
 
                 const tokens = Array.from(this._model.tokenize(workaroundTokensString + text, false)) as Token[];
 
@@ -354,22 +393,31 @@ export class LlamaModel {
         return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
     }
 
-    public getTokenType(token: Token): GgufMetadataTokenizerTokenType | null {
+    public getTokenAttributes(token: Token): TokenAttributes {
         if (this.vocabularyType === LlamaVocabularyType.none)
-            return null;
+            return TokenAttributes._create(token, TokenAttribute.undefined);
 
-        return this._model.getTokenType(token) as GgufMetadataTokenizerTokenType;
+        return TokenAttributes._create(token, this._model.getTokenAttributes(token));
     }
 
-    /** Check whether the given token is a special token (a control-type token) */
-    public isSpecialToken(token: Token): boolean {
-        const tokenType = this.getTokenType(token);
+    /** Check whether the given token is a special token (a control-type token or a token with no normal text representation) */
+    public isSpecialToken(token: Token | undefined): boolean {
+        if (token == null)
+            return false;
 
-        return tokenType === GgufMetadataTokenizerTokenType.control;
+        if (this.getTokenAttributes(token).control)
+            return true;
+
+        const normalText = this.detokenize([token], false);
+
+        if (normalText === "")
+            return this.detokenize([token], true) !== "";
+
+        return false;
     }
 
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */
-    public isEogToken(token: Token): boolean {
+    public isEogToken(token: Token | undefined): boolean {
         if (token == null)
             return false;
 
@@ -396,6 +444,48 @@ export class LlamaModel {
                 preventDisposalHandle.dispose();
             }
         });
+    }
+
+    /**
+     * Get warnings about the model file that would affect its usage.
+     *
+     * These warnings include all the warnings generated by `GgufInsights`, but are more comprehensive.
+     */
+    public getWarnings() {
+        this._ensureNotDisposed();
+
+        const warnings = this._fileInsights.getWarnings(this._modelPath);
+        const modelFilePathText = `("${getReadablePath(this._modelPath)}")`;
+
+        try {
+            const specialTokenString = this.tokens.bosString || this.tokens.eosString || this.tokens.infill.eotString;
+            if (specialTokenString != null && specialTokenString !== "") {
+                const beforeTextNoSpecialTokens = "some test text here";
+                const afterTextNoSpecialTokens = this.detokenize(this.tokenize(beforeTextNoSpecialTokens, false, "trimLeadingSpace"));
+
+                if (beforeTextNoSpecialTokens !== afterTextNoSpecialTokens)
+                    warnings.push(
+                        `Using this model ${modelFilePathText} to tokenize text and then detokenize it resulted in a different text. ` +
+                        "There might be an issue with the model or the tokenizer implementation. " +
+                        "Using this model may not work as intended"
+                    );
+
+                const beforeTextWithSpecialTokens = specialTokenString + beforeTextNoSpecialTokens;
+                const afterTextWithSpecialTokens = this.detokenize(this.tokenize(beforeTextWithSpecialTokens, true, "trimLeadingSpace"), true);
+
+                if (beforeTextWithSpecialTokens !== afterTextWithSpecialTokens)
+                    warnings.push(
+                        `Using this model ${modelFilePathText} to tokenize text with special tokens and then ` +
+                        "detokenize it resulted in a different text. " +
+                        "There might be an issue with the model or the tokenizer implementation. " +
+                        "Using this model may not work as intended"
+                    );
+            }
+        } catch (err) {
+            // do nothing
+        }
+
+        return warnings;
     }
 
     /** @hidden `ModelTypeDescription` type alias is too long in the documentation */
@@ -495,10 +585,21 @@ export class LlamaModel {
         const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
             : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
+        const loggedWarnings = new Set<string>();
 
         function onAbort() {
             model._model.abortActiveModelLoad();
             loadSignal?.removeEventListener("abort", onAbort);
+        }
+
+        function logWarnings(warnings: string[]) {
+            for (const warning of warnings) {
+                if (loggedWarnings.has(warning))
+                    continue;
+
+                _llama._log(LlamaLogLevel.warn, warning);
+                loggedWarnings.add(warning);
+            }
         }
 
         if (loadSignal != null) {
@@ -507,6 +608,8 @@ export class LlamaModel {
 
             loadSignal.addEventListener("abort", onAbort);
         }
+
+        logWarnings(ggufInsights.getWarnings(modelOptions.modelPath));
 
         try {
             const modelLoaded = await model._model.init();
@@ -520,6 +623,8 @@ export class LlamaModel {
                 throw new Error("Failed to load model");
 
             loadSignal?.removeEventListener("abort", onAbort);
+
+            logWarnings(model.getWarnings());
 
             if (loraOptions != null && loraOptions.adapters.length > 0) {
                 const loraThreads = loraOptions.threads ?? defaultLoraThreads;
@@ -550,6 +655,8 @@ export class LlamaModel {
                         throw loadSignal.reason;
                     }
                 }
+
+                logWarnings(model.getWarnings());
             } else if (loraOptions?.onLoadProgress != null) {
                 try {
                     loraOptions.onLoadProgress(1);

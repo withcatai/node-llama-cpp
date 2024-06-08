@@ -30,7 +30,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     ensureLlamaCppRepoIsCloned?: boolean,
     downloadCmakeIfNeeded?: boolean,
     ignoreWorkarounds?: ("cudaArchitecture")[],
-    envVars?: typeof process.env
+    envVars?: typeof process.env,
+    ciMode?: boolean
 }): Promise<void> {
     const {
         nodeTarget = process.version,
@@ -39,7 +40,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         ensureLlamaCppRepoIsCloned: ensureLlamaCppRepoIsClonedArg = false,
         downloadCmakeIfNeeded: downloadCmakeIfNeededArg = false,
         ignoreWorkarounds = [],
-        envVars = process.env
+        envVars = process.env,
+        ciMode = false
     } = compileOptions;
 
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
@@ -84,6 +86,11 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                     cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
+
+                if (ciMode) {
+                    if (!cmakeCustomOptions.has("LLAMA_OPENMP"))
+                        cmakeCustomOptions.set("LLAMA_OPENMP", "OFF");
+                }
 
                 await fs.remove(outDirectory);
 

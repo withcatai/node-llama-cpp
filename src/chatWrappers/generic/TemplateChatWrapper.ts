@@ -1,21 +1,18 @@
-import {ChatHistoryItem, ChatModelFunctions, ChatWrapperSettings} from "../../types.js";
+import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings} from "../../types.js";
 import {SpecialToken, LlamaText, LlamaTextValue, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {parseTextTemplate} from "../../utils/parseTextTemplate.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 
 export type TemplateChatWrapperOptions = {
-    template: ChatTemplate,
-    historyTemplate: ChatHistoryTemplate,
+    template: `${"" | `${string}{{systemPrompt}}`}${string}{{history}}${string}{{completion}}${string}`,
+    historyTemplate: `${string}{{roleName}}${string}{{message}}${string}`,
     modelRoleName: string,
     userRoleName: string,
     systemRoleName?: string,
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
     joinAdjacentMessagesOfTheSameType?: boolean
 };
-
-type ChatTemplate = `${`${string}{{systemPrompt}}` | ""}${string}{{history}}${string}{{completion}}${string}`;
-type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
 
 /**
  * A chat wrapper based on a simple template.
@@ -27,21 +24,21 @@ type ChatHistoryTemplate = `${string}{{roleName}}${string}{{message}}${string}`;
  *     modelRoleName: "model",
  *     userRoleName: "user",
  *     systemRoleName: "system", // optional
- *     // functionCallMessageTemplate: [ // optional
- *     //     "[[call: {{functionName}}({{functionParams}})]]",
- *     //     " [[result: {{functionCallResult}}]]"
- *     // ]
+ *     // functionCallMessageTemplate: { // optional
+ *     //     call: "[[call: {{functionName}}({{functionParams}})]]",
+ *     //     result: " [[result: {{functionCallResult}}]]"
+ *     // }
  * });
  * ```
  *
- * **`{{systemPrompt}}`** is optional and is replaced with the first system message
+ * **<span v-pre>`{{systemPrompt}}`</span>** is optional and is replaced with the first system message
  * (when is does, that system message is not included in the history).
  *
- * **`{{history}}`** is replaced with the chat history.
+ * **<span v-pre>`{{history}}`</span>** is replaced with the chat history.
  * Each message in the chat history is converted using template passed to `historyTemplate`, and all messages are joined together.
  *
- * **`{{completion}}`** is where the model's response is generated.
- * The text that comes after `{{completion}}` is used to determine when the model has finished generating the response,
+ * **<span v-pre>`{{completion}}`</span>** is where the model's response is generated.
+ * The text that comes after <span v-pre>`{{completion}}`</span> is used to determine when the model has finished generating the response,
  * and thus is mandatory.
  *
  * **`functionCallMessageTemplate`** is used to specify the format in which functions can be called by the model and
@@ -51,8 +48,8 @@ export class TemplateChatWrapper extends ChatWrapper {
     public readonly wrapperName = "Template";
     public override readonly settings: ChatWrapperSettings;
 
-    public readonly template: ChatTemplate;
-    public readonly historyTemplate: ChatHistoryTemplate;
+    public readonly template: TemplateChatWrapperOptions["template"];
+    public readonly historyTemplate: TemplateChatWrapperOptions["historyTemplate"];
     public readonly modelRoleName: string;
     public readonly userRoleName: string;
     public readonly systemRoleName: string;
@@ -86,39 +83,35 @@ export class TemplateChatWrapper extends ChatWrapper {
         this._parsedChatHistoryTemplate = parseChatHistoryTemplate(historyTemplate);
 
         this.settings = {
-            ...super.settings,
-            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSetting.functions
+            ...ChatWrapper.defaultSettings,
+            functions: parseFunctionCallMessageTemplate(functionCallMessageTemplate) ?? ChatWrapper.defaultSettings.functions
         };
     }
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[]
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            system: string,
-            user: string,
-            model: string
+            system: LlamaText,
+            user: LlamaText,
+            model: LlamaText
         }> = [];
 
-        const systemTexts: string[] = [];
-        const userTexts: string[] = [];
-        const modelTexts: string[] = [];
+        const systemTexts: LlamaText[] = [];
+        const userTexts: LlamaText[] = [];
+        const modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
                 resultItems.push({
-                    system: systemTexts.join("\n\n"),
-                    user: userTexts.join("\n\n"),
-                    model: modelTexts.join("\n\n")
+                    system: LlamaText.joinValues("\n\n", systemTexts),
+                    user: LlamaText.joinValues("\n\n", userTexts),
+                    model: LlamaText.joinValues("\n\n", modelTexts)
                 });
 
             systemTexts.length = 0;
@@ -132,13 +125,13 @@ export class TemplateChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (!this.joinAdjacentMessagesOfTheSameType || (currentAggregateFocus !== "system" && currentAggregateFocus !== "user"))
                     flush();
 
                 currentAggregateFocus = "user";
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 if (!this.joinAdjacentMessagesOfTheSameType)
                     flush();
@@ -151,7 +144,7 @@ export class TemplateChatWrapper extends ChatWrapper {
 
         flush();
 
-        const getHistoryItem = (role: "system" | "user" | "model", text: string, prefix?: string | null) => {
+        const getHistoryItem = (role: "system" | "user" | "model", text: LlamaText, prefix?: string | null) => {
             const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
             return LlamaText([
                 new SpecialTokensText((prefix ?? "") + roleNamePrefix + role + messagePrefix),
@@ -167,7 +160,7 @@ export class TemplateChatWrapper extends ChatWrapper {
 
                 const res = LlamaText([
                     isFirstItem
-                        ? system.length === 0
+                        ? system.values.length === 0
                             ? new SpecialTokensText(
                                 (this._parsedChatTemplate.systemPromptPrefix ?? "") + this._parsedChatTemplate.historyPrefix
                             )
@@ -178,16 +171,16 @@ export class TemplateChatWrapper extends ChatWrapper {
                                     new SpecialTokensText(this._parsedChatTemplate.historyPrefix)
                                 ])
                                 : getHistoryItem("system", system, this._parsedChatTemplate.historyPrefix)
-                        : system.length === 0
+                        : system.values.length === 0
                             ? LlamaText([])
                             : getHistoryItem("system", system),
 
 
-                    user.length === 0
+                    user.values.length === 0
                         ? LlamaText([])
                         : getHistoryItem("user", user),
 
-                    model.length === 0
+                    model.values.length === 0
                         ? LlamaText([])
                         : !isLastItem
                             ? getHistoryItem("model", model)
@@ -227,7 +220,7 @@ export class TemplateChatWrapper extends ChatWrapper {
     }
 }
 
-function parseChatTemplate(template: ChatTemplate): {
+function parseChatTemplate(template: TemplateChatWrapperOptions["template"]): {
     systemPromptPrefix: string | null,
     historyPrefix: string,
     completionPrefix: string,
@@ -256,7 +249,7 @@ function parseChatTemplate(template: ChatTemplate): {
     };
 }
 
-function parseChatHistoryTemplate(template: ChatHistoryTemplate): {
+function parseChatHistoryTemplate(template: TemplateChatWrapperOptions["historyTemplate"]): {
     roleNamePrefix: string,
     messagePrefix: string,
     messageSuffix: string

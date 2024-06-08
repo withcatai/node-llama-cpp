@@ -2,7 +2,7 @@ import os from "os";
 import path from "path";
 
 export function getReadablePath(fsPath: string) {
-    const resolvedPath = path.resolve(fsPath);
+    const resolvedPath = path.resolve(process.cwd(), fsPath);
 
     if (process.platform === "win32" || process.platform === "cygwin")
         return resolvedPath;

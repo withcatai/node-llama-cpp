@@ -1,5 +1,5 @@
 import {ChatWrapper} from "../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
+import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://huggingface.co/blog/llama2#how-to-prompt-llama-2
@@ -21,35 +21,30 @@ export class Llama2ChatWrapper extends ChatWrapper {
         this._addSpaceBeforeEos = addSpaceBeforeEos;
     }
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[],
-        ignoreStartText?: LlamaText[]
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            system: string,
-            user: string,
-            model: string
+            system: LlamaText,
+            user: LlamaText,
+            model: LlamaText
         }> = [];
 
-        let systemTexts: string[] = [];
-        let userTexts: string[] = [];
-        let modelTexts: string[] = [];
+        let systemTexts: LlamaText[] = [];
+        let userTexts: LlamaText[] = [];
+        let modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
                 resultItems.push({
-                    system: systemTexts.join("\n\n"),
-                    user: userTexts.join("\n\n"),
-                    model: modelTexts.join("\n\n")
+                    system: LlamaText.joinValues("\n\n", systemTexts),
+                    user: LlamaText.joinValues("\n\n", userTexts),
+                    model: LlamaText.joinValues("\n\n", modelTexts)
                 });
 
             systemTexts = [];
@@ -63,13 +58,13 @@ export class Llama2ChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (currentAggregateFocus !== "system" && currentAggregateFocus !== "user")
                     flush();
 
                 currentAggregateFocus = "user";
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
@@ -85,11 +80,11 @@ export class Llama2ChatWrapper extends ChatWrapper {
 
                 return LlamaText([
                     new SpecialToken("BOS"),
-                    (system.length === 0 && user.length === 0)
+                    (system.values.length === 0 && user.values.length === 0)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("[INST] "),
-                            system.length === 0
+                            system.values.length === 0
                                 ? LlamaText([])
                                 : LlamaText([
                                     new SpecialTokensText("<<SYS>>\n"),

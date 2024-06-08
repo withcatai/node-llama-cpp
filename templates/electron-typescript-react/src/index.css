@@ -24,18 +24,24 @@
 
     --link-color: light-dark(#646cff, #646cff);
     --link-hover-color: light-dark(#747bff, #535bf2);
+    --star-link-color: light-dark(#e09c1c, #eac54f);
+    --star-hover-color: light-dark(#daaa52, #c7a027);
 
     --panel-background-color: light-dark(rgba(0 0 0 / 52%), rgba(0 0 0 / 48%));
     --panel-text-color: light-dark(#ffffff, #eeeeee);
     --panel-button-background-color: light-dark(rgba(0 0 0 / 24%), rgba(255 255 255 / 8%));
     --panel-button-hover-border-color: light-dark(var(--panel-text-color), var(--button-hover-border-color));
     --panel-progress-color: light-dark(rgba(255 255 255 / 8%), rgba(255 255 255 / 4%));
-    --panel-box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 0.08), 0px 6px 24px 0px rgba(0, 0, 0, 0.16);
+    --panel-box-shadow: 0px 4px 8px 0px rgba(0 0 0 / 8%), 0px 6px 24px 0px rgba(0 0 0 / 16%);
 
     --error-border-color: light-dark(rgba(239 83 80 / 100%), rgba(239 83 80 / 100%));
 
     --user-message-background-color: light-dark(rgba(0 0 0 / 16%), rgba(0 0 0 / 48%));
     --user-message-text-color: light-dark(#242424, var(--text-color));
+
+    --actions-block-background-color: light-dark(rgba(0 0 0 / 4%), rgba(0 0 0 / 16%));
+    --actions-block-border-color: light-dark(rgba(0 0 0 / 4%), rgba(0 0 0 / 16%));
+    --actions-block-box-shadow: 0px 4px 8px 0px rgba(0 0 0 / 2%), 0px 6px 24px 0px rgba(0 0 0 / 8%);
 }
 
 body {
@@ -53,6 +59,13 @@ a {
     &:hover {
         color: var(--link-hover-color);
     }
+}
+
+code {
+    background-color: color-mix(in srgb, currentColor, transparent 84%);
+    padding: 0.1em 0.3em;
+    border-radius: 0.4em;
+    font-size: 1.2em;
 }
 
 button {

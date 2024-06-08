@@ -33,7 +33,7 @@ describe("FalconChatWrapper", () => {
 
     test("should generate valid context text", () => {
         const chatWrapper = new FalconChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -51,7 +51,7 @@ describe("FalconChatWrapper", () => {
         `);
 
         const chatWrapper2 = new FalconChatWrapper();
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -73,14 +73,16 @@ describe("FalconChatWrapper", () => {
         `);
 
         const chatWrapper3 = new FalconChatWrapper();
-        const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const {contextText: contextText3} = chatWrapper3.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [

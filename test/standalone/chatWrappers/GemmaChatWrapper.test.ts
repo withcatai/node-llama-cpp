@@ -33,7 +33,7 @@ describe("GemmaChatWrapper", () => {
 
     test("should generate valid context text", () => {
         const chatWrapper = new GemmaChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -58,7 +58,7 @@ describe("GemmaChatWrapper", () => {
           ]
         `);
 
-        const {contextText: contextText2} = chatWrapper.generateContextText(conversationHistory2);
+        const {contextText: contextText2} = chatWrapper.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -97,14 +97,16 @@ describe("GemmaChatWrapper", () => {
           ]
         `);
 
-        const {contextText: contextText3} = chatWrapper.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const {contextText: contextText3} = chatWrapper.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [

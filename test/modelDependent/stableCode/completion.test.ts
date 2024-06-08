@@ -6,7 +6,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("stableCode", () => {
     describe("completion", () => {
         test("complete a series", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -27,7 +27,7 @@ describe("stableCode", () => {
         });
 
         test("complete pretictable text", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -50,7 +50,7 @@ describe("stableCode", () => {
 
     describe("infill", () => {
         test("fill the gap in a series", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -70,7 +70,7 @@ describe("stableCode", () => {
         });
 
         test("fill expected text", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({

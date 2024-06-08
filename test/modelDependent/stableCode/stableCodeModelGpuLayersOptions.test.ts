@@ -9,7 +9,7 @@ import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
 describe("stableCode", () => {
     describe("model options", () => {
         describe("Resolve the correct number of GPU layers", async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const fileInfo = await readGgufFileInfo(modelPath);

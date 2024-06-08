@@ -7,7 +7,7 @@ import {simplifyGgufInfoForTestSnapshot} from "../../../utils/helpers/simplifyGg
 
 describe("gguf", async () => {
     describe("parser", async () => {
-        const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+        const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
 
         test("Magic should be GGUF local model", async () => {
             const fileReader = new GgufFsFileReader({filePath: modelPath});

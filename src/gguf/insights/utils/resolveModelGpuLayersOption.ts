@@ -1,4 +1,4 @@
-import {LlamaModelOptions} from "../../../evaluator/LlamaModel.js";
+import {LlamaModelOptions} from "../../../evaluator/LlamaModel/LlamaModel.js";
 import {BuildGpu} from "../../../bindings/types.js";
 import {InsufficientMemoryError} from "../../../utils/InsufficientMemoryError.js";
 import {findBestOption} from "../../../utils/findBestOption.js";

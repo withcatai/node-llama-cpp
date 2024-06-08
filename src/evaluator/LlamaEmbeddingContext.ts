@@ -2,7 +2,7 @@ import {AsyncDisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
 import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
-import type {LlamaModel} from "./LlamaModel.js";
+import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
 export type LlamaEmbeddingContextOptions = {

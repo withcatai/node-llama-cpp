@@ -26,7 +26,7 @@ describe("llama 3", () => {
                         "userMessagePositivityScoreFromOneToTen": {
                             enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
                         },
-                        "positiveAdjectiveWordsInUserMessage": {
+                        "positiveWordsInUserMessage": {
                             type: "array",
                             items: {
                                 type: "string"
@@ -35,13 +35,13 @@ describe("llama 3", () => {
                     }
                 } as const);
 
-                const res = await chatSession.prompt("How's your great day going?", {
+                const res = await chatSession.prompt("It's great!", {
                     grammar
                 });
                 const parsedRes = grammar.parse(res);
 
-                expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(9);
-                expect(parsedRes.positiveAdjectiveWordsInUserMessage).to.eql(["great"]);
+                expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(10);
+                expect(parsedRes.positiveWordsInUserMessage).to.eql(["great"]);
             });
 
             test("get an array of numbers", {timeout: 1000 * 60 * 60 * 2}, async () => {

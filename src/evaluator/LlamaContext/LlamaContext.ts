@@ -13,7 +13,7 @@ import {
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import type {Llama} from "../../bindings/Llama.js";
-import type {LlamaModel} from "../LlamaModel.js";
+import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 
 
 export class LlamaContext {
@@ -861,8 +861,6 @@ export class LlamaContextSequence {
             strategy: contextShiftStrategy = this._contextShift.strategy
         } = {}
     }: {
-        grammarEvaluationState?: LlamaGrammarEvaluationState,
-
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
          * evaluated based on the strategy chosen for the context.

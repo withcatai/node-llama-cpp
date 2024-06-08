@@ -1,25 +1,28 @@
-import {DisposeAggregator, DisposedError, EventRelay} from "lifecycle-utils";
+import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
-import {ChatHistoryItem, ChatModelFunctions, ChatModelResponse, LLamaContextualRepeatPenalty, Token, Tokenizer} from "../../types.js";
+import {
+    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatUserMessage, LLamaContextualRepeatPenalty, Token, Tokenizer
+} from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
-import {LlamaText} from "../../utils/LlamaText.js";
+import {LlamaText, LlamaTextJSON, SpecialToken} from "../../utils/LlamaText.js";
 import {StopGenerationDetector} from "../../utils/StopGenerationDetector.js";
-import {QueuedTokenReleaseLock, TokenStreamRegulator} from "../../utils/TokenStreamRegulator.js";
+import {QueuedTokenRelease, QueuedTokenReleaseLock, TokenStreamRegulator} from "../../utils/TokenStreamRegulator.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
-import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
-import {FunctionCallGrammar, LlamaFunctionCallValidationError} from "./utils/FunctionCallGrammar.js";
+import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
+import {FunctionCallParamsGrammar} from "./utils/FunctionCallParamsGrammar.js";
 
 export type LlamaChatOptions = {
     contextSequence: LlamaContextSequence,
@@ -90,7 +93,8 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
 
     /**
      * Trim whitespace from the end of the generated text
-     * Disabled by default.
+     *
+     * Defaults to `false`.
      */
     trimWhitespaceSuffix?: boolean,
 
@@ -113,7 +117,7 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     /**
      * Custom stop triggers to stop the generation of the response when any of the provided triggers are found.
      */
-    customStopTriggers?: (LlamaText | string | (string | Token)[])[],
+    customStopTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
 
     /**
      * The evaluation context window returned from the last evaluation.
@@ -127,18 +131,76 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          * Minimum overlap percentage with existing context sequence state to use the last evaluation context window.
          * If the last evaluation context window is not used, a new context will be generated based on the full history,
          * which will decrease the likelihood of another context shift happening so soon.
+         *
+         * A number between `0` (exclusive) and `1` (inclusive).
          */
         minimumOverlapPercentageToPreventContextShift?: number
     }
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
-    documentFunctionParams?: never
+    documentFunctionParams?: never,
+    maxParallelFunctionCalls?: never,
+    onFunctionCall?: never
 } | {
     grammar?: never,
     functions?: Functions | ChatModelFunctions,
-    documentFunctionParams?: boolean
+    documentFunctionParams?: boolean,
+    maxParallelFunctionCalls?: number,
+    onFunctionCall?: (
+        functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>
+    ) => void
 });
+
+export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
+    /**
+     * Complete the given user prompt without adding it or the completion to the returned context window.
+     */
+    initialUserPrompt?: string,
+
+    /**
+     * When a completion already started being generated and then the signal is aborted,
+     * the generation will stop and the completion will be returned as is instead of throwing an error.
+     *
+     * Defaults to `false`.
+     */
+    stopOnAbortSignal?: boolean,
+
+    onToken?: LLamaChatGenerateResponseOptions<Functions>["onToken"],
+    signal?: LLamaChatGenerateResponseOptions<Functions>["signal"],
+    maxTokens?: LLamaChatGenerateResponseOptions<Functions>["maxTokens"],
+    temperature?: LLamaChatGenerateResponseOptions<Functions>["temperature"],
+    minP?: LLamaChatGenerateResponseOptions<Functions>["minP"],
+    topK?: LLamaChatGenerateResponseOptions<Functions>["topK"],
+    topP?: LLamaChatGenerateResponseOptions<Functions>["topP"],
+    trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
+    repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
+    tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
+    evaluationPriority?: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"],
+    contextShift?: LLamaChatGenerateResponseOptions<Functions>["contextShift"],
+    customStopTriggers?: LLamaChatGenerateResponseOptions<Functions>["customStopTriggers"],
+    lastEvaluationContextWindow?: LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"],
+
+    grammar?: LlamaGrammar,
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same functions that were used for the previous prompt here.
+     */
+    functions?: Functions | ChatModelFunctions,
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same value that was used for the previous prompt here.
+     */
+    documentFunctionParams?: boolean
+};
 
 export type LLamaChatContextShiftOptions = {
     /**
@@ -174,12 +236,16 @@ const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
     strategy: "eraseFirstResponseAndKeepFirstSystem",
     lastEvaluationMetadata: null
 };
+const defaultRepeatPenaltyLastTokens = 64;
+const defaultTrimWhitespaceSuffix = false;
+const defaultEvaluationPriority: EvaluationPriority = 5;
 
 
 export class LlamaChat {
     /** @internal */ private readonly _chatWrapper: ChatWrapper;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;
+    /** @internal */ private readonly _chatLock = {};
     /** @internal */ private _sequence: LlamaContextSequence | null;
     public readonly onDispose = new EventRelay<void>();
 
@@ -261,7 +327,9 @@ export class LlamaChat {
 
     public async generateResponse<const Functions extends ChatModelFunctions | undefined = undefined>(
         history: ChatHistoryItem[],
-        {
+        options: LLamaChatGenerateResponseOptions<Functions> = {}
+    ): Promise<LlamaChatResponse<Functions>> {
+        const {
             onToken,
             signal,
             stopOnAbortSignal = false,
@@ -271,630 +339,262 @@ export class LlamaChat {
             topK,
             topP,
             grammar,
-            trimWhitespaceSuffix = false,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
             tokenBias,
-            evaluationPriority = 5,
+            evaluationPriority = defaultEvaluationPriority,
             functions,
+            onFunctionCall,
             documentFunctionParams,
+            maxParallelFunctionCalls,
             contextShift = defaultContextShiftOptions,
             customStopTriggers,
             lastEvaluationContextWindow: {
                 history: lastEvaluationContextWindowHistory,
                 minimumOverlapPercentageToPreventContextShift = 0.5
             } = {}
-        }: LLamaChatGenerateResponseOptions<Functions> = {}
-    ): Promise<LlamaChatResponse<Functions>> {
-        const functionsEnabled = (functions != null && Object.keys(functions).length > 0);
+        } = options;
 
-        if (grammar != null && functionsEnabled)
-            throw new Error("Using both grammar and functions is not supported yet");
-
-        if (signal?.aborted)
-            throw signal.reason;
-
-        if (this._sequence == null)
-            throw new DisposedError();
-
-        let resolvedHistory = this._sequence.isLoadedToMemory
-            ? history.slice()
-            : history.map(removeRawFromHistoryItem);
-
-        if (resolvedHistory.length === 0 || resolvedHistory[resolvedHistory.length - 1].type !== "model")
-            resolvedHistory.push({
-                type: "model",
-                response: []
-            });
-
-        const model = this._sequence.model;
-        const context = this._sequence.context;
-        const resolvedContextShift = {
-            ...defaultContextShiftOptions,
-            ...removeNullFields(contextShift)
-        };
-        const {
-            lastTokens: repeatPenaltyLastTokens = 64,
-            punishTokensFilter,
-            penalizeNewLine,
-            penalty,
-            frequencyPenalty,
-            presencePenalty
-        }: LLamaContextualRepeatPenalty = repeatPenalty === false
-            ? {lastTokens: 0}
-            : repeatPenalty;
-        const lastModelResponse = getLastTextModelResponseFromChatHistory(resolvedHistory);
-
-        const res: Token[] = [];
-        const pendingTokens: Token[] = [];
-        let ignoredStartTextTokens: Token[] = [];
-        const functionCallTokens: Token[] = [];
-        const repeatPenaltyEnabled = repeatPenaltyLastTokens > 0;
-        const grammarEvaluationState = grammar != null
-            ? new LlamaGrammarEvaluationState({grammar})
-            : undefined;
-        let functionsGrammar = functionsEnabled
-            ? new FunctionCallGrammar(model._llama, functions as NonNullable<Functions>, this._chatWrapper, false)
-            : undefined;
-        let functionsEvaluationState = (functionsEnabled && functionsGrammar != null)
-            ? new LlamaGrammarEvaluationState({
-                grammar: functionsGrammar
-            })
-            : undefined;
-        const streamRegulator = new TokenStreamRegulator();
-        const stopGenerationDetector = new StopGenerationDetector();
-        const customStopGenerationTriggersDetector = new StopGenerationDetector();
-        const functionSyntaxStartDetector = new StopGenerationDetector();
-        const functionSyntaxEndDetector = new StopGenerationDetector();
-        const disengageInitiallyEngagedFunctionMode = new StopGenerationDetector();
-        const ignoreStartTextDetector = new StopGenerationDetector();
-        const locksToReleaseOnValidGeneration: QueuedTokenReleaseLock[] = [];
-        const functionCallTokenSyntaxLocks: QueuedTokenReleaseLock[] = [];
-
-        let generatedTokens = 0;
-        let isFirstEvaluation = true;
-        let inFunctionEvaluationMode = false;
-        let initiallyEngagedFunctionMode = false;
-        let lastContextWindowHistory: ChatHistoryItem[] = resolvedHistory;
-        let lastHistoryCompressionMetadata: object | null | undefined = resolvedContextShift.lastEvaluationMetadata;
-
-        const ensureNotAborted = () => {
-            if (signal?.aborted && (!stopOnAbortSignal || res.length === 0))
-                throw signal.reason;
-
-            if (this._sequence == null)
-                throw new DisposedError();
-        };
-
-        const getPenaltyTokens = () => {
-            if (this._sequence == null)
-                throw new DisposedError();
-
-            let punishTokens = res.slice(-repeatPenaltyLastTokens);
-
-            if (punishTokensFilter != null)
-                punishTokens = punishTokensFilter(punishTokens);
-
-            if (penalizeNewLine == null || !penalizeNewLine) {
-                const nlToken = model.tokens.nl;
-
-                if (nlToken != null)
-                    punishTokens = punishTokens.filter(token => token !== nlToken);
-            }
-
-            return punishTokens;
-        };
-
-        const getResolvedHistoryWithCurrentModelResponse = () => {
-            if (res.length === 0)
-                return resolvedHistory;
-
-            let modelResponse = model.detokenize(res);
-
-            if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
-                modelResponse = modelResponse.trimEnd();
-
-            if (modelResponse === "")
-                return resolvedHistory;
-
-            return setLastModelTextResponseInChatHistory(
-                resolvedHistory,
-                lastModelResponse + modelResponse
-            );
-        };
-
-        const removeFoundStartIgnoreTextsFromPendingTokens = () => {
-            if (res.length === 0 && pendingTokens.length > 0) {
-                ignoreStartTextDetector.clearInProgressStops();
-                ignoreStartTextDetector.clearTriggeredStops();
-
-                let mostExhaustiveTriggeredStops: ReturnType<typeof ignoreStartTextDetector.getTriggeredStops> | null = null;
-
-                for (let i = 0; i < pendingTokens.length; i++) {
-                    ignoreStartTextDetector.recordGeneration({
-                        text: model.detokenize([pendingTokens[i]]),
-                        tokens: [pendingTokens[i]],
-                        startNewChecks: i === 0
-                    });
-
-                    if (ignoreStartTextDetector.hasTriggeredStops) {
-                        mostExhaustiveTriggeredStops = ignoreStartTextDetector.getTriggeredStops();
-                        ignoreStartTextDetector.clearTriggeredStops();
-                    } else if (!ignoreStartTextDetector.hasInProgressStops)
-                        break;
-                }
-
-                if (mostExhaustiveTriggeredStops != null) {
-                    const [mostExhaustiveTriggeredStop] = mostExhaustiveTriggeredStops;
-
-                    if (mostExhaustiveTriggeredStop != null) {
-                        ignoredStartTextTokens = mostExhaustiveTriggeredStop.stopTrigger
-                            .map((stopTrigger) => {
-                                if (typeof stopTrigger === "string")
-                                    return model.tokenize(stopTrigger, false, "trimLeadingSpace");
-                                else
-                                    return [stopTrigger];
-                            })
-                            .flat(1);
-
-                        const newPendingTokens = mostExhaustiveTriggeredStop.remainingGenerations
-                            .map((generation) => {
-                                if (typeof generation === "string")
-                                    return model.tokenize(generation, false, "trimLeadingSpace");
-                                else
-                                    return generation;
-                            })
-                            .flat(1);
-                        pendingTokens.length = 0;
-                        pendingTokens.push(...newPendingTokens);
-                    }
-                }
-            }
-        };
-
-        if (customStopTriggers != null)
-            StopGenerationDetector.resolveStopTriggers(customStopTriggers, model.tokenizer)
-                .map((stopTrigger) => customStopGenerationTriggersDetector.addStopTrigger(stopTrigger));
-
-        if (grammar != null)
-            StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenizer)
-                .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
-
-        if (functions != null && Object.keys(functions).length > 0)
-            functionSyntaxStartDetector.addStopTrigger([this._chatWrapper.settings.functions.call.prefix]);
-
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            ensureNotAborted();
-
-            let shouldContextShift = false;
-            const queuedChunkTokens = streamRegulator.getAllQueuedChunkTokens();
-            const {
-                history: contextWindowHistory,
-                stopGenerationTriggers,
-                tokens: contextWindowTokens,
-                newResolvedHistory,
-                newHistoryCompressionMetadata,
-                ignoreStartText,
-                functionCallInitiallyEngaged,
-                disengageInitiallyEngagedFunctionCall
-            } = await getContextWindow({
-                resolvedHistory: getResolvedHistoryWithCurrentModelResponse(),
-                resolvedContextShift,
-                lastHistoryCompressionMetadata,
-                pendingTokensCount: ignoredStartTextTokens.length + pendingTokens.length + queuedChunkTokens.length,
-                isFirstEvaluation,
-                chatWrapper: this._chatWrapper,
-                lastEvaluationContextWindowHistory,
-                minimumOverlapPercentageToPreventContextShift,
-                sequence: this._sequence,
-                minFreeContextTokens: 1,
-                functions: functionsEnabled ? functions : undefined,
-                documentFunctionParams
-            });
-            ensureNotAborted();
-
-            if (generatedTokens === 0) {
-                StopGenerationDetector.resolveStopTriggers(ignoreStartText, model.tokenizer)
-                    .map((stopTrigger) => ignoreStartTextDetector.addStopTrigger(stopTrigger));
-
-                if (functionsEnabled) {
-                    initiallyEngagedFunctionMode = functionCallInitiallyEngaged;
-                    StopGenerationDetector.resolveStopTriggers(disengageInitiallyEngagedFunctionCall, model.tokenizer)
-                        .map((stopTrigger) => disengageInitiallyEngagedFunctionMode.addStopTrigger(stopTrigger));
-
-                    if (initiallyEngagedFunctionMode) {
-                        inFunctionEvaluationMode = true;
-                        functionsGrammar = new FunctionCallGrammar(
-                            model._llama,
-                            functions as NonNullable<Functions>,
-                            this._chatWrapper,
-                            true
-                        );
-                        functionsEvaluationState = new LlamaGrammarEvaluationState({
-                            grammar: functionsGrammar
-                        });
-                    }
-                }
-            }
-
-            const tokens = [...contextWindowTokens, ...ignoredStartTextTokens, ...pendingTokens, ...queuedChunkTokens];
-            resolvedHistory = newResolvedHistory;
-            lastHistoryCompressionMetadata = newHistoryCompressionMetadata;
-            lastContextWindowHistory = contextWindowHistory;
-            const contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(contextWindowHistory);
-            const contextWindowsRes: Token[] = [];
-
-            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenizer)
-                .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
-
-            if (functionsGrammar != null)
-                StopGenerationDetector.resolveStopTriggers(functionsGrammar.stopGenerationTriggers, model.tokenizer)
-                    .map((stopTrigger) => functionSyntaxEndDetector.addStopTrigger(stopTrigger));
-
-            let {firstDifferentIndex} = this._sequence.compareContextTokens(tokens);
-
-            // we need to decode at least one token to generate a response
-            if (firstDifferentIndex === tokens.length && firstDifferentIndex > 0)
-                firstDifferentIndex -= 1;
-
-            tokens.splice(0, firstDifferentIndex);
-
-            if (firstDifferentIndex < this._sequence.nextTokenIndex) {
-                await this._sequence.eraseContextTokenRanges([{
-                    start: firstDifferentIndex,
-                    end: this._sequence.nextTokenIndex
-                }]);
-                ensureNotAborted();
-            }
-
-
-            const evaluationIterator = this._sequence.evaluate(tokens, removeNullFields({
-                temperature, minP, topK, topP,
-                grammarEvaluationState: () => {
-                    if (inFunctionEvaluationMode)
-                        return functionsEvaluationState;
-
-                    return grammarEvaluationState;
-                },
-                repeatPenalty: !repeatPenaltyEnabled ? undefined : {
-                    punishTokens: getPenaltyTokens,
-                    penalty,
-                    frequencyPenalty,
-                    presencePenalty
-                },
+        const generateResponseState = new GenerateResponseState<Functions>(
+            this,
+            this._chatWrapper,
+            history,
+            {
+                onToken,
+                signal,
+                stopOnAbortSignal,
+                maxTokens,
+                temperature,
+                minP,
+                topK,
+                topP,
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                trimWhitespaceSuffix,
+                repeatPenalty,
                 tokenBias,
                 evaluationPriority,
-                yieldEogToken: true
-            }));
+                functions,
+                onFunctionCall,
+                documentFunctionParams,
+                maxParallelFunctionCalls,
+                contextShift,
+                customStopTriggers,
+                lastEvaluationContextWindow: {
+                    history: lastEvaluationContextWindowHistory,
+                    minimumOverlapPercentageToPreventContextShift
+                }
+            }
+        );
 
+        if (generateResponseState.grammar != null && generateResponseState.functionsEnabled)
+            throw new Error("Using both grammar and functions is not supported yet");
+
+        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatResponse<Functions>> => {
             try {
-                let currentIteration = await evaluationIterator.next();
-                while (currentIteration.done !== true) {
-                    const token = currentIteration.value;
-                    let replacementToken: Token | undefined = undefined;
+                generateResponseState.ensureLastHistoryItemIsModel();
 
-                    ensureNotAborted();
-                    generatedTokens++;
+                const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
+                    await generateResponseState.loadContextWindow(
+                        generateResponseState.getResolvedHistoryWithCurrentModelResponse(),
+                        false,
+                        avoidReloadingHistory
+                    );
+                };
+                const loadContextWindowForFunctionCallingLoop = async () => loadContextWindow(true);
 
-                    const tokens = [token];
-                    const text = model.detokenize([token]);
-                    const queuedTokenRelease = streamRegulator.addChunk({tokens, text});
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    generateResponseState.startTokenLoop();
+                    generateResponseState.canAvoidReloadingHistory = false;
+                    await loadContextWindow();
 
-                    if (initiallyEngagedFunctionMode)
-                        disengageInitiallyEngagedFunctionMode.recordGeneration({text, tokens, startNewChecks: generatedTokens === 1});
+                    generateResponseState.addStopGenerationTriggersFromChatWrapper();
 
-                    if (text === UNKNOWN_UNICODE_CHAR || (
-                        (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && text.trim() === ""
-                    )) {
-                        locksToReleaseOnValidGeneration.push(queuedTokenRelease.createTextIndexLock(0));
-                    } else {
-                        while (locksToReleaseOnValidGeneration.length > 0)
-                            locksToReleaseOnValidGeneration.shift()!.dispose();
-                    }
+                    if (generateResponseState.generatedTokens === 0) {
+                        generateResponseState.addIgnoreStartTextTriggersFromChatWrapper();
 
-                    functionSyntaxStartDetector.recordGeneration({text, tokens, queuedTokenRelease});
-
-                    if (initiallyEngagedFunctionMode && disengageInitiallyEngagedFunctionMode.hasTriggeredStops) {
-                        initiallyEngagedFunctionMode = false;
-
-                        let shouldStopFunctionEvaluationMode = !functionSyntaxStartDetector.hasTriggeredStops;
-
-                        if (!shouldStopFunctionEvaluationMode && functionsEnabled && functionsGrammar != null) {
-                            const functionCallText = model.detokenize([...functionCallTokens, ...tokens]);
-
-                            try {
-                                const functionName = functionsGrammar.parseFunctionNameFromPartialCall(functionCallText, {
-                                    enableInternalBuiltinFunctions: true,
-                                    initialFunctionCallEngaged: true
-                                });
-
-                                const internalBuiltinFunctions =
-                                    this._chatWrapper.getInternalBuiltinFunctions({initialFunctionCallEngaged: true});
-                                if (internalBuiltinFunctions[functionName] != null) {
-                                    shouldStopFunctionEvaluationMode = true;
-                                }
-                            } catch (err) {
-                                if (!(err instanceof LlamaFunctionCallValidationError))
-                                    throw err;
-                            }
-                        }
-
-                        if (shouldStopFunctionEvaluationMode) {
-                            inFunctionEvaluationMode = false;
-                            functionsGrammar = new FunctionCallGrammar(
-                                model._llama,
-                                functions as NonNullable<Functions>,
-                                this._chatWrapper, false
-                            );
-                            functionsEvaluationState = new LlamaGrammarEvaluationState({
-                                grammar: functionsGrammar
-                            });
-
-                            functionCallTokens.length = 0;
-
-                            while (functionCallTokenSyntaxLocks.length > 0)
-                                functionCallTokenSyntaxLocks.shift()!.dispose();
-
-                            functionSyntaxStartDetector.clearInProgressStops();
-                            functionSyntaxStartDetector.clearTriggeredStops();
-
-                            functionSyntaxEndDetector.clearInProgressStops();
-                            functionSyntaxEndDetector.clearTriggeredStops();
+                        if (generateResponseState.functionsEnabled) {
+                            generateResponseState.initFunctions();
                         }
                     }
 
-                    if (!inFunctionEvaluationMode && functionsEnabled && functionsGrammar != null &&
-                        functionSyntaxStartDetector.hasTriggeredStops && functionsEvaluationState != null
-                    ) {
-                        inFunctionEvaluationMode = true;
-                        functionCallTokenSyntaxLocks.push(queuedTokenRelease.createTextIndexLock(0));
-
-                        stopGenerationDetector.clearTriggeredStops();
-                        stopGenerationDetector.clearInProgressStops();
-                        customStopGenerationTriggersDetector.clearTriggeredStops();
-                        customStopGenerationTriggersDetector.clearInProgressStops();
-
-                        pendingTokens.push(...streamRegulator.popFreeChunkTokens());
-
-                        const triggeredStops = functionSyntaxStartDetector.getTriggeredStops();
-                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
-
-                        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
-                            triggeredStops,
-                            partiallyFreeTokens,
-                            model.tokenizer
+                    if (generateResponseState.functionEvaluationMode !== false) {
+                        const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
+                            loadContextWindowForFunctionCallingLoop
                         );
-                        pendingTokens.push(...queuedTokensBeforeStopTrigger);
+                        if (functionsCallsRes != null)
+                            return functionsCallsRes;
 
-                        const [firstRemainingGenerationAfterStop] = triggeredStops
-                            .map((stopTrigger) => stopTrigger.remainingGenerations)
-                            .filter((remainingGenerations) => remainingGenerations.length > 0)
-                            .flat(1);
+                        await loadContextWindowForFunctionCallingLoop();
+                    }
 
-                        const remainingTextAfterStop =
-                            (firstRemainingGenerationAfterStop == null || firstRemainingGenerationAfterStop.length === 0)
-                                ? ""
-                                : typeof firstRemainingGenerationAfterStop === "string"
-                                    ? firstRemainingGenerationAfterStop
-                                    : model.detokenize(firstRemainingGenerationAfterStop);
+                    await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
+                    await generateResponseState.createNewEvaluationIterator();
 
-                        functionCallTokens.push(...model.tokenize(this._chatWrapper.settings.functions.call.prefix, false, "trimLeadingSpace"));
+                    while (await generateResponseState.iterateEvaluation()) {
+                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                        for (const functionCallToken of functionCallTokens)
-                            context._acceptTokenOnGrammarEvaluationState(functionsEvaluationState, functionCallToken);
-
-                        // these tokens have to be verified that they match the function calling syntax grammar before they can be accepted,
-                        // or the context state should be modified to not include the incompatible tokens
-                        const remainingTextTokens = model.tokenize(remainingTextAfterStop, false, "trimLeadingSpace");
-                        let unfitTokens: Token[] = [];
-
-                        for (let i = 0; i < remainingTextTokens.length; i++) {
-                            const remainingToken = remainingTextTokens[i];
-                            const canBeNextToken = context._canBeNextTokenForGrammarEvaluationState(
-                                functionsEvaluationState,
-                                remainingToken
+                        generateResponseState.detectAndHandleFunctionStartSyntax();
+                        if (generateResponseState.functionEvaluationMode !== false) {
+                            generateResponseState.canAvoidReloadingHistory = false;
+                            generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
+                            const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
+                                loadContextWindowForFunctionCallingLoop
                             );
-
-                            if (!canBeNextToken) {
-                                unfitTokens = remainingTextTokens.slice(i);
-                                break;
-                            }
-
-                            context._acceptTokenOnGrammarEvaluationState(functionsEvaluationState, remainingToken);
-                            functionCallTokens.push(remainingToken);
+                            if (functionsCallsRes != null)
+                                return functionsCallsRes;
                         }
 
-                        if (unfitTokens.length > 0) {
-                            const unfitTokensText = model.detokenize(unfitTokens); // the current token text must end with it
-                            const currentTokenText = queuedTokenRelease.text;
-                            let replacementTokens: Token[];
+                        generateResponseState.recordStopGenerationEvaluation();
 
-                            if (!currentTokenText.endsWith(unfitTokensText)) {
-                                console.warn(getConsoleLogPrefix() + "The current token text does not end with the unfit function call syntax tokens text");
-                                replacementTokens = remainingTextTokens.slice(0, -unfitTokens.length);
-                            } else {
-                                const newCurrentTokensText = currentTokenText.slice(0, -unfitTokensText.length);
-                                replacementTokens = model.tokenize(newCurrentTokensText, false, "trimLeadingSpace");
-                            }
+                        generateResponseState.popStreamRegulatorFreeTokens();
+                        generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
 
-                            if (replacementTokens.length > 0) {
-                                replacementToken = replacementTokens[0];
-                                queuedTokenRelease.modifyTokensAndText(replacementTokens, model.detokenize([replacementToken]));
-                            }
-                        }
-                    } else if (inFunctionEvaluationMode) {
-                        functionCallTokens.push(...tokens);
-                        functionCallTokenSyntaxLocks.push(queuedTokenRelease.createTextIndexLock(0));
-                        functionSyntaxEndDetector.recordGeneration({text, tokens, queuedTokenRelease});
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
+                        if (stopGenerationTriggerRes != null)
+                            return stopGenerationTriggerRes;
+
+                        generateResponseState.spliceIgnoreStartTextDetectedTokens();
+
+                        generateResponseState.moveFreePendingTokensToRes();
+
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("model");
+                        if (maxTokensTriggerRes != null)
+                            return maxTokensTriggerRes;
+
+                        if (generateResponseState.updateShouldContextShift())
+                            break;
+
+                        const abortRes = generateResponseState.handleAbortTrigger("model");
+                        if (abortRes != null)
+                            return abortRes;
                     }
 
-                    if (inFunctionEvaluationMode && functionSyntaxEndDetector.hasTriggeredStops && functionsGrammar != null) {
-                        const functionCallText = model.detokenize(functionCallTokens);
-                        const functionCall = functionsGrammar.parseFunctionCall(functionCallText);
+                    generateResponseState.isFirstEvaluation = false;
 
-                        let modelResponse = model.detokenize(res);
-                        let contextWindowModelResponse = model.detokenize(contextWindowsRes);
+                    if (generateResponseState.shouldContextShift)
+                        continue;
 
-                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) {
-                            modelResponse = modelResponse.trimEnd();
-                            contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-                        }
+                    break;
+                }
 
-                        return {
-                            response: modelResponse,
-                            lastEvaluation: {
-                                contextWindow: setLastModelTextResponseInChatHistory(
-                                    lastContextWindowHistory,
-                                    contextWindowLastModelResponse + contextWindowModelResponse
-                                ),
-                                cleanHistory: setLastModelTextResponseInChatHistory(
-                                    resolvedHistory,
-                                    lastModelResponse + modelResponse
-                                ),
-                                contextShiftMetadata: lastHistoryCompressionMetadata
-                            },
+                throw new Error("The context size is too small to generate a response");
+            } finally {
+                generateResponseState.dispose();
+            }
+        });
+    }
 
-                            // prevent infinite TS type instantiation
-                            functionCall: functionCall satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>> as any,
+    public async loadChatAndCompleteUserMessage<const Functions extends ChatModelFunctions | undefined = undefined>(
+        history: ChatHistoryItem[],
+        options: LLamaChatLoadAndCompleteUserMessageOptions<Functions> = {}
+    ): Promise<LlamaChatLoadAndCompleteUserResponse> {
+        const {
+            initialUserPrompt = "",
+            stopOnAbortSignal = false,
+            onToken,
+            signal,
+            maxTokens = Math.min(256, Math.ceil(this.context.contextSize / 2)),
+            temperature,
+            minP,
+            topK,
+            topP,
+            grammar,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
+            repeatPenalty = {},
+            tokenBias,
+            evaluationPriority = defaultEvaluationPriority,
+            functions,
+            documentFunctionParams,
+            contextShift = defaultContextShiftOptions,
+            customStopTriggers,
+            lastEvaluationContextWindow: {
+                history: lastEvaluationContextWindowHistory,
+                minimumOverlapPercentageToPreventContextShift = 0.8
+            } = {}
+        } = options;
 
-                            metadata: {
-                                stopReason: "functionCall"
-                            }
-                        };
-                    }
+        const lastEvaluationContextWindowHistoryItem = lastEvaluationContextWindowHistory == null
+            ? null
+            : lastEvaluationContextWindowHistory[lastEvaluationContextWindowHistory.length - 1];
+        const lastEvaluationContextWindowUserMessage = lastEvaluationContextWindowHistoryItem?.type === "user"
+            ? lastEvaluationContextWindowHistoryItem.text
+            : "";
 
-                    if (!inFunctionEvaluationMode) {
-                        stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
-                        customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
-                    }
+        const generateResponseState = new GenerateResponseState<Functions>(
+            this,
+            this._chatWrapper,
+            history,
+            {
+                onToken,
+                signal,
+                stopOnAbortSignal,
+                maxTokens,
+                temperature,
+                minP,
+                topK,
+                topP,
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                trimWhitespaceSuffix,
+                repeatPenalty,
+                tokenBias,
+                evaluationPriority,
+                functions,
+                documentFunctionParams,
+                contextShift,
+                customStopTriggers,
+                lastEvaluationContextWindow: {
+                    history: lastEvaluationContextWindowHistory == null
+                        ? undefined
+                        : setLastUserTextInChatHistory(
+                            lastEvaluationContextWindowHistory,
+                            lastEvaluationContextWindowUserMessage + initialUserPrompt
+                        ),
+                    minimumOverlapPercentageToPreventContextShift
+                }
+            }
+        );
 
-                    pendingTokens.push(...streamRegulator.popFreeChunkTokens());
+        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
+            try {
+                generateResponseState.ensureLastHistoryItemIsUser();
+                const lastResolvedHistoryItem = generateResponseState.resolvedHistory[generateResponseState.resolvedHistory.length - 1];
+                const initialUserMessage = lastResolvedHistoryItem?.type === "user"
+                    ? lastResolvedHistoryItem.text
+                    : "";
 
-                    removeFoundStartIgnoreTextsFromPendingTokens();
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    generateResponseState.startTokenLoop();
+                    const {userTextSuffix} = await generateResponseState.loadContextWindow(
+                        setLastUserTextInChatHistory(
+                            generateResponseState.resolvedHistory,
+                            initialUserMessage + initialUserPrompt + this.model.detokenize(generateResponseState.res)
+                        ),
+                        true
+                    );
+                    generateResponseState.functionEvaluationMode = false;
 
-                    if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
-                        model.isEogToken(token)
-                    ) {
-                        stopGenerationDetector.clearInProgressStops();
-                        customStopGenerationTriggersDetector.clearInProgressStops();
-                        pendingTokens.push(...streamRegulator.popFreeChunkTokens());
+                    generateResponseState.addStopGenerationTriggersFromChatWrapper();
 
-                        const triggeredStops = stopGenerationDetector.hasTriggeredStops
-                            ? stopGenerationDetector.getTriggeredStops()
-                            : customStopGenerationTriggersDetector.getTriggeredStops();
-
-                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
-
-                        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
-                            triggeredStops,
-                            partiallyFreeTokens,
-                            model.tokenizer
+                    if (userTextSuffix != null && userTextSuffix.values.length > 0)
+                        generateResponseState.stopGenerationDetector.addStopTrigger(
+                            StopGenerationDetector.resolveLlamaTextTrigger(userTextSuffix, this.model.tokenizer)
                         );
-                        pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
-                        const [firstRemainingGenerationAfterStop] = triggeredStops
-                            .map((stopTrigger) => stopTrigger.remainingGenerations)
-                            .filter((remainingGenerations) => remainingGenerations.length > 0)
-                            .flat(1);
+                    await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
 
-                        removeFoundStartIgnoreTextsFromPendingTokens();
-
-                        if (pendingTokens.length > 0)
-                            onToken?.(pendingTokens.slice());
-
-                        res.push(...pendingTokens);
-                        contextWindowsRes.push(...pendingTokens);
-                        pendingTokens.length = 0;
-
-                        let modelResponse = model.detokenize(res);
-                        let contextWindowModelResponse = model.detokenize(contextWindowsRes);
-
-                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) {
-                            modelResponse = modelResponse.trimEnd();
-                            contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-                        }
-
-                        const lastEvaluation = {
-                            contextWindow: setLastModelTextResponseInChatHistory(
-                                lastContextWindowHistory,
-                                contextWindowLastModelResponse + contextWindowModelResponse
-                            ),
-                            cleanHistory: setLastModelTextResponseInChatHistory(
-                                resolvedHistory,
-                                lastModelResponse + modelResponse
-                            ),
-                            contextShiftMetadata: lastHistoryCompressionMetadata
-                        };
-                        const isEogToken = model.isEogToken(token);
-
-                        if (isEogToken || stopGenerationDetector.hasTriggeredStops) {
-                            return {
-                                response: modelResponse,
-                                lastEvaluation,
-                                metadata: {
-                                    remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                                    stopReason: isEogToken
-                                        ? "eogToken"
-                                        : "stopGenerationTrigger"
-                                }
-                            };
-                        }
+                    if (generateResponseState.maxTokens === 0) {
+                        await generateResponseState.evaluateWithoutGeneratingNewTokens();
 
                         return {
-                            response: modelResponse,
-                            lastEvaluation,
-                            metadata: {
-                                remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                                stopReason: "customStopTrigger",
-                                customStopTrigger: triggeredStops[0].stopTrigger
-                            }
-                        };
-                    }
-
-                    const maxTokensTriggered = maxTokens != null && maxTokens > 0 && generatedTokens >= maxTokens;
-
-                    if (res.length === 0) {
-                        ignoreStartTextDetector.clearInProgressStops();
-                        ignoreStartTextDetector.clearTriggeredStops();
-
-                        ignoreStartTextDetector.recordGeneration({
-                            text: model.detokenize(pendingTokens),
-                            tokens: pendingTokens
-                        });
-                    }
-
-                    if (pendingTokens.length > 0 && (maxTokensTriggered || !ignoreStartTextDetector.hasInProgressStops)) {
-                        removeFoundStartIgnoreTextsFromPendingTokens();
-
-                        if (pendingTokens.length > 0) {
-                            onToken?.(pendingTokens.slice());
-                            res.push(...pendingTokens);
-                            contextWindowsRes.push(...pendingTokens);
-                            pendingTokens.length = 0;
-                        }
-                    }
-
-                    if (maxTokensTriggered) {
-                        let modelResponse = model.detokenize(res);
-                        let contextWindowModelResponse = model.detokenize(contextWindowsRes);
-
-                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) {
-                            modelResponse = modelResponse.trimEnd();
-                            contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-                        }
-
-                        return {
-                            response: modelResponse,
+                            completion: "",
                             lastEvaluation: {
-                                contextWindow: setLastModelTextResponseInChatHistory(
-                                    lastContextWindowHistory,
-                                    contextWindowLastModelResponse + contextWindowModelResponse
+                                contextWindow: setLastUserTextInChatHistory(
+                                    generateResponseState.lastContextWindowHistory,
+                                    initialUserMessage
                                 ),
-                                cleanHistory: setLastModelTextResponseInChatHistory(
-                                    resolvedHistory,
-                                    lastModelResponse + modelResponse
-                                ),
-                                contextShiftMetadata: lastHistoryCompressionMetadata
+                                contextShiftMetadata: generateResponseState.lastHistoryCompressionMetadata
                             },
                             metadata: {
                                 stopReason: "maxTokens"
@@ -902,63 +602,84 @@ export class LlamaChat {
                         };
                     }
 
-                    if (this._sequence.nextTokenIndex >= context.contextSize - 1) {
-                        shouldContextShift = true;
-                        break;
+                    await generateResponseState.createNewEvaluationIterator();
+                    while (await generateResponseState.iterateEvaluation()) {
+                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+
+                        generateResponseState.recordStopGenerationEvaluation();
+
+                        generateResponseState.popStreamRegulatorFreeTokens();
+
+                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
+                        if (stopGenerationTriggerRes != null)
+                            return {
+                                completion: stopGenerationTriggerRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.lastContextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
+                                    ? stopGenerationTriggerRes.metadata
+                                    : stopGenerationTriggerRes.metadata
+                            };
+
+                        generateResponseState.moveFreePendingTokensToRes(false);
+
+                        const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("user");
+                        if (maxTokensTriggerRes != null)
+                            return {
+                                completion: maxTokensTriggerRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.lastContextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: maxTokensTriggerRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: maxTokensTriggerRes.metadata
+                            };
+
+                        if (generateResponseState.updateShouldContextShift())
+                            break;
+
+                        const abortRes = generateResponseState.handleAbortTrigger("user");
+                        if (abortRes != null)
+                            return {
+                                completion: abortRes.response,
+                                lastEvaluation: {
+                                    contextWindow: setLastUserTextInChatHistory(
+                                        generateResponseState.lastContextWindowHistory,
+                                        initialUserMessage
+                                    ),
+                                    contextShiftMetadata: abortRes.lastEvaluation.contextShiftMetadata
+                                },
+                                metadata: abortRes.metadata
+                            };
                     }
 
-                    if (signal?.aborted && stopOnAbortSignal) {
-                        if (res.length === 0)
-                            throw signal.reason;
+                    generateResponseState.isFirstEvaluation = false;
 
-                        let modelResponse = model.detokenize(res);
-                        let contextWindowModelResponse = model.detokenize(contextWindowsRes);
+                    if (generateResponseState.shouldContextShift)
+                        continue;
 
-                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) {
-                            modelResponse = modelResponse.trimEnd();
-                            contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-                        }
-
-                        return {
-                            response: modelResponse,
-                            lastEvaluation: {
-                                contextWindow: setLastModelTextResponseInChatHistory(
-                                    lastContextWindowHistory,
-                                    contextWindowLastModelResponse + contextWindowModelResponse
-                                ),
-                                cleanHistory: setLastModelTextResponseInChatHistory(
-                                    resolvedHistory,
-                                    lastModelResponse + modelResponse
-                                ),
-                                contextShiftMetadata: lastHistoryCompressionMetadata
-                            },
-                            metadata: {
-                                stopReason: "abort"
-                            }
-                        };
-                    }
-                    currentIteration = await evaluationIterator.next(replacementToken);
+                    break;
                 }
+
+                throw new Error("The context size is too small to generate a completion");
             } finally {
-                await evaluationIterator.return();
+                generateResponseState.dispose();
             }
-
-            isFirstEvaluation = false;
-
-            if (shouldContextShift)
-                continue;
-
-            break;
-        }
-
-        throw new Error("The context size is too small to generate a response");
+        });
     }
 }
 
 export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined = undefined> = {
     response: string,
-    functionCall?: Functions extends ChatModelFunctions
-        ? LlamaChatResponseFunctionCall<Functions>
+    functionCalls?: Functions extends ChatModelFunctions
+        ? LlamaChatResponseFunctionCall<Functions>[]
         : never,
     lastEvaluation: {
         cleanHistory: ChatHistoryItem[],
@@ -967,7 +688,7 @@ export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined =
     },
     metadata: {
         remainingGenerationAfterStop?: string | Token[],
-        stopReason: "eogToken" | "stopGenerationTrigger" | "functionCall" | "maxTokens" | "abort"
+        stopReason: "eogToken" | "stopGenerationTrigger" | "functionCalls" | "maxTokens" | "abort"
     } | {
         remainingGenerationAfterStop?: string | Token[],
         stopReason: "customStopTrigger",
@@ -984,7 +705,27 @@ export type LlamaChatResponseFunctionCall<
 > = {
     functionName: FunctionCallName,
     params: Params,
-    raw: string
+    raw: LlamaTextJSON
+};
+
+export type LlamaChatLoadAndCompleteUserResponse = {
+    completion: string,
+    lastEvaluation: {
+        /**
+         * The completion and initial user prompt are not added to this context window result,
+         * but are loaded to the current context sequence state as tokens
+         */
+        contextWindow: ChatHistoryItem[],
+        contextShiftMetadata: any
+    },
+    metadata: {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "eogToken" | "stopGenerationTrigger" | "maxTokens" | "abort"
+    } | {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "customStopTrigger",
+        customStopTrigger: (string | Token)[]
+    }
 };
 
 function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Item): Item {
@@ -996,7 +737,7 @@ function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Ite
             else
                 return {
                     ...item,
-                    raw: undefined
+                    rawCall: undefined
                 };
         });
 
@@ -1031,7 +772,8 @@ async function compressHistoryToFitContextSize({
     metadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"]
 }> {
     function checkIfHistoryFitsContext(history: ChatHistoryItem[]) {
-        const {contextText} = chatWrapper.generateContextText(history, {
+        const {contextText} = chatWrapper.generateContextState({
+            chatHistory: history,
             availableFunctions: functions,
             documentFunctionParams
         });
@@ -1117,6 +859,13 @@ function getLastTextModelResponseFromChatHistory(chatHistory: ChatHistoryItem[])
     return "";
 }
 
+function getLastUserTextFromChatHistory(chatHistory: readonly ChatHistoryItem[]) {
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "user")
+        return "";
+
+    return (chatHistory[chatHistory.length - 1] as ChatUserMessage).text;
+}
+
 function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
@@ -1143,22 +892,102 @@ function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], t
     return newChatHistory;
 }
 
+function setLastUserTextInChatHistory(chatHistory: readonly ChatHistoryItem[], userText: string) {
+    const newChatHistory = chatHistory.slice();
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "user")
+        newChatHistory.push({
+            type: "user",
+            text: ""
+        });
+
+    const lastUserItem = newChatHistory[newChatHistory.length - 1] as ChatUserMessage;
+    const newLastUserItem = {...lastUserItem};
+    newChatHistory[newChatHistory.length - 1] = newLastUserItem;
+
+    newLastUserItem.text = userText;
+
+    return newChatHistory;
+}
+
+function setLastTextInChatHistory(itemType: "user" | "model", chatHistory: ChatHistoryItem[], text: string) {
+    if (itemType === "user")
+        return setLastUserTextInChatHistory(chatHistory, text);
+    else
+        return setLastModelTextResponseInChatHistory(chatHistory, text);
+}
+
+function generateContextText(
+    endWithUserText: boolean,
+    chatWrapper: ChatWrapper,
+    options: Parameters<typeof chatWrapper.generateContextState>[0]
+): ReturnType<typeof generateContextTextThatEndsWithUserText> {
+    if (endWithUserText)
+        return generateContextTextThatEndsWithUserText(chatWrapper, options);
+
+    return chatWrapper.generateContextState(options);
+}
+
+function generateContextTextThatEndsWithUserText(
+    chatWrapper: ChatWrapper, options: Parameters<typeof chatWrapper.generateContextState>[0]
+): ReturnType<typeof chatWrapper.generateContextState> & {
+    userTextSuffix?: LlamaText
+} {
+    const lastUserText = getLastUserTextFromChatHistory(options.chatHistory);
+    const randomId = "W" + (Math.random()
+        .toString(36)
+        .slice(2)) + "W";
+    const {contextText, ...rest} = chatWrapper.generateContextState({
+        ...options,
+        chatHistory: setLastUserTextInChatHistory(options.chatHistory, lastUserText + randomId)
+    });
+    let newContextText = contextText;
+
+    for (let i = 0; i < newContextText.values.length; i++) {
+        const item = newContextText.values[i];
+        if (typeof item !== "string")
+            continue;
+
+        const randomTextIndex = item.indexOf(randomId);
+        if (randomTextIndex < 0)
+            continue;
+
+        const newValue = item.slice(0, randomTextIndex);
+        newContextText = LlamaText([
+            ...newContextText.values.slice(0, i),
+            newValue
+        ]);
+        return {
+            contextText: newContextText,
+            userTextSuffix: LlamaText([
+                item.slice(randomTextIndex + randomId.length),
+                ...newContextText.values.slice(i + 1)
+            ]),
+            ...rest
+        };
+    }
+
+    throw new Error("The random ID was not found in the context text. " +
+        `There might be an issue with the chat wrapper "${chatWrapper.wrapperName}" ` +
+        "where not all user messages are properly added to the the result LlamaText"
+    );
+}
+
 async function getContextWindow({
     resolvedHistory, resolvedContextShift,
     lastHistoryCompressionMetadata, pendingTokensCount = 0, isFirstEvaluation,
     chatWrapper, lastEvaluationContextWindowHistory, minimumOverlapPercentageToPreventContextShift,
-    sequence, minFreeContextTokens = 1, functions, documentFunctionParams
+    sequence, minFreeContextTokens = 1, functions, documentFunctionParams, endWithUserText
 }: {
     resolvedHistory: ChatHistoryItem[], resolvedContextShift: Required<LLamaChatContextShiftOptions>,
     lastHistoryCompressionMetadata: object | null | undefined, pendingTokensCount: number, isFirstEvaluation: boolean,
     chatWrapper: ChatWrapper, lastEvaluationContextWindowHistory?: ChatHistoryItem[], minimumOverlapPercentageToPreventContextShift: number,
     sequence?: LlamaContextSequence, minFreeContextTokens?: number, functions?: ChatModelFunctions,
-    documentFunctionParams?: boolean
+    documentFunctionParams?: boolean, endWithUserText: boolean
 }): Promise<{
     history: ChatHistoryItem[], stopGenerationTriggers: LlamaText[], tokens: Token[],
     newResolvedHistory: ChatHistoryItem[], newHistoryCompressionMetadata: object | null | undefined,
     ignoreStartText: LlamaText[], functionCallInitiallyEngaged: boolean,
-    disengageInitiallyEngagedFunctionCall: LlamaText[]
+    disengageInitiallyEngagedFunctionCall: LlamaText[], userTextSuffix?: LlamaText
 }> {
     if (sequence == null)
         throw new DisposedError();
@@ -1169,16 +998,27 @@ async function getContextWindow({
     if (isFirstEvaluation && lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory) {
         const newContextWindow = lastEvaluationContextWindowHistory.slice();
 
-        if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "model")
+        if (endWithUserText) {
+            if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "user")
+                newContextWindow.push({
+                    type: "user",
+                    text: ""
+                });
+        } else if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "model")
             newContextWindow.push({
                 type: "model",
                 response: []
             });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(newContextWindow, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            {
+                chatHistory: newContextWindow,
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
         const tokens = contextText.tokenize(model.tokenizer);
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize) {
             const {firstDifferentIndex} = sequence.compareContextTokens(tokens);
@@ -1194,7 +1034,8 @@ async function getContextWindow({
                     newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                     ignoreStartText: ignoreStartText ?? [],
                     functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-                    disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+                    disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+                    userTextSuffix
                 };
         }
     }
@@ -1223,10 +1064,15 @@ async function getContextWindow({
             documentFunctionParams
         });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(compressedHistory, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            {
+                chatHistory: compressedHistory,
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
 
         return {
             history: compressedHistory,
@@ -1236,15 +1082,21 @@ async function getContextWindow({
             newHistoryCompressionMetadata: metadata,
             ignoreStartText: ignoreStartText ?? [],
             functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-            disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+            disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+            userTextSuffix
         };
     }
 
     {
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(resolvedHistory, {
-            availableFunctions: functions,
-            documentFunctionParams
-        });
+        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+            endWithUserText,
+            chatWrapper,
+            {
+                chatHistory: resolvedHistory,
+                availableFunctions: functions,
+                documentFunctionParams
+            }
+        );
         const tokens = contextText.tokenize(model.tokenizer);
 
         if (tokens.length + pendingTokensCount + minFreeContextTokens < context.contextSize)
@@ -1256,7 +1108,8 @@ async function getContextWindow({
                 newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                 ignoreStartText: ignoreStartText ?? [],
                 functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-                disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+                disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+                userTextSuffix
             };
     }
 
@@ -1287,10 +1140,15 @@ async function getContextWindow({
         documentFunctionParams
     });
 
-    const {contextText, stopGenerationTriggers, ignoreStartText, functionCall} = chatWrapper.generateContextText(compressedHistory, {
-        availableFunctions: functions,
-        documentFunctionParams
-    });
+    const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+        endWithUserText,
+        chatWrapper,
+        {
+            chatHistory: compressedHistory,
+            availableFunctions: functions,
+            documentFunctionParams
+        }
+    );
 
     return {
         history: compressedHistory,
@@ -1300,6 +1158,1268 @@ async function getContextWindow({
         newHistoryCompressionMetadata: metadata,
         ignoreStartText: ignoreStartText ?? [],
         functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
-        disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? []
+        disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
+        userTextSuffix
     };
+}
+
+class GenerateResponseState<const Functions extends ChatModelFunctions | undefined = undefined> {
+    private readonly llamaChat: LlamaChat;
+    private readonly chatWrapper: ChatWrapper;
+
+    private readonly history: ChatHistoryItem[];
+    private readonly onToken: LLamaChatGenerateResponseOptions<Functions>["onToken"];
+    private readonly signal: LLamaChatGenerateResponseOptions<Functions>["signal"];
+    private readonly stopOnAbortSignal: LLamaChatGenerateResponseOptions<Functions>["stopOnAbortSignal"];
+    public readonly maxTokens: LLamaChatGenerateResponseOptions<Functions>["maxTokens"];
+    private readonly temperature: LLamaChatGenerateResponseOptions<Functions>["temperature"];
+    private readonly minP: LLamaChatGenerateResponseOptions<Functions>["minP"];
+    private readonly topK: LLamaChatGenerateResponseOptions<Functions>["topK"];
+    private readonly topP: LLamaChatGenerateResponseOptions<Functions>["topP"];
+    public readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
+    private readonly trimWhitespaceSuffix: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"];
+    private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
+    private readonly evaluationPriority: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"];
+    private readonly functions: LLamaChatGenerateResponseOptions<Functions>["functions"];
+    private readonly onFunctionCall: LLamaChatGenerateResponseOptions<Functions>["onFunctionCall"];
+    private readonly documentFunctionParams: LLamaChatGenerateResponseOptions<Functions>["documentFunctionParams"];
+    private readonly maxParallelFunctionCalls: LLamaChatGenerateResponseOptions<Functions>["maxParallelFunctionCalls"];
+    private readonly contextShift: LLamaChatGenerateResponseOptions<Functions>["contextShift"];
+    private readonly customStopTriggers: LLamaChatGenerateResponseOptions<Functions>["customStopTriggers"];
+    private readonly lastEvaluationContextWindowHistory: Exclude<LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"], undefined>["history"];
+    private readonly minimumOverlapPercentageToPreventContextShift: Exclude<Exclude<LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"], undefined>["minimumOverlapPercentageToPreventContextShift"], undefined>;
+
+    public readonly functionsEnabled: boolean;
+    private readonly repeatPenaltyEnabled: boolean;
+    private readonly resolvedContextShift: Required<LLamaChatContextShiftOptions>;
+    private readonly resolvedRepeatPenalty: LLamaContextualRepeatPenalty & {
+        lastTokens: number
+    };
+    private readonly lastModelResponse: string;
+    private readonly grammarEvaluationState: LlamaGrammarEvaluationState | undefined;
+    private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
+    private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
+    private functionsEvaluationState: LlamaGrammarEvaluationState | undefined;
+
+    private readonly streamRegulator = new TokenStreamRegulator();
+    public readonly stopGenerationDetector = new StopGenerationDetector();
+    private readonly customStopGenerationTriggersDetector = new StopGenerationDetector();
+    private readonly functionSyntaxStartDetector = new StopGenerationDetector();
+    private readonly disengageInitiallyEngagedFunctionMode = new StopGenerationDetector();
+    private readonly ignoreStartTextDetector = new StopGenerationDetector();
+    private readonly locksToReleaseOnValidGeneration: QueuedTokenReleaseLock[] = [];
+
+    public resolvedHistory: ChatHistoryItem[];
+
+    public readonly res: Token[] = [];
+    public readonly pendingTokens: Token[] = [];
+    public ignoredStartTextTokens: Token[] = [];
+    public readonly resFunctionCalls: Array<{
+        functionName: string,
+        params: any,
+        raw: LlamaText
+    }> = [];
+
+    public functionEvaluationMode: false | "prefixOrDisengage" | "functionName" | "params" | "sectionSuffixOrBetweenCalls" = false;
+    private currentFunctionCallPreviousText: LlamaText = LlamaText([]);
+    private readonly currentFunctionCallCurrentPartTokens: Token[] = [];
+    private functionEvaluationFunctionName: string = "";
+    private currentFunctionCallPreviousPartLeftoverText: string = "";
+    private removedStartTextToIgnore: boolean = false;
+    private releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax: boolean = false;
+
+    public generatedTokens = 0;
+    public isFirstEvaluation = true;
+    public initiallyEngagedFunctionMode = false;
+    public lastContextWindowHistory: ChatHistoryItem[];
+    public lastHistoryCompressionMetadata: object | null | undefined;
+    private restartEvaluationIterator = false;
+
+    // context shift loop
+    public shouldContextShift = false;
+
+    public canAvoidReloadingHistory: boolean = false;
+    public contextWindowTokens: Token[] = [];
+    public stopGenerationTriggers: LlamaText[] = [];
+    public ignoreStartText: LlamaText[] = [];
+    public functionCallInitiallyEngaged: boolean = false;
+    public disengageInitiallyEngagedFunctionCall: LlamaText[] = [];
+    public userTextSuffix?: LlamaText = undefined;
+
+    public tokens: Token[] = [];
+    public contextWindowLastModelResponse: string = "";
+    public contextWindowsRes: Token[] = [];
+
+    // token evaluation loop
+    public evaluationIterator?: AsyncGenerator<Token, void | Token>;
+    public currentIteration?:  IteratorResult<Token, void | Token>;
+    public currentIterationReplacementToken?: Token;
+    public currentToken?: Token;
+    public currentTokens: Token[] = [];
+    public currentText: string = "";
+    public currentQueuedTokenRelease?: QueuedTokenRelease;
+
+    public constructor(
+        llamaChat: LlamaChat,
+        chatWrapper: ChatWrapper,
+        history: ChatHistoryItem[],
+        {
+            onToken,
+            signal,
+            stopOnAbortSignal = false,
+            maxTokens,
+            temperature,
+            minP,
+            topK,
+            topP,
+            grammar,
+            trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
+            repeatPenalty = {},
+            tokenBias,
+            evaluationPriority = defaultEvaluationPriority,
+            functions,
+            onFunctionCall,
+            documentFunctionParams,
+            maxParallelFunctionCalls,
+            contextShift = defaultContextShiftOptions,
+            customStopTriggers,
+            lastEvaluationContextWindow: {
+                history: lastEvaluationContextWindowHistory,
+                minimumOverlapPercentageToPreventContextShift = 0.5
+            } = {}
+        }: LLamaChatGenerateResponseOptions<Functions> = {}
+    ) {
+        this.llamaChat = llamaChat;
+        this.chatWrapper = chatWrapper;
+
+        this.history = history;
+        this.onToken = safeEventCallback(onToken);
+        this.signal = signal;
+        this.stopOnAbortSignal = stopOnAbortSignal;
+        this.maxTokens = maxTokens;
+        this.temperature = temperature;
+        this.minP = minP;
+        this.topK = topK;
+        this.topP = topP;
+        this.grammar = grammar;
+        this.trimWhitespaceSuffix = trimWhitespaceSuffix;
+        this.tokenBias = tokenBias;
+        this.evaluationPriority = evaluationPriority;
+        this.functions = functions;
+        this.onFunctionCall = safeEventCallback(onFunctionCall);
+        this.documentFunctionParams = documentFunctionParams;
+        this.maxParallelFunctionCalls = maxParallelFunctionCalls;
+        this.contextShift = contextShift;
+        this.customStopTriggers = customStopTriggers;
+        this.lastEvaluationContextWindowHistory = lastEvaluationContextWindowHistory;
+        this.minimumOverlapPercentageToPreventContextShift = minimumOverlapPercentageToPreventContextShift;
+
+        this.functionsEnabled = (this.functions != null && Object.keys(this.functions).length > 0);
+
+        if (this.signal?.aborted)
+            throw this.signal.reason;
+
+        if (this.llamaChat.disposed)
+            throw new DisposedError();
+
+        this.resolvedHistory = this.llamaChat.sequence.isLoadedToMemory
+            ? this.history.slice()
+            : this.history.map(removeRawFromHistoryItem);
+        this.resolvedContextShift = {
+            ...defaultContextShiftOptions,
+            ...removeNullFields(this.contextShift)
+        };
+        this.resolvedRepeatPenalty = repeatPenalty === false
+            ? {lastTokens: 0}
+            : {
+                ...(repeatPenalty ?? {}),
+                lastTokens: repeatPenalty?.lastTokens ?? defaultRepeatPenaltyLastTokens
+            };
+        this.lastModelResponse = getLastTextModelResponseFromChatHistory(this.resolvedHistory);
+        this.repeatPenaltyEnabled = this.resolvedRepeatPenalty.lastTokens > 0;
+        this.grammarEvaluationState = this.grammar != null
+            ? new LlamaGrammarEvaluationState({grammar: this.grammar})
+            : undefined;
+        this.functionNameGrammar = this.functionsEnabled
+            ? new FunctionCallNameGrammar(this.llamaChat.model._llama, this.functions as NonNullable<Functions>, this.chatWrapper)
+            : undefined;
+        this.functionsGrammar = undefined;
+        this.functionsEvaluationState = undefined;
+
+        this.lastContextWindowHistory = this.resolvedHistory;
+        this.lastHistoryCompressionMetadata = this.resolvedContextShift;
+
+        if (this.customStopTriggers != null)
+            StopGenerationDetector.resolveStopTriggers(this.customStopTriggers, this.llamaChat.model.tokenizer)
+                .map((stopTrigger) => this.customStopGenerationTriggersDetector.addStopTrigger(stopTrigger));
+
+        if (this.grammar != null)
+            StopGenerationDetector.resolveStopTriggers(this.grammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
+                .map((stopTrigger) => this.stopGenerationDetector.addStopTrigger(stopTrigger));
+
+        if (this.functions != null && Object.keys(this.functions).length > 0)
+            this.functionSyntaxStartDetector.addStopTrigger(
+                StopGenerationDetector.resolveLlamaTextTrigger(
+                    LlamaText([
+                        this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
+                        this.chatWrapper.settings.functions.call.prefix
+                    ]),
+                    this.llamaChat.model.tokenizer
+                )
+            );
+
+        this.getPenaltyTokens = this.getPenaltyTokens.bind(this);
+    }
+
+    public dispose() {
+
+    }
+
+    public [Symbol.dispose]() {
+        this.dispose();
+    }
+
+    public ensureLastHistoryItemIsModel() {
+        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1].type !== "model")
+            this.resolvedHistory.push({
+                type: "model",
+                response: []
+            });
+    }
+
+    public ensureLastHistoryItemIsUser() {
+        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1].type !== "user")
+            this.resolvedHistory.push({
+                type: "user",
+                text: ""
+            });
+    }
+
+    public ensureNotAborted() {
+        if (this.signal?.aborted && (!this.stopOnAbortSignal || this.res.length === 0))
+            throw this.signal.reason;
+
+        if (this.llamaChat.disposed)
+            throw new DisposedError();
+    }
+
+    public getPenaltyTokens() {
+        if (this.llamaChat.disposed)
+            throw new DisposedError();
+
+        let punishTokens = this.res.slice(-this.resolvedRepeatPenalty.lastTokens);
+
+        if (this.resolvedRepeatPenalty.punishTokensFilter != null)
+            punishTokens = this.resolvedRepeatPenalty.punishTokensFilter(punishTokens);
+
+        if (this.resolvedRepeatPenalty.penalizeNewLine == null || !this.resolvedRepeatPenalty.penalizeNewLine) {
+            const nlToken = this.llamaChat.model.tokens.nl;
+
+            if (nlToken != null)
+                punishTokens = punishTokens.filter(token => token !== nlToken);
+        }
+
+        return punishTokens;
+    }
+
+    public getResolvedHistoryWithCurrentModelResponse() {
+        if (this.res.length === 0)
+            return this.resolvedHistory;
+
+        let modelResponse = this.llamaChat.model.detokenize(this.res);
+
+        if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix)
+            modelResponse = modelResponse.trimEnd();
+
+        if (modelResponse === "")
+            return this.resolvedHistory;
+
+        return setLastModelTextResponseInChatHistory(
+            this.resolvedHistory,
+            this.lastModelResponse + modelResponse
+        );
+    }
+
+    public removeFoundStartIgnoreTextsFromPendingTokens(forceRemove: boolean = false) {
+        if (!this.removedStartTextToIgnore && this.res.length === 0 && this.pendingTokens.length > 0 &&
+            this.ignoreStartTextDetector.hasTriggeredStops && (forceRemove || !this.ignoreStartTextDetector.hasInProgressStops)
+        ) {
+            this.ignoreStartTextDetector.clearInProgressStops();
+            this.ignoreStartTextDetector.clearTriggeredStops();
+
+            let mostExhaustiveTriggeredStops: ReturnType<typeof this.ignoreStartTextDetector.getTriggeredStops> | null = null;
+            let mostExhaustiveTriggeredStopsLeftoverTokens: Token[] = [];
+
+            for (let i = 0; i < this.pendingTokens.length; i++) {
+                this.ignoreStartTextDetector.recordGeneration({
+                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]]),
+                    tokens: [this.pendingTokens[i]],
+                    startNewChecks: i === 0,
+                    triggerMustStartWithGeneration: true
+                });
+
+                if (this.ignoreStartTextDetector.hasTriggeredStops) {
+                    mostExhaustiveTriggeredStops = this.ignoreStartTextDetector.getTriggeredStops();
+                    this.ignoreStartTextDetector.clearTriggeredStops();
+                    mostExhaustiveTriggeredStopsLeftoverTokens = this.pendingTokens.slice(i + 1);
+                } else if (!this.ignoreStartTextDetector.hasInProgressStops)
+                    break;
+            }
+
+            if (mostExhaustiveTriggeredStops != null) {
+                const [mostExhaustiveTriggeredStop] = mostExhaustiveTriggeredStops;
+
+                if (mostExhaustiveTriggeredStop != null) {
+                    this.ignoredStartTextTokens = mostExhaustiveTriggeredStop.stopTrigger
+                        .map((stopTrigger) => {
+                            if (typeof stopTrigger === "string")
+                                return this.llamaChat.model.tokenize(stopTrigger, false, "trimLeadingSpace");
+                            else
+                                return [stopTrigger];
+                        })
+                        .flat(1);
+
+                    const newPendingTokens = [
+                        ...mostExhaustiveTriggeredStop.remainingGeneration,
+                        mostExhaustiveTriggeredStopsLeftoverTokens
+                    ]
+                        .map((generation) => {
+                            if (typeof generation === "string")
+                                return this.llamaChat.model.tokenize(generation, false, "trimLeadingSpace");
+                            else
+                                return generation;
+                        })
+                        .flat(1);
+                    this.pendingTokens.length = 0;
+                    this.pendingTokens.push(...newPendingTokens);
+                    this.removedStartTextToIgnore = true;
+                }
+            }
+        }
+    }
+
+    public startTokenLoop() {
+        this.ensureNotAborted();
+        this.shouldContextShift = false;
+    }
+
+    private getContextWindowFunctionCallsTokens() {
+        if (this.functionEvaluationMode === false)
+            return [];
+        else if (this.functionEvaluationMode === "prefixOrDisengage")
+            return [
+                ...LlamaText(this.currentFunctionCallPreviousText).tokenize(this.llamaChat.model.tokenizer, "trimLeadingSpace"),
+                ...this.currentFunctionCallCurrentPartTokens
+            ];
+
+        const text: (LlamaText | string)[] = [];
+        if (this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix != null)
+            text.push(this.chatWrapper.settings.functions.parallelism.call.sectionPrefix);
+
+        for (let i = 0; i < this.resFunctionCalls.length; i++) {
+            const call = this.resFunctionCalls[i];
+
+            if (i > 0)
+                text.push(this.chatWrapper.settings.functions?.parallelism?.call?.betweenCalls ?? "");
+
+            text.push(call.raw);
+        }
+
+        text.push(this.currentFunctionCallPreviousText);
+
+        return [
+            ...LlamaText(text).tokenize(this.llamaChat.model.tokenizer, "trimLeadingSpace"),
+            ...this.currentFunctionCallCurrentPartTokens
+        ];
+    }
+
+    public async loadContextWindow(
+        resolvedHistory: ChatHistoryItem[],
+        endWithUserText: boolean = false,
+        avoidReloadingHistory: boolean = false
+    ): Promise<{userTextSuffix?: LlamaText}> {
+        const queuedChunkTokens = this.streamRegulator.getAllQueuedChunkTokens();
+        const functionCallsTokens = this.getContextWindowFunctionCallsTokens();
+
+        if (!avoidReloadingHistory || !this.canAvoidReloadingHistory || !this.llamaChat.sequence.isLoadedToMemory) {
+            const {
+                history: contextWindowHistory,
+                stopGenerationTriggers,
+                tokens: contextWindowTokens,
+                newResolvedHistory,
+                newHistoryCompressionMetadata,
+                ignoreStartText,
+                functionCallInitiallyEngaged,
+                disengageInitiallyEngagedFunctionCall,
+                userTextSuffix
+            } = await getContextWindow({
+                resolvedHistory: resolvedHistory,
+                resolvedContextShift: this.resolvedContextShift,
+                lastHistoryCompressionMetadata: this.lastHistoryCompressionMetadata,
+                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length,
+                isFirstEvaluation: this.isFirstEvaluation,
+                chatWrapper: this.chatWrapper,
+                lastEvaluationContextWindowHistory: this.lastEvaluationContextWindowHistory,
+                minimumOverlapPercentageToPreventContextShift: this.minimumOverlapPercentageToPreventContextShift,
+                sequence: this.llamaChat.sequence,
+                minFreeContextTokens: 1,
+                functions: this.functionsEnabled ? this.functions : undefined,
+                documentFunctionParams: this.documentFunctionParams,
+                endWithUserText
+            });
+
+            this.ensureNotAborted();
+
+            this.contextWindowTokens = contextWindowTokens;
+            this.stopGenerationTriggers = stopGenerationTriggers;
+            this.ignoreStartText = ignoreStartText;
+            this.functionCallInitiallyEngaged = functionCallInitiallyEngaged;
+            this.disengageInitiallyEngagedFunctionCall = disengageInitiallyEngagedFunctionCall;
+            this.userTextSuffix = userTextSuffix;
+
+            this.resolvedHistory = newResolvedHistory;
+            this.lastHistoryCompressionMetadata = newHistoryCompressionMetadata;
+            this.lastContextWindowHistory = contextWindowHistory;
+            this.contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(contextWindowHistory);
+            this.contextWindowsRes = [];
+
+            this.canAvoidReloadingHistory = true;
+        }
+
+        this.tokens = [
+            ...this.contextWindowTokens,
+            ...this.ignoredStartTextTokens,
+            ...this.pendingTokens,
+            ...queuedChunkTokens,
+            ...functionCallsTokens
+        ];
+
+        if (avoidReloadingHistory && this.tokens.length >= this.llamaChat.sequence.context.contextSize - 1)
+            return await this.loadContextWindow(resolvedHistory, endWithUserText, false);
+
+        return {
+            userTextSuffix: this.userTextSuffix
+        };
+    }
+
+    public addIgnoreStartTextTriggersFromChatWrapper() {
+        StopGenerationDetector.resolveStopTriggers(this.ignoreStartText, this.llamaChat.model.tokenizer)
+            .map((stopTrigger) => this.ignoreStartTextDetector.addStopTrigger(stopTrigger));
+    }
+
+    public addStopGenerationTriggersFromChatWrapper() {
+        StopGenerationDetector.resolveStopTriggers(this.stopGenerationTriggers, this.llamaChat.model.tokenizer)
+            .map((stopTrigger) => this.stopGenerationDetector.addStopTrigger(stopTrigger));
+    }
+
+    public initFunctions() {
+        this.initiallyEngagedFunctionMode = this.functionCallInitiallyEngaged;
+
+        if (this.initiallyEngagedFunctionMode) {
+            StopGenerationDetector.resolveStopTriggers(this.disengageInitiallyEngagedFunctionCall, this.llamaChat.model.tokenizer)
+                .map((stopTrigger) => this.disengageInitiallyEngagedFunctionMode.addStopTrigger(stopTrigger));
+
+            if (this.disengageInitiallyEngagedFunctionMode.hasTriggers) {
+                this.functionEvaluationMode = "prefixOrDisengage";
+                this.functionsGrammar = undefined;
+                this.functionsEvaluationState = undefined;
+            } else {
+                this.functionEvaluationMode = "functionName";
+            }
+
+            this.restartEvaluationIterator = true;
+        }
+    }
+
+    public async enterFunctionCallingLoop(loadContextWindow: () => Promise<void>) {
+        if (!this.functionsEnabled) {
+            this.functionEvaluationMode = false;
+            return undefined;
+        }
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            if (this.functionEvaluationMode === "prefixOrDisengage") {
+                this.functionsGrammar = undefined;
+                this.functionsEvaluationState = undefined;
+                this.currentFunctionCallPreviousText = LlamaText([]);
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+
+                const prefixTokens = LlamaText(this.chatWrapper.settings.functions.call.prefix)
+                    .tokenize(this.llamaChat.model.tokenizer, "trimLeadingSpace");
+                const prefixDetector = new StopGenerationDetector();
+                const afterPrefixLeftoverTokens: Token[] = [];
+                prefixDetector.addStopTrigger(
+                    StopGenerationDetector.resolveLlamaTextTrigger(
+                        LlamaText(this.chatWrapper.settings.functions.call.prefix),
+                        this.llamaChat.model.tokenizer
+                    )
+                );
+
+                for (const prefixToken of prefixTokens) {
+                    const tokens = [prefixToken];
+                    const text = this.llamaChat.model.detokenize(tokens);
+                    const disregardedPossibilities = this.disengageInitiallyEngagedFunctionMode
+                        .getDisregardedPossibilitiesCountForAGeneration({
+                            text,
+                            tokens,
+                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 0
+                        });
+
+                    if (disregardedPossibilities > 0)
+                        break;
+
+                    this.currentFunctionCallCurrentPartTokens.push(prefixToken);
+
+                    this.disengageInitiallyEngagedFunctionMode.recordGeneration({
+                        text: text,
+                        tokens: tokens,
+                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                        triggerMustStartWithGeneration: true
+                    });
+
+                    if (prefixDetector.hasTriggeredStops)
+                        afterPrefixLeftoverTokens.push(prefixToken);
+                    else
+                        prefixDetector.recordGeneration({
+                            text: text,
+                            tokens: tokens,
+                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                            triggerMustStartWithGeneration: true
+                        });
+                }
+
+                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                    const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
+                    if (stopGenerationTriggerRes != null)
+                        return stopGenerationTriggerRes;
+
+                    this.currentFunctionCallCurrentPartTokens.push(token);
+
+                    this.disengageInitiallyEngagedFunctionMode.recordGeneration({
+                        text: this.currentText,
+                        tokens: this.currentTokens,
+                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                        triggerMustStartWithGeneration: true
+                    });
+
+                    if (prefixDetector.hasTriggeredStops)
+                        afterPrefixLeftoverTokens.push(token);
+                    else
+                        prefixDetector.recordGeneration({
+                            text: this.currentText,
+                            tokens: this.currentTokens,
+                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                            triggerMustStartWithGeneration: true
+                        });
+
+                    if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops ||
+                        !this.disengageInitiallyEngagedFunctionMode.hasInProgressStops
+                    )
+                        break;
+                }
+
+                const abortRes = this.handleAbortTrigger("model");
+                if (abortRes != null)
+                    return abortRes;
+
+                if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops) {
+                    for (const token of this.currentFunctionCallCurrentPartTokens) {
+                        this.currentToken = token;
+                        this.currentTokens = [this.currentToken];
+                        this.currentText = this.llamaChat.model.detokenize(this.currentTokens);
+
+                        this.currentQueuedTokenRelease = this.streamRegulator.addChunk({
+                            tokens: this.currentTokens,
+                            text: this.currentText
+                        });
+                        this.recordStopGenerationEvaluation();
+                    }
+
+                    this.currentFunctionCallCurrentPartTokens.length = 0;
+                    this.functionEvaluationMode = false;
+                    return undefined;
+                }
+
+                if (prefixDetector.hasTriggeredStops) {
+                    const triggeredStops = prefixDetector.getTriggeredStops();
+                    const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+                    this.currentFunctionCallPreviousPartLeftoverText = StopGenerationDetector.detokenizeRemainingGeneration(
+                        firstRemainingGenerationAfterStop,
+                        this.llamaChat.model.detokenize
+                    ) + this.llamaChat.model.detokenize(afterPrefixLeftoverTokens);
+                } else
+                    this.currentFunctionCallPreviousPartLeftoverText = "";
+
+                this.functionEvaluationMode = "functionName";
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+
+                continue;
+            } else if (this.functionEvaluationMode === "functionName") {
+                const functionNameGenerationDoneDetector = new StopGenerationDetector();
+
+                this.stopGenerationDetector.clearInProgressStops();
+                this.customStopGenerationTriggersDetector.clearInProgressStops();
+                this.currentFunctionCallPreviousText = LlamaText(this.chatWrapper.settings.functions.call.prefix);
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+                const functionNameGrammar = this.functionNameGrammar ?? new FunctionCallNameGrammar(
+                    this.llamaChat.model._llama,
+                    this.functions as NonNullable<Functions>,
+                    this.chatWrapper
+                );
+                this.functionsGrammar = functionNameGrammar;
+                this.functionsEvaluationState = new LlamaGrammarEvaluationState({
+                    grammar: this.functionsGrammar
+                });
+
+                StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
+                    .map((stopTrigger) => functionNameGenerationDoneDetector.addStopTrigger(stopTrigger));
+
+                if (this.currentFunctionCallPreviousPartLeftoverText !== "") {
+                    const validFunctionNames = Object.keys(this.functions as NonNullable<Functions>);
+                    const hasAnyFunctionStartWithLeftover = validFunctionNames.some(
+                        (functionName) => functionName.startsWith(this.currentFunctionCallPreviousPartLeftoverText)
+                    );
+
+                    if (hasAnyFunctionStartWithLeftover) {
+                        const leftoverTokens = this.llamaChat.model.tokenize(this.currentFunctionCallPreviousPartLeftoverText, false, "trimLeadingSpace");
+                        this.currentFunctionCallPreviousPartLeftoverText = "";
+
+                        for (const leftoverToken of leftoverTokens) {
+                            const canBeNextToken = this.llamaChat.context._canBeNextTokenForGrammarEvaluationState(
+                                this.functionsEvaluationState,
+                                leftoverToken
+                            );
+
+                            if (!canBeNextToken)
+                                break;
+
+                            this.llamaChat.context._acceptTokenOnGrammarEvaluationState(this.functionsEvaluationState, leftoverToken);
+                            this.currentFunctionCallCurrentPartTokens.push(leftoverToken);
+                            functionNameGenerationDoneDetector.recordGeneration({
+                                text: this.llamaChat.model.detokenize([leftoverToken]),
+                                tokens: [leftoverToken]
+                            });
+                        }
+                    }
+                }
+
+                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                    this.currentFunctionCallCurrentPartTokens.push(token);
+
+                    functionNameGenerationDoneDetector.recordGeneration({
+                        text: this.currentText,
+                        tokens: this.currentTokens
+                    });
+
+                    if (functionNameGenerationDoneDetector.hasTriggeredStops)
+                        break;
+                }
+
+                const abortRes = this.handleAbortTrigger("model");
+                if (abortRes != null)
+                    return abortRes;
+
+                const functionCallNameText = this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens);
+                const functionName = functionNameGrammar.parseFunctionName(functionCallNameText);
+
+                this.functionEvaluationFunctionName = functionName;
+                this.functionEvaluationMode = "params";
+                continue;
+            } else if (this.functionEvaluationMode === "params") {
+                this.currentFunctionCallPreviousText = LlamaText([
+                    this.chatWrapper.settings.functions.call.prefix,
+                    this.functionEvaluationFunctionName,
+                    this.chatWrapper.settings.functions.call.paramsPrefix
+                ]);
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+
+                let params: any = undefined;
+                let paramsText: string = "";
+
+                const functionDefinition = (this.functions as NonNullable<Functions>)[this.functionEvaluationFunctionName];
+                if (functionDefinition == null)
+                    throw new Error(`Function "${this.functionEvaluationFunctionName}" is not provided in the functions object`);
+                else if (functionDefinition.params == null) {
+                    params = undefined;
+                    paramsText = "";
+                } else {
+                    const functionParamsGenerationDoneDetector = new StopGenerationDetector();
+
+                    const functionParamsGrammar = new FunctionCallParamsGrammar(
+                        this.llamaChat.model._llama,
+                        this.functions as NonNullable<Functions>,
+                        this.chatWrapper,
+                        this.functionEvaluationFunctionName,
+                        functionDefinition.params
+                    );
+                    this.functionsGrammar = functionParamsGrammar;
+                    this.functionsEvaluationState = new LlamaGrammarEvaluationState({
+                        grammar: this.functionsGrammar
+                    });
+
+                    StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
+                        .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
+
+                    for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                        this.currentFunctionCallCurrentPartTokens.push(token);
+
+                        functionParamsGenerationDoneDetector.recordGeneration({
+                            text: this.currentText,
+                            tokens: this.currentTokens
+                        });
+
+                        if (functionParamsGenerationDoneDetector.hasTriggeredStops)
+                            break;
+                    }
+
+                    const abortRes = this.handleAbortTrigger("model");
+                    if (abortRes != null)
+                        return abortRes;
+
+                    const functionCallParamsText = this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens);
+                    const parsedFunctionParams = functionParamsGrammar.parseParams(functionCallParamsText);
+                    params = parsedFunctionParams.params;
+                    paramsText = parsedFunctionParams.raw;
+                }
+
+                const functionCallText = LlamaText([
+                    this.chatWrapper.settings.functions.call.prefix,
+                    this.functionEvaluationFunctionName,
+                    this.chatWrapper.settings.functions.call.paramsPrefix,
+                    paramsText,
+                    this.chatWrapper.settings.functions.call.suffix
+                ]);
+                this.resFunctionCalls.push({
+                    functionName: this.functionEvaluationFunctionName,
+                    params,
+                    raw: functionCallText
+                });
+                this.onFunctionCall?.({
+                    functionName: this.functionEvaluationFunctionName,
+                    params: structuredClone(params),
+                    raw: functionCallText.toJSON()
+                });
+                this.currentFunctionCallPreviousText = LlamaText([]);
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+                this.functionEvaluationFunctionName = "";
+
+                if (this.chatWrapper.settings.functions.parallelism == null || (
+                    this.maxParallelFunctionCalls != null && this.maxParallelFunctionCalls <= this.resFunctionCalls.length
+                )) {
+                    this.functionEvaluationMode = false;
+                    return this.returnFunctionCallResults();
+                }
+
+                this.functionEvaluationMode = "sectionSuffixOrBetweenCalls";
+                continue;
+            } else if (this.functionEvaluationMode === "sectionSuffixOrBetweenCalls") {
+                const sectionSuffixDetector = new StopGenerationDetector();
+                let isFirstToken = true;
+
+                this.functionsGrammar = undefined;
+                this.functionsEvaluationState = undefined;
+                this.currentFunctionCallPreviousText = LlamaText([]);
+                this.currentFunctionCallCurrentPartTokens.length = 0;
+
+                StopGenerationDetector.resolveStopTriggers([
+                    ...(
+                        this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix != null
+                            ? [this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix]
+                            : []
+                    ),
+                    LlamaText(new SpecialToken("EOS")),
+                    LlamaText(new SpecialToken("EOT"))
+                ], this.llamaChat.model.tokenizer)
+                    .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
+
+                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                    this.currentFunctionCallCurrentPartTokens.push(token);
+
+                    sectionSuffixDetector.recordGeneration({
+                        text: this.currentText,
+                        tokens: this.currentTokens,
+                        startNewChecks: isFirstToken,
+                        triggerMustStartWithGeneration: true
+                    });
+
+                    isFirstToken = false;
+
+                    if (sectionSuffixDetector.hasTriggeredStops || !sectionSuffixDetector.hasInProgressStops)
+                        break;
+                }
+
+                const abortRes = this.handleAbortTrigger("model");
+                if (abortRes != null)
+                    return abortRes;
+
+                if (sectionSuffixDetector.hasTriggeredStops) {
+                    this.functionEvaluationMode = false;
+                    return this.returnFunctionCallResults();
+                }
+
+                this.functionEvaluationMode = "functionName";
+                this.initiallyEngagedFunctionMode = false;
+                continue;
+            }
+
+            break;
+        }
+
+        return undefined;
+    }
+
+    public releasePartiallyFreeTokensBeforeFunctionCallStart() {
+        if (this.releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax)
+            return;
+
+        this.stopGenerationDetector.clearInProgressStops();
+        this.customStopGenerationTriggersDetector.clearInProgressStops();
+        this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+
+        const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
+        const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
+        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+            triggeredStops,
+            partiallyFreeTokens,
+            this.llamaChat.model.tokenizer
+        );
+        this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+
+        this.removeFoundStartIgnoreTextsFromPendingTokens(true);
+
+        if (this.pendingTokens.length > 0)
+            this.onToken?.(this.pendingTokens.slice());
+
+        this.res.push(...this.pendingTokens);
+        this.contextWindowsRes.push(...this.pendingTokens);
+        this.pendingTokens.length = 0;
+
+        this.streamRegulator.clearQueue();
+
+        this.releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax = true;
+    }
+
+    public returnFunctionCallResults(): LlamaChatResponse<Functions> | undefined {
+        if (this.resFunctionCalls.length > 0) {
+            this.releasePartiallyFreeTokensBeforeFunctionCallStart();
+
+            let modelResponse = this.llamaChat.model.detokenize(this.res);
+            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
+
+            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
+                modelResponse = modelResponse.trimEnd();
+                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
+            }
+
+            return {
+                response: modelResponse,
+                lastEvaluation: {
+                    contextWindow: setLastTextInChatHistory(
+                        "model",
+                        this.lastContextWindowHistory,
+                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                    ),
+                    cleanHistory: setLastTextInChatHistory(
+                        "model",
+                        this.resolvedHistory,
+                        this.lastModelResponse + modelResponse
+                    ),
+                    contextShiftMetadata: this.lastHistoryCompressionMetadata
+                },
+
+                functionCalls: this.resFunctionCalls.map((functionCall) => {
+                    return {
+                        functionName: functionCall.functionName,
+                        params: functionCall.params,
+                        raw: functionCall.raw.toJSON()
+                    } satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>;
+                }) satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>[] as any, // prevent infinite TS type instantiation
+
+                metadata: {
+                    stopReason: "functionCalls"
+                }
+            };
+        }
+
+        return undefined;
+    }
+
+    public async *evaluateWithContextShift(loadContextWindow: () => Promise<void>): AsyncGenerator<Token> {
+        while (true) {
+            this.startTokenLoop();
+            await loadContextWindow();
+            await this.alignCurrentSequenceStateWithCurrentTokens();
+
+            await this.createNewEvaluationIterator();
+            while (await this.iterateEvaluation()) {
+                if (this.currentToken == null)
+                    break;
+
+                yield this.currentToken;
+
+                if (this.shouldAbort)
+                    return;
+
+                if (this.updateShouldContextShift())
+                    break;
+
+                if (this.restartEvaluationIterator) {
+                    await this.createNewEvaluationIterator();
+                }
+            }
+
+            this.isFirstEvaluation = false;
+
+            if (this.shouldContextShift)
+                continue;
+
+            break;
+        }
+
+        throw new Error("The context size is too small to generate a response");
+    }
+
+    public async alignCurrentSequenceStateWithCurrentTokens() {
+        let {firstDifferentIndex} = this.llamaChat.sequence.compareContextTokens(this.tokens);
+
+        // we need to decode at least one token to generate a response
+        if (firstDifferentIndex === this.tokens.length && firstDifferentIndex > 0)
+            firstDifferentIndex -= 1;
+
+        this.tokens.splice(0, firstDifferentIndex);
+
+        if (firstDifferentIndex < this.llamaChat.sequence.nextTokenIndex) {
+            await this.llamaChat.sequence.eraseContextTokenRanges([{
+                start: firstDifferentIndex,
+                end: this.llamaChat.sequence.nextTokenIndex
+            }]);
+            this.ensureNotAborted();
+        }
+    }
+
+    public async evaluateWithoutGeneratingNewTokens() {
+        if (this.evaluationIterator != null)
+            await this.evaluationIterator.return();
+
+        await this.llamaChat.sequence.evaluateWithoutGeneratingNewTokens(this.tokens, removeNullFields({
+            evaluationPriority: this.evaluationPriority
+        }));
+    }
+
+    public async createNewEvaluationIterator() {
+        if (this.evaluationIterator != null)
+            await this.evaluationIterator.return();
+
+        this.currentIterationReplacementToken = undefined;
+        this.restartEvaluationIterator = false;
+        this.evaluationIterator = this.llamaChat.sequence.evaluate(this.tokens, removeNullFields({
+            temperature: this.temperature,
+            minP: this.minP,
+            topK: this.topK,
+            topP: this.topP,
+            grammarEvaluationState: () => {
+                if (this.functionEvaluationMode !== false)
+                    return this.functionsEvaluationState;
+
+                return this.grammarEvaluationState;
+            },
+            repeatPenalty: !this.repeatPenaltyEnabled ? undefined : {
+                punishTokens: this.getPenaltyTokens,
+                penalty: this.resolvedRepeatPenalty.penalty,
+                frequencyPenalty: this.resolvedRepeatPenalty.frequencyPenalty,
+                presencePenalty: this.resolvedRepeatPenalty.presencePenalty
+            },
+            tokenBias: this.tokenBias,
+            evaluationPriority: this.evaluationPriority,
+            yieldEogToken: true
+        }));
+    }
+
+    public async iterateEvaluation() {
+        this.currentIteration = await this.evaluationIterator?.next(this.currentIterationReplacementToken);
+        this.currentIterationReplacementToken = undefined;
+
+        this.ensureNotAborted();
+        this.generatedTokens++;
+
+        if (this.currentIteration != null && this.currentIteration?.done !== true) {
+            this.currentToken = this.currentIteration.value;
+            this.currentTokens = [this.currentToken];
+            this.currentText = this.llamaChat.model.detokenize(this.currentTokens);
+
+            if (this.functionEvaluationMode === false)
+                this.currentQueuedTokenRelease = this.streamRegulator.addChunk({
+                    tokens: this.currentTokens,
+                    text: this.currentText
+                });
+            else
+                this.currentQueuedTokenRelease = undefined;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public waitOnPartialCharactersOrWhiteSpaceTokens() {
+        if (this.currentText === UNKNOWN_UNICODE_CHAR || (
+            (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) && this.currentText?.trim() === ""
+        )) {
+            if (this.currentQueuedTokenRelease != null)
+                this.locksToReleaseOnValidGeneration.push(this.currentQueuedTokenRelease.createTextIndexLock(0));
+        } else {
+            while (this.locksToReleaseOnValidGeneration.length > 0)
+                this.locksToReleaseOnValidGeneration.shift()!.dispose();
+        }
+    }
+
+    public detectAndHandleFunctionStartSyntax() {
+        this.functionSyntaxStartDetector.recordGeneration({
+            text: this.currentText,
+            tokens: this.currentTokens,
+            queuedTokenRelease: this.currentQueuedTokenRelease
+        });
+
+        if (this.currentQueuedTokenRelease != null && this.functionEvaluationMode === false && this.functionsEnabled &&
+            this.functionSyntaxStartDetector.hasTriggeredStops
+        ) {
+            this.functionEvaluationMode = "functionName";
+            this.currentQueuedTokenRelease.createTextIndexLock(0);
+
+            this.stopGenerationDetector.clearTriggeredStops();
+            this.stopGenerationDetector.clearInProgressStops();
+            this.customStopGenerationTriggersDetector.clearTriggeredStops();
+            this.customStopGenerationTriggersDetector.clearInProgressStops();
+
+            this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+
+            const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
+            const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
+
+            const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+                triggeredStops,
+                partiallyFreeTokens,
+                this.llamaChat.model.tokenizer
+            );
+            this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+
+            const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+            const remainingTextAfterStop = StopGenerationDetector.detokenizeRemainingGeneration(
+                firstRemainingGenerationAfterStop,
+                this.llamaChat.model.detokenize
+            );
+
+            this.currentFunctionCallPreviousPartLeftoverText = remainingTextAfterStop;
+        }
+    }
+
+    public recordStopGenerationEvaluation() {
+        this.stopGenerationDetector.recordGeneration({
+            text: this.currentText,
+            tokens: this.currentTokens,
+            queuedTokenRelease: this.currentQueuedTokenRelease
+        });
+        this.customStopGenerationTriggersDetector.recordGeneration({
+            text: this.currentText,
+            tokens: this.currentTokens,
+            queuedTokenRelease: this.currentQueuedTokenRelease
+        });
+    }
+
+    public popStreamRegulatorFreeTokens() {
+        this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+    }
+
+    public handleStopGenerationTrigger(lastHistoryItemType: "user" | "model") {
+        if (this.stopGenerationDetector.hasTriggeredStops || this.customStopGenerationTriggersDetector.hasTriggeredStops ||
+            this.llamaChat.model.isEogToken(this.currentToken)
+        ) {
+            this.stopGenerationDetector.clearInProgressStops();
+            this.customStopGenerationTriggersDetector.clearInProgressStops();
+            this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+
+            const triggeredStops = this.stopGenerationDetector.hasTriggeredStops
+                ? this.stopGenerationDetector.getTriggeredStops()
+                : this.customStopGenerationTriggersDetector.getTriggeredStops();
+
+            const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
+
+            const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+                triggeredStops,
+                partiallyFreeTokens,
+                this.llamaChat.model.tokenizer
+            );
+            this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+
+            const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+
+            this.removeFoundStartIgnoreTextsFromPendingTokens(true);
+
+            if (this.pendingTokens.length > 0)
+                this.onToken?.(this.pendingTokens.slice());
+
+            this.res.push(...this.pendingTokens);
+            this.contextWindowsRes.push(...this.pendingTokens);
+            this.pendingTokens.length = 0;
+
+            let modelResponse = this.llamaChat.model.detokenize(this.res);
+            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
+
+            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
+                modelResponse = modelResponse.trimEnd();
+                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
+            }
+
+            const lastEvaluation = {
+                contextWindow: setLastTextInChatHistory(
+                    lastHistoryItemType,
+                    this.lastContextWindowHistory,
+                    this.contextWindowLastModelResponse + contextWindowModelResponse
+                ),
+                cleanHistory: setLastTextInChatHistory(
+                    lastHistoryItemType,
+                    this.resolvedHistory,
+                    this.lastModelResponse + modelResponse
+                ),
+                contextShiftMetadata: this.lastHistoryCompressionMetadata
+            };
+            const isEogToken = this.llamaChat.model.isEogToken(this.currentToken);
+
+            if (isEogToken || this.stopGenerationDetector.hasTriggeredStops) {
+                return {
+                    response: modelResponse,
+                    lastEvaluation,
+                    metadata: {
+                        remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
+                        stopReason: isEogToken
+                            ? "eogToken"
+                            : "stopGenerationTrigger"
+                    }
+                } satisfies LlamaChatResponse<Functions>;
+            }
+
+            return {
+                response: modelResponse,
+                lastEvaluation,
+                metadata: {
+                    remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
+                    stopReason: "customStopTrigger",
+                    customStopTrigger: triggeredStops[0].stopTrigger
+                }
+            } satisfies LlamaChatResponse<Functions>;
+        }
+
+        return undefined;
+    }
+
+    public spliceIgnoreStartTextDetectedTokens() {
+        if (this.res.length === 0) {
+            this.ignoreStartTextDetector.clearInProgressStops();
+            this.ignoreStartTextDetector.clearTriggeredStops();
+
+            this.ignoreStartTextDetector.recordGeneration({
+                text: this.llamaChat.model.detokenize(this.pendingTokens),
+                tokens: this.pendingTokens
+            });
+        }
+    }
+
+    public isMaxTokensTriggered() {
+        return this.maxTokens != null && this.maxTokens > 0 && this.generatedTokens >= this.maxTokens;
+    }
+
+    public moveFreePendingTokensToRes(removeFoundStartIgnoreTextsFromPendingTokens: boolean = true) {
+        if (this.pendingTokens.length > 0 && (this.isMaxTokensTriggered() || !this.ignoreStartTextDetector.hasInProgressStops)) {
+            if (removeFoundStartIgnoreTextsFromPendingTokens)
+                this.removeFoundStartIgnoreTextsFromPendingTokens();
+
+            if (this.pendingTokens.length > 0) {
+                this.onToken?.(this.pendingTokens.slice());
+                this.res.push(...this.pendingTokens);
+                this.contextWindowsRes.push(...this.pendingTokens);
+                this.pendingTokens.length = 0;
+            }
+        }
+    }
+
+    public handleMaxTokensTrigger(lastHistoryItemType: "user" | "model") {
+        if (this.isMaxTokensTriggered()) {
+            let modelResponse = this.llamaChat.model.detokenize(this.res);
+            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
+
+            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
+                modelResponse = modelResponse.trimEnd();
+                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
+            }
+
+            return {
+                response: modelResponse,
+                lastEvaluation: {
+                    contextWindow: setLastTextInChatHistory(
+                        lastHistoryItemType,
+                        this.lastContextWindowHistory,
+                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                    ),
+                    cleanHistory: setLastTextInChatHistory(
+                        lastHistoryItemType,
+                        this.resolvedHistory,
+                        this.lastModelResponse + modelResponse
+                    ),
+                    contextShiftMetadata: this.lastHistoryCompressionMetadata
+                },
+                metadata: {
+                    stopReason: "maxTokens"
+                }
+            } satisfies LlamaChatResponse<Functions>;
+        }
+
+        return undefined;
+    }
+
+    public updateShouldContextShift() {
+        this.shouldContextShift = this.llamaChat.sequence.nextTokenIndex >= this.llamaChat.context.contextSize - 1;
+        return this.shouldContextShift;
+    }
+
+    public get shouldAbort() {
+        return !!(this.signal?.aborted && this.stopOnAbortSignal);
+    }
+
+    public handleAbortTrigger(lastHistoryItemType: "user" | "model") {
+        if (this.shouldAbort && this.signal?.aborted && this.stopOnAbortSignal) {
+            if (this.res.length === 0)
+                throw this.signal.reason;
+
+            let modelResponse = this.llamaChat.model.detokenize(this.res);
+            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
+
+            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
+                modelResponse = modelResponse.trimEnd();
+                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
+            }
+
+            return {
+                response: modelResponse,
+                lastEvaluation: {
+                    contextWindow: setLastTextInChatHistory(
+                        lastHistoryItemType,
+                        this.lastContextWindowHistory,
+                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                    ),
+                    cleanHistory: setLastTextInChatHistory(
+                        lastHistoryItemType,
+                        this.resolvedHistory,
+                        this.lastModelResponse + modelResponse
+                    ),
+                    contextShiftMetadata: this.lastHistoryCompressionMetadata
+                },
+                metadata: {
+                    stopReason: "abort"
+                }
+            } satisfies LlamaChatResponse<Functions>;
+        }
+
+        return undefined;
+    }
 }

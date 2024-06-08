@@ -1,4 +1,4 @@
-import {Token, Tokenizer} from "../types.js";
+import {Detokenizer, Token, Tokenizer} from "../types.js";
 import {SpecialToken, isLlamaText, LlamaText, SpecialTokensText} from "./LlamaText.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock} from "./TokenStreamRegulator.js";
 
@@ -12,8 +12,18 @@ export class StopGenerationDetector<T extends string = string> {
         queuedTokenReleaseLocks: Set<QueuedTokenReleaseLock>
     }>();
 
-    public recordGeneration({text, tokens, queuedTokenRelease, startNewChecks = true}: {
-        text: string, tokens: Token[], queuedTokenRelease?: QueuedTokenRelease, startNewChecks?: boolean
+    public recordGeneration({
+        text,
+        tokens,
+        queuedTokenRelease,
+        startNewChecks = true,
+        triggerMustStartWithGeneration = false
+    }: {
+        text: string,
+        tokens: Token[],
+        queuedTokenRelease?: QueuedTokenRelease,
+        startNewChecks?: boolean,
+        triggerMustStartWithGeneration?: boolean
     }) {
         const currentActiveChecks = this._activeChecks;
         this._activeChecks = new Set();
@@ -42,7 +52,7 @@ export class StopGenerationDetector<T extends string = string> {
         if (!startNewChecks)
             return;
 
-        for (let i = 0; i < text.length; i++) {
+        for (let i = 0; i < text.length && (!triggerMustStartWithGeneration || i === 0); i++) {
             const char = text[i];
             const currentPart = this._stopTriggers.get(char);
 
@@ -58,7 +68,7 @@ export class StopGenerationDetector<T extends string = string> {
             textCheck.queuedTokenReleaseLock?.dispose();
         }
 
-        for (let i = 0; i < tokens.length; i++) {
+        for (let i = 0; i < tokens.length && (!triggerMustStartWithGeneration || i === 0); i++) {
             const token = tokens[i];
             const currentPart = this._stopTriggers.get(token);
 
@@ -127,18 +137,13 @@ export class StopGenerationDetector<T extends string = string> {
 
     /** Gets the stops that have been found and triggered. */
     public getTriggeredStops() {
-        const res: Array<{
-            stopTrigger: StopGenerationTrigger,
-            events: T[],
-            remainingGenerations: (string | Token[])[],
-            queuedTokenReleaseLocks: QueuedTokenReleaseLock[]
-        }> = [];
+        const res: TriggeredStop<T>[] = [];
 
         for (const [triggerPart, triggeredStop] of this._triggeredStops.entries()) {
             res.push({
                 stopTrigger: triggerPart.completesTrigger!,
                 events: Array.from(triggerPart.completeEvents ?? new Set()),
-                remainingGenerations: Array.from(triggeredStop.remainingGenerations),
+                remainingGeneration: Array.from(triggeredStop.remainingGenerations),
                 queuedTokenReleaseLocks: Array.from(triggeredStop.queuedTokenReleaseLocks)
             });
         }
@@ -162,6 +167,51 @@ export class StopGenerationDetector<T extends string = string> {
         this._activeChecks.clear();
     }
 
+    public get hasTriggers() {
+        return this._stopTriggers.size > 0;
+    }
+
+    /**
+     * For a given generation, get the number of possibilities that would be disregarded if the generation is recorded.
+     *
+     * Calling this function does not change the state of the detector.
+     */
+    public getDisregardedPossibilitiesCountForAGeneration({
+        text, tokens, startNewChecks
+    }: {
+        text: string, tokens: Token[],
+
+        /** Setting this to `true` implies that `triggerMustStartWithGeneration` is also `true` */
+        startNewChecks: boolean
+    }) {
+        let res = 0;
+
+        for (const check of this._activeChecks) {
+            const disregardedTextPossibilities = this._getCountOfPossibleTriggersToBeDisregarded(check.currentPart, text);
+            const disregardedTokenPossibilities = this._getCountOfPossibleTriggersToBeDisregarded(check.currentPart, tokens);
+
+            res += Math.min(disregardedTextPossibilities, disregardedTokenPossibilities);
+        }
+
+        if (startNewChecks) {
+            const disregardedTextPossibilities = text.length > 0
+                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(text[0]), text.slice(1))
+                : null;
+            const disregardedTokenPossibilities = tokens.length > 0
+                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(tokens[0]), tokens.slice(1))
+                : null;
+
+            if (disregardedTextPossibilities != null && disregardedTokenPossibilities != null)
+                res += Math.min(disregardedTextPossibilities, disregardedTokenPossibilities);
+            else if (disregardedTextPossibilities != null)
+                res += disregardedTextPossibilities;
+            else if (disregardedTokenPossibilities != null)
+                res += disregardedTokenPossibilities;
+        }
+
+        return res;
+    }
+
     /** @internal */
     private _addFoundStop(
         part: TriggerPart<T>,
@@ -181,6 +231,35 @@ export class StopGenerationDetector<T extends string = string> {
 
         if (queuedTokenReleaseLock != null)
             triggeredStop.queuedTokenReleaseLocks.add(queuedTokenReleaseLock);
+    }
+
+    /** @internal */
+    private _getCountOfPossibleTriggersToBeDisregarded(initialPart: TriggerPart<T> | undefined, value: string | Token[]) {
+        if (initialPart == null)
+            return 0;
+
+        let part: TriggerPart<T> | undefined = initialPart;
+        let res = 0;
+
+        for (let i = 0; i < value.length && part != null; i++) {
+            const item = value[i];
+
+            if (part.next == null)
+                return res + 1;
+
+            if (part.next.has(item)) {
+                res += part.next.size - 1;
+                part = part.next.get(item);
+                continue;
+            }
+
+            return res + part.next.size;
+        }
+
+        if (part == null || part.next == null)
+            return res + 1;
+
+        return res;
     }
 
     /** @internal */
@@ -223,7 +302,7 @@ export class StopGenerationDetector<T extends string = string> {
     }
 
     public static resolveStopTriggers(
-        stopTriggers: readonly (string | StopGenerationTrigger | LlamaText)[],
+        stopTriggers: readonly (string | Readonly<StopGenerationTrigger> | LlamaText)[],
         tokenizer: Tokenizer
     ) {
         return stopTriggers
@@ -258,9 +337,32 @@ export class StopGenerationDetector<T extends string = string> {
                 .flat(1)
         );
     }
+
+    public static getFirstRemainingGenerationAfterStop(triggeredStops: TriggeredStop[]): string | Token[] | undefined {
+        const [firstRemainingGenerationAfterStop] = triggeredStops
+            .map((stopTrigger) => stopTrigger.remainingGeneration)
+            .filter((remainingGenerations) => remainingGenerations.length > 0)
+            .flat(1);
+
+        return firstRemainingGenerationAfterStop;
+    }
+
+    public static detokenizeRemainingGeneration(
+        remainingGeneration: string | Token[] | undefined,
+        detokenizer: Detokenizer,
+        specialTokens: boolean = false
+    ) {
+        if (remainingGeneration == null || remainingGeneration.length === 0)
+            return "";
+
+        if (typeof remainingGeneration === "string")
+            return remainingGeneration;
+
+        return detokenizer(remainingGeneration, specialTokens);
+    }
 }
 
-function simplifyStopTrigger(stopTrigger: StopGenerationTrigger): StopGenerationTrigger {
+function simplifyStopTrigger(stopTrigger: Readonly<StopGenerationTrigger>): StopGenerationTrigger {
     let text = "";
     const res: StopGenerationTrigger = [];
 
@@ -293,4 +395,11 @@ type TriggerPart<T extends string = string> = {
     next?: Map<string | Token, TriggerPart<T>>,
     completesTrigger?: StopGenerationTrigger,
     completeEvents?: Set<T>
+};
+
+export type TriggeredStop<T extends string = string> = {
+    stopTrigger: StopGenerationTrigger,
+    events: T[],
+    remainingGeneration: (string | Token[])[],
+    queuedTokenReleaseLocks: QueuedTokenReleaseLock[]
 };

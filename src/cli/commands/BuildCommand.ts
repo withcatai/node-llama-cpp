@@ -26,7 +26,10 @@ type BuildCommand = {
     noUsageExample?: boolean,
 
     /** @internal */
-    noCustomCmakeBuildOptionsInBinaryFolderName?: boolean
+    noCustomCmakeBuildOptionsInBinaryFolderName?: boolean,
+
+    /** @internal */
+    ciMode?: boolean
 };
 
 export const BuildCommand: CommandModule<object, BuildCommand> = {
@@ -69,6 +72,12 @@ export const BuildCommand: CommandModule<object, BuildCommand> = {
                 hidden: true, // this is only for the CI to use
                 default: false,
                 description: "Don't include custom CMake build options in build folder name"
+            })
+            .option("ciMode", {
+                type: "boolean",
+                hidden: true, // this is only for the CI to use
+                default: false,
+                description: "Enable CI only build options"
             });
     },
     handler: BuildLlamaCppCommand
@@ -79,7 +88,12 @@ export async function BuildLlamaCppCommand({
     nodeTarget = undefined,
     gpu = defaultLlamaCppGpuSupport,
     noUsageExample = false,
-    noCustomCmakeBuildOptionsInBinaryFolderName = false
+
+    /** @internal */
+    noCustomCmakeBuildOptionsInBinaryFolderName = false,
+
+    /** @internal */
+    ciMode = false
 }: BuildCommand) {
     if (!(await isLlamaCppRepoCloned())) {
         console.log(chalk.red('llama.cpp is not downloaded. Please run "node-llama-cpp download" first'));
@@ -133,7 +147,8 @@ export async function BuildLlamaCppCommand({
                     updateLastBuildInfo: true,
                     downloadCmakeIfNeeded: false,
                     ensureLlamaCppRepoIsCloned: false,
-                    includeBuildOptionsInBinaryFolderName
+                    includeBuildOptionsInBinaryFolderName,
+                    ciMode: isCI && ciMode
                 });
             });
         } catch (err) {

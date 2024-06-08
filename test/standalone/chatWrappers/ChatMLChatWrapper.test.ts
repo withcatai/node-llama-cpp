@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import {ChatHistoryItem, Llama3ChatWrapper} from "../../../src/index.js";
+import {ChatMLChatWrapper, ChatHistoryItem} from "../../../src/index.js";
 import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
-describe("Llama3ChatWrapper", () => {
+describe("ChatMLChatWrapper", () => {
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",
         text: defaultChatSystemPrompt
@@ -32,8 +32,8 @@ describe("Llama3ChatWrapper", () => {
     }];
 
     test("should generate valid context text", () => {
-        const chatWrapper = new Llama3ChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const chatWrapper = new ChatMLChatWrapper();
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -43,39 +43,30 @@ describe("Llama3ChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
-
+              "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>assistant
           ",
             },
             "Hello!",
           ]
         `);
 
-        const chatWrapper2 = new Llama3ChatWrapper();
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const chatWrapper2 = new ChatMLChatWrapper();
+        const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -85,68 +76,53 @@ describe("Llama3ChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
-
+              "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>assistant
           ",
             },
             "Hello!",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>user
           ",
             },
             "How are you?",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>assistant
           ",
             },
             "I'm good, how are you?",
           ]
         `);
 
-        const chatWrapper3 = new Llama3ChatWrapper();
-        const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const chatWrapper3 = new ChatMLChatWrapper();
+        const {contextText: contextText3} = chatWrapper3.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
@@ -156,31 +132,22 @@ describe("Llama3ChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
-
+              "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>assistant
           ",
             },
             "Hello!",
@@ -195,36 +162,31 @@ describe("Llama3ChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
-
+              "value": "<|im_start|>system
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>user
           ",
             },
             "Hi there!",
             {
-              "type": "specialToken",
-              "value": "EOT",
+              "type": "specialTokensText",
+              "value": "<|im_end|>
+          <|im_start|>assistant
+          ",
             },
+            "Hello!",
             {
               "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
-
+              "value": "<|im_end|>
+          <|im_start|>assistant
           ",
             },
-            "Hello!
-
-          ",
           ]
         `);
     });

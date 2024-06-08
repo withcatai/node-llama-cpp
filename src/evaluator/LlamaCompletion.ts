@@ -5,9 +5,10 @@ import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {UnsupportedError} from "../utils/UnsupportedError.js";
 import {removeNullFields} from "../utils/removeNullFields.js";
 import {QueuedTokenReleaseLock, TokenStreamRegulator} from "../utils/TokenStreamRegulator.js";
-import {StopGenerationDetector, StopGenerationTrigger} from "../utils/StopGenerationDetector.js";
+import {StopGenerationDetector} from "../utils/StopGenerationDetector.js";
 import {UNKNOWN_UNICODE_CHAR} from "../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeStopTrigger.js";
+import {safeEventCallback} from "../utils/safeEventCallback.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
@@ -91,8 +92,10 @@ export type LlamaCompletionGenerationOptions = {
 
     grammar?: LlamaGrammar,
 
-    /** Consider any of these as EOS for the generated text */
-    stopGenerationTriggers?: readonly (StopGenerationTrigger | LlamaText)[],
+    /**
+     * Custom stop triggers to stop the completion when any of the provided triggers are found.
+     */
+    customStopTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
 
     /**
      * The number of tokens to delete from the context window to make space for new ones.
@@ -118,6 +121,18 @@ export type LlamaInfillGenerationOptions = LlamaCompletionGenerationOptions & {
      * Defaults to 10% of the context size.
      */
     minPrefixKeepTokens?: number | ((sequence: LlamaContextSequence) => number | Promise<number>)
+};
+
+export type LlamaCompletionResponse = {
+    response: string,
+    metadata: {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "eogToken" | "stopGenerationTrigger" | "maxTokens"
+    } | {
+        remainingGenerationAfterStop?: string | Token[],
+        stopReason: "customStopTrigger",
+        customStopTrigger: (string | Token)[]
+    }
 };
 
 const defaultContextShiftSize = (
@@ -206,11 +221,11 @@ export class LlamaCompletion {
             tokenBias,
             evaluationPriority = 5,
             grammar,
-            stopGenerationTriggers,
+            customStopTriggers,
             contextShiftSize = defaultContextShiftSize,
             disableContextShift
         }: LlamaCompletionGenerationOptions = {}
-    ) {
+    ): Promise<LlamaCompletionResponse> {
         if (this._sequence == null || this.disposed)
             throw new DisposedError();
 
@@ -274,7 +289,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
-                onToken,
+                onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
                 temperature,
@@ -287,7 +302,7 @@ export class LlamaCompletion {
                 evaluationPriority,
                 grammar,
                 contextShiftSize,
-                stopGenerationTriggers
+                customStopTriggers
             }, {
                 async contextShift({shiftSize, res, pendingTokens, sequence}): Promise<{
                     newContextState: Token[]
@@ -340,11 +355,11 @@ export class LlamaCompletion {
             evaluationPriority = 5,
             grammar,
             contextShiftSize = defaultContextShiftSize,
-            stopGenerationTriggers,
+            customStopTriggers,
             minPrefixKeepTokens = defaultMinPrefixKeepTokens,
             disableContextShift = false
         }: LlamaInfillGenerationOptions = {}
-    ) {
+    ): Promise<LlamaCompletionResponse> {
         if (this._sequence == null || this.disposed)
             throw new DisposedError();
 
@@ -457,7 +472,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
-                onToken,
+                onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
                 temperature,
@@ -470,7 +485,7 @@ export class LlamaCompletion {
                 evaluationPriority,
                 grammar,
                 contextShiftSize,
-                stopGenerationTriggers
+                customStopTriggers
             }, {
                 async contextShift({shiftSize, res, pendingTokens, sequence}): Promise<{
                     newContextState: Token[]
@@ -505,7 +520,7 @@ export class LlamaCompletion {
             evaluationPriority = 5,
             grammar,
             contextShiftSize = defaultContextShiftSize,
-            stopGenerationTriggers
+            customStopTriggers
         }: LlamaCompletionGenerationOptions,
         {
             contextShift
@@ -517,7 +532,7 @@ export class LlamaCompletion {
                 sequence: LlamaContextSequence
             }): Promise<{newContextState: Token[]}>
         }
-    ) {
+    ): Promise<LlamaCompletionResponse> {
         if (this._sequence == null)
             throw new DisposedError();
 
@@ -542,6 +557,7 @@ export class LlamaCompletion {
             : repeatPenalty;
         const streamRegulator = new TokenStreamRegulator();
         const stopGenerationDetector = new StopGenerationDetector();
+        const customStopGenerationTriggersDetector = new StopGenerationDetector();
         const locksToReleaseOnValidGeneration: QueuedTokenReleaseLock[] = [];
         const repeatPenaltyEnabled = repeatPenaltyLastTokens > 0;
 
@@ -552,9 +568,9 @@ export class LlamaCompletion {
             StopGenerationDetector.resolveStopTriggers(grammar.stopGenerationTriggers, model.tokenizer)
                 .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
 
-        if (stopGenerationTriggers != null)
-            StopGenerationDetector.resolveStopTriggers(stopGenerationTriggers, model.tokenizer)
-                .map((stopTrigger) => stopGenerationDetector.addStopTrigger(stopTrigger));
+        if (customStopTriggers != null)
+            StopGenerationDetector.resolveStopTriggers(customStopTriggers, model.tokenizer)
+                .map((stopTrigger) => customStopGenerationTriggersDetector.addStopTrigger(stopTrigger));
 
         const ensureNotAborted = () => {
             if (signal?.aborted)
@@ -637,11 +653,16 @@ export class LlamaCompletion {
                 }
 
                 stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
+                customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
 
                 pendingTokens.push(...streamRegulator.popFreeChunkTokens());
 
-                if (stopGenerationDetector.hasTriggeredStops || model.isEogToken(token)) {
-                    const triggeredStops  = stopGenerationDetector.getTriggeredStops();
+                if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
+                    model.isEogToken(token)
+                ) {
+                    const triggeredStops  = stopGenerationDetector.hasTriggeredStops
+                        ? stopGenerationDetector.getTriggeredStops()
+                        : customStopGenerationTriggersDetector.getTriggeredStops();
                     const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
 
                     const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
@@ -651,10 +672,7 @@ export class LlamaCompletion {
                     );
                     pendingTokens.push(...queuedTokensBeforeStopTrigger);
 
-                    const [firstRemainingGenerationAfterStop] = triggeredStops
-                        .map((stopTrigger) => stopTrigger.remainingGenerations)
-                        .filter((remainingGenerations) => remainingGenerations.length > 0)
-                        .flat(1);
+                    const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
                     if (pendingTokens.length > 0)
                         onToken?.(pendingTokens.slice());
@@ -667,13 +685,25 @@ export class LlamaCompletion {
                     if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
                         modelResponse = modelResponse.trimEnd();
 
+                    const isEogToken = model.isEogToken(token);
+
+                    if (isEogToken || stopGenerationDetector.hasTriggeredStops)
+                        return {
+                            response: modelResponse,
+                            metadata: {
+                                remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
+                                stopReason: isEogToken
+                                    ? "eogToken"
+                                    : "stopGenerationTrigger"
+                            }
+                        };
+
                     return {
                         response: modelResponse,
                         metadata: {
                             remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                            stopReason: model.isEogToken(token)
-                                ? "eogToken" as const
-                                : "stopGenerationTrigger" as const
+                            stopReason: "customStopTrigger",
+                            customStopTrigger: triggeredStops[0].stopTrigger
                         }
                     };
                 }
@@ -693,7 +723,7 @@ export class LlamaCompletion {
                     return {
                         response: modelResponse,
                         metadata: {
-                            stopReason: "maxTokens" as const
+                            stopReason: "maxTokens"
                         }
                     };
                 }

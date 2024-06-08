@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
-import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel.js";
+import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel/LlamaModel.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
 import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
@@ -254,6 +254,11 @@ export class Llama {
     /** @internal */
     public async _init() {
         await this._bindings.init();
+    }
+
+    /** @internal */
+    public _log(level: LlamaLogLevel, message: string) {
+        this._onAddonLog(LlamaLogLevelToAddonLogLevel.get(level) ?? defaultLogLevel, message + "\n");
     }
 
     /** @internal */

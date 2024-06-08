@@ -37,7 +37,8 @@ async function detectCudaSupport({
     platform: BinaryPlatform
 }) {
     if (platform === "win") {
-        const librarySearchPaths = await getCudaInstallationPaths({platform});
+        const librarySearchPaths = (await getCudaInstallationPaths({platform}))
+            .flatMap((cudaInstallationPath) => [cudaInstallationPath, path.join(cudaInstallationPath, "bin")]);
         const windir = getWindir();
 
         const [

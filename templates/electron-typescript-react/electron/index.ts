@@ -1,6 +1,6 @@
 import {fileURLToPath} from "node:url";
 import path from "node:path";
-import {app, BrowserWindow} from "electron";
+import {app, shell, BrowserWindow} from "electron";
 import {registerLlmRpc} from "./rpc/llmRpc.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +34,15 @@ function createWindow() {
         }
     });
     registerLlmRpc(win);
+
+    // open external links in the default browser
+    win.webContents.setWindowOpenHandler(({url}) => {
+        if (url.startsWith("file://"))
+            return {action: "allow"};
+
+        void shell.openExternal(url);
+        return {action: "deny"};
+    });
 
     // Test active push message to Renderer-process.
     win.webContents.on("did-finish-load", () => {

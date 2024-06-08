@@ -6,7 +6,7 @@ import {createTestLlama, getTestLlama} from "../../utils/getTestLlama.js";
 describe("stableCode", () => {
     describe("parallel", () => {
         test("can use multiple bindings in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
             const llama2 = await createTestLlama();
 
@@ -56,7 +56,7 @@ describe("stableCode", () => {
         });
 
         test("can use multiple models in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -100,7 +100,7 @@ describe("stableCode", () => {
         });
 
         test("can use multiple contexts in parallel", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -141,7 +141,7 @@ describe("stableCode", () => {
         });
 
         test("can use multiple context sequences in parallel", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
-            const modelPath = await getModelFile("stable-code-3b.Q5_K_M.gguf");
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({

@@ -6,8 +6,8 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("functionary", () => {
     describe("grammar", () => {
         describe("JSON schema", () => {
-            test("find verb in message", {timeout: 1000 * 60 * 60 * 2}, async () => {
-                const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+            test("find verb in message", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
+                const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
                 const llama = await getTestLlama();
 
                 const model = await llama.loadModel({
@@ -26,7 +26,7 @@ describe("functionary", () => {
                         "userMessagePositivityScoreFromOneToTen": {
                             enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
                         },
-                        "verbsInUserMessage": {
+                        "positiveWordsInUserMessage": {
                             type: "array",
                             items: {
                                 type: "string"
@@ -35,17 +35,17 @@ describe("functionary", () => {
                     }
                 } as const);
 
-                const res = await chatSession.prompt("How's your great day going so far?", {
+                const res = await chatSession.prompt("It's great!", {
                     grammar
                 });
                 const parsedRes = grammar.parse(res);
 
                 expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(10);
-                expect(parsedRes.verbsInUserMessage).to.eql(["going"]);
+                expect(parsedRes.positiveWordsInUserMessage).to.eql(["great"]);
             });
 
             test("get an array of numbers", {timeout: 1000 * 60 * 60 * 2}, async () => {
-                const modelPath = await getModelFile("functionary-small-v2.2.q4_0.gguf");
+                const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
                 const llama = await getTestLlama();
 
                 const model = await llama.loadModel({

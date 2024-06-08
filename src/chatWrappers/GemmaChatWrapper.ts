@@ -1,5 +1,5 @@
 import {ChatWrapper} from "../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
+import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://ai.google.dev/gemma/docs/formatting
@@ -7,48 +7,48 @@ import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js"
 export class GemmaChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Gemma";
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[],
-        ignoreStartText?: LlamaText[],
-        functionCall?: {
-            initiallyEngaged: boolean,
-            disengageInitiallyEngaged: LlamaText[]
-        }
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override readonly settings: ChatWrapperSettings = {
+        ...ChatWrapper.defaultSettings,
+        supportsSystemMessages: false
+    };
+
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            user: string,
-            model: string
+            user: LlamaText,
+            model: LlamaText
         }> = [];
 
-        let systemTexts: string[] = [];
-        let userTexts: string[] = [];
-        let modelTexts: string[] = [];
+        let systemTexts: LlamaText[] = [];
+        let userTexts: LlamaText[] = [];
+        let modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
         function flush() {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0) {
-                const systemText = systemTexts.join("\n\n");
-                let userText = userTexts.join("\n\n");
+                const systemText = LlamaText.joinValues("\n\n", systemTexts);
+                let userText = LlamaText.joinValues("\n\n", userTexts);
 
                 // there's no system prompt support in Gemma, so we'll prepend the system text to the user message
-                if (systemText.length > 0) {
-                    if (userText.length === 0)
+                if (systemText.values.length > 0) {
+                    if (userText.values.length === 0)
                         userText = systemText;
                     else
-                        userText = systemText + "\n\n---\n\n" + userText;
+                        userText = LlamaText([
+                            systemText,
+                            "\n\n---\n\n",
+                            userText
+                        ]);
 
                 }
                 resultItems.push({
                     user: userText,
-                    model: modelTexts.join("\n\n")
+                    model: LlamaText.joinValues("\n\n", modelTexts)
                 });
             }
 
@@ -63,13 +63,13 @@ export class GemmaChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 if (currentAggregateFocus !== "system" && currentAggregateFocus !== "user")
                     flush();
 
                 currentAggregateFocus = "user";
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 currentAggregateFocus = "model";
                 modelTexts.push(this.generateModelResponseText(item.response));
@@ -84,7 +84,7 @@ export class GemmaChatWrapper extends ChatWrapper {
                 const isLastItem = index === resultItems.length - 1;
 
                 return LlamaText([
-                    (user.length === 0)
+                    (user.values.length === 0)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("<start_of_turn>user\n"),
@@ -92,7 +92,7 @@ export class GemmaChatWrapper extends ChatWrapper {
                             new SpecialTokensText("<end_of_turn>\n")
                         ]),
 
-                    (model.length === 0 && !isLastItem)
+                    (model.values.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("<start_of_turn>model\n"),

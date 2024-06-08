@@ -1,10 +1,10 @@
-import {Token, Tokenizer} from "../types.js";
 import type {InspectOptions, inspect as InspectFunction} from "node:util";
+import type {Token, Tokenizer} from "../types.js";
 
 export type LlamaTextValue = string | SpecialTokensText | SpecialToken;
 export type LlamaTextInputValue = LlamaTextValue | LlamaText | number | boolean | readonly LlamaTextInputValue[];
 
-export type LlamaTextJSON = Array<LlamaTextJSONValue>;
+export type LlamaTextJSON = string | LlamaTextJSONValue[];
 export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | LlamaTextSpecialTokenJSON;
 export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: string};
 export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
@@ -24,12 +24,26 @@ class LlamaText {
         return new LlamaTextConstructor([...this.values, value]);
     }
 
-    public mapValues(mapper: (value: LlamaTextValue) => LlamaTextInputValue) {
+    public mapValues(
+        mapper: (
+            this: readonly LlamaTextValue[],
+            value: LlamaTextValue,
+            index: number,
+            values: readonly LlamaTextValue[]
+        ) => LlamaTextInputValue
+    ) {
         return new LlamaTextConstructor(
             this.values.map(mapper)
         );
     }
 
+    /**
+     * Joins the values with the given separator.
+     *
+     * Note that the values are squashed when they are loaded into the `LlamaText`, so the separator is not added between adjacent strings.
+     *
+     * To add the separator on values before squashing them, use `LlamaText.joinValues` instead.
+     */
     public joinValues(separator: LlamaText | LlamaTextValue) {
         const newValues: LlamaTextValue[] = [];
 
@@ -61,6 +75,11 @@ class LlamaText {
     }
 
     public toJSON(): LlamaTextJSON {
+        if (this.values.length === 1 && typeof this.values[0] === "string")
+            return this.values[0];
+        else if (this.values.length === 0)
+            return "";
+
         return this.values.map((value) => {
             if (value instanceof SpecialToken)
                 return value.toJSON() satisfies LlamaTextJSONValue;
@@ -225,9 +244,14 @@ class LlamaText {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "LlamaText(" + inspect(this.values, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "LlamaText(" + inspectFunction(this.values, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined
@@ -237,6 +261,9 @@ class LlamaText {
 
     public static fromJSON(json: LlamaTextJSON): LlamaText {
         // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        if (typeof json === "string")
+            return new LlamaTextConstructor(json);
 
         return new LlamaTextConstructor(
             json.map((value) => {
@@ -270,6 +297,95 @@ class LlamaText {
 
         return true;
     }
+
+    /**
+     * Attempt to convert tokens to a `LlamaText` while preserving special tokens.
+     *
+     * Non-standard special tokens that don't have a text representation are ignored.
+     */
+    public static fromTokens(tokenizer: Tokenizer, tokens: Token[]): LlamaText {
+        // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        const res: (string | SpecialToken | SpecialTokensText)[] = [];
+        const pendingTokens: Token[] = [];
+
+        const addPendingTokens = () => {
+            if (pendingTokens.length === 0)
+                return;
+
+            res.push(tokenizer.detokenize(pendingTokens, false));
+            pendingTokens.length = 0;
+        };
+
+        const builtinTokens = SpecialToken.getTokenToValueMap(tokenizer);
+
+        for (const token of tokens) {
+            if (token == null)
+                continue;
+
+            const builtinTokenValue = builtinTokens.get(token);
+            if (builtinTokenValue != null) {
+                addPendingTokens();
+                res.push(new SpecialToken(builtinTokenValue));
+                continue;
+            }
+
+            const regularText = tokenizer.detokenize([token], false);
+            const retokenizedRegularText = tokenizer(regularText, false, "trimLeadingSpace");
+            if (retokenizedRegularText.length === 1 && retokenizedRegularText[0] === token) {
+                pendingTokens.push(token);
+                continue;
+            }
+
+            const specialText = tokenizer.detokenize([token], true);
+            const retokenizedSpecialText = tokenizer(specialText, true, "trimLeadingSpace");
+            if (retokenizedSpecialText.length === 1 && retokenizedSpecialText[0] === token) {
+                addPendingTokens();
+                res.push(new SpecialTokensText(specialText));
+                continue;
+            }
+
+            pendingTokens.push(token);
+        }
+
+        addPendingTokens();
+
+        return new LlamaTextConstructor(res);
+    }
+
+    /**
+     * Join values with the given separator before squashing adjacent strings inside the values
+     */
+    public static joinValues(separator: LlamaText | string, values: readonly LlamaTextInputValue[]): LlamaText {
+        // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        const newValues: (LlamaTextInputValue | LlamaText)[] = [];
+
+        for (let i = 0; i < values.length; i++) {
+            const value = values[i];
+
+            if (i !== 0)
+                newValues.push(separator);
+
+            newValues.push(value);
+        }
+
+        return new LlamaTextConstructor(newValues);
+    }
+
+    public static isLlamaText(value: unknown): value is LlamaText {
+        // assigned to `LlamaTextConstructor` manually to expose this static method
+
+        if (value instanceof LlamaTextConstructor || value instanceof LlamaText)
+            return true;
+
+        try {
+            // detect a `LlamaText` created from a different module import
+            return value != null && Object.getPrototypeOf(value as LlamaText)?._type === "LlamaText";
+        } catch (err) {
+            return false;
+        }
+    }
 }
 Object.defineProperty(LlamaText.prototype, "_type", {
     enumerable: false,
@@ -296,6 +412,9 @@ const LlamaTextConstructor: LlamaTextConstructor = function LlamaText(this: Llam
 (LlamaTextConstructor as (() => any)).prototype.constructor = LlamaTextConstructor;
 LlamaTextConstructor.fromJSON = LlamaText.fromJSON;
 LlamaTextConstructor.compare = LlamaText.compare;
+LlamaTextConstructor.fromTokens = LlamaText.fromTokens;
+LlamaTextConstructor.joinValues = LlamaText.joinValues;
+LlamaTextConstructor.isLlamaText = LlamaText.isLlamaText;
 
 const _LlamaText = LlamaTextConstructor;
 type _LlamaText = LlamaText;
@@ -353,9 +472,14 @@ export class SpecialTokensText {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "new SpecialTokensText(" + inspect(this.value, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "new SpecialTokensText(" + inspectFunction(this.value, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined
@@ -410,9 +534,14 @@ export class SpecialToken {
 
     /** @internal */
     public [Symbol.for("nodejs.util.inspect.custom")](
-        depth: number | null, inspectOptions: InspectOptions, inspect: typeof InspectFunction
+        depth: number | null, inspectOptions: InspectOptions, inspect?: typeof InspectFunction
     ) {
-        return "new SpecialToken(" + inspect(this.value, {
+        const inspectFunction = inspect ?? ((inspectOptions as any)?.inspect as undefined | typeof InspectFunction);
+
+        if (inspectFunction == null)
+            return JSON.stringify(this.toJSON(), undefined, 4);
+
+        return "new SpecialToken(" + inspectFunction(this.value, {
             ...(inspectOptions ?? {}),
             depth: depth == null
                 ? undefined
@@ -430,14 +559,27 @@ export class SpecialToken {
     public static isSpecialTokenJSON(value: LlamaTextJSONValue): value is LlamaTextSpecialTokenJSON {
         return value != null && typeof value === "object" && value.type === "specialToken";
     }
+
+    public static getTokenToValueMap(tokenizer: Tokenizer): ReadonlyMap<Token | undefined, BuiltinSpecialTokenValue> {
+        const supportedValues = [
+            "BOS", "EOS", "NL", "EOT"
+        ] as const satisfies BuiltinSpecialTokenValue[];
+        void (0 as any as BuiltinSpecialTokenValue satisfies typeof supportedValues[number]);
+
+        const res = new Map<Token | undefined, BuiltinSpecialTokenValue>(
+            supportedValues.map(
+                (value) => ([tokenizer(value, "builtin")[0], value])
+            )
+        );
+
+        res.delete(undefined);
+
+        return res;
+    }
 }
 
 export function isLlamaText(value: unknown): value is LlamaText {
-    if (value instanceof LlamaTextConstructor || value instanceof LlamaText)
-        return true;
-
-    // detect a `LlamaText` created from a different module import
-    return value != null && Object.getPrototypeOf(value as LlamaText)?._type === "LlamaText";
+    return LlamaText.isLlamaText(value);
 }
 
 export function tokenizeText(text: string | LlamaText, tokenizer: Tokenizer) {

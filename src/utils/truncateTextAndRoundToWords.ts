@@ -1,3 +1,5 @@
+import {LlamaText, SpecialToken, SpecialTokensText} from "./LlamaText.js";
+
 const truncatePrefix = "...";
 
 /**
@@ -32,4 +34,37 @@ export function truncateTextAndRoundToWords(text: string, truncateStartIndex: nu
         return "";
 
     return truncatePrefix + res.slice(truncatePrefix.length);
+}
+
+export function truncateLlamaTextAndRoundToWords(llamaText: LlamaText, truncateStartIndex: number, maxRound: number = 6): LlamaText {
+    if (truncateStartIndex <= 0)
+        return llamaText;
+
+    for (let i = 0; i < llamaText.values.length; i++) {
+        const value = llamaText.values[i];
+        if (typeof value === "string") {
+            if (value.length > truncateStartIndex) {
+                return LlamaText([
+                    truncateTextAndRoundToWords(value, truncateStartIndex, maxRound),
+                    ...llamaText.values.slice(i + 1)
+                ]);
+            }
+
+            truncateStartIndex -= value.length;
+        } else if (value instanceof SpecialToken) {
+            truncateStartIndex--;
+            if (truncateStartIndex <= 0)
+                return LlamaText(llamaText.values.slice(i + 1));
+        } else {
+            void (value satisfies SpecialTokensText);
+
+            // SpecialTokensText shouldn't be truncated
+            if (value.value.length > truncateStartIndex)
+                return LlamaText(llamaText.values.slice(i + 1));
+
+            truncateStartIndex -= value.value.length;
+        }
+    }
+
+    return LlamaText([]);
 }

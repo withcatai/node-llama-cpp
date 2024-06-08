@@ -33,7 +33,7 @@ describe("GeneralChatWrapper", () => {
 
     test("should generate valid context text for default roles", () => {
         const chatWrapper = new GeneralChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -53,7 +53,7 @@ describe("GeneralChatWrapper", () => {
         `);
 
         const chatWrapper2 = new GeneralChatWrapper();
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -79,14 +79,16 @@ describe("GeneralChatWrapper", () => {
         `);
 
         const chatWrapper3 = new GeneralChatWrapper();
-        const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const {contextText: contextText3} = chatWrapper3.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
@@ -131,7 +133,7 @@ describe("GeneralChatWrapper", () => {
             userMessageTitle: "Instruction",
             modelResponseTitle: "Response"
         });
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -154,7 +156,7 @@ describe("GeneralChatWrapper", () => {
             userMessageTitle: "Instruction",
             modelResponseTitle: "Response"
         });
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [

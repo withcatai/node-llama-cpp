@@ -1,44 +1,35 @@
 import {ChatWrapper} from "../ChatWrapper.js";
-import {ChatHistoryItem, ChatModelFunctions} from "../types.js";
+import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
 // source: https://github.com/openai/openai-python/blob/120d225b91a8453e15240a49fb1c6794d8119326/chatml.md
 export class ChatMLChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "ChatML";
 
-    public override generateContextText(history: readonly ChatHistoryItem[], {availableFunctions, documentFunctionParams}: {
-        availableFunctions?: ChatModelFunctions,
-        documentFunctionParams?: boolean
-    } = {}): {
-        contextText: LlamaText,
-        stopGenerationTriggers: LlamaText[],
-        ignoreStartText?: LlamaText[],
-        functionCall?: {
-            initiallyEngaged: boolean,
-            disengageInitiallyEngaged: LlamaText[]
-        }
-    } {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(history, availableFunctions, {
+    public override generateContextState({
+        chatHistory, availableFunctions, documentFunctionParams
+    }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
         const resultItems: Array<{
-            system: string,
-            user: string,
-            model: string
+            system: LlamaText,
+            user: LlamaText,
+            model: LlamaText
         }> = [];
 
-        let systemTexts: string[] = [];
-        let userTexts: string[] = [];
-        let modelTexts: string[] = [];
+        let systemTexts: LlamaText[] = [];
+        let userTexts: LlamaText[] = [];
+        let modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | null = null;
 
         function flush() {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
                 resultItems.push({
-                    system: systemTexts.join("\n\n"),
-                    user: userTexts.join("\n\n"),
-                    model: modelTexts.join("\n\n")
+                    system: LlamaText.joinValues("\n\n", systemTexts),
+                    user: LlamaText.joinValues("\n\n", userTexts),
+                    model: LlamaText.joinValues("\n\n", modelTexts)
                 });
 
             systemTexts = [];
@@ -52,12 +43,12 @@ export class ChatMLChatWrapper extends ChatWrapper {
                     flush();
 
                 currentAggregateFocus = "system";
-                systemTexts.push(item.text);
+                systemTexts.push(LlamaText.fromJSON(item.text));
             } else if (item.type === "user") {
                 flush();
 
                 currentAggregateFocus = null;
-                userTexts.push(item.text);
+                userTexts.push(LlamaText(item.text));
             } else if (item.type === "model") {
                 flush();
 
@@ -75,7 +66,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
                 const isLastItem = index === resultItems.length - 1;
 
                 return LlamaText([
-                    (system.length === 0)
+                    (system.values.length === 0)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("<|im_start|>system\n"),
@@ -83,7 +74,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
                             new SpecialTokensText("<|im_end|>\n")
                         ]),
 
-                    (user.length === 0)
+                    (user.values.length === 0)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("<|im_start|>user\n"),
@@ -91,7 +82,7 @@ export class ChatMLChatWrapper extends ChatWrapper {
                             new SpecialTokensText("<|im_end|>\n")
                         ]),
 
-                    (model.length === 0 && !isLastItem)
+                    (model.values.length === 0 && !isLastItem)
                         ? LlamaText([])
                         : LlamaText([
                             new SpecialTokensText("<|im_start|>assistant\n"),

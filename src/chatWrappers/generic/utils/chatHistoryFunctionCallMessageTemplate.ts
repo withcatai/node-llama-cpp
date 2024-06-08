@@ -1,10 +1,16 @@
 import {parseTextTemplate} from "../../../utils/parseTextTemplate.js";
+import {ChatWrapperSettings} from "../../../types.js";
 
-export function parseFunctionCallMessageTemplate(template?: ChatHistoryFunctionCallMessageTemplate) {
+export function parseFunctionCallMessageTemplate(
+    template?: ChatHistoryFunctionCallMessageTemplate
+): ChatWrapperSettings["functions"] | null {
     if (template == null)
         return null;
 
-    const [functionCallTemplate, functionCallResultTemplate] = template;
+    const {
+        call: functionCallTemplate,
+        result: functionCallResultTemplate
+    } = template;
 
     if (functionCallTemplate == null || functionCallResultTemplate == null)
         throw new Error("Both function call and function call result templates are required");
@@ -62,16 +68,16 @@ export function parseFunctionCallMessageTemplate(template?: ChatHistoryFunctionC
  *
  * For example:
  * ```typescript
- * const template: ChatHistoryFunctionCallMessageTemplate = [
- *     "[[call: {{functionName}}({{functionParams}})]]"
- *     " [[result: {{functionCallResult}}]]"
- * ];
+ * const template: ChatHistoryFunctionCallMessageTemplate = {
+ *     call: "[[call: {{functionName}}({{functionParams}})]]",
+ *     result: " [[result: {{functionCallResult}}]]"
+ * };
  * ```
  *
- * It's mandatory for the call template to have text before `{{functionName}}` in order for the chat wrapper know when
+ * It's mandatory for the call template to have text before <span v-pre>`{{functionName}}`</span> in order for the chat wrapper know when
  * to activate the function calling grammar.
  */
-export type ChatHistoryFunctionCallMessageTemplate = [
+export type ChatHistoryFunctionCallMessageTemplate = {
     call: `${string}{{functionName}}${string}{{functionParams}}${string}`,
     result: `${string}{{functionCallResult}}${string}`
-];
+};

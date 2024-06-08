@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {defaultExtraAllocationSize} from "../consts.js";
@@ -15,7 +16,7 @@ export class GgufFsFileReader extends GgufFileReader {
 
     public constructor({filePath, signal}: GgufFsFileReaderOptions) {
         super();
-        this.filePath = filePath;
+        this.filePath = path.resolve(process.cwd(), filePath);
         this._signal = signal;
     }
 

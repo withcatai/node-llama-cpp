@@ -10,8 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const modelsFolder = path.join(__dirname, "..", ".models");
 const supportedModels = {
-    "functionary-small-v2.2.q4_0.gguf": "https://huggingface.co/meetkai/functionary-small-v2.2-GGUF/resolve/main/functionary-small-v2.2.q4_0.gguf?download=true",
-    "stable-code-3b.Q5_K_M.gguf": "https://huggingface.co/TheBloke/stable-code-3b-GGUF/resolve/main/stable-code-3b.Q5_K_M.gguf?download=true",
+    "functionary-small-v2.5.Q4_0.gguf": "https://huggingface.co/meetkai/functionary-small-v2.5-GGUF/resolve/main/functionary-small-v2.5.Q4_0.gguf?download=true",
+    "stable-code-3b-Q5_K_M.gguf": "https://huggingface.co/stabilityai/stable-code-3b/resolve/main/stable-code-3b-Q5_K_M.gguf?download=true",
     "bge-small-en-v1.5-q8_0.gguf": "https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf?download=true",
     "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf": "https://huggingface.co/mradermacher/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
 } as const;
@@ -85,7 +85,8 @@ export async function downloadAllModels() {
     if (pendingDownloads.length > 0) {
         console.info(`Downloading ${pendingDownloads.length} model${pendingDownloads.length === 1 ? "" : "s"}`);
         const downloader = await downloadSequence({
-            cliProgress: true
+            cliProgress: true,
+            parallelDownloads: 4
         }, ...pendingDownloads);
         await downloader.download();
     }

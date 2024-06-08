@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import {ChatMLChatWrapper, ChatHistoryItem} from "../../../src/index.js";
+import {ChatHistoryItem, Llama2ChatWrapper} from "../../../src/index.js";
 import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
-describe("ChatMLChatWrapper", () => {
+describe("Llama2ChatWrapper", () => {
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",
         text: defaultChatSystemPrompt
@@ -32,8 +32,8 @@ describe("ChatMLChatWrapper", () => {
     }];
 
     test("should generate valid context text", () => {
-        const chatWrapper = new ChatMLChatWrapper();
-        const {contextText} = chatWrapper.generateContextText(conversationHistory);
+        const chatWrapper = new Llama2ChatWrapper();
+        const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -43,30 +43,29 @@ describe("ChatMLChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|im_start|>system
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>user
+              "value": "
+          <</SYS>>
+
           ",
             },
             "Hi there!",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
-          ",
+              "value": " [/INST] ",
             },
             "Hello!",
           ]
         `);
 
-        const chatWrapper2 = new ChatMLChatWrapper();
-        const {contextText: contextText2} = chatWrapper2.generateContextText(conversationHistory2);
+        const chatWrapper2 = new Llama2ChatWrapper();
+        const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
@@ -76,51 +75,56 @@ describe("ChatMLChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|im_start|>system
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>user
+              "value": "
+          <</SYS>>
+
           ",
             },
             "Hi there!",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
-          ",
+              "value": " [/INST] ",
             },
             "Hello!",
             {
+              "type": "specialToken",
+              "value": "EOS",
+            },
+            {
+              "type": "specialToken",
+              "value": "BOS",
+            },
+            {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>user
-          ",
+              "value": "[INST] ",
             },
             "How are you?",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
-          ",
+              "value": " [/INST] ",
             },
             "I'm good, how are you?",
           ]
         `);
 
-        const chatWrapper3 = new ChatMLChatWrapper();
-        const {contextText: contextText3} = chatWrapper3.generateContextText(conversationHistory);
-        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextText([
-            ...conversationHistory,
-            {
-                type: "model",
-                response: []
-            }
-        ]);
+        const chatWrapper3 = new Llama2ChatWrapper();
+        const {contextText: contextText3} = chatWrapper3.generateContextState({chatHistory: conversationHistory});
+        const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextState({
+            chatHistory: [
+                ...conversationHistory,
+                {
+                    type: "model",
+                    response: []
+                }
+            ]
+        });
 
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
@@ -130,23 +134,22 @@ describe("ChatMLChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|im_start|>system
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>user
+              "value": "
+          <</SYS>>
+
           ",
             },
             "Hi there!",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
-          ",
+              "value": " [/INST] ",
             },
             "Hello!",
           ]
@@ -160,31 +163,26 @@ describe("ChatMLChatWrapper", () => {
             },
             {
               "type": "specialTokensText",
-              "value": "<|im_start|>system
+              "value": "[INST] <<SYS>>
           ",
             },
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>user
+              "value": "
+          <</SYS>>
+
           ",
             },
             "Hi there!",
             {
               "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
-          ",
+              "value": " [/INST] ",
             },
-            "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": "<|im_end|>
-          <|im_start|>assistant
+            "Hello!
+
           ",
-            },
           ]
         `);
     });
