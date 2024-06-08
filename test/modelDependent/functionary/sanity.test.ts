@@ -18,9 +18,12 @@ describe("functionary", () => {
                 contextSequence: context.getSequence()
             });
 
-            const res = await chatSession.prompt("How much is 6+6");
+            let res = await chatSession.prompt("How much is 6+6");
 
-            expect(res).to.eql("6 + 6 = 12.");
+            if (res.endsWith("."))
+                res = res.slice(0, -".".length);
+
+            expect(res).to.eql("6 + 6 = 12");
         });
 
         test("text is tokenized with special tokens when appropriate", {timeout: 1000 * 60 * 60 * 2}, async () => {

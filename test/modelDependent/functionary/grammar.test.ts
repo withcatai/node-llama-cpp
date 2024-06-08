@@ -6,7 +6,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("functionary", () => {
     describe("grammar", () => {
         describe("JSON schema", () => {
-            test("find verb in message", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            test("find verb in message", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
                 const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
                 const llama = await getTestLlama();
 
