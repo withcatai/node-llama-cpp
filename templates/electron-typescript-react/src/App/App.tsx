@@ -75,6 +75,9 @@ export function App() {
     }, []);
 
     const error = state.llama.error ?? state.model.error ?? state.context.error ?? state.contextSequence.error;
+    const loading = state.selectedModelFilePath != null && error == null && (
+        !state.model.loaded || !state.llama.loaded || !state.context.loaded || !state.contextSequence.loaded || !state.chatSession.loaded
+    );
     const showMessage = state.selectedModelFilePath == null || error != null || state.chatSession.simplifiedChat.length === 0;
 
     return <div className="app">
@@ -95,6 +98,12 @@ export function App() {
                     error != null &&
                     <div className="error">
                         {String(error)}
+                    </div>
+                }
+                {
+                    loading &&
+                    <div className="loading">
+                        Loading...
                     </div>
                 }
                 {
@@ -130,6 +139,7 @@ export function App() {
                 }
                 {
                     (
+                        !loading &&
                         state.selectedModelFilePath != null &&
                         error == null &&
                         state.chatSession.simplifiedChat.length === 0

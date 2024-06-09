@@ -71,6 +71,7 @@
                 unicode-bidi: plaintext;
                 overflow: hidden;
                 opacity: 0.36;
+                mask: linear-gradient(to top, rgb(0 0 0 / 16%), black 24px);
 
                 &.hide {
                     opacity: 0;

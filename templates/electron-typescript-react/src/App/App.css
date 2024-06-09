@@ -113,8 +113,31 @@
             }
         }
 
+        > .loading {
+            opacity: 0.6;
+            font-weight: bold;
+
+            mask: linear-gradient(
+                to right,
+                rgb(0 0 0 / 48%) 34%,
+                black,
+                rgb(0 0 0 / 48%) 66%
+            ) content-box 0 0 / 300% 100% no-repeat;
+            animation: loading-animation 2s infinite ease-in-out;
+        }
+
         > .typeMessage {
             opacity: 0.6;
         }
+    }
+}
+
+@keyframes loading-animation {
+    0% {
+        mask-position: 100% 100%;
+    }
+
+    100% {
+        mask-position: 0 100%;
     }
 }

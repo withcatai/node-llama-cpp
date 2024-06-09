@@ -54,7 +54,7 @@ async function packDirectory({
         const packItemPath = [...currentPath, item.name];
         const itemPath = path.join(templateDirectory, ...packItemPath);
 
-        if (ig.ignores(path.relative(templateDirectory, itemPath)))
+        if (item.name === "package-lock.json" || ig.ignores(path.relative(templateDirectory, itemPath)))
             continue;
 
         if (item.isDirectory()) {
