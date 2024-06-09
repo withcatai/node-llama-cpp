@@ -10,7 +10,7 @@
     "start": "vite dev",
     "start:build": "electron ./dist-electron",
     "prebuild": "rimraf ./dist ./dist-electron ./release",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build && electron-builder --config ./electron-builder.ts",
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",
@@ -41,6 +41,7 @@
     "typescript": "^5.4.5",
     "vite": "^5.2.13",
     "vite-plugin-electron": "^0.28.7",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "zx": "^8.1.2"
   }
 }

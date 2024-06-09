@@ -31,4 +31,4 @@ node_modules
 /llama/xpack/store
 /llama/xpack/xpacks
 /llama/xpack/cmakeInstall.lock
-/llamaBins
+/bins

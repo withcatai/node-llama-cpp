@@ -16,7 +16,7 @@ const env = envVar.from(process.env);
 
 export const llamaDirectory = path.join(__dirname, "..", "llama");
 export const llamaToolchainsDirectory = path.join(llamaDirectory, "toolchains");
-export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "llamaBins");
+export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "bins");
 export const llamaLocalBuildBinsDirectory = path.join(llamaDirectory, "localBuilds");
 export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
 export const projectTemplatesDirectory = path.join(__dirname, "..", "templates");

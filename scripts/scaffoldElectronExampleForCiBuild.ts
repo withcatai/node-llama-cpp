@@ -25,6 +25,8 @@ const {packageVersion, packageFolderPath} = argv;
 if (packageVersion === "")
     throw new Error("packageVersion is empty");
 
+console.info("node-llama-cpp version:", packageVersion);
+
 const resolvedPackageFolderPath = path.resolve(process.cwd(), packageFolderPath);
 
 const templateFilePath = path.join(packedProjectTemplatesDirectory, `${electronTemplateName}.json`);

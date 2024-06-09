@@ -193,7 +193,7 @@ jobs:
             throw new Error("Could not find node versions");
           }
           
-          await $`mkdir -p llamaBins`;
+          await $`mkdir -p bins`;
           
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
@@ -218,9 +218,9 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
           }
           
-          // move binaries to llamaBins
+          // move binaries to bins
           const localBuildsDirectoryPath = path.join(process.cwd(), "llama", "localBuilds");
-          const llamaBinsDirectoryPath = path.join(process.cwd(), "llamaBins");
+          const llamaBinsDirectoryPath = path.join(process.cwd(), "bins");
           for (const folderName of await fs.readdir(localBuildsDirectoryPath)) {
             await fs.move(
               path.join(localBuildsDirectoryPath, folderName, "Release"),
@@ -229,7 +229,7 @@ jobs:
           }
           
           await $`echo "Built binaries:"`;
-          await $`ls llamaBins`;
+          await $`ls bins`;
           
           EOF
 
@@ -237,7 +237,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "bins-${{ matrix.config.artifact }}"
-          path: "llamaBins/*"
+          path: "bins/*"
 
   standalone-tests:
     name: Standalone tests
@@ -359,8 +359,8 @@ jobs:
           path: artifacts
       - name: Move artifacts
         run: |
-          mkdir -p llamaBins
-          mv artifacts/bins-*/* llamaBins/
+          mkdir -p bins
+          mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
           
           cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
@@ -379,7 +379,7 @@ jobs:
           rm -f ./templates/package-lock.json
           
           echo "Built binaries:"
-          ls llamaBins
+          ls bins
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
       - name: Release
@@ -475,8 +475,10 @@ jobs:
         run: npm ci
 
       - name: Create Electron app project
+        shell: bash
         env:
           DEPLOYED_PACKAGE_VERSION: ${{ needs.release.outputs.package-version }}
+          NODE_LLAMA_CPP_SKIP_DOWNLOAD: true
         run: |
           npx --no vite-node ./scripts/scaffoldElectronExampleForCiBuild.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --packageFolderPath ./electron-app-example
           cd electron-app-example
@@ -491,10 +493,15 @@ jobs:
           npm run build
           ls ./release
 
-      - name: Add builds to current release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          file: "electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}"
-          file_glob: true
-          tag: ${{ needs.release.outputs.package-version }}
-          make_latest: false
+          name: "electron-app-example-${{ matrix.config.name }}"
+          path: "./electron-app-example/release"
+
+      - name: Add builds to current release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release.outputs.package-version }}" ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}
