@@ -475,8 +475,10 @@ jobs:
         run: npm ci
 
       - name: Create Electron app project
+        shell: bash
         env:
           DEPLOYED_PACKAGE_VERSION: ${{ needs.release.outputs.package-version }}
+          NODE_LLAMA_CPP_SKIP_DOWNLOAD: true
         run: |
           npx --no vite-node ./scripts/scaffoldElectronExampleForCiBuild.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --packageFolderPath ./electron-app-example
           cd electron-app-example
@@ -491,10 +493,15 @@ jobs:
           npm run build
           ls ./release
 
-      - name: Add builds to current release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          file: "electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}"
-          file_glob: true
-          tag: ${{ needs.release.outputs.package-version }}
-          make_latest: false
+          name: "electron-app-example-${{ matrix.config.name }}"
+          path: "./electron-app-example/release"
+
+      - name: Add builds to current release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release.outputs.package-version }}" ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}
