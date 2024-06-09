@@ -282,7 +282,24 @@ export const llmFunctions = {
                         }
                     };
 
-                    llmFunctions.chatSession.resetChatHistory();
+                    llmFunctions.chatSession.resetChatHistory(false);
+
+                    try {
+                        await chatSession?.preloadPrompt("", {
+                            signal: promptAbortController?.signal
+                        });
+                    } catch (err) {
+                        // do nothing
+                    }
+                    chatSessionCompletionEngine?.complete(llmState.state.chatSession.draftPrompt.prompt);
+
+                    llmState.state = {
+                        ...llmState.state,
+                        chatSession: {
+                            ...llmState.state.chatSession,
+                            loaded: true
+                        }
+                    };
                 } catch (err) {
                     console.error("Failed to create chat session", err);
                     llmState.state = {
@@ -354,7 +371,7 @@ export const llmFunctions = {
         stopActivePrompt() {
             promptAbortController?.abort();
         },
-        resetChatHistory() {
+        resetChatHistory(markAsLoaded: boolean = true) {
             if (contextSequence == null)
                 return;
 
@@ -383,7 +400,9 @@ export const llmFunctions = {
             llmState.state = {
                 ...llmState.state,
                 chatSession: {
-                    loaded: true,
+                    loaded: markAsLoaded
+                        ? true
+                        : llmState.state.chatSession.loaded,
                     generatingResult: false,
                     simplifiedChat: [],
                     draftPrompt: {
