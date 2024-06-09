@@ -38,16 +38,16 @@
     "node-llama-cpp": "file:../.."
   },
   "devDependencies": {
-    "@types/node": "^20.11.29",
-    "@typescript-eslint/eslint-plugin": "^6.3.0",
-    "@typescript-eslint/parser": "^6.3.0",
+    "@types/node": "^20.14.2",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
     "eslint": "^8.46.0",
-    "eslint-plugin-import": "^2.28.0",
+    "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsdoc": "^46.9.0",
-    "eslint-plugin-n": "^16.3.1",
+    "eslint-plugin-n": "^17.8.1",
     "rimraf": "^5.0.7",
-    "tslib": "^2.6.1",
-    "typescript": "^5.2.2",
+    "tslib": "^2.6.3",
+    "typescript": "^5.4.5",
     "vite-node": "^1.4.0"
   }
 }
