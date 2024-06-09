@@ -12,7 +12,7 @@
     "dist/",
     "templates/packed/",
     "llama/",
-    "llamaBins/",
+    "bins/",
     "package.json",
     "README.md",
     "LICENSE"

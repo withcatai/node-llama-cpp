@@ -193,7 +193,7 @@ jobs:
             throw new Error("Could not find node versions");
           }
           
-          await $`mkdir -p llamaBins`;
+          await $`mkdir -p bins`;
           
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
@@ -218,9 +218,9 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
           }
           
-          // move binaries to llamaBins
+          // move binaries to bins
           const localBuildsDirectoryPath = path.join(process.cwd(), "llama", "localBuilds");
-          const llamaBinsDirectoryPath = path.join(process.cwd(), "llamaBins");
+          const llamaBinsDirectoryPath = path.join(process.cwd(), "bins");
           for (const folderName of await fs.readdir(localBuildsDirectoryPath)) {
             await fs.move(
               path.join(localBuildsDirectoryPath, folderName, "Release"),
@@ -229,7 +229,7 @@ jobs:
           }
           
           await $`echo "Built binaries:"`;
-          await $`ls llamaBins`;
+          await $`ls bins`;
           
           EOF
 
@@ -237,7 +237,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "bins-${{ matrix.config.artifact }}"
-          path: "llamaBins/*"
+          path: "bins/*"
 
   standalone-tests:
     name: Standalone tests
@@ -359,8 +359,8 @@ jobs:
           path: artifacts
       - name: Move artifacts
         run: |
-          mkdir -p llamaBins
-          mv artifacts/bins-*/* llamaBins/
+          mkdir -p bins
+          mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
           
           cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
@@ -379,7 +379,7 @@ jobs:
           rm -f ./templates/package-lock.json
           
           echo "Built binaries:"
-          ls llamaBins
+          ls bins
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
       - name: Release
