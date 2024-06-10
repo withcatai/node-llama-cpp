@@ -503,5 +503,13 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release.outputs.package-version }}
         run: |
-          gh release upload "${{ needs.release.outputs.package-version }}" ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}
+          shopt -s nullglob
+          
+          for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}; do
+            echo "Adding $file to release"
+            gh release upload "$RELEASE_TAG" "$file"
+          done
+          
+          shopt -u nullglob

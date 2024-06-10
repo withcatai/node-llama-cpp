@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "main": "./dist-electron/index.js",
   "type": "module",
+  "homepage": "https://github.com/withcatai/node-llama-cpp",
+  "author": {
+    "name": "Author name",
+    "email": "email@example.com"
+  },
   "scripts": {
     "_postinstall": "npm run models:pull",
     "models:pull": "node-llama-cpp pull --dir ./models \"{{modelUrl|escape|escape}}\"",
@@ -43,5 +48,12 @@
     "vite-plugin-electron": "^0.28.7",
     "vite-plugin-electron-renderer": "^0.14.5",
     "zx": "^8.1.2"
+  },
+  "overrides": {
+    "electron-builder": {
+      "read-config-file": {
+        "config-file-ts": ">=0.2.8-rc1"
+      }
+    }
   }
 }
