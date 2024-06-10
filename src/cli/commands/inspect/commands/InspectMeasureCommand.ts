@@ -147,7 +147,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             sourceType: "filesystem"
         });
         const ggufInsights = await GgufInsights.from(ggufMetadata, llama);
-        const totalVram = llama.getVramState().total;
+        const totalVram = (await llama.getVramState()).total;
 
         let lastGpuLayers = maxLayers ?? ggufInsights.totalLayers;
         let previousContextSizeCheck: undefined | number = undefined;
@@ -588,7 +588,7 @@ async function runTestWorkerLogic() {
                 currentContextSizeCheck = null;
 
             try {
-                const preContextVramUsage = llama.getVramState().used;
+                const preContextVramUsage = (await llama.getVramState()).used;
                 const context = await model.createContext({
                     contextSize: currentContextSizeCheck ?? undefined,
                     ignoreMemorySafetyChecks: currentContextSizeCheck != null
@@ -599,7 +599,7 @@ async function runTestWorkerLogic() {
                     await sequence.evaluateWithoutGeneratingNewTokens(model.tokenize(evaluateText));
                 }
 
-                const postContextVramUsage = llama.getVramState().used;
+                const postContextVramUsage = (await llama.getVramState()).used;
 
                 sendInfoBack({
                     type: "stats",
@@ -638,13 +638,13 @@ async function runTestWorkerLogic() {
         evaluateText?: string
     }) {
         try {
-            const preModelVramUsage = llama.getVramState().used;
+            const preModelVramUsage = (await llama.getVramState()).used;
             const model = await llama.loadModel({
                 modelPath,
                 gpuLayers,
                 ignoreMemorySafetyChecks: true
             });
-            const postModelVramUsage = llama.getVramState().used;
+            const postModelVramUsage = (await llama.getVramState()).used;
 
             sendInfoBack({
                 type: "stats",

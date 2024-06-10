@@ -54,7 +54,7 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, vramPadding, debug
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, vramOrchestrator, vramPadding
     }: {
         bindings: BindingModule,
         logLevel: LlamaLogLevel,
@@ -65,32 +65,20 @@ export class Llama {
             repo: string,
             release: string
         },
-        vramPadding: number | ((totalVram: number) => number),
-        debug: boolean
+        debug: boolean,
+        gpu: BuildGpu,
+        vramOrchestrator: MemoryOrchestrator,
+        vramPadding: MemoryReservation
     }) {
         this._bindings = bindings;
-        this._gpu = bindings.getGpuType() ?? false;
+        this._gpu = gpu;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
         this._consts = bindings.getConsts();
         this._debug = debug;
-
-        this._vramOrchestrator = new MemoryOrchestrator(() => {
-            const {total, used} = bindings.getGpuVramInfo();
-
-            return {
-                total,
-                free: Math.max(0, total - used)
-            };
-        });
-
-        if (this._gpu === false || vramPadding === 0)
-            this._vramPadding = this._vramOrchestrator.reserveMemory(0);
-        else if (vramPadding instanceof Function)
-            this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding(this._vramOrchestrator.getMemoryState().total));
-        else
-            this._vramPadding = this._vramOrchestrator.reserveMemory(vramPadding);
+        this._vramOrchestrator = vramOrchestrator;
+        this._vramPadding = vramPadding;
 
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
@@ -204,7 +192,7 @@ export class Llama {
         return this._vramPadding.size;
     }
 
-    public getVramState() {
+    public async getVramState() {
         this._ensureNotDisposed();
 
         const {total, used} = this._bindings.getGpuVramInfo();
@@ -216,7 +204,7 @@ export class Llama {
         };
     }
 
-    public getGpuDeviceNames() {
+    public async getGpuDeviceNames() {
         this._ensureNotDisposed();
 
         const {deviceNames} = this._bindings.getGpuDeviceInfo();
@@ -360,6 +348,24 @@ export class Llama {
         skipLlamaInit?: boolean,
         debug: boolean
     }) {
+        const gpu = bindings.getGpuType() ?? false;
+        const vramOrchestrator = new MemoryOrchestrator(() => {
+            const {total, used} = bindings.getGpuVramInfo();
+
+            return {
+                total,
+                free: Math.max(0, total - used)
+            };
+        });
+
+        let resolvedVramPadding: MemoryReservation;
+        if (gpu === false || vramPadding === 0)
+            resolvedVramPadding = vramOrchestrator.reserveMemory(0);
+        else if (vramPadding instanceof Function)
+            resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding((await vramOrchestrator.getMemoryState()).total));
+        else
+            resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding);
+
         const llama =  new Llama({
             bindings,
             buildType,
@@ -370,8 +376,10 @@ export class Llama {
             },
             logLevel,
             logger,
-            vramPadding,
-            debug
+            debug,
+            gpu,
+            vramOrchestrator,
+            vramPadding: resolvedVramPadding
         });
 
         if (!skipLlamaInit)

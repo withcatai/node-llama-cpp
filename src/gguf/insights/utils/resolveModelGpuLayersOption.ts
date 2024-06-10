@@ -9,13 +9,14 @@ import type {GgufInsights} from "../GgufInsights.js";
 
 const fitContextExtraMemoryPaddingPercentage = 0.5;
 
-export function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
+export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
     ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
     llamaGpu, llamaSupportsGpuOffloading
 }: {
     ggufInsights: GgufInsights, ignoreMemorySafetyChecks?: boolean,
-    getVramState(): {total: number, free: number}, llamaVramPaddingSize: number, llamaGpu: BuildGpu, llamaSupportsGpuOffloading: boolean
-}): number {
+    getVramState(): Promise<{total: number, free: number}>, llamaVramPaddingSize: number, llamaGpu: BuildGpu,
+    llamaSupportsGpuOffloading: boolean
+}): Promise<number> {
     if (gpuLayers == null)
         gpuLayers = "auto";
 
@@ -30,7 +31,7 @@ export function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLay
         if (ignoreMemorySafetyChecks)
             return resolvedGpuLayers;
 
-        const vramState = getVramState();
+        const vramState = await getVramState();
         const maxLayersRequirements = getVramRequiredForGpuLayers({
             gpuLayers: resolvedGpuLayers,
             ggufInsights,
@@ -45,7 +46,7 @@ export function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLay
         if (llamaGpu === false)
             return 0;
 
-        const vramState = getVramState();
+        const vramState = await getVramState();
         if (vramState.total === 0)
             return 0;
 

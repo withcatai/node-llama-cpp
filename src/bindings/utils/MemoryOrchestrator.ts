@@ -19,7 +19,7 @@ export class MemoryOrchestrator {
         });
     }
 
-    public getMemoryState() {
+    public async getMemoryState() {
         const {free, total} = this._getMemoryState();
 
         return {

@@ -17,14 +17,14 @@ describe("stableCode", () => {
 
             const s1GB = Math.pow(1024, 3);
 
-            function resolveGpuLayers(gpuLayers: LlamaModelOptions["gpuLayers"], {
+            async function resolveGpuLayers(gpuLayers: LlamaModelOptions["gpuLayers"], {
                 totalVram, freeVram, ignoreMemorySafetyChecks = false, llamaGpu = "metal"
             }: {
                 totalVram: number, freeVram: number, ignoreMemorySafetyChecks?: boolean, llamaGpu?: BuildGpu
             }) {
-                const resolvedGpuLayers = ggufInsights.configurationResolver.resolveModelGpuLayers(gpuLayers, {
+                const resolvedGpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(gpuLayers, {
                     ignoreMemorySafetyChecks,
-                    getVramState: () => ({
+                    getVramState: async () => ({
                         total: llamaGpu === false ? 0 : totalVram,
                         free: llamaGpu === false ? 0 : freeVram
                     }),
@@ -33,18 +33,18 @@ describe("stableCode", () => {
                     llamaSupportsGpuOffloading: llamaGpu !== false
                 });
 
-                function resolveAutoContextSize() {
+                async function resolveAutoContextSize() {
                     const modelVram = ggufInsights.estimateModelResourceRequirements({
                         gpuLayers: resolvedGpuLayers
                     }).gpuVram;
 
                     try {
-                        return ggufInsights.configurationResolver.resolveContextContextSize("auto", {
+                        return await ggufInsights.configurationResolver.resolveContextContextSize("auto", {
                             batchSize: undefined,
                             sequences: 1,
                             modelGpuLayers: resolvedGpuLayers,
                             modelTrainContextSize: ggufInsights.trainContextSize ?? 4096,
-                            getVramState: () => ({
+                            getVramState: async () => ({
                                 total: llamaGpu === false ? 0 : totalVram,
                                 free: llamaGpu === false ? 0 : (freeVram - modelVram)
                             }),
@@ -59,13 +59,13 @@ describe("stableCode", () => {
 
                 return {
                     gpuLayers: resolvedGpuLayers,
-                    contextSize: resolveAutoContextSize()
+                    contextSize: await resolveAutoContextSize()
                 };
             }
 
-            it("attempts to resolve 0 gpuLayers", () => {
+            it("attempts to resolve 0 gpuLayers", async () => {
                 {
-                    const res = resolveGpuLayers(0, {
+                    const res = await resolveGpuLayers(0, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 1
                     });
@@ -73,7 +73,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers(0, {
+                    const res = await resolveGpuLayers(0, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -82,7 +82,7 @@ describe("stableCode", () => {
                 }
 
                 {
-                    const res = resolveGpuLayers(0, {
+                    const res = await resolveGpuLayers(0, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false
@@ -92,9 +92,9 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve 16 gpuLayers", () => {
+            it("attempts to resolve 16 gpuLayers", async () => {
                 {
-                    const res = resolveGpuLayers(16, {
+                    const res = await resolveGpuLayers(16, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3
                     });
@@ -120,7 +120,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[Error: Not enough VRAM to fit the model with the specified settings]");
                 }
                 {
-                    const res = resolveGpuLayers(16, {
+                    const res = await resolveGpuLayers(16, {
                         totalVram: s1GB * 6,
 
                         // play with this number to make the test pass, it should be low enough so that there won't be any VRAM left
@@ -135,7 +135,7 @@ describe("stableCode", () => {
 
 
                 {
-                    const res = resolveGpuLayers(16, {
+                    const res = await resolveGpuLayers(16, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false
@@ -144,7 +144,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers(16, {
+                    const res = await resolveGpuLayers(16, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false,
@@ -155,9 +155,9 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve 32 gpuLayers", () => {
+            it("attempts to resolve 32 gpuLayers", async () => {
                 {
-                    const res = resolveGpuLayers(32, {
+                    const res = await resolveGpuLayers(32, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 6
                     });
@@ -174,7 +174,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[Error: Not enough VRAM to fit the model with the specified settings]");
                 }
                 {
-                    const res = resolveGpuLayers(32, {
+                    const res = await resolveGpuLayers(32, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0,
                         ignoreMemorySafetyChecks: true
@@ -184,7 +184,7 @@ describe("stableCode", () => {
                 }
 
                 {
-                    const res = resolveGpuLayers(32, {
+                    const res = await resolveGpuLayers(32, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false
@@ -193,7 +193,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers(32, {
+                    const res = await resolveGpuLayers(32, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false,
@@ -204,9 +204,9 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve 33 gpuLayers", () => {
+            it("attempts to resolve 33 gpuLayers", async () => {
                 {
-                    const res = resolveGpuLayers(33, {
+                    const res = await resolveGpuLayers(33, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 6
                     });
@@ -223,7 +223,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[Error: Not enough VRAM to fit the model with the specified settings]");
                 }
                 {
-                    const res = resolveGpuLayers(33, {
+                    const res = await resolveGpuLayers(33, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.2,
                         ignoreMemorySafetyChecks: true
@@ -233,7 +233,7 @@ describe("stableCode", () => {
                 }
 
                 {
-                    const res = resolveGpuLayers(33, {
+                    const res = await resolveGpuLayers(33, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false
@@ -242,7 +242,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers(33, {
+                    const res = await resolveGpuLayers(33, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false,
@@ -253,7 +253,7 @@ describe("stableCode", () => {
                 }
             });
 
-            it('attempts to resolve "max"', () => {
+            it('attempts to resolve "max"', async () => {
                 try {
                     resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
@@ -285,7 +285,7 @@ describe("stableCode", () => {
                 }
 
                 {
-                    const res = resolveGpuLayers("max", {
+                    const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 1.2,
                         ignoreMemorySafetyChecks: true
@@ -293,7 +293,7 @@ describe("stableCode", () => {
                     expect(res.gpuLayers).to.eql(33);
                     expect(res.contextSize).to.toMatchInlineSnapshot("null");
                 }{
-                    const res = resolveGpuLayers("max", {
+                    const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -301,7 +301,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("5583");
                 }
                 {
-                    const res = resolveGpuLayers("max", {
+                    const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4.4
                     });
@@ -309,7 +309,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("6647");
                 }
                 {
-                    const res = resolveGpuLayers("max", {
+                    const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4.8
                     });
@@ -318,9 +318,9 @@ describe("stableCode", () => {
                 }
             });
 
-            it('attempts to resolve "auto"', () => {
+            it('attempts to resolve "auto"', async () => {
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: 0
                     });
@@ -328,7 +328,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.4
                     });
@@ -336,7 +336,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.8
                     });
@@ -344,7 +344,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("3287");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 1.4
                     });
@@ -352,7 +352,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("4478");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 2.4
                     });
@@ -360,7 +360,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("1325");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3.1
                     });
@@ -368,7 +368,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("3187");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3.3
                     });
@@ -376,7 +376,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("3720");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3.5
                     });
@@ -384,7 +384,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("4252");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3.8
                     });
@@ -392,7 +392,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("5050");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -400,7 +400,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("5583");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4.3
                     });
@@ -408,7 +408,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("6381");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4.5
                     });
@@ -416,7 +416,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("6913");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4.8
                     });
@@ -424,7 +424,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("7712");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 5.2
                     });
@@ -432,7 +432,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("8776");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 5.8
                     });
@@ -440,7 +440,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("10373");
                 }
                 {
-                    const res = resolveGpuLayers("auto", {
+                    const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 6
                     });
@@ -449,9 +449,9 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve {min?: number, max?: number}", () => {
+            it("attempts to resolve {min?: number, max?: number}", async () => {
                 {
-                    const res = resolveGpuLayers({max: 4}, {
+                    const res = await resolveGpuLayers({max: 4}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -459,7 +459,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 {
-                    const res = resolveGpuLayers({min: 0, max: 4}, {
+                    const res = await resolveGpuLayers({min: 0, max: 4}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -486,7 +486,7 @@ describe("stableCode", () => {
                 }
 
                 {
-                    const res = resolveGpuLayers({max: 16}, {
+                    const res = await resolveGpuLayers({max: 16}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -503,7 +503,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[AssertionError: expected \"Should have thrown an error\" not to be reached]");
                 }
                 {
-                    const res = resolveGpuLayers({min: 16}, {
+                    const res = await resolveGpuLayers({min: 16}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -512,7 +512,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("5583");
                 }
                 {
-                    const res = resolveGpuLayers({min: 16, max: 24}, {
+                    const res = await resolveGpuLayers({min: 16, max: 24}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -522,7 +522,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("8405");
                 }
                 {
-                    const res = resolveGpuLayers({min: 16, max: 24}, {
+                    const res = await resolveGpuLayers({min: 16, max: 24}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3
                     });
@@ -533,10 +533,10 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve {fitContext?: {contextSize?: number}}", () => {
+            it("attempts to resolve {fitContext?: {contextSize?: number}}", async () => {
                 {
                     const contextSize = 4096;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: 0,
                         freeVram: 0,
                         llamaGpu: false
@@ -547,7 +547,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 4096;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -557,7 +557,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 4096;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 2,
                         freeVram: s1GB * 1
                     });
@@ -567,7 +567,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 8192;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4
                     });
@@ -577,7 +577,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 8192;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 1,
                         freeVram: s1GB * 1
                     });
@@ -587,7 +587,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 8192;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 0,
                         freeVram: s1GB * 0
                     });
@@ -608,7 +608,7 @@ describe("stableCode", () => {
                 }
                 {
                     const contextSize = 16384;
-                    const res = resolveGpuLayers({fitContext: {contextSize}}, {
+                    const res = await resolveGpuLayers({fitContext: {contextSize}}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });

@@ -576,7 +576,7 @@ export class LlamaModel {
             signal: loadSignal
         });
         const ggufInsights = await GgufInsights.from(fileInfo, _llama);
-        const gpuLayers = ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
+        const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks
         });
         const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;

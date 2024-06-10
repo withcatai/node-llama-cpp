@@ -4,7 +4,7 @@ import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {printInfoLine} from "./printInfoLine.js";
 
-export function printCommonInfoLines({
+export async function printCommonInfoLines({
     context,
     minTitleLength = 0,
     logBatchSize = false,
@@ -24,6 +24,14 @@ export function printCommonInfoLines({
     const padTitle = Math.max(minTitleLength, "Context".length + 1);
 
     if (llama.gpu !== false) {
+        const [
+            vramState,
+            deviceNames
+        ] = await Promise.all([
+            llama.getVramState(),
+            llama.getGpuDeviceNames()
+        ]);
+
         printInfoLine({
             title: "GPU",
             padTitle: padTitle,
@@ -32,10 +40,10 @@ export function printCommonInfoLines({
                 value: getPrettyBuildGpuName(llama.gpu)
             }, {
                 title: "VRAM",
-                value: bytes(llama.getVramState().total)
+                value: bytes(vramState.total)
             }, {
                 title: "Name",
-                value: toOneLine(llama.getGpuDeviceNames().join(", "))
+                value: toOneLine(deviceNames.join(", "))
             }]
         });
     }
