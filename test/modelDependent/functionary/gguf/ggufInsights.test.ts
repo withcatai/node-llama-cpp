@@ -83,12 +83,12 @@ describe("gguf", async () => {
 
             const ggufInsights = await GgufInsights.from(ggufMetadataParseResult, llama);
 
-            const initialModelVramUsage = llama.getVramState().used;
+            const initialModelVramUsage = (await llama.getVramState()).used;
             const model = await llama.loadModel({
                 modelPath: modelPath,
                 gpuLayers: ggufInsights.totalLayers
             });
-            const currentModelVramUsage = llama.getVramState().used;
+            const currentModelVramUsage = (await llama.getVramState()).used;
 
             const modelVramUsageDiff = currentModelVramUsage - initialModelVramUsage;
 
@@ -105,13 +105,13 @@ describe("gguf", async () => {
             if (modelEstimationDiffWithActual !== 0)
                 console.warn("Model size estimation is off by", modelEstimationDiffWithActual, "bytes");
 
-            const initialContextVramUsage = llama.getVramState().used;
+            const initialContextVramUsage = (await llama.getVramState()).used;
             const context = await model.createContext({
                 contextSize: 4096,
                 batchSize: 512,
                 sequences: 1
             });
-            const currentContextVramUsage = llama.getVramState().used;
+            const currentContextVramUsage = (await llama.getVramState()).used;
 
             const contextVramUsageDiff = currentContextVramUsage - initialContextVramUsage;
 
@@ -136,12 +136,12 @@ describe("gguf", async () => {
 
             const ggufInsights = await GgufInsights.from(ggufMetadataParseResult, llama);
 
-            const initialVramUsage = llama.getVramState().used;
+            const initialVramUsage = (await llama.getVramState()).used;
             const model = await llama.loadModel({
                 modelPath: modelPath,
                 gpuLayers: 16
             });
-            const currentVramUsage = llama.getVramState().used;
+            const currentVramUsage = (await llama.getVramState()).used;
 
             const vramUsageDiff = currentVramUsage - initialVramUsage;
 

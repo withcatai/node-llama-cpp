@@ -36,7 +36,7 @@ export const DebugCommand: CommandModule<object, DebugCommand> = {
 async function DebugVramFunction() {
     const llama = await getLlama("lastBuild");
 
-    const vramStatus = llama.getVramState();
+    const vramStatus = await llama.getVramState();
     const totalMemory = os.totalmem();
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;

@@ -2,20 +2,25 @@ import path from "node:path";
 import {$} from "zx";
 import type {Configuration} from "electron-builder";
 
+const appId = "node-llama-cpp.electron.example";
+const productName = "node-llama-cpp Electron example";
+const executableName = "node-llama-cpp-electron-example";
+const appxIdentityName = "node.llama.cpp.electron.example";
+
 /**
  * @see - https://www.electron.build/configuration/configuration
  */
 export default {
-    appId: "node-llama-cpp.electron.example",
+    appId: appId,
     asar: true,
-    productName: "node-llama-cpp Electron example",
-    executableName: "node-llama-cpp-electron-example",
+    productName: productName,
+    executableName: executableName,
     directories: {
         output: "release"
     },
 
     // remove this once you set up your own code signing for macOS
-    async afterSign(context) {
+    async afterPack(context) {
         if (context.electronPlatformName === "darwin") {
             // check whether the app was already signed
             const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
@@ -75,6 +80,7 @@ export default {
         artifactName: "${name}.Windows.${version}.${arch}.${ext}"
     },
     appx: {
+        identityName: appxIdentityName,
         artifactName: "${name}.Windows.${version}.${arch}.${ext}"
     },
     nsis: {
@@ -109,6 +115,7 @@ export default {
                 "arm64"
             ]
         }],
+        category: "Utility",
 
         artifactName: "${name}.Linux.${version}.${arch}.${ext}"
     }

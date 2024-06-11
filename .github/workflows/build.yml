@@ -471,6 +471,13 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install dependencies on Ubuntu
+        if: startsWith(matrix.config.name, 'Ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install libarchive-tools rpm
+          sudo snap install snapcraft --classic
+
       - name: Install modules
         run: npm ci
 
@@ -508,8 +515,8 @@ jobs:
           shopt -s nullglob
           
           for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}; do
-            echo "Adding $file to release"
-            gh release upload "$RELEASE_TAG" "$file"
+            echo "Adding $file to release $RELEASE_TAG"
+            gh release upload "v$RELEASE_TAG" "$file"
           done
           
           shopt -u nullglob

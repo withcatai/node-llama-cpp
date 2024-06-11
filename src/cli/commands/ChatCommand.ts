@@ -435,7 +435,7 @@ async function RunChat({
     }
 
     const padTitle = "Context".length + 1;
-    printCommonInfoLines({
+    await printCommonInfoLines({
         context,
         minTitleLength: padTitle,
         printBos: true,

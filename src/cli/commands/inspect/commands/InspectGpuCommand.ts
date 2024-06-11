@@ -93,8 +93,8 @@ async function logGpuVramUsage(gpu: BuildGpu) {
             skipLlamaInit: true
         });
         const gpuName = getPrettyBuildGpuName(gpu);
-        const vramStatus = llama.getVramState();
-        const gpuDeviceNames = llama.getGpuDeviceNames();
+        const vramStatus = await llama.getVramState();
+        const gpuDeviceNames = await llama.getGpuDeviceNames();
 
         if (gpuDeviceNames.length > 0)
             console.info(`${chalk.yellow(`${gpuName} device${gpuDeviceNames.length > 1 ? "s" : ""}:`)} ${gpuDeviceNames.join(", ")}`);

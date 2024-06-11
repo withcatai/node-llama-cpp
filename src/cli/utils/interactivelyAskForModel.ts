@@ -39,7 +39,7 @@ type ModelOption = {
     selectedUrl?: {
         url: string,
         ggufInsights: GgufInsights,
-        compatibilityScore: ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>
+        compatibilityScore: Awaited<ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>>
     },
     urlSelectionLoadingState?: "done" | "loading"
 } | {
@@ -67,8 +67,8 @@ export async function interactivelyAskForModel({
     const recommendedModelOptions: (ModelOption & { type: "recommendedModel" })[] = [];
     const activeInteractionController = new AbortController();
     let scheduledTitleRerenderTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
-    let lastVramState: { used: number, total: number } = llama.getVramState();
-    const canUseGpu = lastVramState.total > 0;
+    let vramState = await llama.getVramState();
+    const canUseGpu = vramState.total > 0;
 
     if (allowLocalModels && modelsDirectory != null && await fs.existsSync(modelsDirectory)) {
         const ggufFileNames = (await fs.readdir(modelsDirectory))
@@ -112,7 +112,7 @@ export async function interactivelyAskForModel({
                         readItems++;
                         progressUpdater.setProgress(readItems / ggufFileNames.length, renderProgress());
 
-                        const compatibilityScore = ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility();
+                        const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility();
 
                         return {
                             type: "localModel",
@@ -216,7 +216,6 @@ export async function interactivelyAskForModel({
                 title(item, rerender) {
                     const title = chalk.bold("Select a model:") + "  ";
 
-                    const vramState = llama.getVramState();
                     const vramStateText = vramState.total === 0
                         ? chalk.bgGray(
                             " " +
@@ -241,12 +240,13 @@ export async function interactivelyAskForModel({
 
                     const pad = Math.max(0, minWidth - (stripAnsi(title).length + stripAnsi(vramStateText).length));
 
-                    lastVramState = vramState;
                     clearTimeout(scheduledTitleRerenderTimeout);
-                    scheduledTitleRerenderTimeout = setTimeout(() => {
-                        const vramState = llama.getVramState();
-                        if (lastVramState.used !== vramState.used || lastVramState.total !== vramState.total)
+                    scheduledTitleRerenderTimeout = setTimeout(async () => {
+                        const newVramState = await llama.getVramState();
+                        if (vramState.used !== newVramState.used || vramState.total !== newVramState.total) {
+                            vramState = newVramState;
                             rerender();
+                        }
                     }, vramStateUpdateInterval);
 
                     return [
@@ -567,7 +567,7 @@ async function selectFileForModelRecommendation({
                 if (abortSignal.aborted)
                     return;
 
-                const compatibilityScore = ggufInsights.configurationResolver.scoreModelConfigurationCompatibility();
+                const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility();
 
                 if (bestScore == null || compatibilityScore.compatibilityScore > bestScore) {
                     bestScore = compatibilityScore.compatibilityScore;

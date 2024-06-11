@@ -4,7 +4,7 @@ import {BuildGpu} from "../../../bindings/types.js";
 import {minAllowedContextSizeInCalculations} from "../../../config.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 
-export function resolveContextContextSizeOption({
+export async function resolveContextContextSizeOption({
     contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, getVramState, llamaGpu,
     ignoreMemorySafetyChecks = false, isEmbeddingContext = false
 }: {
@@ -14,11 +14,11 @@ export function resolveContextContextSizeOption({
     modelFileInsights: GgufInsights,
     modelGpuLayers: number,
     modelTrainContextSize: number,
-    getVramState(): {total: number, free: number},
+    getVramState(): Promise<{total: number, free: number}>,
     llamaGpu: BuildGpu,
     ignoreMemorySafetyChecks?: boolean,
     isEmbeddingContext?: boolean
-}): number {
+}): Promise<number> {
     if (contextSize == null)
         contextSize = "auto";
 
@@ -28,7 +28,7 @@ export function resolveContextContextSizeOption({
         if (ignoreMemorySafetyChecks)
             return resolvedContextSize;
 
-        const vramState = getVramState();
+        const vramState = await getVramState();
         const contextVram = modelFileInsights.estimateContextResourceRequirements({
             contextSize: resolvedContextSize,
             batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: resolvedContextSize, sequences}),
@@ -45,7 +45,7 @@ export function resolveContextContextSizeOption({
         if (llamaGpu === false)
             return modelTrainContextSize;
 
-        const vramState = getVramState();
+        const vramState = await getVramState();
 
         if (vramState.total === 0)
             return modelTrainContextSize;

@@ -324,7 +324,7 @@ async function RunCompletion({
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
     const padTitle = "Complete".length + 1;
-    printCommonInfoLines({
+    await printCommonInfoLines({
         context,
         minTitleLength: padTitle,
         logBatchSize,
