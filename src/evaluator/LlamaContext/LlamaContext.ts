@@ -541,7 +541,6 @@ export class LlamaContext {
         _model: LlamaModel
     }): Promise<LlamaContext> {
         const sequences = options.sequences ?? getDefaultContextSequences();
-        const contextSize = _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
         const contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,

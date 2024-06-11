@@ -206,7 +206,6 @@ export class GgufInsightsConfigurationResolver {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         llamaGpu = this._ggufInsights._llama.gpu,
         ignoreMemorySafetyChecks = false,
-        isEmbeddingContext = false
         isEmbeddingContext = false,
         sequences = getDefaultContextSequences()
     }: {

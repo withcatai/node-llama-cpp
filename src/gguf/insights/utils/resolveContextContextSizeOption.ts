@@ -18,7 +18,6 @@ export async function resolveContextContextSizeOption({
     llamaGpu: BuildGpu,
     ignoreMemorySafetyChecks?: boolean,
     isEmbeddingContext?: boolean
-}): number {
 }): Promise<number> {
     if (contextSize == null)
         contextSize = "auto";
