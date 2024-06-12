@@ -60,22 +60,13 @@ export default {
         artifactName: "${name}.macOS.${version}.${arch}.${ext}"
     },
     win: {
-        target: [
-            {
-                target: "nsis",
-                arch: [
-                    "x64",
-                    "arm64"
-                ]
-            },
-            {
-                target: "appx",
-                arch: [
-                    "x64",
-                    "arm64"
-                ]
-            }
-        ],
+        target: [{
+            target: "nsis",
+            arch: [
+                "x64",
+                "arm64"
+            ]
+        }],
 
         artifactName: "${name}.Windows.${version}.${arch}.${ext}"
     },
@@ -99,8 +90,7 @@ export default {
         }, {
             target: "snap",
             arch: [
-                "x64",
-                "arm64"
+                "x64"
             ]
         }, {
             target: "deb",

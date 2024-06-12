@@ -1,5 +1,6 @@
 import classNames from "classnames";
 import {LlmState} from "../../../../electron/state/llmState.ts";
+import {MarkdownContent} from "../MarkdownContent/MarkdownContent.js";
 
 import "./ChatHistory.css";
 
@@ -10,14 +11,14 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
             simplifiedChat.map((item, index) => {
                 if (item.type === "model") {
                     const isActive = index === simplifiedChat.length - 1 && generatingResult;
-                    return <div key={index} className={classNames("message", "model", isActive && "active")}>
+                    return <MarkdownContent key={index} className={classNames("message", "model", isActive && "active")}>
                         {item.message}
-                    </div>;
+                    </MarkdownContent>;
 
                 } else if (item.type === "user")
-                    return <div key={index} className="message user">
+                    return <MarkdownContent key={index} className="message user">
                         {item.message}
-                    </div>;
+                    </MarkdownContent>;
 
                 return null;
             })
