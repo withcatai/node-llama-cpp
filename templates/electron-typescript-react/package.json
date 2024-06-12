@@ -24,12 +24,15 @@
   "dependencies": {
     "birpc": "^0.2.17",
     "classnames": "^2.5.1",
+    "highlight.js": "^11.9.0",
     "lifecycle-utils": "^1.4.1",
+    "markdown-it": "^14.1.0",
     "node-llama-cpp": "file:../..",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.12.0",

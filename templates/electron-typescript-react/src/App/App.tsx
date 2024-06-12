@@ -158,7 +158,7 @@ export function App() {
             />
         }
         <InputRow
-            disabled={!state.model.loaded}
+            disabled={!state.model.loaded || !state.contextSequence.loaded}
             stopGeneration={
                 generatingResult
                     ? stopActivePrompt
@@ -167,7 +167,6 @@ export function App() {
             onPromptInput={onPromptInput}
             sendPrompt={sendPrompt}
             generatingResult={generatingResult}
-            contextSequenceLoaded={state.contextSequence.loaded}
             autocompleteInputDraft={state.chatSession.draftPrompt.prompt}
             autocompleteCompletion={state.chatSession.draftPrompt.completion}
         />

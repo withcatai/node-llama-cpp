@@ -7,8 +7,7 @@ import "./InputRow.css";
 
 
 export function InputRow({
-    disabled = false, stopGeneration, sendPrompt, onPromptInput, autocompleteInputDraft, autocompleteCompletion, generatingResult,
-    contextSequenceLoaded
+    disabled = false, stopGeneration, sendPrompt, onPromptInput, autocompleteInputDraft, autocompleteCompletion, generatingResult
 }: InputRowProps) {
     const [inputText, setInputText] = useState<string>("");
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -95,7 +94,7 @@ export function InputRow({
                 className="input"
                 autoComplete="off"
                 spellCheck
-                disabled={disabled || !contextSequenceLoaded}
+                disabled={disabled}
                 onScroll={resizeInput}
                 placeholder={
                     autocompleteText === ""
@@ -120,7 +119,7 @@ export function InputRow({
         </button>
         <button
             className="sendButton"
-            disabled={disabled || !contextSequenceLoaded || inputText === "" || generatingResult}
+            disabled={disabled || inputText === "" || generatingResult}
             onClick={submitPrompt}
         >
             <AddMessageIconSVG className="icon" />
@@ -135,6 +134,5 @@ type InputRowProps = {
     onPromptInput?(currentText: string): void,
     autocompleteInputDraft?: string,
     autocompleteCompletion?: string,
-    generatingResult: boolean,
-    contextSequenceLoaded: boolean
+    generatingResult: boolean
 };
