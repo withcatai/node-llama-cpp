@@ -192,9 +192,17 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 chalk.yellow('To install Xcode command line tools, run "xcode-select --install"')
             );
         else if (buildOptions.gpu === "cuda") {
-            if (!ignoreWorkarounds.includes("cudaArchitecture") && (platform === "win" || platform === "linux") && err instanceof SpawnError &&
-                err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase())
-            ) {
+            if (!ignoreWorkarounds.includes("cudaArchitecture") && (platform === "win" || platform === "linux") &&
+                err instanceof SpawnError && (
+                err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase()) || (
+                    err.combinedStd.toLowerCase().includes(
+                        "Tell CMake where to find the compiler by setting either the environment".toLowerCase()
+                    ) &&
+                    err.combinedStd.toLowerCase().includes(
+                        'variable "CUDACXX" or the CMake cache entry CMAKE_CUDA_COMPILER to the full'.toLowerCase()
+                    )
+                )
+            )) {
                 for (const nvccPath of await getCudaNvccPaths()) {
                     if (buildOptions.progressLogs)
                         console.info(
