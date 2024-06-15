@@ -102,7 +102,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("8687");
                 }
                 try {
-                    resolveGpuLayers(16, {
+                    await resolveGpuLayers(16, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -111,7 +111,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[Error: Not enough VRAM to fit the model with the specified settings]");
                 }
                 try {
-                    resolveGpuLayers(16, {
+                    await resolveGpuLayers(16, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.2
                     });
@@ -165,7 +165,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("10905");
                 }
                 try {
-                    resolveGpuLayers(32, {
+                    await resolveGpuLayers(32, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.2
                     });
@@ -214,7 +214,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("10905");
                 }
                 try {
-                    resolveGpuLayers(33, {
+                    await resolveGpuLayers(33, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.2
                     });
@@ -255,7 +255,7 @@ describe("stableCode", () => {
 
             it('attempts to resolve "max"', async () => {
                 try {
-                    resolveGpuLayers("max", {
+                    await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -265,7 +265,7 @@ describe("stableCode", () => {
                 }
 
                 try {
-                    resolveGpuLayers("max", {
+                    await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0.2
                     });
@@ -275,7 +275,7 @@ describe("stableCode", () => {
                 }
 
                 try {
-                    resolveGpuLayers("max", {
+                    await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 3.2
                     });
@@ -467,7 +467,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("16384");
                 }
                 try {
-                    resolveGpuLayers({min: 2}, {
+                    await resolveGpuLayers({min: 2}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -476,7 +476,7 @@ describe("stableCode", () => {
                     expect(err).toMatchInlineSnapshot("[Error: Not enough VRAM to fit the model with the specified settings]");
                 }
                 try {
-                    resolveGpuLayers({min: 2, max: 4}, {
+                    await resolveGpuLayers({min: 2, max: 4}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 0
                     });
@@ -494,7 +494,7 @@ describe("stableCode", () => {
                     expect(res.contextSize).to.toMatchInlineSnapshot("13167");
                 }
                 try {
-                    resolveGpuLayers({min: 16}, {
+                    await resolveGpuLayers({min: 16}, {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 2
                     });
@@ -597,7 +597,7 @@ describe("stableCode", () => {
                 }
                 {
                     try {
-                        resolveGpuLayers({min: 1, fitContext: {contextSize: 8192}}, {
+                        await resolveGpuLayers({min: 1, fitContext: {contextSize: 8192}}, {
                             totalVram: s1GB * 0.2,
                             freeVram: s1GB * 0
                         });
