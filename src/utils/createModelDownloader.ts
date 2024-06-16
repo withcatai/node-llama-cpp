@@ -6,6 +6,7 @@ import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.j
 import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {cliModelsDirectory} from "../config.js";
+import {safeEventCallback} from "./safeEventCallback.js";
 
 export type ModelDownloaderOptions = {
     modelUrl: string,
@@ -116,10 +117,12 @@ export class ModelDownloader {
         this._fileName = fileName;
         this._headers = headers;
         this._showCliProgress = showCliProgress;
-        this._onProgress = onProgress;
+        this._onProgress = safeEventCallback(onProgress);
         this._deleteTempFileOnCancel = deleteTempFileOnCancel;
         this._skipExisting = skipExisting;
         this._parallelDownloads = parallelDownloads;
+
+        this._onDownloadProgress = this._onDownloadProgress.bind(this);
     }
 
     /**
