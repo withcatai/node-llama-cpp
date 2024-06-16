@@ -54,14 +54,14 @@ jobs:
       matrix:
         config:
           - name: "Windows MSVC"
-            os: windows-2022
+            os: windows-2019
             cc: "cl"
             cxx: "cl"
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
             generators: "Visual Studio 17 2022"
             artifact: "win"
           - name: "Ubuntu GCC"
-            os: ubuntu-22.04
+            os: ubuntu-20.04
             cc: "gcc"
             cxx: "g++"
             generators: "Ninja"
@@ -112,7 +112,7 @@ jobs:
         if: startsWith(matrix.config.os, 'windows')
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
-          cuda: '12.4.1'
+          cuda: '12.2.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
@@ -121,7 +121,7 @@ jobs:
         if: startsWith(matrix.config.name, 'Ubuntu GCC')
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
-          cuda: '12.4.1'
+          cuda: '12.2.0'
           method: 'network'
 
       - name: Install Vulkan SDK on Windows
@@ -508,9 +508,9 @@ jobs:
       matrix:
         config:
           - name: "Windows"
-            os: windows-2022
+            os: windows-2019
           - name: "Ubuntu"
-            os: ubuntu-22.04
+            os: ubuntu-20.04
           - name: "macOS"
             os: macos-13
 
