@@ -101,6 +101,8 @@ if (process.env.TEST_BINDING_CP === "true" && process.send != null) {
             try {
                 const binding: BindingModule = require(message.bindingBinaryPath);
                 await binding.init();
+                binding.getGpuVramInfo();
+                binding.getGpuDeviceInfo();
                 process.send({type: "done"} satisfies ChildToParentMessage);
             } catch (err) {
                 console.error(err);
