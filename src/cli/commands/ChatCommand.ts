@@ -498,7 +498,7 @@ async function RunChat({
     }
 
     void session.preloadPrompt("")
-        .catch(() => void 0); // don't throw an error if preloading fails before a real prompt is sent early
+        .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
