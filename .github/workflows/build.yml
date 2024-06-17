@@ -53,24 +53,17 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - name: "Windows MSVC"
+          - name: "Windows for x64"
+            os: windows-2022
+            artifact: "win-x64"
+          - name: "Windows for Arm"
             os: windows-2019
-            cc: "cl"
-            cxx: "cl"
-            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-            generators: "Visual Studio 17 2022"
-            artifact: "win"
-          - name: "Ubuntu GCC"
+            artifact: "win-arm"
+          - name: "Ubuntu"
             os: ubuntu-20.04
-            cc: "gcc"
-            cxx: "g++"
-            generators: "Ninja"
             artifact: "linux"
-          - name: "macOS Clang"
+          - name: "macOS"
             os: macos-13
-            cc: "clang"
-            cxx: "clang++"
-            generators: "Xcode"
             artifact: "mac"
 
     steps:
@@ -97,7 +90,7 @@ jobs:
           choco install ninja cmake
 
       - name: Install dependencies on Ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu GCC')
+        if: matrix.config.name == 'Ubuntu'
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
@@ -108,8 +101,8 @@ jobs:
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
 
-      - name: Install Cuda on Windows
-        if: startsWith(matrix.config.os, 'windows')
+      - name: Install Cuda on Windows for x64
+        if: matrix.config.name == 'Windows for x64'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
           cuda: '12.2.0'
@@ -118,14 +111,14 @@ jobs:
           use-local-cache: false
 
       - name: Install Cuda on Ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu GCC')
+        if: matrix.config.name == 'Ubuntu'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
           cuda: '12.2.0'
           method: 'network'
 
-      - name: Install Vulkan SDK on Windows
-        if: startsWith(matrix.config.os, 'windows')
+      - name: Install Vulkan SDK on Windows for x64
+        if: matrix.config.name == 'Windows for x64'
         shell: powershell
         env:
           VULKAN_VERSION: 1.3.261.1
@@ -136,7 +129,7 @@ jobs:
           Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
 
       - name: Install Vulkan SDK on Ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu GCC')
+        if: matrix.config.name == 'Ubuntu'
         run: |
           wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
@@ -144,7 +137,7 @@ jobs:
           sudo apt install vulkan-sdk
 
       - name: Install dependencies on macOS
-        if: startsWith(matrix.config.os, 'macos')
+        if: matrix.config.name == 'macOS'
         run: |
           brew install cmake ninja
           alias make=cmake
@@ -203,10 +196,11 @@ jobs:
           }
           
           // build binaries
-          if (process.env.ARTIFACT_NAME === "win") {
+          if (process.env.ARTIFACT_NAME === "win-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
+          } else if (process.env.ARTIFACT_NAME === "win-arm") {
             await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
           } else if (process.env.ARTIFACT_NAME === "linux") {
             await buildBinary("x64", ["--gpu", "false"]);
@@ -242,7 +236,7 @@ jobs:
           key: cache-upx-${{ runner.os }}-${{ github.workflow }}
 
       - name: Compress CUDA binary on Windows
-        if: startsWith(matrix.config.os, 'windows')
+        if: matrix.config.name == 'Windows for x64'
         shell: bash
         env:
           UPX_VERSION: 4.2.4
@@ -262,7 +256,7 @@ jobs:
           ./upx/upx/upx.exe --best ./bins/win-x64-cuda/llama-addon.node
 
       - name: Compress CUDA binary on Ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu GCC')
+        if: matrix.config.name == 'Ubuntu'
         env:
           UPX_VERSION: 4.2.4
         run: |
@@ -508,7 +502,7 @@ jobs:
       matrix:
         config:
           - name: "Windows"
-            os: windows-2019
+            os: windows-2022
           - name: "Ubuntu"
             os: ubuntu-20.04
           - name: "macOS"
@@ -521,7 +515,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies on Ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu')
+        if: matrix.config.name == 'Ubuntu'
         run: |
           sudo apt-get update
           sudo apt-get install libarchive-tools rpm
