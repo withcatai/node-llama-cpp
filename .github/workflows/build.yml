@@ -235,25 +235,25 @@ jobs:
           path: "upxInstallations/**"
           key: cache-upx-${{ runner.os }}-${{ github.workflow }}
 
-      - name: Compress CUDA binary on Windows
-        if: matrix.config.name == 'Windows for x64'
-        shell: bash
-        env:
-          UPX_VERSION: 4.2.4
-        run: |
-          mkdir -p upxInstallations
-
-          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-win64.zip" ]; then
-            pushd upxInstallations
-            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-win64.zip"
-            popd
-          fi
-
-          mkdir -p upx
-          unzip -d ./upx "./upxInstallations/upx-${UPX_VERSION}-win64.zip"
-          mv "./upx/upx-${UPX_VERSION}-win64" ./upx/upx
-
-          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/llama-addon.node
+#      - name: Compress CUDA binary on Windows
+#        if: matrix.config.name == 'Windows for x64'
+#        shell: bash
+#        env:
+#          UPX_VERSION: 4.2.4
+#        run: |
+#          mkdir -p upxInstallations
+#
+#          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-win64.zip" ]; then
+#            pushd upxInstallations
+#            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-win64.zip"
+#            popd
+#          fi
+#
+#          mkdir -p upx
+#          unzip -d ./upx "./upxInstallations/upx-${UPX_VERSION}-win64.zip"
+#          mv "./upx/upx-${UPX_VERSION}-win64" ./upx/upx
+#
+#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/llama-addon.node
 
       - name: Compress CUDA binary on Ubuntu
         if: matrix.config.name == 'Ubuntu'

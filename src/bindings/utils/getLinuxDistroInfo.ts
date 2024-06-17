@@ -25,10 +25,10 @@ export async function isDistroAlpineLinux(linuxDistroInfo: LinuxDistroInfo) {
 
 async function getOsReleaseInfo() {
     for (const osReleasePath of osReleasePaths) {
-        if (!(await fs.pathExists(osReleasePath)))
-            continue;
-
         try {
+            if (!(await fs.pathExists(osReleasePath)))
+                continue;
+
             const osReleaseFile = await fs.readFile(osReleasePath, "utf-8");
 
             const res = new Map<string, string>();
