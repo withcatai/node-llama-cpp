@@ -190,11 +190,14 @@ const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInE
 
 /**
  * Get a `llama.cpp` binding.
- * Defaults to prefer a prebuilt binary, and fallbacks to building from source if a prebuilt binary is not found.
- * Pass `"lastCliBuild"` to default to use the last successful build created using the `download` or `build` CLI commands if one exists.
+ *
+ * Defaults to use a local binary built using the `download` or `build` CLI commands if one exists,
+ * otherwise, uses a prebuilt binary, and fallbacks to building from source if a prebuilt binary is not found.
+ *
+ * Pass `"lastBuild"` to default to use the last successful build created using the `download` or `build` CLI commands if one exists.
  */
-export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOptions): Promise<Llama>;
 export async function getLlama(options?: LlamaOptions): Promise<Llama>;
+export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOptions): Promise<Llama>;
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
         const lastBuildInfo = await getLastBuildInfo();
@@ -515,14 +518,22 @@ async function loadExistingLlamaBinary({
                         skipLlamaInit,
                         debug
                     });
-                } else if (progressLogs)
+                } else if (progressLogs) {
+                    const binaryDescription = describeBinary({
+                        ...buildOptions,
+                        customCmakeOptions: existingPrebuiltBinaryMustMatchBuildOptions
+                            ? buildOptions.customCmakeOptions
+                            : new Map()
+                    });
                     console.warn(
-                        getConsoleLogPrefix() + "The prebuilt binary is not compatible with the current system" + (
+                        getConsoleLogPrefix() +
+                        `The prebuilt ${binaryDescription} is not compatible with the current system` + (
                             fallbackMessage != null
                                 ? ", " + fallbackMessage
                                 : ""
                         )
                     );
+                }
             } catch (err) {
                 const binaryDescription = describeBinary({
                     ...buildOptions,
@@ -686,6 +697,9 @@ function getShouldTestBinaryBeforeLoading({
         if (platformInfo.name !== buildMetadata.buildOptions.platformInfo.name ||
             platformInfo.version !== buildMetadata.buildOptions.platformInfo.version
         )
+            return true;
+    } else if (platform === "win") {
+        if (buildMetadata.buildOptions.gpu !== false)
             return true;
     }
 

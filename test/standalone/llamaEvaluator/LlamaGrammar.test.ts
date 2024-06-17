@@ -236,7 +236,7 @@ describe("grammar for JSON schema", () => {
             grammar.parse(JSON.stringify(exampleInvalidValue));
             expect.unreachable("Parsing should have failed");
         } catch (err) {
-            expect(err).toMatchInlineSnapshot('[Error: Expected "string" but got "number"]');
+            expect(err).toMatchInlineSnapshot("[Error: Expected one of 2 schemas but got 10]");
         }
 
         try {

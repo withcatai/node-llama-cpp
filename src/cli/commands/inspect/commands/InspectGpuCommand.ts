@@ -10,6 +10,7 @@ import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getModuleVersion} from "../../../../utils/getModuleVersion.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
+import {Llama} from "../../../../bindings/Llama.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -26,6 +27,14 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         const arch = process.arch;
         const availableComputeLayers = await detectAvailableComputeLayers({platform});
         const gpusToLogVramUsageOf: BuildGpu[] = [];
+        const gpuToLlama = new Map<BuildGpu, Llama | undefined>();
+
+        async function loadLlamaForGpu(gpu: BuildGpu) {
+            if (!gpuToLlama.has(gpu))
+                gpuToLlama.set(gpu, await getLlamaForGpu(gpu));
+
+            return gpuToLlama.get(gpu);
+        }
 
         console.info(`${chalk.yellow("OS:")} ${os.type()} ${os.release()} ${chalk.dim("(" + os.arch() + ")")}`);
 
@@ -62,18 +71,34 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         } else if (availableComputeLayers.cuda.hasCudaRuntime && !availableComputeLayers.cuda.hasNvidiaDriver) {
             console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA runtime is installed, but NVIDIA driver is not")}`);
         } else if (availableComputeLayers.cuda.hasCudaRuntime && availableComputeLayers.cuda.hasNvidiaDriver) {
-            console.info(`${chalk.yellow("CUDA:")} ${chalk.green("available")}`);
-            gpusToLogVramUsageOf.push("cuda");
+            const llama = await loadLlamaForGpu("cuda");
+
+            if (llama == null)
+                console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA is detected, but using it failed")}`);
+            else {
+                console.info(`${chalk.yellow("CUDA:")} ${chalk.green("available")}`);
+                gpusToLogVramUsageOf.push("cuda");
+            }
         }
 
         if (availableComputeLayers.vulkan) {
-            console.info(`${chalk.yellow("Vulkan:")} ${chalk.green("available")}`);
-            gpusToLogVramUsageOf.push("vulkan");
+            const llama = await loadLlamaForGpu("vulkan");
+
+            if (llama == null)
+                console.info(`${chalk.yellow("Vulkan:")} ${chalk.red("Vulkan is detected, but using it failed")}`);
+            else {
+                console.info(`${chalk.yellow("Vulkan:")} ${chalk.green("available")}`);
+                gpusToLogVramUsageOf.push("vulkan");
+            }
         }
 
         for (const gpu of gpusToLogVramUsageOf) {
+            const llama = gpuToLlama.get(gpu);
+            if (llama == null)
+                continue;
+
             console.info();
-            await logGpuVramUsage(gpu);
+            await logGpuVramUsage(gpu, llama);
         }
 
         console.info();
@@ -81,9 +106,9 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
     }
 };
 
-async function logGpuVramUsage(gpu: BuildGpu) {
+async function getLlamaForGpu(gpu: BuildGpu) {
     try {
-        const llama = await getLlamaForOptions({
+        return await getLlamaForOptions({
             gpu: gpu,
             build: "never",
             progressLogs: false,
@@ -92,6 +117,13 @@ async function logGpuVramUsage(gpu: BuildGpu) {
         }, {
             skipLlamaInit: true
         });
+    } catch (err) {
+        return undefined;
+    }
+}
+
+async function logGpuVramUsage(gpu: BuildGpu, llama: Llama) {
+    try {
         const gpuName = getPrettyBuildGpuName(gpu);
         const vramStatus = await llama.getVramState();
         const gpuDeviceNames = await llama.getGpuDeviceNames();

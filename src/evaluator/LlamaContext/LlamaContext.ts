@@ -1001,11 +1001,11 @@ export class LlamaContextSequence {
 
                 let freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
-                if (freeSpace <= 1) {
+                if (freeSpace <= 0) {
                     await this._freeUpSpaceForTokens(contextShiftOptions);
                     freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
-                    if (freeSpace <= 1)
+                    if (freeSpace <= 0)
                         throw new Error("Failed to free up space for new tokens");
                 }
 
@@ -1052,12 +1052,10 @@ export class LlamaContextSequence {
 
         if (contextShiftOptions.strategy === "eraseBeginning") {
             let eraseStartIndex = 0;
-            if (this.model.tokens.shouldPrependBosToken && this.model.tokens.bos != null &&
-                this._contextTokens[0] === this.model.tokens.bos
-            )
+            if (this.model.tokens.bos != null && this._contextTokens[0] === this.model.tokens.bos)
                 eraseStartIndex = 1;
 
-            await this.eraseContextTokenRanges([{start: eraseStartIndex, end: size}]);
+            await this.eraseContextTokenRanges([{start: eraseStartIndex, end: size + eraseStartIndex}]);
         } else {
             const ranges = await contextShiftOptions.strategy({
                 sequence: this,

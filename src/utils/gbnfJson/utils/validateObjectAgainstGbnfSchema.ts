@@ -54,7 +54,7 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
                 return true;
         }
 
-        throw new Error(`Expected one type of [${
+        throw new TechnicalValidationError(`Expected one type of [${
             schema.type.map((type) => JSON.stringify(type)).join(", ")
         }] but got type "${object === null ? null : typeof object}"`);
     }
@@ -62,7 +62,7 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
     if (validateImmutableType(object, schema.type))
         return true;
 
-    throw new Error(`Expected "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
+    throw new TechnicalValidationError(`Expected "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
 }
 
 function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
