@@ -11,6 +11,8 @@ import {getModuleVersion} from "../../../../utils/getModuleVersion.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
+import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
+import {getLinuxDistroInfo} from "../../../../bindings/utils/getLinuxDistroInfo.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -36,7 +38,21 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             return gpuToLlama.get(gpu);
         }
 
-        console.info(`${chalk.yellow("OS:")} ${os.type()} ${os.release()} ${chalk.dim("(" + os.arch() + ")")}`);
+        if (platform === "linux") {
+            const linuxDistroInfo = await getLinuxDistroInfo();
+
+            if (linuxDistroInfo.prettyName !== "")
+                console.info(`${chalk.yellow("OS:")} ${linuxDistroInfo.prettyName} ${chalk.dim("(" + os.arch() + ")")}`);
+            else
+                console.info(`${chalk.yellow("OS:")} ${linuxDistroInfo.name || os.type()} ${linuxDistroInfo.version || os.release()} ${chalk.dim("(" + os.arch() + ")")}`);
+        } else {
+            const platformInfo = await getPlatformInfo();
+            const osName = platformInfo.name === "Unknown"
+                ? os.type()
+                : platformInfo.name;
+
+            console.info(`${chalk.yellow("OS:")} ${osName} ${platformInfo.version} ${chalk.dim("(" + os.arch() + ")")}`);
+        }
 
         if (process.versions.node != null)
             console.info(`${chalk.yellow("Node:")} ${process.versions.node} ${chalk.dim("(" + arch + ")")}`);
