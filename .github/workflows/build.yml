@@ -118,6 +118,7 @@ jobs:
         timeout-minutes: 40
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
+          NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_OPENMP: OFF
         run: |
           npm ci
           
