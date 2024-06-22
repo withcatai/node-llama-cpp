@@ -117,7 +117,14 @@ export type ChatModelFunctionCall = {
     description?: string,
     params: any,
     result: any,
-    rawCall?: LlamaTextJSON
+    rawCall?: LlamaTextJSON,
+
+    /**
+     * Whether this function call starts a new function calling chunk.
+     *
+     * Relevant only when parallel function calling is supported.
+     */
+    startsNewChunk?: boolean
 };
 
 export type ChatModelFunctions = {

@@ -2,7 +2,8 @@ import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-
 import {defaultChatSystemPrompt} from "../../config.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions, Token
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions,
+    Token
 } from "../../types.js";
 import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToChatHistory.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
@@ -411,6 +412,7 @@ export class LlamaChatSession {
             if (this._chat == null)
                 throw new DisposedError();
 
+            const supportsParallelFunctionCalling = this._chat.chatWrapper.settings.functions.parallelism != null;
             const abortController = wrapAbortSignal(signal);
             let lastEvaluation = this._lastEvaluation;
             let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
@@ -545,6 +547,7 @@ export class LlamaChatSession {
 
                         newContextWindowChatHistory = lastEvaluation.contextWindow;
 
+                        let startNewChunk = supportsParallelFunctionCalling;
                         for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
                             newChatHistory = addFunctionCallToChatHistory({
                                 chatHistory: newChatHistory,
@@ -552,7 +555,8 @@ export class LlamaChatSession {
                                 functionDescription: functionDefinition.description,
                                 callParams: functionCall.params,
                                 callResult: functionCallResult,
-                                rawCall: functionCall.raw
+                                rawCall: functionCall.raw,
+                                startsNewChunk: startNewChunk
                             });
 
                             newContextWindowChatHistory = addFunctionCallToChatHistory({
@@ -561,8 +565,11 @@ export class LlamaChatSession {
                                 functionDescription: functionDefinition.description,
                                 callParams: functionCall.params,
                                 callResult: functionCallResult,
-                                rawCall: functionCall.raw
+                                rawCall: functionCall.raw,
+                                startsNewChunk: startNewChunk
                             });
+
+                            startNewChunk = false;
                         }
 
                         lastEvaluation.cleanHistory = newChatHistory;
@@ -776,14 +783,16 @@ function addFunctionCallToChatHistory({
     functionDescription,
     callParams,
     callResult,
-    rawCall
+    rawCall,
+    startsNewChunk
 }: {
     chatHistory: ChatHistoryItem[],
     functionName: string,
     functionDescription?: string,
     callParams: any,
     callResult: any,
-    rawCall?: LlamaTextJSON
+    rawCall?: LlamaTextJSON,
+    startsNewChunk?: boolean
 }) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
@@ -799,14 +808,19 @@ function addFunctionCallToChatHistory({
     const modelResponse = newLastModelResponseItem.response.slice();
     newLastModelResponseItem.response = modelResponse;
 
-    modelResponse.push({
+    const functionCall: ChatModelFunctionCall = {
         type: "functionCall",
         name: functionName,
         description: functionDescription,
         params: callParams,
         result: callResult,
         rawCall
-    });
+    };
+
+    if (startsNewChunk)
+        functionCall.startsNewChunk = true;
+
+    modelResponse.push(functionCall);
 
     return newChatHistory;
 }

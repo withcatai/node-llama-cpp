@@ -4,6 +4,7 @@ import {
 } from "./types.js";
 import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
+import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 
 export abstract class ChatWrapper {
     public static defaultSettings: ChatWrapperSettings = {
@@ -105,7 +106,7 @@ export abstract class ChatWrapper {
             (
                 params === undefined
                     ? ""
-                    : JSON.stringify(params)
+                    : jsonDumps(params)
             ),
             this.settings.functions.call.suffix
         ]);
@@ -120,7 +121,7 @@ export abstract class ChatWrapper {
 
                     return value
                         .replaceAll("{{functionName}}", functionName)
-                        .replaceAll("{{functionParams}}", functionParams === undefined ? "" : JSON.stringify(functionParams));
+                        .replaceAll("{{functionParams}}", functionParams === undefined ? "" : jsonDumps(functionParams));
                 });
         }
 
@@ -129,7 +130,7 @@ export abstract class ChatWrapper {
             (
                 result === undefined
                     ? "void"
-                    : JSON.stringify(result)
+                    : jsonDumps(result)
             ),
             resolveParameters(this.settings.functions.result.suffix)
         ]);
@@ -153,6 +154,9 @@ export abstract class ChatWrapper {
                 res.push(LlamaText(response));
                 continue;
             }
+
+            if (response.startsNewChunk)
+                addFunctionCalls();
 
             pendingFunctionCalls.push(response);
         }

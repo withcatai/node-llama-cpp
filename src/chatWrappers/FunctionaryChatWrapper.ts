@@ -3,8 +3,9 @@ import {
     ChatHistoryItem, ChatModelFunctions, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings,
     isChatModelResponseFunctionCall
 } from "../types.js";
-import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
+import {jsonDumps} from "./utils/jsonDumps.js";
 
 // source: https://github.com/MeetKai/functionary/blob/main/tests/prompt_test_v2.txt
 export class FunctionaryChatWrapper extends ChatWrapper {
@@ -161,6 +162,9 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                 ])
                             );
                         } else if (isChatModelResponseFunctionCall(response)) {
+                            if (response.startsNewChunk)
+                                addPendingFunctions();
+
                             pendingFunctionCalls.push(
                                 response.rawCall != null
                                     ? LlamaText.fromJSON(response.rawCall)
@@ -170,7 +174,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                         new SpecialTokensText("\n"),
                                         response.params === undefined
                                             ? ""
-                                            : JSON.stringify(response.params)
+                                            : jsonDumps(response.params)
                                     ])
                             );
                             pendingFunctionResults.push(
@@ -180,7 +184,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     new SpecialTokensText("\n"),
                                     response.result === undefined
                                         ? "" // "void"
-                                        : JSON.stringify(response.result),
+                                        : jsonDumps(response.result),
                                     new SpecialToken("EOT")
                                 ])
                             );
@@ -314,7 +318,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                         new SpecialTokensText("<|content|>"),
                                         response.params === undefined
                                             ? ""
-                                            : JSON.stringify(response.params)
+                                            : jsonDumps(response.params)
                                     ])
                             );
                             pendingFunctionResults.push(
@@ -325,7 +329,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     new SpecialTokensText("<|content|>"),
                                     response.result === undefined
                                         ? "" // "void"
-                                        : JSON.stringify(response.result)
+                                        : jsonDumps(response.result)
                                 ])
                             );
                         } else

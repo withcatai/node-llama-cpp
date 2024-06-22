@@ -70,6 +70,7 @@ import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
 import {GgufInsightsConfigurationResolver} from "./gguf/insights/GgufInsightsConfigurationResolver.js";
 import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
+import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -248,5 +249,6 @@ export {
     GgufInsightsConfigurationResolver,
     createModelDownloader,
     ModelDownloader,
-    type ModelDownloaderOptions
+    type ModelDownloaderOptions,
+    jsonDumps
 };
