@@ -1,11 +1,11 @@
 import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
-import {documentationPageUrls, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../config.js";
-import withOra from "../../utils/withOra.js";
-import {clearAllLocalBuilds} from "../../bindings/utils/clearAllLocalBuilds.js";
-import {clearLocalCmake, fixXpackPermissions} from "../../utils/cmake.js";
-import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {documentationPageUrls, llamaCppDirectory, llamaCppDirectoryInfoFilePath} from "../../../../config.js";
+import withOra from "../../../../utils/withOra.js";
+import {clearAllLocalBuilds} from "../../../../bindings/utils/clearAllLocalBuilds.js";
+import {clearLocalCmake, fixXpackPermissions} from "../../../../utils/cmake.js";
+import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 
 type ClearCommand = {
     type: "source" | "builds" | "cmake" | "all"
@@ -15,8 +15,8 @@ export const ClearCommand: CommandModule<object, ClearCommand> = {
     command: "clear [type]",
     aliases: ["clean"],
     describe: withCliCommandDescriptionDocsUrl(
-        "Clear files created by node-llama-cpp",
-        documentationPageUrls.CLI.Clear
+        "Clear files created by `node-llama-cpp`",
+        documentationPageUrls.CLI.Source.Clear
     ),
     builder(yargs) {
         return yargs

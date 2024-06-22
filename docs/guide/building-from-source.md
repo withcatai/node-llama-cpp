@@ -5,16 +5,16 @@ In case binaries are not available for your platform or fail to load,
 it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 
 ## Downloading a release
-To download a release of `llama.cpp` and build it from source you can use the [CLI `download` command](./cli/download.md).
+To download a release of `llama.cpp` and build it from source you can use the [CLI `source download` command](../cli/source/download.md).
 
 ```shell
-npx --no node-llama-cpp download
+npx --no node-llama-cpp source download
 ```
 
 ::: tip NOTE
 
 `node-llama-cpp` ships with a git bundle of the release of `llama.cpp` it was built with,
-so when you run the [`download`](./cli/download.md) command without specifying a specific release or repo,
+so when you run the [`source download`](../cli/source/download.md) command without specifying a specific release or repo,
 it will use the bundled git bundle instead of downloading the release from GitHub.
 
 This is useful for building from source on machines that aren't connected to the internet.
@@ -31,16 +31,16 @@ If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile
 
 :::
 
-## `download` and `build` commands
-The difference between the [`download`](./cli/download.md) and [`build`](./cli/build.md) commands
-is that the `download` command downloads a release of `llama.cpp` and builds it,
-while the `build` command builds the `llama.cpp` release that's already downloaded.
+## `source download` and `source build` commands
+The difference between the [`source download`](../cli/source/download.md) and [`source build`](../cli/source/build.md) commands
+is that the `source download` command downloads a release of `llama.cpp` and builds it,
+while the `source build` command builds the `llama.cpp` release that's already downloaded.
 
-You can only use the `build` command after you've already downloaded a release of `llama.cpp` with the `download` command.
+You can only use the `source build` command after you've already downloaded a release of `llama.cpp` with the `source download` command.
 
-To only download a release of `llama.cpp` without building it, use the `download` command with the `--skipBuild` option:
+To only download a release of `llama.cpp` without building it, use the `source download` command with the `--skipBuild` option:
 ```shell
-npx --no node-llama-cpp download --skipBuild
+npx --no node-llama-cpp source download --skipBuild
 ```
 
 ## Customizing the build
@@ -51,7 +51,7 @@ npx --no node-llama-cpp download --skipBuild
 `llama.cpp` has cmake build options that can be configured to customize the build.
 You can find documentation for these options [here](https://github.com/ggerganov/llama.cpp#blas-build).
 
-To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_` before running the [`download`](./cli/download.md) or [`build`](./cli/build.md) commands.
+To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_` before running the [`source download`](../cli/source/download.md) or [`source build`](../cli/source/build.md) commands.
 
 ## Downloading a newer release
 Every new release of `node-llama-cpp` ships with the latest release of `llama.cpp` that was available at the time of the release,
@@ -64,12 +64,12 @@ A new release may contain breaking changes, so it won't necessarily work properl
 
 You can do this by specifying the `--release` option with the release tag you want to download:
 ```shell
-npx --no node-llama-cpp download --release "b1350"
+npx --no node-llama-cpp source download --release "b1350"
 ```
 
 > You can find the release tag on the [`llama.cpp` releases page](https://github.com/ggerganov/llama.cpp/releases):
 
 You can also opt to download the latest release available:
 ```shell
-npx --no node-llama-cpp download --release latest
+npx --no node-llama-cpp source download --release latest
 ```

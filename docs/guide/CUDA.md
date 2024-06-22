@@ -7,7 +7,7 @@
 ## Building `node-llama-cpp` with CUDA support
 Run this command inside of your project:
 ```bash
-npx --no node-llama-cpp download --cuda
+npx --no node-llama-cpp source download --cuda
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.

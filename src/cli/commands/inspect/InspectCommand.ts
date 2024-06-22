@@ -12,7 +12,7 @@ type InspectCommand = {
 export const InspectCommand: CommandModule<object, InspectCommand> = {
     command: "inspect <command>",
     describe: withCliCommandDescriptionDocsUrl(
-        "Inspect the inner workings of node-llama-cpp",
+        "Inspect the inner workings of `node-llama-cpp`",
         documentationPageUrls.CLI.Inspect.index
     ),
     builder(yargs) {
@@ -22,6 +22,6 @@ export const InspectCommand: CommandModule<object, InspectCommand> = {
             .command(InspectMeasureCommand);
     },
     async handler() {
-        // this function must exit, even though we do nothing here
+        // this function must exist, even though we do nothing here
     }
 };

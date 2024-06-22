@@ -15,7 +15,7 @@ const homepageUrlWithoutTrailingSlash = homepageUrl.endsWith("/")
 
 const newFooterTemplate = defaultFooterTemplate + "\n---\n\n" +
     `Shipped with \`llama.cpp\` release [\`${binariesSourceRelease.split("`").join("")}\`](https://github.com/${defaultLlamaCppGitHubRepo}/releases/tag/${encodeURIComponent(binariesSourceRelease)})\n\n` +
-    `> To use the latest \`llama.cpp\` release available, run \`npx --no ${cliBinName} download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#downloading-a-newer-release))\n`;
+    `> To use the latest \`llama.cpp\` release available, run \`npx -n ${cliBinName} source download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#downloading-a-newer-release))\n`;
 
 /**
  * @type {import("semantic-release").GlobalConfig}

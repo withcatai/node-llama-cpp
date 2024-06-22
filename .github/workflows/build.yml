@@ -23,7 +23,7 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        run: node ./dist/cli/cli.js download --release b3543 --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
+        run: node ./dist/cli/cli.js source download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -193,7 +193,7 @@ jobs:
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
             
-            await $`node ./dist/cli/cli.js build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
+            await $`node ./dist/cli/cli.js source build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
           }
           
           // build binaries
@@ -315,7 +315,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build --noUsageExample
+        run: node ./dist/cli/cli.js source build --noUsageExample
 
       - name: Run standalone tests
         run: npm run test:standalone
@@ -354,7 +354,7 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build --noUsageExample
+        run: node ./dist/cli/cli.js source build --noUsageExample
 
       - name: Cache models
         id: cache-test-models

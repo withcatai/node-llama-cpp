@@ -5,27 +5,27 @@ import chalk from "chalk";
 import {
     defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath,
     defaultLlamaCppGpuSupport, documentationPageUrls
-} from "../../config.js";
-import {compileLlamaCpp} from "../../bindings/utils/compileLLamaCpp.js";
-import withOra from "../../utils/withOra.js";
-import {clearTempFolder} from "../../utils/clearTempFolder.js";
-import {setBinariesGithubRelease} from "../../bindings/utils/binariesGithubRelease.js";
-import {downloadCmakeIfNeeded} from "../../utils/cmake.js";
-import withStatusLogs from "../../utils/withStatusLogs.js";
-import {getIsInDocumentationMode} from "../../state.js";
-import {getGitBundlePathForRelease, unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../utils/gitReleaseBundles.js";
-import {cloneLlamaCppRepo} from "../../bindings/utils/cloneLlamaCppRepo.js";
-import {getPlatform} from "../../bindings/utils/getPlatform.js";
-import {resolveCustomCmakeOptions} from "../../bindings/utils/resolveCustomCmakeOptions.js";
-import {logBinaryUsageExampleToConsole} from "../../bindings/utils/logBinaryUsageExampleToConsole.js";
-import {resolveGithubRelease} from "../../utils/resolveGithubRelease.js";
-import {BuildGpu, BuildOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../bindings/types.js";
-import {logUsedGpuTypeOption} from "../utils/logUsedGpuTypeOption.js";
-import {getGpuTypesToUseForOption} from "../../bindings/utils/getGpuTypesToUseForOption.js";
-import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
-import {getPrettyBuildGpuName} from "../../bindings/consts.js";
-import {getPlatformInfo} from "../../bindings/utils/getPlatformInfo.js";
-import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+} from "../../../../config.js";
+import {compileLlamaCpp} from "../../../../bindings/utils/compileLLamaCpp.js";
+import withOra from "../../../../utils/withOra.js";
+import {clearTempFolder} from "../../../../utils/clearTempFolder.js";
+import {setBinariesGithubRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
+import {downloadCmakeIfNeeded} from "../../../../utils/cmake.js";
+import withStatusLogs from "../../../../utils/withStatusLogs.js";
+import {getIsInDocumentationMode} from "../../../../state.js";
+import {getGitBundlePathForRelease, unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../../../utils/gitReleaseBundles.js";
+import {cloneLlamaCppRepo} from "../../../../bindings/utils/cloneLlamaCppRepo.js";
+import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
+import {resolveCustomCmakeOptions} from "../../../../bindings/utils/resolveCustomCmakeOptions.js";
+import {logBinaryUsageExampleToConsole} from "../../../../bindings/utils/logBinaryUsageExampleToConsole.js";
+import {resolveGithubRelease} from "../../../../utils/resolveGithubRelease.js";
+import {BuildGpu, BuildOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../../../bindings/types.js";
+import {logUsedGpuTypeOption} from "../../../utils/logUsedGpuTypeOption.js";
+import {getGpuTypesToUseForOption} from "../../../../bindings/utils/getGpuTypesToUseForOption.js";
+import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
+import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
+import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
+import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -45,7 +45,7 @@ export const DownloadCommand: CommandModule<object, DownloadCommandArgs> = {
     command: "download",
     describe: withCliCommandDescriptionDocsUrl(
         "Download a release of `llama.cpp` and compile it",
-        documentationPageUrls.CLI.Download
+        documentationPageUrls.CLI.Source.Download
     ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();

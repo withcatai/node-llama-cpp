@@ -14,7 +14,7 @@ and when building from source on macOS on Apple Silicon Macs, Metal support is e
 ### Building `node-llama-cpp` with Metal support disabled
 Run this command inside of your project:
 ```bash
-npx --no node-llama-cpp download --no-metal
+npx --no node-llama-cpp source download --no-metal
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
@@ -23,7 +23,7 @@ npx --no node-llama-cpp download --no-metal
 ### Building `node-llama-cpp` with Metal support enabled
 Run this command inside of your project:
 ```bash
-npx --no node-llama-cpp download --metal
+npx --no node-llama-cpp source download --metal
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.

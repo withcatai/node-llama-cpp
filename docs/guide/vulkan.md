@@ -58,11 +58,11 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
 ## Building from source
 When you use the [`getLlama`](../api/functions/getLlama) method, if there's no binary that matches the provided options, it'll automatically build `llama.cpp` from source.
 
-Manually building from source using the [`download`](./cli/download) command is recommended for troubleshooting build issues.
+Manually building from source using the [`source download`](../cli/source/download.md) command is recommended for troubleshooting build issues.
 
 To manually build from source, run this command inside of your project:
 ```bash
-npx --no node-llama-cpp download --gpu vulkan
+npx --no node-llama-cpp source download --gpu vulkan
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
