@@ -174,6 +174,9 @@ export default defineConfig({
                     text: "npm",
                     link: "https://www.npmjs.com/package/node-llama-cpp"
                 }, {
+                    text: "GitHub Discussions",
+                    link: "https://github.com/withcatai/node-llama-cpp/discussions?discussions_q=is%3Aopen"
+                }, {
                     text: "Contribute",
                     link: "/guide/contributing"
                 },
@@ -188,7 +191,10 @@ export default defineConfig({
             }
         ],
         search: {
-            provider: "local"
+            provider: "local",
+            options: {
+                detailedView: true
+            }
         },
         sidebar: {
             "/api/": orderApiReferenceSidebar(getApiReferenceSidebar()),
