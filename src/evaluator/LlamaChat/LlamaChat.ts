@@ -32,7 +32,11 @@ export type LlamaChatOptions = {
     /** `"auto"` is used by default */
     chatWrapper?: "auto" | ChatWrapper,
 
-    /** Automatically dispose the sequence when the session is disposed */
+    /**
+     * Automatically dispose the sequence when the session is disposed
+     *
+     * Defaults to `false`.
+     */
     autoDisposeSequence?: boolean
 };
 
@@ -280,7 +284,7 @@ export class LlamaChat {
     public constructor({
         contextSequence,
         chatWrapper = "auto",
-        autoDisposeSequence = true
+        autoDisposeSequence = false
     }: LlamaChatOptions) {
         if (contextSequence == null)
             throw new Error("contextSequence cannot be null");

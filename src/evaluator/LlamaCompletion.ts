@@ -19,7 +19,11 @@ import {TokenBias} from "./TokenBias.js";
 export type LlamaCompletionOptions = {
     contextSequence: LlamaContextSequence,
 
-    /** Automatically dispose the sequence when the object is disposed */
+    /**
+     * Automatically dispose the sequence when the object is disposed.
+     *
+     * Defaults to `false`.
+     */
     autoDisposeSequence?: boolean
 };
 
@@ -164,7 +168,7 @@ export class LlamaCompletion {
 
     public constructor({
         contextSequence,
-        autoDisposeSequence = true
+        autoDisposeSequence = false
     }: LlamaCompletionOptions) {
         this._sequence = contextSequence;
         this._autoDisposeSequence = autoDisposeSequence;

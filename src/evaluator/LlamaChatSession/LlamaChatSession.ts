@@ -36,7 +36,11 @@ export type LlamaChatSessionOptions = {
      */
     forceAddSystemPrompt?: boolean,
 
-    /** Automatically dispose the sequence when the session is disposed */
+    /**
+     * Automatically dispose the sequence when the session is disposed.
+     *
+     * Defaults to `false`.
+     */
     autoDisposeSequence?: boolean,
 
     contextShift?: LlamaChatSessionContextShiftOptions
@@ -289,7 +293,7 @@ export class LlamaChatSession {
         chatWrapper = "auto",
         systemPrompt,
         forceAddSystemPrompt = false,
-        autoDisposeSequence = true,
+        autoDisposeSequence = false,
         contextShift
     }: LlamaChatSessionOptions) {
         if (contextSequence == null)
