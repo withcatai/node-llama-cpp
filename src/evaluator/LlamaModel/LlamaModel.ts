@@ -405,7 +405,12 @@ export class LlamaModel {
      * Transform tokens into text
      * @param tokens - the tokens to detokenize.
      * @param [specialTokens] - if set to `true`, special tokens will be detokenized to their corresponding token text representation.
+     *
      * Recommended for debugging purposes only.
+     *
+     * > **Note:** there may be additional spaces around special tokens that were not present in the original text - this is not a bug,
+     * this is [how the tokenizer is supposed to work](https://github.com/ggerganov/llama.cpp/pull/7697#issuecomment-2144003246).
+     *
      * Defaults to `false`.
      * @param [lastTokens] - the last few tokens that preceded the tokens to detokenize.
      * If provided, the last few tokens will be used to determine whether a space has to be added before the current tokens or not,
@@ -499,29 +504,15 @@ export class LlamaModel {
         const modelFilePathText = `("${getReadablePath(this._modelPath)}")`;
 
         try {
-            const specialTokenString = this.tokens.bosString || this.tokens.eosString || this.tokens.infill.eotString;
-            if (specialTokenString != null && specialTokenString !== "") {
-                const beforeTextNoSpecialTokens = "some test text here";
-                const afterTextNoSpecialTokens = this.detokenize(this.tokenize(beforeTextNoSpecialTokens, false, "trimLeadingSpace"));
+            const beforeTextNoSpecialTokens = "some test text here";
+            const afterTextNoSpecialTokens = this.detokenize(this.tokenize(beforeTextNoSpecialTokens, false, "trimLeadingSpace"), false);
 
-                if (beforeTextNoSpecialTokens !== afterTextNoSpecialTokens)
-                    warnings.push(
-                        `Using this model ${modelFilePathText} to tokenize text and then detokenize it resulted in a different text. ` +
-                        "There might be an issue with the model or the tokenizer implementation. " +
-                        "Using this model may not work as intended"
-                    );
-
-                const beforeTextWithSpecialTokens = specialTokenString + beforeTextNoSpecialTokens;
-                const afterTextWithSpecialTokens = this.detokenize(this.tokenize(beforeTextWithSpecialTokens, true, "trimLeadingSpace"), true);
-
-                if (beforeTextWithSpecialTokens !== afterTextWithSpecialTokens)
-                    warnings.push(
-                        `Using this model ${modelFilePathText} to tokenize text with special tokens and then ` +
-                        "detokenize it resulted in a different text. " +
-                        "There might be an issue with the model or the tokenizer implementation. " +
-                        "Using this model may not work as intended"
-                    );
-            }
+            if (beforeTextNoSpecialTokens !== afterTextNoSpecialTokens)
+                warnings.push(
+                    `Using this model ${modelFilePathText} to tokenize text and then detokenize it resulted in a different text. ` +
+                    "There might be an issue with the model or the tokenizer implementation. " +
+                    "Using this model may not work as intended"
+                );
         } catch (err) {
             // do nothing
         }

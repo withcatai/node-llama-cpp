@@ -65,7 +65,7 @@
     "dev:setup": "npm run build && node ./dist/cli/cli.js source download --noUsageExample && npm run docs:generateTypedoc && npm run dev:setup:downloadAllTestModels",
     "dev:build": "npm run build && node ./dist/cli/cli.js source build --noUsageExample",
     "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo ./test/.models ./docs/api ./docs/api-overrides ./templates/packed",
-    "docs:generateTypedoc": "typedoc --entryPoints ./src/apiDocsIndex.ts && rimraf ./docs/api/index.md ./docs/api/globals.md ./docs/api/functions/LlamaText.md",
+    "docs:generateTypedoc": "typedoc && rimraf ./docs/api/index.md ./docs/api/globals.md ./docs/api/functions/LlamaText.md",
     "docs:dev": "npm run docs:generateTypedoc && vitepress dev",
     "docs:build": "npm run docs:generateTypedoc && vitepress build",
     "docs:preview": "npm run docs:generateTypedoc && vitepress preview"

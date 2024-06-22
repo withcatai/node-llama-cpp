@@ -16,6 +16,7 @@
             margin-inline-start: 48px;
             margin-inline-end: 12px;
             color: var(--user-message-text-color);
+            word-break: break-word;
 
             &:not(:first-child) {
                 margin-top: 36px;
@@ -26,6 +27,7 @@
             align-self: flex-start;
             margin-inline-end: 48px;
             padding-inline-start: 24px;
+            word-break: break-word;
 
             &.active {
                 &:after {

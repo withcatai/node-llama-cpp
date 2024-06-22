@@ -25,8 +25,12 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
 
         if (checkEquivalence(jinjaChatWrapper, specializedChatWrapper, testChatHistories, tokenizer))
             return true;
+    } catch (err) {
+        // Do nothing
+    }
 
 
+    try {
         const jinjaChatWrapperWithLeadingWhitespaceTrimming = new JinjaTemplateChatWrapper({
             ...jinjaTemplateWrapperOptions,
             convertUnsupportedSystemMessagesToUserMessages: canTestMultipleConvertSystemMessagesToUserMessages
@@ -44,8 +48,43 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
     if (!canTestMultipleConvertSystemMessagesToUserMessages)
         return false;
 
+    const convertSystemMessagesToUserMessagesTemplate = "### System message\n\n{{message}}\n\n----";
+    const transformedTestChatHistories = testChatHistories
+        .map((history) => (
+            history
+                .slice()
+                .map((item, index, array) => {
+                    if (item.type === "system") {
+                        if (index === 0 && array.length > 1 && array[1].type === "user") {
+                            array[1] = {
+                                type: "user",
+                                text: LlamaText([
+                                    LlamaText.joinValues(
+                                        LlamaText.fromJSON(item.text),
+                                        convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
+                                    ),
+                                    "\n\n",
+                                    array[1].text
+                                ]).toString()
+                            } satisfies ChatHistoryItem;
+                            return null;
+                        }
+
+                        return {
+                            type: "user",
+                            text: LlamaText.joinValues(
+                                LlamaText.fromJSON(item.text),
+                                convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
+                            ).toString()
+                        } satisfies ChatHistoryItem;
+                    }
+
+                    return item;
+                })
+                .filter((item): item is ChatUserMessage | ChatModelResponse => item != null)
+        ));
+
     try {
-        const convertSystemMessagesToUserMessagesTemplate = "### System message\n\n{{message}}\n\n----";
         const jinjaChatWrapper = new JinjaTemplateChatWrapper({
             ...jinjaTemplateWrapperOptions,
             convertUnsupportedSystemMessagesToUserMessages: {
@@ -55,45 +94,14 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
             trimLeadingWhitespaceInResponses: false
         });
 
-        const transformedTestChatHistories = testChatHistories
-            .map((history) => (
-                history
-                    .slice()
-                    .map((item, index, array) => {
-                        if (item.type === "system") {
-                            if (index === 0 && array.length > 1 && array[1].type === "user") {
-                                array[1] = {
-                                    type: "user",
-                                    text: LlamaText([
-                                        LlamaText.joinValues(
-                                            LlamaText.fromJSON(item.text),
-                                            convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
-                                        ),
-                                        "\n\n",
-                                        array[1].text
-                                    ]).toString()
-                                } satisfies ChatHistoryItem;
-                                return null;
-                            }
-
-                            return {
-                                type: "user",
-                                text: LlamaText.joinValues(
-                                    LlamaText.fromJSON(item.text),
-                                    convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
-                                ).toString()
-                            } satisfies ChatHistoryItem;
-                        }
-
-                        return item;
-                    })
-                    .filter((item): item is ChatUserMessage | ChatModelResponse => item != null)
-            ));
-
         if (checkEquivalence(jinjaChatWrapper, specializedChatWrapper, transformedTestChatHistories, tokenizer))
             return true;
+    } catch (err) {
+        // Do nothing
+    }
 
 
+    try {
         const jinjaChatWrapperWithLeadingWhitespaceTrimming = new JinjaTemplateChatWrapper({
             ...jinjaTemplateWrapperOptions,
             convertUnsupportedSystemMessagesToUserMessages: {

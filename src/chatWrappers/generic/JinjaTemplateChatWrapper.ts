@@ -421,7 +421,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
             return {supportsSystemMessages};
         } catch (err) {
-            throw new Error("The provided Jinja template failed that sanity test: " + String(err));
+            throw new Error("The provided Jinja template failed the sanity test: " + String(err) + ". Inspect the Jinja template to find out what went wrong");
         }
     }
 }
