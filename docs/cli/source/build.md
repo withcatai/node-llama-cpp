@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# `build` command
+# `source build` command
 
 <script setup lang="ts">
-import {data as docs} from "./cli.data.js";
-const commandDoc = docs.build;
+import {data as docs} from "../cli.data.js";
+const commandDoc = docs.source.build;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ::: info
 If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.

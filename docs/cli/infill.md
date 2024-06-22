@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# CLI
+# `infill` command
 
 <script setup lang="ts">
 import {data as docs} from "./cli.data.js";
-const commandDoc = docs.index;
+const commandDoc = docs.infill;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

@@ -8,7 +8,7 @@ import {data as docs} from "../cli.data.js";
 const commandDoc = docs.inspect.measure;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

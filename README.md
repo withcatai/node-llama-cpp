@@ -29,7 +29,7 @@
 ## [Documentation](https://withcatai.github.io/node-llama-cpp/)
 * [Getting started guide](https://withcatai.github.io/node-llama-cpp/guide/)
 * [API reference](https://withcatai.github.io/node-llama-cpp/api/classes/LlamaModel)
-* [CLI help](https://withcatai.github.io/node-llama-cpp/guide/cli/)
+* [CLI help](https://withcatai.github.io/node-llama-cpp/cli/)
 * [Changelog](https://github.com/withcatai/node-llama-cpp/releases)
 * [Roadmap](https://github.com/orgs/withcatai/projects/1)
 

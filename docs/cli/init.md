@@ -8,7 +8,7 @@ import {data as docs} from "./cli.data.js";
 const commandDoc = docs.init;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ::: info
 This command is also available via:

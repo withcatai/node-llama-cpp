@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# `clear` command
+# `complete` command
 
 <script setup lang="ts">
 import {data as docs} from "./cli.data.js";
-const commandDoc = docs.clear;
+const commandDoc = docs.complete;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

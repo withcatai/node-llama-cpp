@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# `inspect gpu` command
+# `inspect gguf` command
 
 <script setup lang="ts">
 import {data as docs} from "../cli.data.js";
-const commandDoc = docs.inspect.gpu;
+const commandDoc = docs.inspect.gguf;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

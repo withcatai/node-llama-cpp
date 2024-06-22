@@ -85,7 +85,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
 
     return {
         title,
-        description: withoutCliCommandDescriptionDocsUrl(description),
+        description: htmlEscapeWithCodeMarkdown(withoutCliCommandDescriptionDocsUrl(description)),
         usage: npxRunPrefix + title,
         usageHtml: markdownRenderer.render("```shell\n" + npxRunPrefix + title + "\n```"),
         options: res

@@ -1,26 +1,27 @@
 import {CommandModule} from "yargs";
 import {createMarkdownRenderer} from "vitepress";
-import {PullCommand} from "../../../src/cli/commands/PullCommand.js";
-import {BuildCommand} from "../../../src/cli/commands/BuildCommand.js";
-import {ChatCommand} from "../../../src/cli/commands/ChatCommand.js";
-import {CompleteCommand} from "../../../src/cli/commands/CompleteCommand.js";
-import {InfillCommand} from "../../../src/cli/commands/InfillCommand.js";
-import {InspectCommand} from "../../../src/cli/commands/inspect/InspectCommand.js";
-import {InspectGpuCommand} from "../../../src/cli/commands/inspect/commands/InspectGpuCommand.js";
-import {InspectGgufCommand} from "../../../src/cli/commands/inspect/commands/InspectGgufCommand.js";
-import {DownloadCommand} from "../../../src/cli/commands/DownloadCommand.js";
-import {ClearCommand} from "../../../src/cli/commands/ClearCommand.js";
-import {InspectMeasureCommand} from "../../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
-import {InitCommand} from "../../../src/cli/commands/InitCommand.js";
-import {cliBinName, npxRunPrefix} from "../../../src/config.js";
-import {htmlEscape} from "../../../.vitepress/utils/htmlEscape.js";
-import {getCommandHtmlDoc} from "../../../.vitepress/utils/getCommandHtmlDoc.js";
-import {buildHtmlHeading} from "../../../.vitepress/utils/buildHtmlHeading.js";
-import {buildHtmlTable} from "../../../.vitepress/utils/buildHtmlTable.js";
-import {setIsInDocumentationMode} from "../../../src/state.js";
-import {htmlEscapeWithCodeMarkdown} from "../../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
-import {getInlineCodeBlockHtml} from "../../../.vitepress/utils/getInlineCodeBlockHtml.js";
-import {withoutCliCommandDescriptionDocsUrl} from "../../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
+import {PullCommand} from "../../src/cli/commands/PullCommand.js";
+import {ChatCommand} from "../../src/cli/commands/ChatCommand.js";
+import {CompleteCommand} from "../../src/cli/commands/CompleteCommand.js";
+import {InfillCommand} from "../../src/cli/commands/InfillCommand.js";
+import {InspectCommand} from "../../src/cli/commands/inspect/InspectCommand.js";
+import {InspectGpuCommand} from "../../src/cli/commands/inspect/commands/InspectGpuCommand.js";
+import {InspectGgufCommand} from "../../src/cli/commands/inspect/commands/InspectGgufCommand.js";
+import {SourceCommand} from "../../src/cli/commands/source/SourceCommand.js";
+import {DownloadCommand} from "../../src/cli/commands/source/commands/DownloadCommand.js";
+import {BuildCommand} from "../../src/cli/commands/source/commands/BuildCommand.js";
+import {ClearCommand} from "../../src/cli/commands/source/commands/ClearCommand.js";
+import {InspectMeasureCommand} from "../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
+import {InitCommand} from "../../src/cli/commands/InitCommand.js";
+import {cliBinName, npxRunPrefix} from "../../src/config.js";
+import {htmlEscape} from "../../.vitepress/utils/htmlEscape.js";
+import {getCommandHtmlDoc} from "../../.vitepress/utils/getCommandHtmlDoc.js";
+import {buildHtmlHeading} from "../../.vitepress/utils/buildHtmlHeading.js";
+import {buildHtmlTable} from "../../.vitepress/utils/buildHtmlTable.js";
+import {setIsInDocumentationMode} from "../../src/state.js";
+import {htmlEscapeWithCodeMarkdown} from "../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
+import {getInlineCodeBlockHtml} from "../../.vitepress/utils/getInlineCodeBlockHtml.js";
+import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
 export default {
     async load() {
@@ -34,9 +35,7 @@ export default {
                 ["complete", CompleteCommand],
                 ["infill", InfillCommand],
                 ["inspect", InspectCommand],
-                ["download", DownloadCommand],
-                ["build", BuildCommand],
-                ["clear", ClearCommand]
+                ["source", SourceCommand]
             ]),
 
             pull: await getCommandHtmlDoc(PullCommand),
@@ -58,9 +57,20 @@ export default {
                     parentCommand: InspectCommand
                 })
             },
-            download: await getCommandHtmlDoc(DownloadCommand),
-            build: await getCommandHtmlDoc(BuildCommand),
-            clear: await getCommandHtmlDoc(ClearCommand)
+            source: {
+                index: await getCommandHtmlDoc(SourceCommand, {
+                    subCommandsParentPageLink: "source"
+                }),
+                download: await getCommandHtmlDoc(DownloadCommand, {
+                    parentCommand: SourceCommand
+                }),
+                build: await getCommandHtmlDoc(BuildCommand, {
+                    parentCommand: SourceCommand
+                }),
+                clear: await getCommandHtmlDoc(ClearCommand, {
+                    parentCommand: SourceCommand
+                })
+            }
         };
     }
 };

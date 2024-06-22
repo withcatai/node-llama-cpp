@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# `chat` command
+# `inspect` command
 
 <script setup lang="ts">
 import {data as docs} from "./cli.data.js";
-const commandDoc = docs.chat;
+const commandDoc = docs.inspect.index;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

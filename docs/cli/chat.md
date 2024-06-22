@@ -1,14 +1,14 @@
 ---
 outline: deep
 ---
-# `pull` command
+# `chat` command
 
 <script setup lang="ts">
 import {data as docs} from "./cli.data.js";
-const commandDoc = docs.pull;
+const commandDoc = docs.chat;
 </script>
 
-{{commandDoc.description}}
+<p><div v-html="commandDoc.description"></div></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

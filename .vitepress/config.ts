@@ -65,7 +65,7 @@ export default defineConfig({
         hostname,
         transformItems(items) {
             return items.map((item) => {
-                if (item.url.includes("api/") || item.url.includes("guide/cli/")) {
+                if (item.url.includes("api/") || item.url.includes("cli/")) {
                     item = {
                         ...item,
                         lastmod: undefined,
@@ -107,7 +107,7 @@ export default defineConfig({
             pageData.frontmatter.outline = [2, 3];
         }
 
-        if (pageData.filePath.startsWith("guide/cli/")) {
+        if (pageData.filePath.startsWith("cli/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
         }
@@ -160,6 +160,7 @@ export default defineConfig({
         },
         nav: [
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},
+            {text: "CLI", link: "/cli/", activeMatch: "/cli/"},
             {text: "API Reference", link: "/api/functions/getLlama", activeMatch: "/api/"},
             {
                 text: packageVersion,
@@ -218,16 +219,26 @@ export default defineConfig({
                     {text: "Setting up a dev environment", link: "/development"},
                     {text: "Pull request guidelines", link: "/contributing"}
                 ]
-            }, {
+            }],
+
+            "/cli/": [{
                 text: "CLI",
-                base: "/guide/cli",
-                collapsed: true,
+                base: "/cli",
                 link: "/",
                 items: [
-                    {text: "Pull", link: "/pull"},
-                    {text: "Chat", link: "/chat"},
                     {text: "Init", link: "/init"},
-                    {text: "Download", link: "/download"},
+                    {text: "Chat", link: "/chat"},
+                    {text: "Pull", link: "/pull"},
+                    {
+                        text: "Source",
+                        link: "/source",
+                        collapsed: true,
+                        items: [
+                            {text: "Download", link: "/source/download"},
+                            {text: "Build", link: "/source/build"},
+                            {text: "Clear", link: "/source/clear"},
+                        ]
+                    },
                     {text: "Complete", link: "/complete"},
                     {text: "Infill", link: "/infill"},
                     {
@@ -239,9 +250,7 @@ export default defineConfig({
                             {text: "GGUF", link: "/inspect/gguf"},
                             {text: "Measure", link: "/inspect/measure"},
                         ]
-                    },
-                    {text: "Build", link: "/build"},
-                    {text: "Clear", link: "/clear"}
+                    }
                 ]
             }]
         },
