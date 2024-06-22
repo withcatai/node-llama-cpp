@@ -115,7 +115,7 @@ a.inlineCodeLink:hover {
 }
 
 a.inlineCodeLink pre>code {
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 3px 6px;
     background-color: var(--vp-code-bg);
 }
@@ -193,4 +193,98 @@ div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[
 .twoslash-popup-container>.twoslash-popup-code>pre.shiki:only-child:has(>code:only-child) {
     margin-top: 0px;
     margin-bottom: 0px;
+}
+
+.VPFeature {
+    border-radius: 16px;
+}
+
+.vp-doc :not(pre) > code {
+    border-radius: 8px;
+}
+
+@media (min-width: 768px) {
+    .DocSearch-Button {
+        border-radius: 12px;
+    }
+}
+
+@media (min-width: 640px) {
+    .vp-doc div[class*='language-'], .vp-block {
+        border-radius: 12px;
+    }
+}
+
+.VPNavScreenAppearance {
+    border-radius: 12px;
+}
+
+div.VPLocalSearchBox > .shell {
+    border-radius: 12px;
+    box-shadow: 0px 4px 8px 0px rgba(0 0 0 / 8%), 0px 6px 24px 0px rgba(0 0 0 / 16%);
+}
+
+@media (max-width: 767px) {
+    div.VPLocalSearchBox > .shell {
+        border-radius: 0;
+    }
+}
+
+div.VPLocalSearchBox > .shell > .search-bar {
+    border-radius: 8px;
+}
+div.VPLocalSearchBox > .shell > .results > li > .result {
+    border-radius: 8px;
+}
+
+div.search-keyboard-shortcuts[class] kbd {
+    border-radius: 8px;
+}
+
+.vp-doc [class*='language-'] > button.copy {
+    border-radius: 8px;
+}
+
+.vp-doc [class*='language-'] > button.copy.copied, .vp-doc [class*='language-'] > button.copy:hover.copied {
+    border-radius: 0 8px 8px 0;
+}
+
+.vp-doc [class*='language-'] > button.copy.copied::before, .vp-doc [class*='language-'] > button.copy:hover.copied::before {
+    border-radius: 8px 0 0 8px;
+}
+
+.language-ts >.lang {
+    display: none;
+}
+
+.vpi-social-npm {
+    border-radius: 4px;
+}
+
+.custom-block {
+    border-radius: 12px;
+}
+
+.pager-link[class] {
+    border-radius: 12px;
+}
+
+.vp-doc table {
+    border-style: hidden;
+    border-radius: 12px;
+    outline: solid 1px var(--vp-c-divider);
+    outline-offset: -1px;
+    max-width: max-content;
+}
+
+.DocSearch-Button-Keys {
+    margin-right: -1px;
+}
+
+.DocSearch-Button .DocSearch-Button-Key {
+    border-radius: 8px 0 0 8px;
+}
+
+.DocSearch-Button .DocSearch-Button-Key + .DocSearch-Button-Key {
+    border-radius: 0 8px 8px 0;
 }
