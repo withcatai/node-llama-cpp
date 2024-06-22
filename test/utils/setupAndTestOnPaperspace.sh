@@ -5,9 +5,9 @@
 # Intended to run on Ubuntu 22.04.
 #
 # Run this script with this command:
-# bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"
+# bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/test/utils/setupAndTestOnPaperspace.sh)"
 
-installationCommand='bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/beta/test/utils/setupAndTestOnPaperspace.sh)"'
+installationCommand='bash -c "$(curl -fsSL https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/test/utils/setupAndTestOnPaperspace.sh)"'
 
 defaultRepo="withcatai/node-llama-cpp"
 targetFolder="$HOME/workspace/test-node-llama-cpp"
