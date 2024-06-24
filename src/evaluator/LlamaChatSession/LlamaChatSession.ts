@@ -285,17 +285,16 @@ export class LlamaChatSession {
 
     public readonly onDispose = new EventRelay<void>();
 
-    /**
-     * @param options
-     */
-    public constructor({
-        contextSequence,
-        chatWrapper = "auto",
-        systemPrompt,
-        forceAddSystemPrompt = false,
-        autoDisposeSequence = false,
-        contextShift
-    }: LlamaChatSessionOptions) {
+    public constructor(options: LlamaChatSessionOptions) {
+        const {
+            contextSequence,
+            chatWrapper = "auto",
+            systemPrompt,
+            forceAddSystemPrompt = false,
+            autoDisposeSequence = false,
+            contextShift
+        } = options;
+
         if (contextSequence == null)
             throw new Error("contextSequence cannot be null");
 
@@ -367,29 +366,30 @@ export class LlamaChatSession {
         return this.sequence.model;
     }
 
-    /**
-     * @param prompt
-     * @param [options]
-     */
-    public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
-        functions,
-        documentFunctionParams,
-        maxParallelFunctionCalls,
-        onTextChunk,
-        onToken,
-        signal,
-        stopOnAbortSignal = false,
-        maxTokens,
-        temperature,
-        minP,
-        topK,
-        topP,
-        grammar,
-        trimWhitespaceSuffix = false,
-        repeatPenalty,
-        tokenBias,
-        customStopTriggers
-    }: LLamaChatPromptOptions<Functions> = {}) {
+    public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(
+        prompt: string,
+        options: LLamaChatPromptOptions<Functions> = {}
+    ) {
+        const {
+            functions,
+            documentFunctionParams,
+            maxParallelFunctionCalls,
+            onTextChunk,
+            onToken,
+            signal,
+            stopOnAbortSignal = false,
+            maxTokens,
+            temperature,
+            minP,
+            topK,
+            topP,
+            grammar,
+            trimWhitespaceSuffix = false,
+            repeatPenalty,
+            tokenBias,
+            customStopTriggers
+        } = options;
+
         const {responseText} = await this.promptWithMeta<Functions>(prompt, {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,

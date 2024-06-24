@@ -38,7 +38,7 @@ getElectronExampleAppDownloadLink()
                 </div>
             </div>
             <div class="features-list vp-doc">
-                <h1>Many features</h1>
+                <h1>A complete package</h1>
                 <p>Everything you need to use large language models in your project</p>
                 <div class="content">
                     <slot name="features-list" />

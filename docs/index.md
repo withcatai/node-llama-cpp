@@ -14,7 +14,7 @@ hero:
       link: /guide/
     - theme: alt
       text: API Reference
-      link: /api/classes/LlamaModel
+      link: /api/functions/getLlama
   image:
     src: /logo.roundEdges.png
     alt: node-llama-cpp Logo
@@ -92,6 +92,7 @@ npx -y node-llama-cpp inspect gpu
 * Inspect GGUF files
 * Custom CMake options
 * Automatic batching
+* TypeScript type-safety
 
 </template>
 <template v-slot:simple-code>
@@ -148,7 +149,7 @@ const text = "Hello world";
 console.log("Text:", text);
 
 const embedding = await context.getEmbeddingFor(text);
-console.log("Embedding:", embedding);
+console.log("Embedding vector:", embedding.vector);
 ```
 
 </template>

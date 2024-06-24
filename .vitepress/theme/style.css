@@ -195,6 +195,11 @@ div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[
     margin-bottom: 0px;
 }
 
+.twoslash-floating .twoslash-popup-docs p,
+.twoslash-floating .twoslash-popup-error p {
+    text-wrap: wrap;
+}
+
 .VPFeature {
     border-radius: 16px;
 }
