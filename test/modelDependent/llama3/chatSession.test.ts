@@ -2,6 +2,7 @@ import {describe, expect, test} from "vitest";
 import {Llama3ChatWrapper, LlamaChatSession, Token} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
+import {pushAll} from "../../../src/utils/pushAll.js";
 
 describe("llama 3", () => {
     describe("chat session", () => {
@@ -27,7 +28,7 @@ describe("llama 3", () => {
                 signal: abortController.signal,
                 stopOnAbortSignal: true,
                 onToken(chunk) {
-                    tokens.push(...chunk);
+                    pushAll(tokens, chunk);
 
                     if (tokens.length >= 2)
                         abortController.abort();

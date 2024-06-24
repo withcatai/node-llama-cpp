@@ -1,5 +1,6 @@
 import {DisposedError} from "lifecycle-utils";
 import {Token, Tokenizer} from "../types.js";
+import {pushAll} from "./pushAll.js";
 
 export class TokenStreamRegulator {
     /** @internal */ private readonly _queue: QueuedTokenRelease[] = [];
@@ -16,7 +17,7 @@ export class TokenStreamRegulator {
         const res: Token[] = [];
 
         while (this._queue.length > 0 && this._queue[0].isFree)
-            res.push(...this._queue.shift()!.tokens);
+            pushAll(res, this._queue.shift()!.tokens);
 
         return res;
     }
@@ -60,7 +61,7 @@ export class TokenStreamRegulator {
                     if (resTokensText.length + tokenText.length > text.length) {
                         const remainingText = text.slice(resTokensText.length);
                         const remainingTokens = tokenizer(remainingText, false, "trimLeadingSpace");
-                        resTokens.push(...remainingTokens);
+                        pushAll(resTokens, remainingTokens);
                         break;
                     }
 

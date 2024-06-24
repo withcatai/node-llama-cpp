@@ -9,6 +9,7 @@ import {StopGenerationDetector} from "../utils/StopGenerationDetector.js";
 import {UNKNOWN_UNICODE_CHAR} from "../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeStopTrigger.js";
 import {safeEventCallback} from "../utils/safeEventCallback.js";
+import {pushAll} from "../utils/pushAll.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
@@ -248,7 +249,7 @@ export class LlamaCompletion {
                 throw new Error("The context size is too small to generate a response for the given input");
 
             const slicedTokens = tokens.slice(-inputTokensSize);
-            res.push(...slicedTokens);
+            pushAll(res, slicedTokens);
 
             return res;
         }
@@ -428,10 +429,10 @@ export class LlamaCompletion {
                 newContextState.push(bosToken);
 
             newContextState.push(prefixToken);
-            newContextState.push(...resolvedPrefixTokens);
+            pushAll(newContextState, resolvedPrefixTokens);
 
             newContextState.push(suffixToken);
-            newContextState.push(...resolvedSuffixTokens);
+            pushAll(newContextState, resolvedSuffixTokens);
 
             newContextState.push(middleToken);
 
@@ -655,7 +656,7 @@ export class LlamaCompletion {
                 stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
                 customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
 
-                pendingTokens.push(...streamRegulator.popFreeChunkTokens());
+                pushAll(pendingTokens, streamRegulator.popFreeChunkTokens());
 
                 if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
                     model.isEogToken(token)
@@ -670,14 +671,14 @@ export class LlamaCompletion {
                         partiallyFreeTokens,
                         model.tokenizer
                     );
-                    pendingTokens.push(...queuedTokensBeforeStopTrigger);
+                    pushAll(pendingTokens, queuedTokensBeforeStopTrigger);
 
                     const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
                     if (pendingTokens.length > 0)
                         onToken?.(pendingTokens.slice());
 
-                    res.push(...pendingTokens);
+                    pushAll(res, pendingTokens);
                     pendingTokens.length = 0;
 
                     let modelResponse = model.detokenize(res);
@@ -710,7 +711,7 @@ export class LlamaCompletion {
 
                 if (pendingTokens.length > 0) {
                     onToken?.(pendingTokens.slice());
-                    res.push(...pendingTokens);
+                    pushAll(res, pendingTokens);
                     pendingTokens.length = 0;
                 }
 

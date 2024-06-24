@@ -1,3 +1,4 @@
+import {pushAll} from "./pushAll.js";
 import type {InspectOptions, inspect as InspectFunction} from "node:util";
 import type {Token, Tokenizer} from "../types.js";
 
@@ -52,7 +53,7 @@ class LlamaText {
 
             if (i !== this.values.length - 1) {
                 if (isLlamaText(separator))
-                    newValues.push(...separator.values);
+                    pushAll(newValues, separator.values);
                 else
                     newValues.push(separator);
             }
@@ -98,16 +99,18 @@ class LlamaText {
 
         for (const value of this.values) {
             if (value instanceof SpecialToken) {
-                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer));
+                pushAll(res, tokenizer(textToTokenize, false, resolveTokenizerOptions()));
+                pushAll(res, value.tokenize(tokenizer));
                 textToTokenize = "";
             } else if (value instanceof SpecialTokensText) {
-                res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()), ...value.tokenize(tokenizer, hasContent() || options === "trimLeadingSpace"));
+                pushAll(res, tokenizer(textToTokenize, false, resolveTokenizerOptions()));
+                pushAll(res, value.tokenize(tokenizer, hasContent() || options === "trimLeadingSpace"));
                 textToTokenize = "";
             } else
                 textToTokenize += value;
         }
 
-        res.push(...tokenizer(textToTokenize, false, resolveTokenizerOptions()));
+        pushAll(res, tokenizer(textToTokenize, false, resolveTokenizerOptions()));
 
         return res;
     }
