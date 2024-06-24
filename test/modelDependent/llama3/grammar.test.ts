@@ -20,7 +20,7 @@ describe("llama 3", () => {
                     contextSequence: context.getSequence()
                 });
 
-                const grammar = new LlamaJsonSchemaGrammar(llama, {
+                const grammar = await llama.createGrammarForJsonSchema({
                     type: "object",
                     properties: {
                         "userMessagePositivityScoreFromOneToTen": {
@@ -33,7 +33,7 @@ describe("llama 3", () => {
                             }
                         }
                     }
-                } as const);
+                });
 
                 const res = await chatSession.prompt("It's great!", {
                     grammar

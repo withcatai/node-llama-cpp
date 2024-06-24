@@ -343,7 +343,9 @@ export const llmFunctions = {
                     signal: promptAbortController.signal,
                     stopOnAbortSignal: true,
                     onToken(chunk) {
-                        inProgressResponse.push(...chunk);
+                        for (const token of chunk)
+                            inProgressResponse.push(token);
+
                         llmState.state = {
                             ...llmState.state,
                             chatSession: {

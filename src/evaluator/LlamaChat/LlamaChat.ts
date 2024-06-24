@@ -18,6 +18,7 @@ import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
+import {pushAll} from "../../utils/pushAll.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -1491,7 +1492,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         })
                         .flat(1);
                     this.pendingTokens.length = 0;
-                    this.pendingTokens.push(...newPendingTokens);
+                    pushAll(this.pendingTokens, newPendingTokens);
                     this.removedStartTextToIgnore = true;
                 }
             }
@@ -1975,7 +1976,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
         this.stopGenerationDetector.clearInProgressStops();
         this.customStopGenerationTriggersDetector.clearInProgressStops();
-        this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+        pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
 
         const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
         const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
@@ -1984,15 +1985,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             partiallyFreeTokens,
             this.llamaChat.model.tokenizer
         );
-        this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+        pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
         this.removeFoundStartIgnoreTextsFromPendingTokens(true);
 
         if (this.pendingTokens.length > 0)
             this.onToken?.(this.pendingTokens.slice());
 
-        this.res.push(...this.pendingTokens);
-        this.contextWindowsRes.push(...this.pendingTokens);
+        pushAll(this.res, this.pendingTokens);
+        pushAll(this.contextWindowsRes, this.pendingTokens);
         this.pendingTokens.length = 0;
 
         this.streamRegulator.clearQueue();
@@ -2192,7 +2193,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.customStopGenerationTriggersDetector.clearTriggeredStops();
             this.customStopGenerationTriggersDetector.clearInProgressStops();
 
-            this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+            pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
 
             const triggeredStops = this.functionSyntaxStartDetector.getTriggeredStops();
             const partiallyFreeTokens = this.streamRegulator.getPartiallyFreeChunk(this.llamaChat.model.tokenizer);
@@ -2202,7 +2203,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 partiallyFreeTokens,
                 this.llamaChat.model.tokenizer
             );
-            this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+            pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
             const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
             const remainingTextAfterStop = StopGenerationDetector.detokenizeRemainingGeneration(
@@ -2228,7 +2229,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public popStreamRegulatorFreeTokens() {
-        this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+        pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
     }
 
     public handleStopGenerationTrigger(lastHistoryItemType: "user" | "model") {
@@ -2237,7 +2238,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         ) {
             this.stopGenerationDetector.clearInProgressStops();
             this.customStopGenerationTriggersDetector.clearInProgressStops();
-            this.pendingTokens.push(...this.streamRegulator.popFreeChunkTokens());
+            pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
 
             const triggeredStops = this.stopGenerationDetector.hasTriggeredStops
                 ? this.stopGenerationDetector.getTriggeredStops()
@@ -2250,7 +2251,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 partiallyFreeTokens,
                 this.llamaChat.model.tokenizer
             );
-            this.pendingTokens.push(...queuedTokensBeforeStopTrigger);
+            pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
             const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
@@ -2259,8 +2260,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             if (this.pendingTokens.length > 0)
                 this.onToken?.(this.pendingTokens.slice());
 
-            this.res.push(...this.pendingTokens);
-            this.contextWindowsRes.push(...this.pendingTokens);
+            pushAll(this.res, this.pendingTokens);
+            pushAll(this.contextWindowsRes, this.pendingTokens);
             this.pendingTokens.length = 0;
 
             let modelResponse = this.llamaChat.model.detokenize(this.res);
@@ -2336,8 +2337,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             if (this.pendingTokens.length > 0) {
                 this.onToken?.(this.pendingTokens.slice());
-                this.res.push(...this.pendingTokens);
-                this.contextWindowsRes.push(...this.pendingTokens);
+                pushAll(this.res, this.pendingTokens);
+                pushAll(this.contextWindowsRes, this.pendingTokens);
                 this.pendingTokens.length = 0;
             }
         }

@@ -3,6 +3,7 @@ import {Token} from "../../../types.js";
 import {getConsoleLogPrefix} from "../../../utils/getConsoleLogPrefix.js";
 import {LruCache} from "../../../utils/LruCache.js";
 import {safeEventCallback} from "../../../utils/safeEventCallback.js";
+import {pushAll} from "../../../utils/pushAll.js";
 import type {LLamaChatCompletePromptOptions, LlamaChatSession} from "../LlamaChatSession.js";
 
 export type LLamaChatPromptCompletionEngineOptions = {
@@ -146,7 +147,7 @@ export class LlamaChatSessionPromptCompletionEngine {
             maxTokens: leftTokens,
             signal: currentAbortSignal,
             onToken: (chunk) => {
-                currentCompletion.push(...chunk);
+                pushAll(currentCompletion, chunk);
                 const completion = (existingCompletion ?? "") + this._chatSession.model.detokenize(currentCompletion);
                 completionCache.putCompletion(prompt, completion);
 
