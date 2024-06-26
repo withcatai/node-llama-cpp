@@ -1,4 +1,4 @@
-import {GgufFileReader, valueTypeToBytesToRead} from "../fileReaders/GgufFileReader.js";
+import {GgufFileReader} from "../fileReaders/GgufFileReader.js";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {UnsupportedGgufValueTypeError} from "../errors/UnsupportedGgufValueTypeError.js";
 import {

@@ -2,7 +2,7 @@ import {InvalidGgufMagicError} from "../errors/InvalidGgufMagicError.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
-import {GgufFileReader, valueTypeToBytesToRead} from "../fileReaders/GgufFileReader.js";
+import {GgufFileReader} from "../fileReaders/GgufFileReader.js";
 import {GgufFileInfo, GgufVersionParserOptions, GgufVersionParserResult} from "../types/GgufFileInfoTypes.js";
 import {getGgufMetadataArchitectureData} from "../utils/getGgufMetadataArchitectureData.js";
 import {GgufV2Parser} from "./GgufV2Parser.js";
