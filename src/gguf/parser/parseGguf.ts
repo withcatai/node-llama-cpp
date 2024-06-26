@@ -51,8 +51,7 @@ export async function parseGguf({
 }
 
 async function parseMagicAndVersion(fileReader: GgufFileReader, readOffset: GgufReadOffset) {
-    const fileMagicBytes = await fileReader.readByteRange(readOffset, valueTypeToBytesToRead.uint8 * ggufMagic.length);
-    const fileMagicText = String.fromCharCode(...fileMagicBytes);
+    const fileMagicText = await fileReader.readStringWithLength(readOffset, ggufMagic.length);
 
     if (fileMagicText !== ggufMagic)
         throw new InvalidGgufMagicError(ggufMagic, fileMagicText);

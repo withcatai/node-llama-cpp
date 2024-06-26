@@ -25,16 +25,35 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
         this._signal = signal;
     }
 
-    public async readByteRange(offset: number | GgufReadOffset, length: number) {
+    public readByteRange(offset: number | GgufReadOffset, length: number) {
         const readOffset = GgufReadOffset.resolveReadOffset(offset);
         const endOffset = readOffset.offset + length;
 
         if (endOffset >= this._buffer.length)
-            await this._fetchToExpandBufferUpToOffset(endOffset);
+            return this._fetchToExpandBufferUpToOffset(endOffset)
+                .then(() => {
+                    const res = this._buffer.subarray(readOffset.offset, endOffset);
+                    readOffset.moveBy(length);
+                    return res;
+                });
 
         const res = this._buffer.subarray(readOffset.offset, endOffset);
         readOffset.moveBy(length);
         return res;
+    }
+
+    protected ensureHasByteRange(offset: number | GgufReadOffset, length: number) {
+        const readOffset = GgufReadOffset.resolveReadOffset(offset);
+        const endOffset = readOffset.offset + length;
+
+        if (endOffset >= this._buffer.length)
+            return this._fetchToExpandBufferUpToOffset(endOffset)
+                .then(() => {
+                    if (endOffset >= this._buffer.length)
+                        throw new Error("Expected buffer to be long enough for the requested byte range");
+                });
+
+        return undefined;
     }
 
     private async _fetchToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
