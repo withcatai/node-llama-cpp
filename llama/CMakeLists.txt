@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.14)
 
 project("llama-addon" C CXX)
 
 if (MSVC)
-    if (LLAMA_STATIC)
+    if (GGML_STATIC)
         add_link_options(-static)
         if (MINGW)
             add_link_options(-static-libgcc -static-libstdc++)
@@ -29,7 +29,7 @@ include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
-if (LLAMA_CUDA)
+if (GGML_CUDA)
     cmake_minimum_required(VERSION 3.17)
 
     find_package(CUDAToolkit)
@@ -43,17 +43,17 @@ if (LLAMA_CUDA)
 
         add_compile_definitions(GPU_INFO_USE_CUDA)
 
-        if (LLAMA_STATIC)
-            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
+        if (GGML_STATIC)
+            set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
         else()
-            set(LLAMA_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart)
+            set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart)
         endif()
 
         set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
 
         if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
             # copied from llama.cpp/CMakLists.txt under "if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)"
-            if (LLAMA_CUDA_F16 OR LLAMA_CUDA_DMMV_F16)
+            if (GGML_CUDA_F16 OR GGML_CUDA_DMMV_F16)
                 set(CMAKE_CUDA_ARCHITECTURES "60;61;70")
             else()
                 set(CMAKE_CUDA_ARCHITECTURES "52;61;70")
@@ -64,12 +64,12 @@ if (LLAMA_CUDA)
     endif()
 endif()
 
-if (LLAMA_VULKAN OR LLAMA_KOMPUTE)
+if (GGML_VULKAN OR GGML_KOMPUTE)
     find_package(Vulkan)
     if (Vulkan_FOUND)
-        if (LLAMA_VULKAN)
+        if (GGML_VULKAN)
             message(STATUS "Using Vulkan for GPU info")
-        elseif (LLAMA_KOMPUTE)
+        elseif (GGML_KOMPUTE)
             message(STATUS "Using Vulkan for GPU info because Kompute is enabled")
         endif()
 
@@ -84,7 +84,7 @@ if (LLAMA_VULKAN OR LLAMA_KOMPUTE)
     endif()
 endif()
 
-if (LLAMA_HIPBLAS)
+if (GGML_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
 
     if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
@@ -111,7 +111,7 @@ if (LLAMA_HIPBLAS)
     endif()
 endif()
 
-if (LLAMA_METAL)
+if (GGML_METAL)
     find_library(FOUNDATION_LIBRARY Foundation REQUIRED)
     find_library(METAL_FRAMEWORK    Metal      REQUIRED)
     find_library(METALKIT_FRAMEWORK MetalKit   REQUIRED)

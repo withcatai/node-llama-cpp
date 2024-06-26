@@ -70,16 +70,19 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
 
-                if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("LLAMA_METAL"))
-                    cmakeCustomOptions.set("LLAMA_METAL", "1");
-                else if (!cmakeCustomOptions.has("LLAMA_METAL"))
-                    cmakeCustomOptions.set("LLAMA_METAL", "OFF");
+                if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("GGML_METAL"))
+                    cmakeCustomOptions.set("GGML_METAL", "1");
+                else if (!cmakeCustomOptions.has("GGML_METAL"))
+                    cmakeCustomOptions.set("GGML_METAL", "OFF");
 
-                if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("LLAMA_CUDA"))
-                    cmakeCustomOptions.set("LLAMA_CUDA", "1");
+                // if (cmakeCustomOptions.get("GGML_METAL") === "1" && !cmakeCustomOptions.has("GGML_METAL_EMBED_LIBRARY"))
+                //     cmakeCustomOptions.set("GGML_METAL_EMBED_LIBRARY", "1");
 
-                if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("LLAMA_VULKAN"))
-                    cmakeCustomOptions.set("LLAMA_VULKAN", "1");
+                if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("GGML_CUDA"))
+                    cmakeCustomOptions.set("GGML_CUDA", "1");
+
+                if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("GGML_VULKAN"))
+                    cmakeCustomOptions.set("GGML_VULKAN", "1");
 
                 if (!cmakeCustomOptions.has("LLAMA_CCACHE"))
                     cmakeCustomOptions.set("LLAMA_CCACHE", "OFF");
@@ -88,8 +91,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
                 if (ciMode) {
-                    if (!cmakeCustomOptions.has("LLAMA_OPENMP"))
-                        cmakeCustomOptions.set("LLAMA_OPENMP", "OFF");
+                    if (!cmakeCustomOptions.has("GGML_OPENMP"))
+                        cmakeCustomOptions.set("GGML_OPENMP", "OFF");
                 }
 
                 await fs.remove(outDirectory);
