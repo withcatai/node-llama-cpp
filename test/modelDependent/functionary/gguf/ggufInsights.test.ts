@@ -267,7 +267,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "272MB",
-                "gpuVram": "786.68MB",
+                "gpuVram": "786.67MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -334,7 +334,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "4MB",
-                "gpuVram": "454.68MB",
+                "gpuVram": "454.67MB",
               }
             `);
 
@@ -368,7 +368,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "0B",
-                "gpuVram": "650.7MB",
+                "gpuVram": "650.69MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -379,7 +379,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "0B",
-                "gpuVram": "454.68MB",
+                "gpuVram": "454.67MB",
               }
             `);
         });
