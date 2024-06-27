@@ -254,7 +254,7 @@ jobs:
 #          unzip -d ./upx "./upxInstallations/upx-${UPX_VERSION}-win64.zip"
 #          mv "./upx/upx-${UPX_VERSION}-win64" ./upx/upx
 #
-#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/llama-addon.node
+#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/Release/ggml.dll
 
       - name: Compress CUDA binary on Ubuntu
         if: matrix.config.name == 'Ubuntu'
@@ -274,7 +274,7 @@ jobs:
           mv "./upx/upx-${UPX_VERSION}-amd64_linux" ./upx/upx
 
           chmod +x ./bins/linux-x64-cuda/llama-addon.node
-          ./upx/upx/upx --best ./bins/linux-x64-cuda/llama-addon.node
+          ./upx/upx/upx --best ./bins/linux-x64-cuda/libggml.so
           chmod -x ./bins/linux-x64-cuda/llama-addon.node
 
       - name: Publish artifact
