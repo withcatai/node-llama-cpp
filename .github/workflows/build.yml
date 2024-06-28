@@ -424,13 +424,21 @@ jobs:
           
           echo "Built binaries:"
           ls bins
+      - name: Move binaries to standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/movePrebuiltBinariesToStandaloneModules.ts
+      - name: Prepare standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/prepareStandalonePrebuiltBinaryModules.ts
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+          GH_RELEASE_REF: ${{ github.ref }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+          
+          npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url
         run: |

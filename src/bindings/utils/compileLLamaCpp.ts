@@ -13,6 +13,7 @@ import {spawnCommand, SpawnError} from "../../utils/spawnCommand.js";
 import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "../../utils/cmake.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {withLockfile} from "../../utils/withLockfile.js";
+import {getModuleVersion} from "../../utils/getModuleVersion.js";
 import {ensureLlamaCppRepoIsCloned, isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
 import {getBuildFolderNameForBuildOptions} from "./getBuildFolderNameForBuildOptions.js";
 import {setLastBuildInfo} from "./lastBuildInfo.js";
@@ -275,9 +276,40 @@ export async function getLocalBuildBinaryBuildMetadata(folderName: string) {
     return buildMetadata;
 }
 
-export async function getPrebuiltBinaryPath(folderName: string) {
-    const binaryPath = path.join(llamaPrebuiltBinsDirectory, folderName, "llama-addon.node");
+export async function getPrebuiltBinaryPath(buildOptions: BuildOptions, folderName: string) {
+    const localPrebuiltBinaryDirectoryPath = path.join(llamaPrebuiltBinsDirectory, folderName);
+
+    const binaryPath = await resolvePrebuiltBinaryPath(localPrebuiltBinaryDirectoryPath);
+
+    if (binaryPath != null)
+        return binaryPath;
+
+    const packagePrebuiltBinariesDirectoryPath = await getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions);
+    if (packagePrebuiltBinariesDirectoryPath == null)
+        return null;
+
+    const packagePrebuiltBinaryDirectoryPath = path.join(packagePrebuiltBinariesDirectoryPath, folderName);
+    const binaryPathFromPackage = await resolvePrebuiltBinaryPath(packagePrebuiltBinaryDirectoryPath);
+
+    if (binaryPathFromPackage != null)
+        return binaryPathFromPackage;
+
+    return null;
+}
+
+export async function getPrebuiltBinaryBuildMetadata(folderName: string) {
     const buildMetadataFilePath = path.join(llamaPrebuiltBinsDirectory, folderName, buildMetadataFileName);
+
+    if (!(await fs.pathExists(buildMetadataFilePath)))
+        throw new Error(`Could not find build metadata file for prebuilt build "${folderName}"`);
+
+    const buildMetadata: BuildMetadataFile = await fs.readJson(buildMetadataFilePath);
+    return buildMetadata;
+}
+
+async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
+    const binaryPath = path.join(prebuiltBinaryDirectoryPath, "llama-addon.node");
+    const buildMetadataFilePath = path.join(prebuiltBinaryDirectoryPath, buildMetadataFileName);
 
     const [
         binaryExists,
@@ -293,14 +325,35 @@ export async function getPrebuiltBinaryPath(folderName: string) {
     return null;
 }
 
-export async function getPrebuiltBinaryBuildMetadata(folderName: string) {
-    const buildMetadataFilePath = path.join(llamaPrebuiltBinsDirectory, folderName, buildMetadataFileName);
+function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildOptions) {
+    async function getBinariesPathFromModules(moduleImport: () => Promise<{getBinsDir(): {binsDir: string, packageVersion: string}}>) {
+        try {
+            const [
+                binariesModule,
+                currentModuleVersion
+            ] = await Promise.all([
+                moduleImport(),
+                getModuleVersion()
+            ]);
+            const {binsDir, packageVersion} =  binariesModule?.getBinsDir?.() ?? {};
 
-    if (!(await fs.pathExists(buildMetadataFilePath)))
-        throw new Error(`Could not find build metadata file for prebuilt build "${folderName}"`);
+            if (binsDir == null || packageVersion !== currentModuleVersion)
+                return null;
 
-    const buildMetadata: BuildMetadataFile = await fs.readJson(buildMetadataFilePath);
-    return buildMetadata;
+            return binsDir;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    if (buildOptions.platform === "win" && buildOptions.arch === "x64" && buildOptions.gpu === "cuda")
+        // @ts-ignore
+        return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-cuda"));
+    else if (buildOptions.platform === "linux" && buildOptions.arch === "x64" && buildOptions.gpu === "cuda")
+        // @ts-ignore
+        return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-cuda"));
+
+    return null;
 }
 
 async function getCmakePathArgs() {

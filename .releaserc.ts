@@ -39,6 +39,9 @@ export default {
                 "footerPartial": newFooterTemplate
             }
         }],
+        ["@semantic-release/exec", {
+            "publishCmd": "npx --no vite-node ./scripts/publishStandalonePrebuiltBinaryModules.ts --packageVersion \"${nextRelease.version}\""
+        }],
         "@semantic-release/npm",
         ["@semantic-release/github", {
             "discussionCategoryName": "Releases"
