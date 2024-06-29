@@ -15,6 +15,11 @@ for (const packageName of await fs.readdir(subPackagesDirectory)) {
     if ((await fs.stat(packagePath)).isFile())
         continue;
 
+    $.verbose = true;
+    cd(packagePath);
+    await $`npm ci -f`;
+    await $`npm run build`;
+
     const packageJson = await fs.readJson(packagePackageJsonPath);
     delete packageJson.devDependencies;
     const postinstall = packageJson.scripts?.postinstall;
@@ -24,9 +29,4 @@ for (const packageName of await fs.readdir(subPackagesDirectory)) {
         packageJson.scripts = {postinstall};
 
     await fs.writeJson(packagePackageJsonPath, packageJson, {spaces: 2});
-
-    $.verbose = true;
-    cd(packagePath);
-    await $`npm ci -f`;
-    await $`npm build`;
 }
