@@ -141,17 +141,19 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                 for (const binFilesDirPath of binFilesDirPaths) {
                     if (await fs.pathExists(binFilesDirPath)) {
-                        const files = await fs.readdir(binFilesDirPath);
+                        const itemNames = await fs.readdir(binFilesDirPath);
 
                         await Promise.all(
-                            files.map((fileName) => (
-                                fs.copy(path.join(binFilesDirPath, fileName), path.join(compiledResultDirPath, fileName), {
+                            itemNames.map((itemName) => (
+                                fs.copy(path.join(binFilesDirPath, itemName), path.join(compiledResultDirPath, itemName), {
                                     overwrite: false
                                 })
                             ))
                         );
                     }
                 }
+
+                await applyResultDirFixes(compiledResultDirPath, path.join(outDirectory, "_temp"));
 
                 await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
                     buildOptions: convertBuildOptionsToBuildOptionsJSON(buildOptions)
@@ -282,7 +284,11 @@ export async function getPrebuiltBinaryPath(buildOptions: BuildOptions, folderNa
     const binaryPath = await resolvePrebuiltBinaryPath(localPrebuiltBinaryDirectoryPath);
 
     if (binaryPath != null)
-        return binaryPath;
+        return {
+            binaryPath,
+            folderName,
+            folderPath: localPrebuiltBinaryDirectoryPath
+        };
 
     const packagePrebuiltBinariesDirectoryPath = await getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions);
     if (packagePrebuiltBinariesDirectoryPath == null)
@@ -292,19 +298,45 @@ export async function getPrebuiltBinaryPath(buildOptions: BuildOptions, folderNa
     const binaryPathFromPackage = await resolvePrebuiltBinaryPath(packagePrebuiltBinaryDirectoryPath);
 
     if (binaryPathFromPackage != null)
-        return binaryPathFromPackage;
+        return {
+            binaryPath: binaryPathFromPackage,
+            folderName,
+            folderPath: packagePrebuiltBinaryDirectoryPath
+        };
 
     return null;
 }
 
-export async function getPrebuiltBinaryBuildMetadata(folderName: string) {
-    const buildMetadataFilePath = path.join(llamaPrebuiltBinsDirectory, folderName, buildMetadataFileName);
+export async function getPrebuiltBinaryBuildMetadata(folderPath: string, folderName: string) {
+    const buildMetadataFilePath = path.join(folderPath, buildMetadataFileName);
 
     if (!(await fs.pathExists(buildMetadataFilePath)))
         throw new Error(`Could not find build metadata file for prebuilt build "${folderName}"`);
 
     const buildMetadata: BuildMetadataFile = await fs.readJson(buildMetadataFilePath);
     return buildMetadata;
+}
+
+async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
+    const releaseDirPath = path.join(resultDirPath, "Release");
+
+    if (await fs.pathExists(releaseDirPath)) {
+        await fs.remove(tempDirPath);
+        await fs.ensureDir(tempDirPath);
+        await fs.move(releaseDirPath, tempDirPath);
+
+        const itemNames = await fs.readdir(tempDirPath);
+
+        await Promise.all(
+            itemNames.map((itemName) => (
+                fs.move(path.join(tempDirPath, itemName), path.join(resultDirPath, itemName), {
+                    overwrite: true
+                })
+            ))
+        );
+
+        await fs.remove(tempDirPath);
+    }
 }
 
 async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
