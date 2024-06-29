@@ -145,7 +145,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 40
+        timeout-minutes: 80
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
@@ -187,6 +187,7 @@ jobs:
             throw new Error("Could not find node versions");
           }
           
+          $.verbose = true;
           await $`mkdir -p bins`;
           
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
@@ -253,28 +254,28 @@ jobs:
 #          unzip -d ./upx "./upxInstallations/upx-${UPX_VERSION}-win64.zip"
 #          mv "./upx/upx-${UPX_VERSION}-win64" ./upx/upx
 #
-#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/llama-addon.node
+#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/Release/ggml.dll
 
-      - name: Compress CUDA binary on Ubuntu
-        if: matrix.config.name == 'Ubuntu'
-        env:
-          UPX_VERSION: 4.2.4
-        run: |
-          mkdir -p upxInstallations
-
-          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" ]; then
-            pushd upxInstallations
-            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz"
-            popd
-          fi
-
-          mkdir -p upx
-          tar -xvf "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" -C ./upx
-          mv "./upx/upx-${UPX_VERSION}-amd64_linux" ./upx/upx
-
-          chmod +x ./bins/linux-x64-cuda/llama-addon.node
-          ./upx/upx/upx --best ./bins/linux-x64-cuda/llama-addon.node
-          chmod -x ./bins/linux-x64-cuda/llama-addon.node
+#      - name: Compress CUDA binary on Ubuntu
+#        if: matrix.config.name == 'Ubuntu'
+#        env:
+#          UPX_VERSION: 4.2.4
+#        run: |
+#          mkdir -p upxInstallations
+#
+#          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" ]; then
+#            pushd upxInstallations
+#            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz"
+#            popd
+#          fi
+#
+#          mkdir -p upx
+#          tar -xvf "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" -C ./upx
+#          mv "./upx/upx-${UPX_VERSION}-amd64_linux" ./upx/upx
+#
+#          chmod +x ./bins/linux-x64-cuda/llama-addon.node
+#          ./upx/upx/upx --best ./bins/linux-x64-cuda/libggml.so
+#          chmod -x ./bins/linux-x64-cuda/llama-addon.node
 
       - name: Publish artifact
         uses: actions/upload-artifact@v4
@@ -423,13 +424,21 @@ jobs:
           
           echo "Built binaries:"
           ls bins
+      - name: Move binaries to standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/movePrebuiltBinariesToStandaloneModules.ts
+      - name: Prepare standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/prepareStandalonePrebuiltBinaryModules.ts
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+          GH_RELEASE_REF: ${{ github.ref }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+          
+          npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url
         run: |

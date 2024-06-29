@@ -10,8 +10,7 @@ describe("gguf", async () => {
         test("Magic should be GGUF remote model", {timeout: 1000 * 60 * 10}, async () => {
             const fileReader = new GgufNetworkFetchFileReader({url: remoteGGUFModel});
 
-            const magic = await fileReader.readByteRange(0, 4);
-            const magicText = String.fromCharCode(...magic);
+            const magicText = await fileReader.readStringWithLength(0, 4);
 
             expect(magicText)
                 .toBe("GGUF");

@@ -1,4 +1,5 @@
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
+import {Promisable, transformPromisable} from "../../utils/transformPromisable.js";
 
 export const valueTypeToBytesToRead = {
     uint8: 1,
@@ -17,74 +18,114 @@ export const valueTypeToBytesToRead = {
 export abstract class GgufFileReader {
     protected _buffer = Buffer.alloc(0);
 
-    public abstract readByteRange(offset: number | GgufReadOffset, length: number): Promise<Buffer>;
+    public abstract readByteRange(offset: number | GgufReadOffset, length: number): Promisable<Buffer>;
+    protected abstract ensureHasByteRange(offset: number | GgufReadOffset, length: number): Promisable<void>;
 
-    public async readUint8(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint8);
-        return response.readUInt8();
+    public readUint8(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.uint8, (resolvedOffset) => {
+            return this._buffer.readUInt8(resolvedOffset);
+        });
     }
 
-    public async readUint16(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint16);
-        return response.readUInt16LE();
+    public readUint16(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.uint16, (resolvedOffset) => {
+            return this._buffer.readUInt16LE(resolvedOffset);
+        });
     }
 
-    public async readUint32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint32);
-        return response.readUInt32LE();
+    public readUint32(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.uint32, (resolvedOffset) => {
+            return this._buffer.readUInt32LE(resolvedOffset);
+        });
     }
 
-    public async readUint64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint64);
-        return response.readBigUInt64LE();
+    public readUint64(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.uint64, (resolvedOffset) => {
+            return this._buffer.readBigUInt64LE(resolvedOffset);
+        });
     }
 
-    public async readInt8(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int8);
-        return response.readInt8();
+    public readInt8(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.int8, (resolvedOffset) => {
+            return this._buffer.readInt8(resolvedOffset);
+        });
     }
 
-    public async readInt16(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int16);
-        return response.readInt16LE();
+    public readInt16(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.int16, (resolvedOffset) => {
+            return this._buffer.readInt16LE(resolvedOffset);
+        });
     }
 
-    public async readInt32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int32);
-        return response.readInt32LE();
+    public readInt32(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.int32, (resolvedOffset) => {
+            return this._buffer.readInt32LE(resolvedOffset);
+        });
     }
 
-    public async readInt64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.int64);
-        return response.readBigInt64LE();
+    public readInt64(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.int64, (resolvedOffset) => {
+            return this._buffer.readBigInt64LE(resolvedOffset);
+        });
     }
 
-    public async readFloat32(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.float32);
-        return response.readFloatLE();
+    public readFloat32(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.float32, (resolvedOffset) => {
+            return this._buffer.readFloatLE(resolvedOffset);
+        });
     }
 
-    public async readFloat64(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.float64);
-        return response.readDoubleLE();
+    public readFloat64(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.float64, (resolvedOffset) => {
+            return this._buffer.readDoubleLE(resolvedOffset);
+        });
     }
 
-    public async readBool(offset: number | GgufReadOffset) {
-        const response = await this._readByteRangeAndUpdateOffset(offset, valueTypeToBytesToRead.uint8);
-        return response.readUInt8() === 1;
+    public readBool(offset: number | GgufReadOffset) {
+        return this._withBufferRead(offset, valueTypeToBytesToRead.uint8, (resolvedOffset) => {
+            return this._buffer.readUInt8(resolvedOffset) === 1;
+        });
+    }
+
+    public readString(offset: number | GgufReadOffset) {
+        const readOffset = GgufReadOffset.resolveReadOffset(offset);
+
+        return transformPromisable(this.readUint64(readOffset), (length) => {
+            return this.readStringWithLength(readOffset, Number(length));
+        });
+    }
+
+    public readStringWithLength(offset: number | GgufReadOffset, length: number) {
+        const readLength = valueTypeToBytesToRead.uint8 * length;
+
+        return this._withBufferRead(offset, readLength, (resolvedOffset) => {
+            const res: string[] = [];
+
+            for (let i = resolvedOffset; i < resolvedOffset + readLength && i < this._buffer.length; i++)
+                res.push(String.fromCharCode(this._buffer[i]));
+
+            return res.join("");
+        });
     }
 
     protected _addToBuffer(buffer: Buffer){
-        this._buffer = Buffer.concat([this._buffer, buffer]);
+        const newBuffer = Buffer.alloc(this._buffer.byteLength + buffer.byteLength);
+        this._buffer.copy(newBuffer);
+        buffer.copy(newBuffer, this._buffer.byteLength);
+
+        this._buffer = newBuffer;
     }
 
-    private async _readByteRangeAndUpdateOffset(offset: number | GgufReadOffset, length: number) {
-        const readOffset = GgufReadOffset.resolveReadOffset(offset);
+    private _withBufferRead<T>(offset: number | GgufReadOffset, length: number, reader: (resolvedOffset: number) => T): Promisable<T> {
+        return transformPromisable(this.ensureHasByteRange(offset, length), () => {
+            const resolvedOffset = GgufReadOffset.resolveReadOffset(offset);
 
-        const response = await this.readByteRange(readOffset.offset, length);
-        readOffset.moveBy(length);
+            return transformPromisable(reader(resolvedOffset.offset), (res) => {
+                resolvedOffset.moveBy(Math.min(length, this._buffer.length - resolvedOffset.offset));
 
-        return response;
+                return res;
+            });
+        });
     }
 
     public static castNumberIfSafe(value: bigint) {

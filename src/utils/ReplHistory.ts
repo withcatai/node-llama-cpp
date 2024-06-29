@@ -1,3 +1,4 @@
+import path from "path";
 import fs from "fs-extra";
 import {withLock} from "lifecycle-utils";
 
@@ -29,6 +30,7 @@ export class ReplHistory {
                 const json = parseReplJsonfile(await fs.readJSON(this._filePath!));
                 this._fileContent = this._addItemToHistory(line, json);
 
+                await fs.ensureDir(path.dirname(this._filePath!));
                 await fs.writeJSON(this._filePath!, this._fileContent, {
                     spaces: 4
                 });
@@ -62,10 +64,12 @@ export class ReplHistory {
             });
 
         try {
-            if (!(await fs.pathExists(filePath)))
+            if (!(await fs.pathExists(filePath))) {
+                await fs.ensureDir(path.dirname(filePath));
                 await fs.writeJSON(filePath, emptyHistory, {
                     spaces: 4
                 });
+            }
 
             const json = parseReplJsonfile(await fs.readJSON(filePath));
             return new ReplHistory(filePath, json);

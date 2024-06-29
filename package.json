@@ -43,6 +43,7 @@
   "scripts": {
     "prepare": "[ \"$CI\" = true ] || [ -d '.husky/_' ] || husky",
     "postinstall": "cd templates && npm install",
+    "postversion": "vite-node scripts/postVersion.ts",
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
     "build": "tsc --build tsconfig.json --force && npm run build:packTemplates",
     "build:packTemplates": "vite-node scripts/packTemplates.ts",
@@ -105,6 +106,7 @@
   ],
   "author": "Gilad S.",
   "license": "MIT",
+  "preferUnplugged": true,
   "bugs": {
     "url": "https://github.com/withcatai/node-llama-cpp/issues"
   },
@@ -189,5 +191,9 @@
     "typescript": {
       "optional": true
     }
+  },
+  "optionalDependencies": {
+    "@node-llama-cpp/win-x64-cuda": "0.1.0",
+    "@node-llama-cpp/linux-x64-cuda": "0.1.0"
   }
 }

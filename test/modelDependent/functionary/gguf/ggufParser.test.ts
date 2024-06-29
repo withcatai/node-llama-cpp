@@ -11,8 +11,7 @@ describe("gguf", async () => {
 
         test("Magic should be GGUF local model", async () => {
             const fileReader = new GgufFsFileReader({filePath: modelPath});
-            const magic = await fileReader.readByteRange(0, 4);
-            const magicText = String.fromCharCode(...magic);
+            const magicText = await fileReader.readStringWithLength(0, 4);
 
             expect(magicText).toBe("GGUF");
         });

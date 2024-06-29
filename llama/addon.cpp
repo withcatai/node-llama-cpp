@@ -235,7 +235,7 @@ static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_mod
     if (token < 0) {
         return Napi::Number::From(info.Env(), -1);
     }
-    
+
     auto tokenAttributes = llama_token_get_attr(model, token);
 
     if (!(tokenAttributes & LLAMA_TOKEN_ATTR_CONTROL) && !(tokenAttributes & LLAMA_TOKEN_ATTR_UNDEFINED)) {
@@ -1810,7 +1810,7 @@ static void addonLlamaCppLogCallback(ggml_log_level level, const char* text, voi
             fputs(text, stdout);
             fflush(stdout);
         }
-    }    
+    }
 }
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {
