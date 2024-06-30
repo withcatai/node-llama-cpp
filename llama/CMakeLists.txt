@@ -131,6 +131,8 @@ endif()
 
 file(GLOB SOURCE_FILES "addon.cpp" ${GPU_INFO_SOURCES})
 
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} ${GPU_INFO_HEADERS})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
