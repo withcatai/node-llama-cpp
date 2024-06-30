@@ -566,7 +566,7 @@ jobs:
         run: |
           shopt -s nullglob
           
-          for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,deb,tar.gz}; do
+          for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,assert,deb,tar.gz}; do
             echo "Adding $file to release $RELEASE_TAG"
             gh release upload "v$RELEASE_TAG" "$file"
           done
