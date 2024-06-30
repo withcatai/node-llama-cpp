@@ -486,20 +486,16 @@ async function loadExistingLlamaBinary({
     }
 
     if (canUsePrebuiltBinaries) {
-        const prebuiltBinPath = await getPrebuiltBinaryPath(
+        const prebuiltBinDetails = await getPrebuiltBinaryPath(
             buildOptions,
             existingPrebuiltBinaryMustMatchBuildOptions
                 ? buildFolderName.withCustomCmakeOptions
                 : buildFolderName.withoutCustomCmakeOptions
         );
 
-        if (prebuiltBinPath != null) {
+        if (prebuiltBinDetails != null) {
             try {
-                const buildMetadata = await getPrebuiltBinaryBuildMetadata(
-                    existingPrebuiltBinaryMustMatchBuildOptions
-                        ? buildFolderName.withCustomCmakeOptions
-                        : buildFolderName.withoutCustomCmakeOptions
-                );
+                const buildMetadata = await getPrebuiltBinaryBuildMetadata(prebuiltBinDetails.folderPath, prebuiltBinDetails.folderName);
                 const shouldTestBinaryBeforeLoading = getShouldTestBinaryBeforeLoading({
                     isPrebuiltBinary: true,
                     platform,
@@ -507,11 +503,11 @@ async function loadExistingLlamaBinary({
                     buildMetadata
                 });
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(prebuiltBinPath)
+                    ? await testBindingBinary(prebuiltBinDetails.binaryPath)
                     : true;
 
                 if (binaryCompatible) {
-                    const binding = loadBindingModule(prebuiltBinPath);
+                    const binding = loadBindingModule(prebuiltBinDetails.binaryPath);
 
                     return await Llama._create({
                         bindings: binding,
