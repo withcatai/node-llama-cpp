@@ -1,32 +1,37 @@
 import chalk from "chalk";
 import logSymbols from "log-symbols";
+import {clockChar} from "../consts.js";
+import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 
-const clockChar = "\u25f7";
 
 export default async function withStatusLogs<T>(
-    message: string | {
+    messageAndOptions: string | {
         loading: string,
         success?: string,
         fail?: string,
+        disableLogs?: boolean
     },
     callback: () => Promise<T>
 ): Promise<T> {
-    console.log(`${chalk.cyan(clockChar)} ${typeof message === "string" ? message : message.loading}`);
+    if (typeof messageAndOptions !== "string" && messageAndOptions.disableLogs)
+        return await callback();
+
+    console.log(getConsoleLogPrefix() + `${chalk.cyan(clockChar)} ${typeof messageAndOptions === "string" ? messageAndOptions : messageAndOptions.loading}`);
 
     try {
         const res = await callback();
 
-        if (typeof message !== "string")
-            console.log(`${logSymbols.success} ${message.success}`);
+        if (typeof messageAndOptions !== "string")
+            console.log(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions.success}`);
         else
-            console.log(`${logSymbols.success} ${message}`);
+            console.log(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions}`);
 
         return res;
     } catch (er) {
-        if (typeof message !== "string")
-            console.log(`${logSymbols.error} ${message.fail}`);
+        if (typeof messageAndOptions !== "string")
+            console.log(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions.fail}`);
         else
-            console.log(`${logSymbols.error} ${message}`);
+            console.log(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions}`);
 
         throw er;
     }

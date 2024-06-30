@@ -1,7 +1,7 @@
 ---
 outline: deep
 ---
-# Getting started 
+# Getting started
 
 ## Installation
 Inside of your node.js project directory, run this command:
@@ -53,15 +53,18 @@ npx --no node-llama-cpp chat --wrapper llamaChat --model <path-to-a-model-file-o
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "dolphin-2.1-mistral-7b.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -71,7 +74,7 @@ const a1 = await session.prompt(q1);
 console.log("AI: " + a1);
 
 
-const q2 = "Summerize what you said";
+const q2 = "Summarize what you said";
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2);

@@ -1,7 +1,10 @@
 name: Build
 on:
   push:
-
+    branches:
+      - master
+      - beta
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -9,8 +12,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
@@ -20,27 +23,26 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        run: node ./dist/cli/cli.js download --release latest --skipBuild --noBundle --updateBinariesReleaseMetadataAndSaveGitBundle
+        run: node ./dist/cli/cli.js download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "build"
           path: "dist"
-      - name: Upload binariesGithubRelease.json artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload packed templates artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: "binariesGithubRelease"
-          path: "llama/binariesGithubRelease.json"
+          name: "build-templates"
+          path: "templates/packed"
       - name: Upload llama.cpp artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "llama.cpp"
-          path: "llama/llama.cpp"
-      - name: Upload gitRelease.bundle artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: "gitReleaseBundle"
-          path: "llama/gitRelease.bundle"
+          path: |
+            llama/binariesGithubRelease.json
+            llama/llama.cpp.info.json
+            llama/llama.cpp
+            llama/gitRelease.bundle
 
   build-binaries:
     name: Build binaries - ${{ matrix.config.name }}
@@ -51,51 +53,44 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - name: "Windows MSVC"
+          - name: "Windows for x64"
+            os: windows-2019
+            artifact: "win-x64"
+          - name: "Windows for Arm"
             os: windows-2022
-            cc: "cl"
-            cxx: "cl"
-            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-            generators: "Visual Studio 17 2022"
-            artifact: "win"
-          - name: "Ubuntu GCC"
-            os: ubuntu-22.04
-            cc: "gcc"
-            cxx: "g++"
-            generators: "Ninja"
+            artifact: "win-arm"
+          - name: "Ubuntu"
+            os: ubuntu-20.04
             artifact: "linux"
-          - name: "macOS Clang"
-            os: macos-12
-            cc: "clang"
-            cxx: "clang++"
-            generators: "Xcode"
+          - name: "macOS"
+            os: macos-13
             artifact: "mac"
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: llama.cpp
-          path: llama/llama.cpp
+          path: llama
 
-      - name: Install dependencies on windows
+      - name: Install dependencies on Windows
         if: startsWith(matrix.config.os, 'windows')
         run: |
           choco install ninja cmake
 
-      - name: Install dependencies on ubuntu
-        if: startsWith(matrix.config.name, 'Ubuntu GCC')
+      - name: Install dependencies on Ubuntu
+        if: matrix.config.name == 'Ubuntu'
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
@@ -106,8 +101,43 @@ jobs:
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
 
-      - name: Install dependencies on macos
-        if: startsWith(matrix.config.os, 'macos')
+      - name: Install Cuda on Windows for x64
+        if: matrix.config.name == 'Windows for x64'
+        uses: Jimver/cuda-toolkit@v0.2.15
+        with:
+          cuda: '12.2.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
+          use-local-cache: false
+
+      - name: Install Cuda on Ubuntu
+        if: matrix.config.name == 'Ubuntu'
+        uses: Jimver/cuda-toolkit@v0.2.15
+        with:
+          cuda: '12.2.0'
+          method: 'network'
+
+      - name: Install Vulkan SDK on Windows for x64
+        if: matrix.config.name == 'Windows for x64'
+        shell: powershell
+        env:
+          VULKAN_VERSION: 1.3.261.1
+        run: |
+          curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/VulkanSDK-${env:VULKAN_VERSION}-Installer.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
+
+      - name: Install Vulkan SDK on Ubuntu
+        if: matrix.config.name == 'Ubuntu'
+        run: |
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
+          sudo apt update
+          sudo apt install vulkan-sdk
+
+      - name: Install dependencies on macOS
+        if: matrix.config.name == 'macOS'
         run: |
           brew install cmake ninja
           alias make=cmake
@@ -115,7 +145,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 40
+        timeout-minutes: 80
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
           NODE_LLAMA_CPP_CMAKE_OPTION_LLAMA_OPENMP: OFF
@@ -149,57 +179,110 @@ jobs:
             return {versions, latestVersion};
           }
           
-          function getArches() {
-            switch (process.env.ARTIFACT_NAME) {
-              case "win":
-                return ["x64" /*, "arm64" */ ]; // disabled arm64 for now as compilation doesn't work
-              case "linux":
-                return ["x64", "arm64", "armv7l"];
-              case "mac":
-                return ["x64", "arm64"];
-            }
-            
-            return ["x64"];
-          }
-          
           const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
           
           const nodeVersion = latestNodeVersions.get(18);
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
-          const arches = getArches();
           
           if (nodeVersion == null || windowsOnArmNodeVersion == null) {
             throw new Error("Could not find node versions");
           }
           
-          console.log("Building for node version", nodeVersion, "and archs", arches);
+          $.verbose = true;
+          await $`mkdir -p bins`;
           
-          await $`mkdir -p llamaBins`;
+          async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
+            console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
+            
+            await $`node ./dist/cli/cli.js build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
+          }
           
-          for (const arch of arches) {
-            let buildNodeVersion = nodeVersion;
-            
-            if (process.env.ARTIFACT_NAME === "win" && arch === "arm64") {
-              buildNodeVersion = windowsOnArmNodeVersion;
-            }
-            
-            console.log(`Building ${arch} for node ${buildNodeVersion}`);
-            
-            const binName = `${process.env.ARTIFACT_NAME}-${arch}`; 
-            await $`node ./dist/cli/cli.js build --arch ${arch} --nodeTarget ${buildNodeVersion}`;
-            await $`mv ./llama/build/Release ${"./llamaBins/" + binName}`;
+          // build binaries
+          if (process.env.ARTIFACT_NAME === "win-x64") {
+            await buildBinary("x64", ["--gpu", "false"]);
+            await buildBinary("x64", ["--gpu", "cuda"]);
+            await buildBinary("x64", ["--gpu", "vulkan"]);
+          } else if (process.env.ARTIFACT_NAME === "win-arm") {
+            await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
+          } else if (process.env.ARTIFACT_NAME === "linux") {
+            await buildBinary("x64", ["--gpu", "false"]);
+            await buildBinary("x64", ["--gpu", "cuda"]);
+            await buildBinary("x64", ["--gpu", "vulkan"]);
+            await buildBinary("arm64", ["--gpu", "false"]);
+            await buildBinary("armv7l", ["--gpu", "false"]);
+          } else if (process.env.ARTIFACT_NAME === "mac") {
+            await buildBinary("arm64", ["--gpu", "metal"]);
+            await buildBinary("x64", ["--gpu", "false"]);
+          }
+          
+          // move binaries to bins
+          const localBuildsDirectoryPath = path.join(process.cwd(), "llama", "localBuilds");
+          const llamaBinsDirectoryPath = path.join(process.cwd(), "bins");
+          for (const folderName of await fs.readdir(localBuildsDirectoryPath)) {
+            await fs.move(
+              path.join(localBuildsDirectoryPath, folderName, "Release"),
+              path.join(llamaBinsDirectoryPath, folderName)
+            );
           }
           
           await $`echo "Built binaries:"`;
-          await $`ls llamaBins`;
+          await $`ls bins`;
           
           EOF
 
+      - name: Cache UPX
+        id: cache-upx
+        uses: actions/cache@v4
+        with:
+          path: "upxInstallations/**"
+          key: cache-upx-${{ runner.os }}-${{ github.workflow }}
+
+#      - name: Compress CUDA binary on Windows
+#        if: matrix.config.name == 'Windows for x64'
+#        shell: bash
+#        env:
+#          UPX_VERSION: 4.2.4
+#        run: |
+#          mkdir -p upxInstallations
+#
+#          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-win64.zip" ]; then
+#            pushd upxInstallations
+#            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-win64.zip"
+#            popd
+#          fi
+#
+#          mkdir -p upx
+#          unzip -d ./upx "./upxInstallations/upx-${UPX_VERSION}-win64.zip"
+#          mv "./upx/upx-${UPX_VERSION}-win64" ./upx/upx
+#
+#          ./upx/upx/upx.exe --best ./bins/win-x64-cuda/Release/ggml.dll
+
+#      - name: Compress CUDA binary on Ubuntu
+#        if: matrix.config.name == 'Ubuntu'
+#        env:
+#          UPX_VERSION: 4.2.4
+#        run: |
+#          mkdir -p upxInstallations
+#
+#          if [ ! -f "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" ]; then
+#            pushd upxInstallations
+#            curl -OL "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz"
+#            popd
+#          fi
+#
+#          mkdir -p upx
+#          tar -xvf "./upxInstallations/upx-${UPX_VERSION}-amd64_linux.tar.xz" -C ./upx
+#          mv "./upx/upx-${UPX_VERSION}-amd64_linux" ./upx/upx
+#
+#          chmod +x ./bins/linux-x64-cuda/llama-addon.node
+#          ./upx/upx/upx --best ./bins/linux-x64-cuda/libggml.so
+#          chmod -x ./bins/linux-x64-cuda/llama-addon.node
+
       - name: Publish artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "bins-${{ matrix.config.artifact }}"
-          path: "llamaBins/*"
+          path: "bins/*"
 
   standalone-tests:
     name: Standalone tests
@@ -207,22 +290,22 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: llama.cpp
-          path: llama/llama.cpp
+          path: llama
 
       - name: Install dependencies on ubuntu
         run: |
@@ -233,14 +316,63 @@ jobs:
         run: npm ci
 
       - name: Build binary
-        run: node ./dist/cli/cli.js build
+        run: node ./dist/cli/cli.js build --noUsageExample
 
       - name: Run standalone tests
         run: npm run test:standalone
 
+  model-dependent-tests:
+    name: Model dependent tests
+    runs-on: macos-14
+    env:
+      NODE_LLAMA_CPP_GPU: false
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - name: Download llama.cpp artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: llama.cpp
+          path: llama
+
+      - name: Install dependencies on macOS
+        run: |
+          brew install cmake ninja
+          alias make=cmake
+
+      - name: Install modules
+        run: npm ci
+
+      - name: Build binary
+        run: node ./dist/cli/cli.js build --noUsageExample
+
+      - name: Cache models
+        id: cache-test-models
+        uses: actions/cache@v4
+        with:
+          path: "test/.models/**.gguf"
+          key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
+
+      - name: Download models or ensure all models are downloaded
+        run: npm run dev:setup:downloadAllTestModels
+
+      - name: Run model dependent tests
+        run: npm run test:modelDependent
+
   release:
     name: Release
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta')
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -252,65 +384,192 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      discussions: write
     needs:
       - build
       - build-binaries
+    outputs:
+      package-version: ${{ steps.set-package-version.outputs.package-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Move artifacts
         run: |
-          mkdir -p llamaBins
-          mv artifacts/bins-*/* llamaBins/
+          mkdir -p bins
+          mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
           
-          cp -r artifacts/llama.cpp/grammars llama/grammars
+          cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
           
           rm -f ./llama/binariesGithubRelease.json
-          mv artifacts/binariesGithubRelease/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          
+          rm -f ./llama/llama.cpp.info.json
+          mv artifacts/llama.cpp/llama.cpp.info.json ./llama/llama.cpp.info.json
           
           rm -f ./llama/gitRelease.bundle
-          mv artifacts/gitReleaseBundle/gitRelease.bundle ./llama/gitRelease.bundle
+          mv artifacts/llama.cpp/gitRelease.bundle ./llama/gitRelease.bundle
+          
+          mv artifacts/build-templates templates/packed/
+          rm -f ./templates/package.json
+          rm -f ./templates/package-lock.json
           
           echo "Built binaries:"
-          ls llamaBins
+          ls bins
+      - name: Move binaries to standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/movePrebuiltBinariesToStandaloneModules.ts
+      - name: Prepare standalone prebuilt binary modules
+        run: npx --no vite-node ./scripts/prepareStandalonePrebuiltBinaryModules.ts
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+          GH_RELEASE_REF: ${{ github.ref }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+          
+          npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url
         run: |
           if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
             echo "npm-url=https://www.npmjs.com/package/node-llama-cpp/v/$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
           fi
-      - name: Generate docs with updated version
+      - name: Set package version to GITHUB_OUTPUT
+        id: set-package-version
+        run: |
+          if [ -f .semanticRelease.npmPackage.deployedVersion.txt ]; then
+            echo "package-version=$(cat .semanticRelease.npmPackage.deployedVersion.txt)" >> $GITHUB_OUTPUT
+          fi
+      - name: Prepare `create-node-llama-cpp` module
         if: steps.set-npm-url.outputs.npm-url != ''
+        run: |
+          export DEPLOYED_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
+          
+          pushd packages/create-node-llama-cpp
+          npm ci --ignore-scripts
+          popd
+          
+          npx --no vite-node ./scripts/prepareCreateNodeLlamaCppModuleForPublish.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION"
+          
+          pushd packages/create-node-llama-cpp
+          npm run build
+      - name: Release `create-node-llama-cpp` module
+        if: steps.set-npm-url.outputs.npm-url != ''
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_RELEASE_REF: ${{ github.ref }}
+        run: |
+          cd packages/create-node-llama-cpp
+          
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+          
+          if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
+              npm publish --tag beta
+          else
+              npm publish
+          fi
+      - name: Generate docs with updated version
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
         env:
           DOCS_URL_BASE: "/node-llama-cpp/"
         run: |
           export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
           npm run docs:build
       - name: Upload docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != ''
-        uses: actions/upload-pages-artifact@v2
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != ''
-        uses: actions/deploy-pages@v2
+        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
+        uses: actions/deploy-pages@v4
         with:
           artifact_name: pages-docs
+
+  build-electron-example:
+    name: Build & release Electron app example - ${{ matrix.config.name }}
+    needs:
+      - release
+    if: needs.release.outputs.package-version != ''
+    runs-on: ${{ matrix.config.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Windows"
+            os: windows-2022
+          - name: "Ubuntu"
+            os: ubuntu-20.04
+          - name: "macOS"
+            os: macos-13
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies on Ubuntu
+        if: matrix.config.name == 'Ubuntu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libarchive-tools rpm
+          sudo snap install snapcraft --classic
+
+      - name: Install modules
+        run: npm ci
+
+      - name: Create Electron app project
+        shell: bash
+        env:
+          DEPLOYED_PACKAGE_VERSION: ${{ needs.release.outputs.package-version }}
+          NODE_LLAMA_CPP_SKIP_DOWNLOAD: true
+        run: |
+          npx --no vite-node ./scripts/scaffoldElectronExampleForCiBuild.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --packageFolderPath ./electron-app-example
+          cd electron-app-example
+          npm install
+
+      - name: Build electron app
+        id: build
+        shell: bash
+        timeout-minutes: 480
+        run: |
+          cd electron-app-example
+          npm run build
+          ls ./release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "electron-app-example-${{ matrix.config.name }}"
+          path: "./electron-app-example/release"
+
+      - name: Add builds to current release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release.outputs.package-version }}
+        run: |
+          shopt -s nullglob
+          
+          for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,assert,deb,tar.gz}; do
+            echo "Adding $file to release $RELEASE_TAG"
+            gh release upload "v$RELEASE_TAG" "$file"
+          done
+          
+          shopt -u nullglob

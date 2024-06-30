@@ -40,12 +40,81 @@
     }
 }
 
+.VPNavBar .divider-line:after {
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 32px;
+    background: linear-gradient(var(--vp-c-bg), transparent 70%);
+    content: "";
+    transition: opacity 0.5s;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.VPNavBar:not(.home) .divider-line[class] {
+    background-color: transparent;
+}
+.VPNavBar:not(.home) .divider-line:after {
+    opacity: 1;
+}
+
+@media (min-width: 960px) {
+    .VPNavBar:not(.home.top) .divider-line[class] {
+        background-color: transparent;
+    }
+    .VPNavBar:not(.home.top) .divider-line:after {
+        opacity: 1;
+    }
+
+    .VPNavBar:not(.has-sidebar):not(.home.top) .divider[class] {
+        background-color: transparent;
+    }
+}
+
+.VPLocalNav[class] {
+    border-bottom: none;
+}
+.VPLocalNav[class]:after {
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 32px;
+    background: linear-gradient(var(--vp-c-bg), transparent 70%);
+    content: "";
+    transition: opacity 0.5s;
+    pointer-events: none;
+    z-index: -1;
+}
+
 .main-badges>p {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 4px;
+}
+
+.VPSidebarItem .text {
+    word-break: break-word;
+    line-height: 20px;
+    padding: 6px 0px;
+}
+
+a.inlineCodeLink {
+    /*text-decoration: none;*/
+    text-underline-offset: 4px;
+    color: transparent;
+}
+a.inlineCodeLink:hover {
+    color: inherit;
+}
+
+a.inlineCodeLink pre>code {
+    border-radius: 4px;
+    padding: 3px 6px;
+    background-color: var(--vp-code-bg);
 }
 
 img[src$="assets/logo.roundEdges.png"],

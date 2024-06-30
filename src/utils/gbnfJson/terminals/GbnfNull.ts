@@ -3,11 +3,11 @@ import {reservedRuleNames} from "./gbnfConsts.js";
 
 
 export class GbnfNull extends GbnfTerminal {
-    getGrammar(): string {
+    public getGrammar(): string {
         return '"null"';
     }
 
-    override getRuleName(): string {
+    protected override getRuleName(): string {
         return reservedRuleNames.null;
     }
 }

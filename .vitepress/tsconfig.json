@@ -32,8 +32,5 @@
         "./config.ts",
         "./utils",
         "../docs"
-    ],
-    "ts-node": {
-        "esm": true
-    }
+    ]
 }

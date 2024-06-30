@@ -1,0 +1,71 @@
+.appChatHistory {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: start;
+    overflow: auto;
+    padding: 24px 0px;
+
+    > .message {
+        &.user {
+            align-self: flex-end;
+            background-color: var(--user-message-background-color);
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            margin-inline-start: 48px;
+            margin-inline-end: 12px;
+            color: var(--user-message-text-color);
+
+            &:not(:first-child) {
+                margin-top: 36px;
+            }
+        }
+
+        &.model {
+            align-self: flex-start;
+            margin-inline-end: 48px;
+            padding-inline-start: 24px;
+
+            &.active {
+                &:after {
+                    content: "";
+                    position: static;
+                    display: inline-block;
+                    background-color: currentColor;
+                    width: 8px;
+                    height: 8px;
+                    translate: 0px -2px;
+                    border-radius: 9999px;
+                    margin-inline-start: 8px;
+                    vertical-align: middle;
+
+                    animation: activeModelMessageIndicator 2s infinite ease-in-out;
+                }
+            }
+        }
+
+        > :first-child {
+            margin-top: 0px;
+        }
+
+        > :last-child {
+            margin-bottom: 0px;
+        }
+    }
+}
+
+@keyframes activeModelMessageIndicator {
+    0% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+    50% {
+        transform: scale(1.4);
+        opacity: 0.32;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+}

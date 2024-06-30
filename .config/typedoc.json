@@ -18,5 +18,12 @@
     "preserveAnchorCasing": true,
     "useCodeBlocks": true,
     "expandObjects": true,
-    "parametersFormat": "table"
+    "expandParameters": true,
+    "parametersFormat": "table",
+    "propertiesFormat": "list",
+    "enumMembersFormat": "table",
+    "typeDeclarationFormat": "list",
+    "sort": ["source-order"],
+    "docsRoot": "../docs",
+    "intentionallyNotExported": ["MergeOptionalUnionTypes", "GbnfJsonSchemaToTSType", "_LlamaText"]
 }

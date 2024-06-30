@@ -2,26 +2,29 @@
 /.vscode
 node_modules
 .DS_Store
+*.cpuprofile
 
 /dist
 /docs-site
 /docs/api
+/templates/packed
 
 /.env
 /.eslintcache
 /.vitepress/.cache
 /test/.models
+/test/temp
 /coverage
 
 /llama/compile_commands.json
 /llama/llama.cpp
-/llama/llama.cpp.tag.json
 /llama/llama.cpp.lock
 /llama/llama.cpp.info.json
 /llama/lastBuild.json
 /llama/gitRelease.bundle
 /llama/.temp
-/llama/build
+/llama/.idea
+/llama/cmake-build-debug
 /llama/localBuilds
 /llama/Release
 /llama/Debug
@@ -29,4 +32,4 @@ node_modules
 /llama/xpack/store
 /llama/xpack/xpacks
 /llama/xpack/cmakeInstall.lock
-/llamaBins
+/bins

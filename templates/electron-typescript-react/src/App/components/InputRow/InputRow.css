@@ -1,0 +1,144 @@
+.appInputRow {
+    display: flex;
+    flex-direction: row;
+    position: sticky;
+    bottom: 16px;
+    background-color: var(--panel-background-color);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    box-shadow: var(--panel-box-shadow);
+    overflow: clip;
+    color: var(--panel-text-color);
+    flex-shrink: 0;
+    z-index: 10;
+    align-items: flex-end;
+
+    &.disabled {
+        opacity: 0.48;
+    }
+
+    > .inputContainer {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+        position: relative;
+        isolation: isolate;
+        max-height: 400px;
+        min-height: var(--min-height);
+        --min-height: 55px;
+
+        > .input {
+            flex: 1;
+            border: none;
+            resize: none;
+            box-sizing: border-box;
+            max-height: 160px;
+            min-height: var(--min-height);
+            height: 55px;
+            outline: none;
+            padding: calc((var(--min-height) - 1lh) / 2) 24px;
+            background-color: transparent;
+            font: inherit;
+            align-content: center;
+            align-self: stretch;
+            color: var(--panel-text-color);
+            z-index: 2;
+            unicode-bidi: plaintext;
+            overflow: auto;
+
+            &::placeholder {
+                color: var(--panel-text-color);
+                opacity: 0.4;
+            }
+        }
+
+        > .autocomplete {
+            position: absolute;
+            inset: 0px;
+            z-index: 1;
+            display: flex;
+            overflow: hidden;
+            pointer-events: none;
+            user-select: none;
+
+            > .content {
+                flex: 1;
+                flex-shrink: 0;
+                font: inherit;
+                padding: calc((var(--min-height) - 1lh) / 2) 24px;
+                text-align: initial;
+                unicode-bidi: plaintext;
+                overflow: hidden;
+                opacity: 0.36;
+                mask: linear-gradient(to top, rgb(0 0 0 / 16%), black 24px);
+
+                &.hide {
+                    opacity: 0;
+                }
+
+                > .currentText {
+                    opacity: 0;
+                    display: inline;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                > .completion {
+                    display: inline;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                > .pressTab {
+                    display: inline-block;
+                    margin: -1px 8px;
+                    opacity: 0.8;
+                    border: solid 1px color-mix(in srgb, currentColor, transparent 64%);
+                    border-bottom-width: 2px;
+                    border-radius: 8px;
+                    padding: 0.1em 0.4em;
+                    font-size: 0.8em;
+                    vertical-align: top;
+                }
+            }
+        }
+    }
+
+    > .stopGenerationButton,
+    > .sendButton {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        margin: 8px;
+        background-color: var(--panel-button-background-color);
+        color: var(--panel-text-color);
+        fill: var(--panel-text-color);
+
+        + button {
+            margin-inline-start: 0px;
+        }
+
+        &:hover,
+        &:focus,
+        &:focus-visible {
+            border-color: var(--panel-button-hover-border-color);
+        }
+
+        > .icon {
+            width: 20px;
+            height: 20px;
+        }
+    }
+
+    > .stopGenerationButton {
+        transition: border-color 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing);
+
+        &[disabled] {
+            opacity: 0;
+        }
+    }
+}

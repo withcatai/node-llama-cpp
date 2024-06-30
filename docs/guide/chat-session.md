@@ -26,7 +26,7 @@ const a1 = await session.prompt(q1);
 console.log("AI: " + a1);
 
 
-const q2 = "Summerize what you said";
+const q2 = "Summarize what you said";
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2);
@@ -39,14 +39,14 @@ To learn more about chat prompt wrappers, see the [chat prompt wrapper guide](./
 import {fileURLToPath} from "url";
 import path from "path";
 import {
-    LlamaModel, LlamaContext, LlamaChatSession, LlamaChatPromptWrapper
+    LlamaModel, LlamaContext, LlamaChatSession, Llama3ChatWrapper
 } from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf"),
-    promptWrapper: new LlamaChatPromptWrapper()
+    chatWrapper: new Llama3ChatWrapper()
 });
 const context = new LlamaContext({model});
 const session = new LlamaChatSession({context});
@@ -59,7 +59,7 @@ const a1 = await session.prompt(q1);
 console.log("AI: " + a1);
 
 
-const q2 = "Summerize what you said";
+const q2 = "Summarize what you said";
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2);

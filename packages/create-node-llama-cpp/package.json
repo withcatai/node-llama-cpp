@@ -1,0 +1,56 @@
+{
+  "name": "create-node-llama-cpp",
+  "version": "0.1.0",
+  "description": "Scaffold a new node-llama-cpp project from a template",
+  "main": "dist/index.js",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "create-node-llama-cpp": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "node": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
+    "build": "tsc --build tsconfig.json --force",
+    "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
+    "watch": "tsc --build tsconfig.json --watch --force",
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/withcatai/node-llama-cpp.git"
+  },
+  "keywords": [],
+  "author": "Gilad S.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/withcatai/node-llama-cpp/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/giladgd"
+  },
+  "homepage": "https://withcatai.github.io/node-llama-cpp/",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "node-llama-cpp": "file:../.."
+  }
+}

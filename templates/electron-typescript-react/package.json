@@ -1,0 +1,62 @@
+{
+  "name": "node-llama-cpp-project",
+  "private": true,
+  "version": "0.0.0",
+  "main": "./dist-electron/index.js",
+  "type": "module",
+  "homepage": "https://github.com/withcatai/node-llama-cpp",
+  "author": {
+    "name": "Author name",
+    "email": "email@example.com"
+  },
+  "scripts": {
+    "_postinstall": "npm run models:pull",
+    "models:pull": "node-llama-cpp pull --dir ./models \"{{modelUrl|escape|escape}}\"",
+    "start": "vite dev",
+    "start:build": "electron ./dist-electron",
+    "prebuild": "rimraf ./dist ./dist-electron ./release",
+    "build": "tsc && vite build && electron-builder --config ./electron-builder.ts",
+    "lint": "npm run lint:eslint",
+    "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
+    "format": "npm run lint:eslint -- --fix",
+    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
+  },
+  "dependencies": {
+    "birpc": "^0.2.17",
+    "classnames": "^2.5.1",
+    "highlight.js": "^11.9.0",
+    "lifecycle-utils": "^1.4.1",
+    "markdown-it": "^14.1.0",
+    "node-llama-cpp": "file:../..",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "electron": "^30.1.0",
+    "electron-builder": "^24.13.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^48.2.9",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.13",
+    "vite-plugin-electron": "^0.28.7",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "zx": "^8.1.2"
+  },
+  "overrides": {
+    "electron-builder": {
+      "read-config-file": {
+        "config-file-ts": ">=0.2.8-rc1"
+      }
+    }
+  }
+}

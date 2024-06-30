@@ -7,8 +7,22 @@ export const reservedRuleNames = {
         integer: "integer-number-rule"
     },
     string: "string-rule",
-    whitespace: {
-        withNewLines: "whitespace-new-lines-rule",
-        withoutNewLines: "whitespace-no-new-lines-rule"
+    whitespace({newLine, nestingScope, scopeSpaces}: {
+        newLine?: "before" | "after" | false, nestingScope: number, scopeSpaces: number
+    }) {
+        if (!newLine)
+            return "whitespace-no-new-lines-rule";
+
+        return [
+            "whitespace-",
+            newLine === "before"
+                ? "b"
+                : newLine === "after"
+                    ? "a"
+                    : "n",
+            "-" + nestingScope,
+            "-" + scopeSpaces,
+            "-rule"
+        ].join("");
     }
 } as const;

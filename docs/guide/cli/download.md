@@ -25,9 +25,7 @@ If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile
 :::
 
 ## Usage
-```shell-vue
-{{commandDoc.usage}}
-```
+<div v-html="commandDoc.usageHtml"></div>
 <div v-html="commandDoc.options"></div>
 
 > To set custom cmake options that are supported by `llama.cpp`'s cmake build,

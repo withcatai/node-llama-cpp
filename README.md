@@ -10,7 +10,7 @@
 
 [![Build](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml/badge.svg)](https://github.com/withcatai/node-llama-cpp/actions/workflows/build.yml)
 [![License](https://badgen.net/badge/color/MIT/green?label=license)](https://www.npmjs.com/package/node-llama-cpp)
-[![License](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/node-llama-cpp)
+[![Types](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/node-llama-cpp)
 [![Version](https://badgen.net/npm/v/node-llama-cpp)](https://www.npmjs.com/package/node-llama-cpp)
 
 </div>
@@ -19,8 +19,8 @@
 
 ## Features
 * Run a text generation model locally on your machine
-* Metal and CUDA support
-* Pre-built binaries are provided, with a fallback to building from source without `node-gyp` or Python
+* Metal, CUDA and Vulkan support
+* Pre-built binaries are provided, with a fallback to building from source _**without**_ `node-gyp` or Python
 * Chat with a model using a chat wrapper
 * Use the CLI to chat with a model without writing any code
 * Up-to-date with the latest version of `llama.cpp`. Download and compile the latest release with a single CLI command.
@@ -47,15 +47,18 @@ To disable this behavior set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNL
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "dolphin-2.1-mistral-7b.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -65,7 +68,7 @@ const a1 = await session.prompt(q1);
 console.log("AI: " + a1);
 
 
-const q2 = "Summerize what you said";
+const q2 = "Summarize what you said";
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2);

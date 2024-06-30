@@ -39,6 +39,7 @@ body:
         Your bug can be investigated much faster if your code can be run without any dependencies other than `node-llama-cpp`.
         Issues without reproduction steps or code examples may be closed as not actionable.
         Please try to provide a Minimal, Complete, and Verifiable example ([link](http://stackoverflow.com/help/mcve)).
+        Also, please enable enable debug logs by using `getLlama({debug: true})` to get more information.
       placeholder: >-
         Please try to provide a Minimal, Complete, and Verifiable example.
         http://stackoverflow.com/help/mcve
@@ -49,7 +50,8 @@ body:
     attributes:
       label: My Environment
       description: >-
-        Please add any other relevant dependencies to this table at the end.
+        Please include the result of the command `npx --yes node-llama-cpp inspect gpu`.
+        Please also add any other relevant dependencies to this table at the end.
         For example: Electron, Bun, Webpack.
       value: |
         | Dependency               | Version             |
@@ -68,7 +70,7 @@ body:
       description: >-
         Add any other context about the bug report here.
   - type: checkboxes
-    id: drivers
+    id: features
     attributes:
       label: Relevant Features Used
       options:
@@ -76,7 +78,11 @@ body:
           required: false
         - label: CUDA support
           required: false
+        - label: Vulkan support
+          required: false
         - label: Grammar
+          required: false
+        - label: Function calling
           required: false
   - type: dropdown
     id: pr
