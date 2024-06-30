@@ -322,7 +322,6 @@ async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
 
     if (await fs.pathExists(releaseDirPath)) {
         await fs.remove(tempDirPath);
-        await fs.ensureDir(tempDirPath);
         await fs.move(releaseDirPath, tempDirPath);
 
         const itemNames = await fs.readdir(tempDirPath);
