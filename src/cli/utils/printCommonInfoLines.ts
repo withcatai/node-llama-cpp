@@ -86,6 +86,10 @@ export async function printCommonInfoLines({
             title: "Batch size",
             value: bytes(context.batchSize)
         }, {
+            show: context.flashAttention,
+            title: "Flash attention",
+            value: "enabled"
+        }, {
             show: tokenMeterEnabled,
             title: "Token meter",
             value: "enabled"

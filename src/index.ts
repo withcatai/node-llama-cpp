@@ -84,7 +84,7 @@ import {
     type GgufMetadata, type GgufMetadataLlmToType, GgufArchitectureType, GgufFileType, GgufMetadataTokenizerTokenType,
     GgufMetadataArchitecturePoolingType, type GgufMetadataGeneral, type GgufMetadataTokenizer, type GgufMetadataDefaultArchitectureType,
     type GgufMetadataLlmLLaMA, type GgufMetadataMPT, type GgufMetadataGPTNeoX, type GgufMetadataGPTJ, type GgufMetadataGPT2,
-    type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, type GgufMetadataRWKV, isGgufMetadataOfArchitectureType
+    type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, isGgufMetadataOfArchitectureType
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
 
@@ -238,7 +238,6 @@ export {
     type GgufMetadataBloom,
     type GgufMetadataFalcon,
     type GgufMetadataMamba,
-    type GgufMetadataRWKV,
     GgmlType,
     isGgufMetadataOfArchitectureType,
     GgufInsights,

@@ -1,31 +1,44 @@
 export const enum GgufArchitectureType {
     llama = "llama",
     falcon = "falcon",
+    grok = "grok",
     gpt2 = "gpt2",
     gptj = "gptj",
     gptneox = "gptneox",
     mpt = "mpt",
     baichuan = "baichuan",
     starcoder = "starcoder",
-    persimmon = "persimmon",
     refact = "refact",
     bert = "bert",
     nomicBert = "nomic-bert",
+    jinaBertV2 = "jina-bert-v2",
     bloom = "bloom",
     stablelm = "stablelm",
     qwen = "qwen",
     qwen2 = "qwen2",
+    qwen2moe = "qwen2moe",
     phi2 = "phi2",
+    phi3 = "phi3",
     plamo = "plamo",
     codeshell = "codeshell",
     orion = "orion",
     internlm2 = "internlm2",
     minicpm = "minicpm",
     gemma = "gemma",
+    gemma2 = "gemma2",
     starcoder2 = "starcoder2",
     mamba = "mamba",
+    xverse = "xverse",
     commandR = "command-r",
-    rwkv = "rwkv"
+    dbrx = "dbrx",
+    olmo = "olmo",
+    openelm = "openelm",
+    arctic = "arctic",
+    deepseek2 = "deepseek2",
+    bitnet = "bitnet",
+    t5 = "t5",
+    jais = "jais",
+    unknown = "(unknown)"
 }
 
 export type GgufMetadata<A extends GgufArchitectureType = GgufArchitectureType> = {
@@ -53,8 +66,7 @@ export type GgufMetadataLlmToType = {
     [GgufArchitectureType.gpt2]: GgufMetadataGPT2,
     [GgufArchitectureType.bloom]: GgufMetadataBloom,
     [GgufArchitectureType.falcon]: GgufMetadataFalcon,
-    [GgufArchitectureType.mamba]: GgufMetadataMamba,
-    [GgufArchitectureType.rwkv]: GgufMetadataRWKV
+    [GgufArchitectureType.mamba]: GgufMetadataMamba
 };
 
 // source: `enum llama_ftype` in `llama.h` in the `llama.cpp` source code
@@ -413,15 +425,6 @@ export type GgufMetadataMamba = {
     readonly attention: {
         readonly layer_norm_rms_epsilon: number
     }
-};
-
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#rwkv
-export type GgufMetadataRWKV = {
-    readonly architecture_version: 4 | number,
-    readonly context_length: number,
-    readonly block_count: number,
-    readonly embedding_length: number,
-    readonly feed_forward_length: number
 };
 
 export function isGgufMetadataOfArchitectureType<A extends GgufArchitectureType>(

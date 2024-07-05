@@ -20,6 +20,7 @@ export type BindingModule = {
             contextSize?: number,
             batchSize?: number,
             sequences?: number,
+            flashAttention?: boolean,
             logitsAll?: boolean,
             embeddings?: boolean,
             threads?: number

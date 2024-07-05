@@ -30,6 +30,7 @@ type InfillCommand = {
     suffixFile?: string,
     contextSize?: number,
     batchSize?: number,
+    flashAttention?: boolean,
     threads: number,
     temperature: number,
     minP: number,
@@ -113,6 +114,12 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 alias: "b",
                 type: "number",
                 description: "Batch size to use for the model context. The default value is the context size"
+            })
+            .option("flashAttention", {
+                alias: "fa",
+                type: "boolean",
+                default: false,
+                description: "Enable flash attention"
             })
             .option("threads", {
                 type: "number",
@@ -204,14 +211,14 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
-        threads, temperature, minP, topK,
+        flashAttention, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
         debug, meter, printTimings
     }) {
         try {
             await RunInfill({
-                modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
+                modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
                 threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 debug, meter, printTimings
@@ -226,7 +233,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 
 async function RunInfill({
-    modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
     threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
@@ -300,6 +307,7 @@ async function RunInfill({
                     : contextSize != null
                         ? {fitContext: {contextSize}}
                         : undefined,
+                defaultContextFlashAttention: flashAttention,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
