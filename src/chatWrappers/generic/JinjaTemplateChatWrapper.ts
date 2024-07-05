@@ -9,8 +9,20 @@ import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate
 
 export type JinjaTemplateChatWrapperOptions = {
     template: string,
+
+    /**
+     * Defaults to `"assistant"`.
+     */
     modelRoleName?: string,
+
+    /**
+     * Defaults to `"user"`.
+     */
     userRoleName?: string,
+
+    /**
+     * Defaults to `"system"`.
+     */
     systemRoleName?: string,
 
     /**
