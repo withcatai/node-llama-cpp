@@ -108,20 +108,6 @@ static void adjustNapiExternalMemorySubtract(Napi::Env env, uint64_t size) {
     }
 }
 
-std::string addon_model_token_to_piece(const struct llama_model* model, llama_token token, bool specialTokens) {
-    std::vector<char> result(8, 0);
-    const int n_tokens = llama_token_to_piece(model, token, result.data(), result.size(), specialTokens);
-    if (n_tokens < 0) {
-        result.resize(-n_tokens);
-        int check = llama_token_to_piece(model, token, result.data(), result.size(), specialTokens);
-        GGML_ASSERT(check == -n_tokens);
-    } else {
-        result.resize(n_tokens);
-    }
-
-    return std::string(result.data(), result.size());
-}
-
 #ifdef GPU_INFO_USE_CUDA
 void logCudaError(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
@@ -395,21 +381,18 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
                 ? info[1].As<Napi::Boolean>().Value()
                 : false;
 
-            // Create a stringstream for accumulating the decoded string.
-            std::stringstream ss;
+            std::vector<char> result(8, 0);
+            const int n_length = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), result.data(), result.size(), false, decodeSpecialTokens);
 
-            // Decode each token and accumulate the result.
-            for (size_t i = 0; i < tokens.ElementLength(); i++) {
-                const std::string piece = addon_model_token_to_piece(model, (llama_token)tokens[i], decodeSpecialTokens);
-
-                if (piece.empty()) {
-                    continue;
-                }
-
-                ss << piece;
+            if (n_length < 0) {
+                result.resize(-n_length);
+                int check = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), result.data(), result.size(), false, decodeSpecialTokens);
+                GGML_ASSERT(check == -n_length);
+            } else {
+                result.resize(n_length);
             }
 
-            return Napi::String::New(info.Env(), ss.str());
+            return Napi::String::New(info.Env(), result.data(), result.size());
         }
 
         Napi::Value GetTrainContextSize(const Napi::CallbackInfo& info) {
