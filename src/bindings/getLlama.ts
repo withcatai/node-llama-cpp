@@ -16,7 +16,7 @@ import {
 } from "./utils/compileLLamaCpp.js";
 import {getLastBuildInfo} from "./utils/lastBuildInfo.js";
 import {getClonedLlamaCppRepoReleaseInfo, isLlamaCppRepoCloned} from "./utils/cloneLlamaCppRepo.js";
-import {BuildGpu, BuildMetadataFile, BuildOptions, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, BuildOptions, LlamaGpuType, LlamaLogLevel} from "./types.js";
 import {BinaryPlatform, getPlatform} from "./utils/getPlatform.js";
 import {getBuildFolderNameForBuildOptions} from "./utils/getBuildFolderNameForBuildOptions.js";
 import {resolveCustomCmakeOptions} from "./utils/resolveCustomCmakeOptions.js";
@@ -46,7 +46,10 @@ export type LlamaOptions = {
      *
      * `"auto"` by default.
      */
-    gpu?: "auto" | "metal" | "cuda" | "vulkan" | false,
+    gpu?: "auto" | LlamaGpuType | {
+        type: "auto",
+        exclude?: LlamaGpuType[]
+    },
 
     /**
      * Set the minimum log level for llama.cpp.
@@ -297,6 +300,9 @@ export async function getLlamaForOptions({
             shouldLogNoGlibcWarningIfNoBuildIsAvailable = true;
         }
     }
+
+    if (buildGpusToTry.length === 0)
+        throw new Error("No GPU types available to try building with");
 
     if (build === "auto" || build === "never") {
         for (let i = 0; i < buildGpusToTry.length; i++) {
