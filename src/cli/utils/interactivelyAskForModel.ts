@@ -56,12 +56,14 @@ export async function interactivelyAskForModel({
     llama,
     modelsDirectory,
     allowLocalModels = true,
-    downloadIntent = true
+    downloadIntent = true,
+    flashAttention = false
 }: {
     llama: Llama,
     modelsDirectory?: string,
     allowLocalModels?: boolean,
-    downloadIntent?: boolean
+    downloadIntent?: boolean,
+    flashAttention?: boolean
 }): Promise<string> {
     let localModelFileOptions: (ModelOption & { type: "localModel" })[] = [];
     const recommendedModelOptions: (ModelOption & { type: "recommendedModel" })[] = [];
@@ -112,7 +114,9 @@ export async function interactivelyAskForModel({
                         readItems++;
                         progressUpdater.setProgress(readItems / ggufFileNames.length, renderProgress());
 
-                        const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility();
+                        const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
+                            flashAttention: flashAttention && ggufInsights?.flashAttentionSupported
+                        });
 
                         return {
                             type: "localModel",
@@ -211,7 +215,7 @@ export async function interactivelyAskForModel({
     try {
         // eslint-disable-next-line no-constant-condition
         while (true) {
-            const minWidth = Math.min(80, process.stdout.columns - 1);
+            const minWidth = Math.min(80 + (flashAttention ? 26 : 0), process.stdout.columns - 1);
             const selectedItem = await basicChooseFromListConsoleInteraction({
                 title(item, rerender) {
                     const title = chalk.bold("Select a model:") + "  ";
@@ -235,6 +239,17 @@ export async function interactivelyAskForModel({
                                 (String(Math.floor((vramState.used / vramState.total) * 100 * 100) / 100) + "%") + " " +
                                 chalk.dim("(" + bytes(vramState.used) + "/" + bytes(vramState.total) + ")") +
                                 " "
+                            ) + (
+                                !flashAttention
+                                    ? ""
+                                    : (
+                                        " " +
+                                        chalk.bgGray(
+                                            " " +
+                                            chalk.yellow("Flash attention:") + " " + "enabled" +
+                                            " "
+                                        )
+                                    )
                             )
                         );
 
@@ -273,7 +288,7 @@ export async function interactivelyAskForModel({
                 },
                 items: options,
                 renderItem(item, focused, rerender) {
-                    return renderSelectionItem(item, focused, rerender, activeInteractionController.signal, llama);
+                    return renderSelectionItem(item, focused, rerender, activeInteractionController.signal, llama, flashAttention);
                 },
                 canFocusItem(item) {
                     return item.type === "recommendedModel" || item.type === "localModel" || item.type === "action";
@@ -374,7 +389,9 @@ async function askForModelUrlOrPath(allowLocalModels: boolean): Promise<string |
     );
 }
 
-function renderSelectionItem(item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama) {
+function renderSelectionItem(
+    item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean
+) {
     if (item.type === "localModel") {
         let modelText = item.title instanceof Function
             ? item.title()
@@ -398,7 +415,8 @@ function renderSelectionItem(item: ModelOption, focused: boolean, rerender: () =
                     recommendedModelOption: item,
                     abortSignal,
                     rerenderOption: rerender,
-                    llama
+                    llama,
+                    flashAttention
                 });
             }
 
@@ -542,12 +560,13 @@ function renderCompatibilityPercentageWithColors(percentage: number, {
 }
 
 async function selectFileForModelRecommendation({
-    recommendedModelOption, llama, abortSignal, rerenderOption
+    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention
 }: {
     recommendedModelOption: ModelOption & { type: "recommendedModel" },
     llama: Llama,
     abortSignal: AbortSignal,
-    rerenderOption(): void
+    rerenderOption(): void,
+    flashAttention: boolean
 }) {
     try {
         let bestScore: number | undefined = undefined;
@@ -567,7 +586,9 @@ async function selectFileForModelRecommendation({
                 if (abortSignal.aborted)
                     return;
 
-                const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility();
+                const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
+                    flashAttention
+                });
 
                 if (bestScore == null || compatibilityScore.compatibilityScore > bestScore) {
                     bestScore = compatibilityScore.compatibilityScore;

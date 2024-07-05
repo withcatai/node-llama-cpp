@@ -326,7 +326,9 @@ async function RunChat({
         });
     const logBatchSize = batchSize != null;
 
-    const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers);
+    const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
+        flashAttention
+    });
 
     if (systemInfo)
         console.log(llama.systemInfo);
