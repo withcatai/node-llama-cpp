@@ -84,6 +84,26 @@ export class GgufInsights {
         return this._modelSize;
     }
 
+    public get flashAttentionSupported() {
+        // source: `llama_new_context_with_model` in `llama.cpp`
+
+        if (this._ggufFileInfo.metadata?.general?.architecture === GgufArchitectureType.grok)
+            return false;
+        else if (this._ggufFileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2)
+            return false;
+        else {
+            const nHead = this._ggufFileInfo.architectureMetadata?.attention?.head_count ?? 0;
+            const nEmbd = this._ggufFileInfo.architectureMetadata?.embedding_length ?? 0;
+            const nEmbdHeadK = this._ggufFileInfo.architectureMetadata?.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
+            const nEmbdHeadV = this._ggufFileInfo.architectureMetadata?.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+
+            if (nEmbdHeadK !== nEmbdHeadV)
+                return false;
+        }
+
+        return true;
+    }
+
     public estimateModelResourceRequirements({gpuLayers}: {gpuLayers: number}): GgufInsightsResourceRequirements {
         const {cpu, gpu} = this._getTensorResourceSplit(gpuLayers);
 
@@ -99,10 +119,10 @@ export class GgufInsights {
      * The estimation for the graph overhead memory will be improved in the future to be more precise, but it's good enough for now.
      */
     public estimateContextResourceRequirements({
-        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true
+        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false
     }: {
         contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        includeGraphOverhead?: boolean
+        flashAttention?: boolean, includeGraphOverhead?: boolean
     }): GgufInsightsResourceRequirements {
         if (sequences == null) sequences = getDefaultContextSequences();
         if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
@@ -261,7 +281,7 @@ export class GgufInsights {
             return (totalElements * 77.655 * (actualContextSize / 4096)) + defaultCalculationAdjustment;
         };
 
-        const graphOverheadMemory = !includeGraphOverhead
+        const graphOverheadMemory = (flashAttention || !includeGraphOverhead)
             ? 0
             : estimateGraphOverheadMemory();
 

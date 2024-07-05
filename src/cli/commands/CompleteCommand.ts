@@ -28,6 +28,7 @@ type CompleteCommand = {
     textFile?: string,
     contextSize?: number,
     batchSize?: number,
+    flashAttention?: boolean,
     threads: number,
     temperature: number,
     minP: number,
@@ -103,6 +104,12 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 alias: "b",
                 type: "number",
                 description: "Batch size to use for the model context. The default value is the context size"
+            })
+            .option("flashAttention", {
+                alias: "fa",
+                type: "boolean",
+                default: false,
+                description: "Enable flash attention"
             })
             .option("threads", {
                 type: "number",
@@ -194,14 +201,14 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
-        threads, temperature, minP, topK,
+        flashAttention, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
         debug, meter, printTimings
     }) {
         try {
             await RunCompletion({
-                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
+                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
                 threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 debug, meter, printTimings
@@ -216,7 +223,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
 
 
 async function RunCompletion({
-    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize,
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
     threads, temperature, minP, topK, topP, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
@@ -276,6 +283,7 @@ async function RunCompletion({
                     : contextSize != null
                         ? {fitContext: {contextSize}}
                         : undefined,
+                defaultContextFlashAttention: flashAttention,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);

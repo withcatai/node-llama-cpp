@@ -2,7 +2,9 @@ import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
 import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/getLlama.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
-import {LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType} from "./bindings/types.js";
+import {
+    type LlamaGpuType, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType
+} from "./bindings/types.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
 import {TokenAttributes} from "./evaluator/LlamaModel/utils/TokenAttributes.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./evaluator/LlamaGrammar.js";
@@ -84,7 +86,7 @@ import {
     type GgufMetadata, type GgufMetadataLlmToType, GgufArchitectureType, GgufFileType, GgufMetadataTokenizerTokenType,
     GgufMetadataArchitecturePoolingType, type GgufMetadataGeneral, type GgufMetadataTokenizer, type GgufMetadataDefaultArchitectureType,
     type GgufMetadataLlmLLaMA, type GgufMetadataMPT, type GgufMetadataGPTNeoX, type GgufMetadataGPTJ, type GgufMetadataGPT2,
-    type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, type GgufMetadataRWKV, isGgufMetadataOfArchitectureType
+    type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, isGgufMetadataOfArchitectureType
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
 
@@ -94,6 +96,7 @@ export {
     getLlama,
     type LlamaOptions,
     type LastBuildOptions,
+    type LlamaGpuType,
     LlamaLogLevel,
     NoBinaryFoundError,
     LlamaModel,
@@ -238,7 +241,6 @@ export {
     type GgufMetadataBloom,
     type GgufMetadataFalcon,
     type GgufMetadataMamba,
-    type GgufMetadataRWKV,
     GgmlType,
     isGgufMetadataOfArchitectureType,
     GgufInsights,

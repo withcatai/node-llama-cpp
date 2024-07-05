@@ -1,7 +1,7 @@
-import {DisposeAggregator, EventRelay, withLock, DisposedError, AsyncDisposeAggregator} from "lifecycle-utils";
+import {AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
-import {BatchLogitIndex, AddonContext} from "../../bindings/AddonTypes.js";
+import {AddonContext, BatchLogitIndex} from "../../bindings/AddonTypes.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
@@ -25,6 +25,7 @@ export class LlamaContext {
     /** @internal */ private readonly _model: LlamaModel;
     /** @internal */ private readonly _contextSize: number;
     /** @internal */ private readonly _batchSize: number;
+    /** @internal */ private readonly _flashAttention: boolean;
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
@@ -50,6 +51,7 @@ export class LlamaContext {
         seed = null,
         contextSize,
         batchSize,
+        flashAttention = _model.defaultContextFlashAttention,
         threads = 6,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
@@ -60,7 +62,8 @@ export class LlamaContext {
     }: LlamaContextOptions & {
         sequences: number,
         contextSize: number,
-        batchSize: number
+        batchSize: number,
+        flashAttention: boolean
     }) {
         if (_model.disposed)
             throw new DisposedError();
@@ -72,11 +75,13 @@ export class LlamaContext {
         this._totalSequences = Math.max(1, Math.floor(sequences));
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
+        this._flashAttention = flashAttention;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             sequences: this._totalSequences,
+            flashAttention: this._flashAttention,
             threads: Math.max(0, Math.floor(threads)),
             embeddings: _embeddings,
             noSeed: _noSeed
@@ -134,6 +139,10 @@ export class LlamaContext {
 
     public get batchSize(): number {
         return this._batchSize;
+    }
+
+    public get flashAttention(): boolean {
+        return this._flashAttention;
     }
 
     /**
@@ -541,11 +550,15 @@ export class LlamaContext {
         _model: LlamaModel
     }): Promise<LlamaContext> {
         const sequences = options.sequences ?? getDefaultContextSequences();
+        const flashAttention = _model.flashAttentionSupported
+            ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
+            : false;
         const contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,
             modelGpuLayers: _model.gpuLayers,
             modelTrainContextSize: _model.trainContextSize,
+            flashAttention,
             getVramState: () => _model._llama._vramOrchestrator.getMemoryState(),
             llamaGpu: _model._llama.gpu,
             ignoreMemorySafetyChecks: options.ignoreMemorySafetyChecks,
@@ -557,10 +570,11 @@ export class LlamaContext {
             sequences,
             isEmbeddingContext: options._embeddings,
             modelGpuLayers: _model.gpuLayers,
-            batchSize
+            batchSize,
+            flashAttention
         }).gpuVram;
 
-        const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences});
+        const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
         const {createSignal} = options;
         const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
             ? null

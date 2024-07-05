@@ -41,6 +41,7 @@ type ChatCommand = {
     noJinja?: boolean,
     contextSize?: number,
     batchSize?: number,
+    flashAttention?: boolean,
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
@@ -148,6 +149,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: "b",
                 type: "number",
                 description: "Batch size to use for the model context. The default value is the context size"
+            })
+            .option("flashAttention", {
+                alias: "fa",
+                type: "boolean",
+                default: false,
+                description: "Enable flash attention"
             })
             .option("noTrimWhitespace", {
                 type: "boolean",
@@ -269,7 +276,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
-        promptFile, wrapper, noJinja, contextSize, batchSize,
+        promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
@@ -278,9 +285,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, gpuLayers,
-                lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                noHistory, environmentFunctions, debug, meter, printTimings
+                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP,
+                gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
+                maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -293,9 +300,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
-    contextSize, batchSize, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath, threads, temperature,
-    minP, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty,
-    repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
+    contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
+    threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
+    repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -360,6 +367,7 @@ async function RunChat({
                     : contextSize != null
                         ? {fitContext: {contextSize}}
                         : undefined,
+                defaultContextFlashAttention: flashAttention,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);

@@ -35,10 +35,12 @@ export class GgufInsightsConfigurationResolver {
      */
     public async scoreModelConfigurationCompatibility({
         contextSize = Math.min(4096, this._ggufInsights.trainContextSize ?? 4096),
-        embeddingContext = false
+        embeddingContext = false,
+        flashAttention = false
     }: {
         contextSize?: number,
-        embeddingContext?: boolean
+        embeddingContext?: boolean,
+        flashAttention?: boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => ({total: os.totalmem(), free: os.freemem()})),
@@ -117,7 +119,8 @@ export class GgufInsightsConfigurationResolver {
         const estimatedContextResourceUsage = this._ggufInsights.estimateContextResourceRequirements({
             contextSize: resolvedContextSize,
             isEmbeddingContext: embeddingContext,
-            modelGpuLayers: resolvedGpuLayers
+            modelGpuLayers: resolvedGpuLayers,
+            flashAttention
         });
 
         const rankPoints = {
@@ -184,10 +187,11 @@ export class GgufInsightsConfigurationResolver {
         ignoreMemorySafetyChecks = false,
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize, llamaGpu = this._ggufInsights._llama.gpu,
-        llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading
+        llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading,
+        defaultContextFlashAttention = false
     }: {
         ignoreMemorySafetyChecks?: boolean, getVramState?(): Promise<{total: number, free: number}>,
-        llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean
+        llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: boolean
     } = {}) {
         return resolveModelGpuLayersOption(gpuLayers, {
             ggufInsights: this._ggufInsights,
@@ -195,7 +199,8 @@ export class GgufInsightsConfigurationResolver {
             getVramState,
             llamaVramPaddingSize,
             llamaGpu,
-            llamaSupportsGpuOffloading
+            llamaSupportsGpuOffloading,
+            defaultContextFlashAttention
         });
     }
 
@@ -203,6 +208,7 @@ export class GgufInsightsConfigurationResolver {
         modelGpuLayers,
         batchSize,
         modelTrainContextSize,
+        flashAttention = false,
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         llamaGpu = this._ggufInsights._llama.gpu,
         ignoreMemorySafetyChecks = false,
@@ -211,6 +217,7 @@ export class GgufInsightsConfigurationResolver {
     }: {
         modelGpuLayers: number,
         modelTrainContextSize: number,
+        flashAttention?: boolean,
         batchSize?: LlamaContextOptions["batchSize"],
         sequences?: number,
         getVramState?(): Promise<{total: number, free: number}>,
@@ -225,6 +232,7 @@ export class GgufInsightsConfigurationResolver {
             modelFileInsights: this._ggufInsights,
             modelGpuLayers,
             modelTrainContextSize,
+            flashAttention,
             getVramState,
             llamaGpu,
             ignoreMemorySafetyChecks,

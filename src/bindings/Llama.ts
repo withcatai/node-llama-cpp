@@ -7,7 +7,7 @@ import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
 import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaLocks, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
@@ -31,7 +31,7 @@ export class Llama {
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _vramPadding: MemoryReservation;
     /** @internal */ public readonly _debug: boolean;
-    /** @internal */ private readonly _gpu: BuildGpu;
+    /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
@@ -244,7 +244,10 @@ export class Llama {
         await this._bindings.init();
     }
 
-    /** @internal */
+    /**
+     * Log messages related to the Llama instance
+     * @internal
+     */
     public _log(level: LlamaLogLevel, message: string) {
         this._onAddonLog(LlamaLogLevelToAddonLogLevel.get(level) ?? defaultLogLevel, message + "\n");
     }

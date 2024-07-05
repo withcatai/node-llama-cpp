@@ -987,6 +987,10 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
                     context_params.embeddings = options.Get("embeddings").As<Napi::Boolean>().Value();
                 }
 
+                if (options.Has("flashAttention")) {
+                    context_params.flash_attn = options.Get("flashAttention").As<Napi::Boolean>().Value();
+                }
+
                 if (options.Has("threads")) {
                     const auto n_threads = options.Get("threads").As<Napi::Number>().Uint32Value();
                     const auto resolved_n_threads = n_threads == 0 ? std::thread::hardware_concurrency() : n_threads;

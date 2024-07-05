@@ -15,6 +15,7 @@ import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {LlamaContextOptions} from "../LlamaContext/types.js";
 import {LlamaContext} from "../LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
+import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
@@ -107,6 +108,27 @@ export type LlamaModelOptions = {
     },
 
     /**
+     * Enable flash attention by default for contexts created with this model.
+     * Only works with models that support flash attention.
+     *
+     * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
+     *
+     * The support for flash attention is currently experimental and may not always work as expected.
+     * Use with caution.
+     *
+     * This option will be ignored if flash attention is not supported by the model.
+     *
+     * Enabling this affects the calculations of default values for the model and contexts created with it
+     * as flash attention reduces the amount of memory required,
+     * which allows for more layers to be offloaded to the GPU and for context sizes to be bigger.
+     *
+     * Defaults to `false`.
+     *
+     * Upon flash attention exiting the experimental status, the default value will become `true`.
+     */
+    defaultContextFlashAttention?: boolean,
+
+    /**
      * Called with the load percentage when the model is being loaded.
      * > **Note:** This progress does not include the progress of loading the provided LoRA adapters (when `lora` is used)
      * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
@@ -128,6 +150,7 @@ export type LlamaModelOptions = {
 const defaultLoraThreads = 6;
 const defaultLoraScale = 1;
 const defaultUseMmap = true;
+const defaultContextFlashAttentionEnabled = false;
 
 export class LlamaModel {
     /** @internal */ public readonly _llama: Llama;
@@ -142,6 +165,9 @@ export class LlamaModel {
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _llamaPreventDisposalHandle: DisposalPreventionHandle;
+    /** @internal */ private readonly _defaultContextFlashAttentionOptionEnabled: boolean;
+    /** @internal */ private readonly _defaultContextFlashAttention: boolean;
+    /** @internal */ private readonly _flashAttentionSupported: boolean;
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
@@ -157,11 +183,17 @@ export class LlamaModel {
     }, {
         _llama,
         _fileInfo,
-        _fileInsights
+        _fileInsights,
+        _defaultContextFlashAttentionOptionEnabled,
+        _defaultContextFlashAttention,
+        _flashAttentionSupported
     }: {
         _llama: Llama,
         _fileInfo: GgufFileInfo,
-        _fileInsights: GgufInsights
+        _fileInsights: GgufInsights,
+        _defaultContextFlashAttentionOptionEnabled: boolean,
+        _defaultContextFlashAttention: boolean,
+        _flashAttentionSupported: boolean
     }) {
         this._llama = _llama;
         this._fileInfo = _fileInfo;
@@ -170,6 +202,9 @@ export class LlamaModel {
         this._gpuLayers = gpuLayers;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
+        this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
+        this._defaultContextFlashAttention = _defaultContextFlashAttention;
+        this._flashAttentionSupported = _flashAttentionSupported;
         this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
             addonExports: this._llama._bindings,
             gpuLayers,
@@ -268,6 +303,14 @@ export class LlamaModel {
         this._ensureNotDisposed();
 
         return this._model.getModelSize();
+    }
+
+    public get flashAttentionSupported() {
+        return this._flashAttentionSupported;
+    }
+
+    public get defaultContextFlashAttention() {
+        return this._defaultContextFlashAttention;
     }
 
     /**
@@ -485,6 +528,26 @@ export class LlamaModel {
             // do nothing
         }
 
+        try {
+            if (this._defaultContextFlashAttentionOptionEnabled && !this._flashAttentionSupported) {
+                if (this.fileInfo.metadata?.general?.architecture === GgufArchitectureType.grok)
+                    warnings.push("Flash attention is incompatible with Grok and thus was turned off");
+                else if (this.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2)
+                    warnings.push("Flash attention is incompatible with Gemma2 and thus was turned off");
+                else {
+                    const nHead = this.fileInfo.architectureMetadata?.attention?.head_count ?? 0;
+                    const nEmbd = this.fileInfo.architectureMetadata?.embedding_length ?? 0;
+                    const nEmbdHeadK = this.fileInfo.architectureMetadata?.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
+                    const nEmbdHeadV = this.fileInfo.architectureMetadata?.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+
+                    if (nEmbdHeadK !== nEmbdHeadV)
+                        warnings.push("Flash attention is incompatible with this model and thus was turned off");
+                }
+            }
+        } catch (err) {
+            // do nothing
+        }
+
         return warnings;
     }
 
@@ -562,7 +625,7 @@ export class LlamaModel {
     }: {
         _llama: Llama
     }) {
-        const {loadSignal} = modelOptions;
+        const {loadSignal, defaultContextFlashAttention} = modelOptions;
         let useMmap = modelOptions.useMmap ?? defaultUseMmap;
         const loraOptions: LlamaModelOptions["lora"] = typeof modelOptions.lora === "string"
             ? {adapters: [{loraFilePath: modelOptions.lora}]}
@@ -576,12 +639,24 @@ export class LlamaModel {
             signal: loadSignal
         });
         const ggufInsights = await GgufInsights.from(fileInfo, _llama);
+        const flashAttentionSupported = ggufInsights.flashAttentionSupported;
+        const resolvedDefaultContextFlashAttention = flashAttentionSupported
+            ? (defaultContextFlashAttention ?? defaultContextFlashAttentionEnabled)
+            : false;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
-            ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks
+            ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
+            defaultContextFlashAttention: resolvedDefaultContextFlashAttention
         });
         const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;
 
-        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {_fileInfo: fileInfo, _fileInsights: ggufInsights, _llama});
+        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
+            _fileInfo: fileInfo,
+            _fileInsights: ggufInsights,
+            _llama,
+            _defaultContextFlashAttentionOptionEnabled: defaultContextFlashAttention ?? false,
+            _flashAttentionSupported: flashAttentionSupported,
+            _defaultContextFlashAttention: resolvedDefaultContextFlashAttention
+        });
         const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
             : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
