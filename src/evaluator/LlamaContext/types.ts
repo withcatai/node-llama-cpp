@@ -48,10 +48,10 @@ export type LlamaContextOptions = {
      *
      * This option will be ignored if flash attention is not supported by the model.
      *
-     * Defaults to `false` (inherited from the model option `defaultFlashAttention`).
+     * Defaults to `false` (inherited from the model option `defaultContextFlashAttention`).
      *
      * Upon flash attention exiting the experimental status, the default value will become `true`
-     * (the inherited value from the model option `defaultFlashAttention` will become `true`).
+     * (the inherited value from the model option `defaultContextFlashAttention` will become `true`).
      */
     flashAttention?: boolean,
 
