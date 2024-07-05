@@ -91,7 +91,6 @@ getElectronExampleAppDownloadLink()
 <style scoped>
 .content {
     margin-top: calc(96px * 1.5);
-    margin-bottom: 96px;
     display: flex;
     flex-direction: column;
 
