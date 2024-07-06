@@ -140,6 +140,59 @@ describe("llama 3", () => {
 
             expect(res2.length).to.be.greaterThan(1);
         });
+
+        test("Compare fruit prices", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+
+            const context = await model.createContext({
+                contextSize: 4096
+            });
+            const chatSession = new LlamaChatSession({
+                contextSequence: context.getSequence()
+            });
+
+            const fruitPrices: Record<string, string> = {
+                "apple": "$6",
+                "banana": "$4"
+            };
+
+            const promptOptions: Parameters<typeof chatSession.prompt>[1] = {
+                functions: {
+                    getFruitPrice: defineChatSessionFunction({
+                        description: "Get the price of a fruit",
+                        params: {
+                            type: "object",
+                            properties: {
+                                name: {
+                                    type: "string"
+                                }
+                            }
+                        },
+                        async handler(params) {
+                            const name = params.name.toLowerCase();
+                            if (Object.hasOwn(fruitPrices, name))
+                                return {
+                                    name: name,
+                                    price: fruitPrices[name]
+                                };
+
+                            return `Fruit "${params.name}" is not recognized`;
+                        }
+                    })
+                }
+            } as const;
+
+            const res = await chatSession.prompt("Is an apple more expensive than a banana?", promptOptions);
+
+            expect(res).to.be.eq(
+                "I'd be happy to help you with that!  Based on the prices I just retrieved, it seems that an apple is indeed more expensive than a banana. The price of an apple is $6, while the price of a banana is $4."
+            );
+        });
     });
 
     describe("functions and grammar", () => {

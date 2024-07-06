@@ -244,7 +244,7 @@ const fruitPrices: Record<string, string> = {
 };
 const functions = {
     getFruitPrice: defineChatSessionFunction({
-        description: "Get price of a fruit",
+        description: "Get the price of a fruit",
         params: {
             type: "object",
             properties: {
