@@ -62,7 +62,7 @@ export type ModelDownloaderOptions = {
  * If the url points to a `.gguf` file that is split into multiple parts (for example, `model-00001-of-00009.gguf`),
  * all the parts will be downloaded to the specified directory.
  *
- * If the url points to a `.gguf` file that is binary spliced into multiple parts (for example, `model.gguf.part1of9`),
+ * If the url points to a `.gguf` file that is binary split into multiple parts (for example, `model.gguf.part1of9`),
  * all the parts will be spliced into a single file and be downloaded to the specified directory.
  *
  * If the url points to a `.gguf` file that is not split or binary spliced (for example, `model.gguf`),
