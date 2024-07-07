@@ -28,7 +28,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
                 functions: {
                     call: {
                         optionalPrefixSpace: true,
-                        prefix: "||call:",
+                        prefix: "||call: ",
                         paramsPrefix: LlamaText(new SpecialTokensText("(")),
                         suffix: LlamaText(new SpecialTokensText(")"))
                     },
@@ -56,7 +56,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
                 functions: {
                     call: {
                         optionalPrefixSpace: true,
-                        prefix: "||call:",
+                        prefix: "||call: ",
                         paramsPrefix: LlamaText(new SpecialTokensText("(")),
                         suffix: LlamaText(new SpecialTokensText(")"))
                     },
