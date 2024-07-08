@@ -12,9 +12,9 @@ import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
-    targetDirectory = cliModelsDirectory
+    targetDirectory = cliModelsDirectory, flashAttention = false
 }: {
-    targetDirectory?: string
+    targetDirectory?: string, flashAttention?: boolean
 } = {}) {
     let resolvedGgufPath = ggufPath;
 
@@ -23,7 +23,8 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             llama,
             modelsDirectory: targetDirectory,
             allowLocalModels: true,
-            downloadIntent: true
+            downloadIntent: true,
+            flashAttention
         });
 
     if (!isUrl(resolvedGgufPath)) {
