@@ -430,6 +430,8 @@ jobs:
         run: npx --no vite-node ./scripts/prepareStandalonePrebuiltBinaryModules.ts
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
+      - name: Resolve next release
+        run: npx --no vite-node ./scripts/resolveNextReleaseVersion.ts --saveToFile ./semanticReleaseDryRunResult.json
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -437,6 +439,7 @@ jobs:
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+          export DRY_RUN_RESULT="$(cat ./semanticReleaseDryRunResult.json)"
           
           npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
