@@ -283,6 +283,43 @@ jobs:
           name: "bins-${{ matrix.config.artifact }}"
           path: "bins/*"
 
+  resolve-next-release:
+    name: Resolve next release
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: read
+      id-token: read
+      contents: read
+      issues: read
+      pull-requests: read
+      discussions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci
+      - name: Resolve next release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --no vite-node ./scripts/resolveNextReleaseVersion.ts --saveReleaseToFile ./semanticReleaseDryRunReleaseResult.json --saveVersionToFile ./resolvedNextVersion.txt
+      - name: Save next version output
+        run: echo "next-version=$(cat ./resolvedNextVersion.txt)" >> $GITHUB_ENV
+      - name: Update job summary
+        run: |
+          if [ "$(cat ./resolvedNextVersion.txt)" == "false" ]; then
+            echo "Next release version: `N/A`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Next release version: `$(cat ./resolvedNextVersion.txt)`" >> $GITHUB_STEP_SUMMARY
+          fi
+      - name: Upload resolved release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "resolved-next-release"
+          path: "./semanticReleaseDryRunReleaseResult.json"
+
   standalone-tests:
     name: Standalone tests
     runs-on: ubuntu-22.04
@@ -371,7 +408,7 @@ jobs:
 
   release:
     name: Release
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta')
+    if: needs.resolve-next-release.outputs.next-version != '' && needs.resolve-next-release.outputs.next-version != 'false'
     runs-on: ubuntu-latest
     concurrency: release-${{ github.ref }}
     environment:
@@ -385,6 +422,7 @@ jobs:
       pull-requests: write
       discussions: write
     needs:
+      - resolve-next-release
       - build
       - build-binaries
     outputs:
@@ -430,8 +468,8 @@ jobs:
         run: npx --no vite-node ./scripts/prepareStandalonePrebuiltBinaryModules.ts
       - name: Add "postinstall" script to package.json
         run: npm run addPostinstallScript
-      - name: Resolve next release
-        run: npx --no vite-node ./scripts/resolveNextReleaseVersion.ts --saveToFile ./semanticReleaseDryRunResult.json
+      - name: Move semanticReleaseDryRunReleaseResult.json artifact
+        run: mv artifacts/resolved-next-release/semanticReleaseDryRunReleaseResult.json ./semanticReleaseDryRunReleaseResult.json
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -439,7 +477,7 @@ jobs:
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
-          export DRY_RUN_RESULT="$(cat ./semanticReleaseDryRunResult.json)"
+          export DRY_RUN_RESULT="$(cat ./semanticReleaseDryRunReleaseResult.json)"
           
           npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
@@ -482,27 +520,20 @@ jobs:
           else
               npm publish
           fi
-      - name: Generate docs with updated version
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        env:
-          DOCS_URL_BASE: "/node-llama-cpp/"
-        run: |
-          export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
-          npm run docs:build
-      - name: Upload docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/upload-pages-artifact@v3
+
+  auto-approve-documentation-website-deployment:
+    name: Auto-approve documentation website deployment
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs:
+      - release
+    steps:
+      - name: Approve documentation website deployment
+        uses: activescott/automate-environment-deployment-approval@v1.0.6
         with:
-          name: pages-docs
-          path: docs-site
-      - name: Deploy docs to GitHub Pages
-        if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/deploy-pages@v4
-        with:
-          artifact_name: pages-docs
-      - name: Update feed
-        run: |
-          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://withcatai.github.io/node-llama-cpp/feed.atom"
+          github_token: ${{ secrets.AUTO_APPROVAL_GITHUB_TOKEN }}
+          environment_allow_list: "Documentation website"
+          actor_allow_list: giladgd
 
   build-electron-example:
     name: Build & release Electron app example - ${{ matrix.config.name }}
@@ -578,3 +609,75 @@ jobs:
           done
           
           shopt -u nullglob
+
+  update-documentation-website:
+    name: Update documentation website
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.build.result == 'success' &&
+      needs.resolve-next-release.result == 'success' &&
+      needs.resolve-next-release.outputs.next-version != '' && (
+        needs.resolve-next-release.outputs.next-version == 'false' ||
+        needs.release.result == 'skipped' || (
+          needs.release.result == 'success' &&
+          needs.release.outputs.package-version != ''
+        )
+      )
+    runs-on: ubuntu-latest
+    concurrency: update-documentation-website-${{ github.ref }}
+    environment:
+      name: Documentation website
+      url: "https://withcatai.github.io/node-llama-cpp/"
+    needs:
+      - build
+      - resolve-next-release
+      - release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci
+      - name: Move artifacts
+        run: |
+          mv artifacts/build dist/
+
+          rm -f ./llama/binariesGithubRelease.json
+          mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+
+          rm -f ./llama/llama.cpp.info.json
+          mv artifacts/llama.cpp/llama.cpp.info.json ./llama/llama.cpp.info.json
+      - name: Resolve docs version
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.package-version || needs.resolve-next-release.outputs.next-version }}
+        run: |
+          if [ "$RELEASE_VERSION" == "false" ]; then
+            npx --no vite-node ./scripts/resolveLatestReleaseVersion.ts --saveVersionToFile ./docsVersion.txt
+          else
+            echo "$RELEASE_VERSION" > ./docsVersion.txt
+          fi
+      - name: Generate docs with updated version
+        env:
+          DOCS_URL_BASE: "/node-llama-cpp/"
+        run: |
+          export DOCS_PACKAGE_VERSION="$(cat ./docsVersion.txt)"
+          echo "Package version: $DOCS_PACKAGE_VERSION"
+          
+          npm run docs:build
+      - name: Upload docs to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: pages-docs
+          path: docs-site
+      - name: Deploy docs to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: pages-docs
+      - name: Update feed
+        run: |
+          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://withcatai.github.io/node-llama-cpp/blog/feed.atom"
