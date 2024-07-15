@@ -15,7 +15,7 @@ export function BlogPageInfoPlugin({
         configResolved(config) {
             root = config.root ?? "";
         },
-        async transform(code, id, options) {
+        async transform(code, id) {
             if (!id.endsWith(".md"))
                 return code;
             else if (!include(id))
@@ -27,7 +27,7 @@ export function BlogPageInfoPlugin({
                 relativePath: id,
                 cleanUrls: true
             };
-            const md = markdownRenderer.render(code, mdEnv);
+            markdownRenderer.render(code, mdEnv);
             const {frontmatter = {}} = mdEnv;
 
             const frontmatterEndIndex = findFrontmatterEndIndex(code);

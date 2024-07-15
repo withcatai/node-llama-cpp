@@ -417,7 +417,6 @@ export default defineConfig({
         }
 
         async function addBlogRssFeed() {
-            const blogDirPath = path.join(siteConfig.srcDir, "blog");
             const feedFilePath = path.join(siteConfig.outDir, "blog", "feed.atom");
 
             const feed = new Feed({
@@ -455,7 +454,7 @@ export default defineConfig({
                 return bDate.getTime() - aDate.getTime();
             });
 
-            for (const {url, excerpt, frontmatter, html, src} of blogPosts) {
+            for (const {url, excerpt, frontmatter, html} of blogPosts) {
                 const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:imag");
                 const date = new Date(frontmatter.date);
                 if (Number.isNaN(date.getTime()))
