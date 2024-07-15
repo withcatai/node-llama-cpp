@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {withBase} from "vitepress";
 import {ref} from "vue";
 import {
     defaultDownloadElectronExampleAppLink,
@@ -33,7 +34,7 @@ getElectronExampleAppDownloadLink()
                     <p>Check out your hardware capabilities</p>
                     <div class="code">
                         <slot name="inspect-command" />
-                        <p><a class="learn-more" href="./cli/inspect/gpu">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
             </div>
@@ -52,7 +53,7 @@ getElectronExampleAppDownloadLink()
                     <p>Integrate <code>node-llama-cpp</code> in your codebase and prompt models</p>
                     <div class="code">
                         <slot name="simple-code" />
-                        <p><a class="learn-more" href="./cli/inspect/gpu">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
                 <div class="panel">
@@ -60,7 +61,7 @@ getElectronExampleAppDownloadLink()
                     <p>Get embedding for a given text</p>
                     <div class="code">
                         <slot name="simple-embedding" />
-                        <p><a class="learn-more" href="./cli/inspect/gpu">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
             </div>
@@ -72,7 +73,7 @@ getElectronExampleAppDownloadLink()
                     <p>Force a model response to follow your JSON schema</p>
                     <div class="code">
                         <slot name="json-schema" />
-                        <p><a class="learn-more" href="./cli/inspect/gpu">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
                 <div class="panel">
@@ -80,7 +81,7 @@ getElectronExampleAppDownloadLink()
                     <p>Let a model call functions to retrieve data or perform actions</p>
                     <div class="code">
                         <slot name="function-calling" />
-                        <p><a class="learn-more" href="./cli/inspect/gpu">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
             </div>
@@ -103,7 +104,7 @@ getElectronExampleAppDownloadLink()
             &:before {
                 content: "";
                 position: absolute;
-                inset: calc(-128px - 24px) var(--vp-offset, 0px);
+                inset: calc(-128px - 24px) var(--vp-offset, calc(-1 * (100vw - 100%) / 2));
                 display: block;
                 z-index: -1;
                 pointer-events: none;
@@ -165,7 +166,7 @@ getElectronExampleAppDownloadLink()
         .code {
             :global(.language-shell),
             :global(.language-TypeScript) {
-                //margin-inline-start: -24px;
+                /* margin-inline-start: -24px; */
 
                 :global(.lang) {
                     display: none;

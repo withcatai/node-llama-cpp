@@ -500,6 +500,9 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: pages-docs
+      - name: Update feed
+        run: |
+          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://withcatai.github.io/node-llama-cpp/feed.atom"
 
   build-electron-example:
     name: Build & release Electron app example - ${{ matrix.config.name }}

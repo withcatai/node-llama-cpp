@@ -20,18 +20,6 @@
         }
     </style>
     <defs>
-        <radialGradient
-            id="BgMaskRadialGradient"
-            cx="6880"
-            cy="4046"
-            r="9763"
-            gradientUnits="userSpaceOnUse"
-        >
-            <stop offset="0" stop-opacity="1" stop-color="white"/>
-            <stop offset=".48" stop-opacity=".18" stop-color="white"/>
-            <stop offset="0.82" stop-opacity="0" stop-color="white"/>
-            <stop offset="1" stop-opacity="0" stop-color="white"/>
-        </radialGradient>
         <linearGradient
             id="ThemeGradient"
             gradientTransform="rotate(18)"
@@ -42,42 +30,41 @@
         </linearGradient>
         <linearGradient
             id="BgGradient"
-            gradientTransform="rotate(-18)"
             gradientUnits="userSpaceOnUse"
-            x1="-512"
-            x2="9216"
-            y1="-2560"
-            y2="7168"
         >
-            <stop offset="0" stop-color="#faad5e"/>
-            <stop offset="1" stop-color="#bd44c5"/>
+            <stop offset="0" stop-color="black" stop-opacity="0.3"/>
+            <stop offset="0.6" stop-color="black" stop-opacity="0.25"/>
+            <stop offset="1" stop-color="black" stop-opacity="0"/>
         </linearGradient>
         <radialGradient id="LogoGlowGradient">
             <stop offset="0" stop-opacity="0.12" stop-color="white"/>
             <stop offset="0.6" stop-opacity="0.04" stop-color="white"/>
             <stop offset="1" stop-opacity="0" stop-color="white"/>
         </radialGradient>
+        <filter id="backgroundBlur" filterUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="16"/>
+        </filter>
     </defs>
     <rect id="background" x="0" y="0" width="4096" height="2048" fill="#1b1b1f"/>
+    <image id="backgroundTheme" href="themeBackground.png" x="-64" y="-64" width="4224" height="2176" filter="url(#backgroundBlur)"/>
 
-    <mask id="BgGradientMask">
-        <rect x="0" y="0" width="4096" height="2048" fill="black"/>
-        <rect x="0" y="0" width="4096" height="2048" fill="url(#BgMaskRadialGradient)"/>
-    </mask>
-    <rect id="bgGradient" x="0" y="0" width="4096" height="2048" fill="url(#BgGradient)" mask="url(#BgGradientMask)"/>
+    <rect id="bgGradient" x="0" y="0" width="4096" height="2048" fill="url(#BgGradient)"/>
 
     <mask id="LogoMask">
         <rect fill="white" x="3072" y="1024" width="768" height="768" rx="128"/>
     </mask>
     <circle id="logo-glow" fill="url(#LogoGlowGradient)" cx="3456" cy="1408" r="1472" />
-    <image id="logo" href="logo.roundEdges.png" x="3072" y="1024" width="768" height="768" mask="url(#LogoMask)"/>
+    <image id="logo" href="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" x="3072" y="1024" width="768" height="768" mask="url(#LogoMask)"/>
 
     <text id="logo-text" x="256" y="1792" font-size="90" font-weight="700" fill="url(#ThemeGradient)" alignment-baseline="baseline" font-family="Inter, sans-serif">node-llama-cpp</text>
 
     <text id="category" x="256" y="448" opacity=".42" font-size="108" fill="#FFFFF5" alignment-baseline="baseline" font-family="Inter, sans-serif">{{category}}</text>
-    <text id="text" x="256" y="567" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="hanging" font-family="Inter, sans-serif">
-        <tspan x="256" dy="0.76em">{{line1}}</tspan>
-        <tspan x="256" dy="1.2em">{{line2}}</tspan>
-        <tspan x="256" dy="1.2em">{{line3}}</tspan>
-    </text>
+    <text id="text" x="256" y="520" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line1}}</text>
+    <text id="text" x="256" y="780" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line2}}</text>
+    <text id="text" x="256" y="1039" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line3}}</text>
+
+    <rect id="view-guard-top" x="0" y="-100" width="4096" height="100" fill="black"/>
+    <rect id="view-guard-bottom" x="0" y="2048" width="4096" height="100" fill="black"/>
+    <rect id="view-guard-right" x="4096" y="0" width="100" height="2048" fill="black"/>
+    <rect id="view-guard-left" x="-100" y="0" width="100" height="2048" fill="black"/>
 </svg>

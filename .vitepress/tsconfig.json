@@ -13,7 +13,7 @@
         "forceConsistentCasingInFileNames": true,
         "noFallthroughCasesInSwitch": true,
         "skipLibCheck": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "strictNullChecks": true,
         "isolatedModules": true,
@@ -33,6 +33,7 @@
         "./utils",
         "./components/**/*.vue",
         "./components.d.ts",
+        "./theme",
         "../docs"
     ]
 }

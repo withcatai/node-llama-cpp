@@ -1,22 +1,41 @@
-import {DefaultTheme, defineConfig} from "vitepress";
+import {DefaultTheme, defineConfig, HeadConfig, createContentLoader} from "vitepress";
 import path from "path";
+import {createRequire} from "node:module";
+import process from "process";
 import fs from "fs-extra";
 import {fileURLToPath} from "url";
 import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
-import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 import envVar from "env-var";
-import process from "process";
+import {Feed} from "feed";
+import {rehype} from "rehype";
+import {Element as HastElement, Parent} from "hast";
+import {GitChangelog, GitChangelogMarkdownSection} from "@nolebase/vitepress-plugin-git-changelog/vite";
+import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-image/vitepress";
+import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
+import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
+
+import type {Node as UnistNode} from "unist";
+
+
+const require = createRequire(import.meta.url);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson: typeof import("../package.json") = fs.readJsonSync(path.join(__dirname, "..", "package.json"));
 const env = envVar.from(process.env);
 
-const urlBase = env.get("DOCS_URL_BASE").asString();
-const packageVersion = env.get("DOCS_PACKAGE_VERSION").default(packageJson.version).asString();
+const urlBase = env.get("DOCS_URL_BASE")
+    .asString();
+const packageVersion = env.get("DOCS_PACKAGE_VERSION")
+    .default(packageJson.version)
+    .asString();
 const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
 const hostname = "https://withcatai.github.io/node-llama-cpp/";
+
+const socialPosterLink = hostname + "social.poster.jpg";
+const defaultPageTitle = "node-llama-cpp - node.js bindings for llama.cpp";
+const defaultPageDescription = "Run AI models locally on your machine with node.js bindings for llama.cpp";
 
 const chatWrappersOrder = [
     "GeneralChatWrapper",
@@ -49,9 +68,17 @@ function resolveHref(href: string) {
     return urlBase + href;
 }
 
+const defaultImageMetaTags: HeadConfig[] = [
+    ["meta", {name: "og:image", content: socialPosterLink}],
+    ["meta", {name: "og:image:width", content: "4096"}],
+    ["meta", {name: "og:image:height", content: "2048"}],
+    ["meta", {name: "twitter:image", content: socialPosterLink}],
+    ["meta", {name: "twitter:card", content: "summary_large_image"}]
+];
+
 export default defineConfig({
     title: "node-llama-cpp",
-    description: "Run AI models locally on your machine with node.js bindings for llama.cpp",
+    description: defaultPageDescription,
 
     srcDir: "./docs",
     outDir: "./docs-site",
@@ -59,6 +86,10 @@ export default defineConfig({
 
     cleanUrls: true,
     lastUpdated: true,
+
+    contentProps: {
+        packageVersion
+    },
 
     base: urlBase,
     sitemap: {
@@ -68,8 +99,8 @@ export default defineConfig({
                 if (item.url.includes("api/") || item.url.includes("cli/")) {
                     item = {
                         ...item,
-                        lastmod: undefined,
-                    }
+                        lastmod: undefined
+                    };
                 }
 
                 return item;
@@ -79,37 +110,58 @@ export default defineConfig({
     head: [
         ["link", {rel: "icon", type: "image/svg+xml", href: resolveHref("/favicon.svg")}],
         ["link", {rel: "icon", type: "image/png", href: resolveHref("/favicon.png")}],
+        ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom")}],
         ["meta", {name: "theme-color", content: "#cd8156"}],
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
         ["meta", {name: "og:type", content: "website"}],
         ["meta", {name: "og:locale", content: "en"}],
-        ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
-        ["meta", {name: "og:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
-        ["meta", {name: "og:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}],
-        ["meta", {name: "og:image", content: hostname + "social.poster.jpg"}],
-        ["meta", {name: "og:image:width", content: "4096"}],
-        ["meta", {name: "og:image:height", content: "2048"}],
-        ["meta", {name: "twitter:image:src", content: hostname + "social.poster.jpg"}],
-        ["meta", {name: "twitter:card", content: "summary_large_image"}],
-        ["meta", {name: "twitter:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
-        ["meta", {name: "twitter:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}]
+        ["meta", {name: "og:site_name", content: "node-llama-cpp"}]
     ],
     transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
             head.push(["meta", {name: "google-site-verification", content: googleSiteVerificationCode}]);
-        }
+            head.push(...defaultImageMetaTags);
+        } else if (pageData.relativePath === "404.md")
+            head.push(...defaultImageMetaTags);
+
+        const title = [
+            pageData.title,
+            pageData.titleTemplate
+        ]
+            .filter(Boolean)
+            .join(" - ") || defaultPageTitle;
+        const description = pageData.description || defaultPageDescription;
+
+        head.push(["meta", {name: "og:title", content: title}]);
+        head.push(["meta", {name: "og:description", content: description}]);
+        head.push(["meta", {name: "twitter:title", content: title}]);
+        head.push(["meta", {name: "twitter:description", content: description}]);
     },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
-            pageData.frontmatter ||= {}
+            pageData.frontmatter ||= {};
             pageData.frontmatter.outline = [2, 3];
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
         }
 
         if (pageData.filePath.startsWith("cli/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
+        }
+
+        if (pageData.filePath.startsWith("blog/")) {
+            pageData.frontmatter.editLink = false;
+            pageData.frontmatter.aside = false;
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
         }
 
         let canonicalUrl = hostname + pageData.relativePath;
@@ -126,7 +178,28 @@ export default defineConfig({
         pageData.frontmatter.head.push([
             "link",
             {rel: "canonical", href: canonicalUrl}
-        ])
+        ]);
+    },
+    vite: {
+        plugins: [
+            GitChangelog({
+                repoURL: () => "https://github.com/withcatai/node-llama-cpp",
+                cwd: path.join(__dirname, "..", "docs")
+            }),
+            GitChangelogMarkdownSection({
+                exclude: (id) => (
+                    id.includes(path.sep + "api" + path.sep) ||
+                    id.includes(path.sep + "cli" + path.sep) ||
+                    id.includes(path.sep + "blog" + path.sep)
+                ),
+                sections: {
+                    disableContributors: true
+                }
+            }),
+            BlogPageInfoPlugin({
+                include: (id) => id.includes(path.sep + "blog" + path.sep) && !id.endsWith(path.sep + "blog" + path.sep + "index.md")
+            })
+        ]
     },
     markdown: {
         codeTransformers: [
@@ -162,6 +235,7 @@ export default defineConfig({
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},
             {text: "CLI", link: "/cli/", activeMatch: "/cli/"},
             {text: "API Reference", link: "/api/functions/getLlama", activeMatch: "/api/"},
+            {text: "Blog", link: "/blog/", activeMatch: "/blog/"},
             {
                 text: packageVersion,
                 items: [{
@@ -205,8 +279,9 @@ export default defineConfig({
                 items: [
                     {text: "Getting started", link: "/"},
                     {text: "Chat session", link: "/chat-session"},
-                    {text: "Chat prompt wrapper", link: "/chat-prompt-wrapper"},
-                    {text: "Using grammar", link: "/grammar"}
+                    {text: "Chat wrapper", link: "/chat-wrapper"},
+                    {text: "Using grammar", link: "/grammar"},
+                    {text: "Using function calling", link: "/function-calling"}
                 ]
             }, {
                 text: "Advanced",
@@ -216,6 +291,8 @@ export default defineConfig({
                     {text: "Metal support", link: "/Metal"},
                     {text: "CUDA support", link: "/CUDA"},
                     {text: "Vulkan support", link: "/vulkan"},
+                    {text: "Using tokens", link: "/tokens"},
+                    {text: "Using LlamaText", link: "/llama-text"},
                     {text: "Troubleshooting", link: "/troubleshooting"}
                 ]
             }, {
@@ -242,7 +319,7 @@ export default defineConfig({
                         items: [
                             {text: "Download", link: "/source/download"},
                             {text: "Build", link: "/source/build"},
-                            {text: "Clear", link: "/source/clear"},
+                            {text: "Clear", link: "/source/clear"}
                         ]
                     },
                     {text: "Complete", link: "/complete"},
@@ -254,7 +331,7 @@ export default defineConfig({
                         items: [
                             {text: "GPU", link: "/inspect/gpu"},
                             {text: "GGUF", link: "/inspect/gguf"},
-                            {text: "Measure", link: "/inspect/measure"},
+                            {text: "Measure", link: "/inspect/measure"}
                         ]
                     }
                 ]
@@ -264,8 +341,217 @@ export default defineConfig({
             {icon: "npm", link: "https://www.npmjs.com/package/node-llama-cpp"},
             {icon: "github", link: "https://github.com/withcatai/node-llama-cpp"}
         ]
+    },
+    async buildEnd(siteConfig) {
+        const blogPosts = await createContentLoader("blog/*.md", {
+            excerpt: true,
+            render: true
+        })
+            .load();
+
+        async function addOgImages() {
+            const svgImages: Record<string, Buffer> = {
+                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png":
+                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.roundEdges.png"))
+            };
+
+            const interFontFilesDirectoryPath = path.join(require.resolve("@fontsource/inter"), "..", "files");
+            const interFontFilesToLoad = [
+                "inter-latin-400-normal.woff2",
+                "inter-latin-500-normal.woff2",
+                "inter-latin-600-normal.woff2",
+                "inter-latin-700-normal.woff2",
+                "inter-latin-ext-400-normal.woff2",
+                "inter-latin-ext-500-normal.woff2",
+                "inter-latin-ext-600-normal.woff2",
+                "inter-latin-ext-700-normal.woff2",
+            ];
+
+            await buildEndGenerateOpenGraphImages({
+                baseUrl: resolveHref(""),
+                category: {
+                    byCustomGetter(page) {
+                        if (page.link?.startsWith("/api/")) return "API";
+                        if (page.link?.startsWith("/guide/")) return "Guide";
+                        if (page.link?.startsWith("/cli/")) return "CLI";
+                        if (page.link === "/blog/") return " ";
+                        if (page.link?.startsWith("/blog/")) return "Blog";
+
+                        return " ";
+                    }
+                },
+                async svgImageUrlResolver(imageUrl: string) {
+                    if (svgImages[imageUrl] != null)
+                        return svgImages[imageUrl];
+
+                    throw new Error(`Unknown SVG image URL: ${imageUrl}`);
+                },
+                svgFontBuffers: await Promise.all(
+                    interFontFilesToLoad.map((fontFilename) => (
+                        fs.readFile(path.join(interFontFilesDirectoryPath, fontFilename))
+                    ))
+                ),
+                templateSvgPath: path.join(__dirname, "assets", "ogTemplate.svg"),
+                resultImageWidth: 1200,
+                maxCharactersPerLine: 20
+            })({
+                ...siteConfig,
+                site: {
+                    ...siteConfig.site,
+                    themeConfig: {
+                        ...siteConfig.site.themeConfig,
+                        sidebar: {
+                            ...siteConfig.site.themeConfig.sidebar,
+                            "/_blog/": {
+                                text: "Blog",
+                                link: "/blog/",
+                                items: blogPosts.map((post) => ({
+                                    text: post.frontmatter.title,
+                                    link: post.url
+                                }))
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function addBlogRssFeed() {
+            const blogDirPath = path.join(siteConfig.srcDir, "blog");
+            const feedFilePath = path.join(siteConfig.outDir, "blog", "feed.atom");
+
+            const feed = new Feed({
+                title: "node-llama-cpp",
+                description: "Run AI models locally on your machine",
+                id: hostname,
+                link: hostname,
+                language: "en",
+                image: socialPosterLink,
+                favicon: resolveHref("/favicon.ico"),
+                copyright: "node-llama-cpp",
+                generator: "node-llama-cpp",
+                feed: resolveHref("/blog/feed.atom"),
+                author: {
+                    name: typeof packageJson.author === "string"
+                        ? packageJson.author
+                        : (packageJson.author as undefined | { name?: string })?.name
+                },
+                hub: "https://pubsubhubbub.appspot.com/"
+            });
+
+            blogPosts.sort((a, b) => {
+                const aDate = a.frontmatter.date
+                    ? new Date(a.frontmatter.date)
+                    : null;
+                const bDate = b.frontmatter.date
+                    ? new Date(b.frontmatter.date)
+                    : null;
+
+                if (aDate == null)
+                    return -1;
+                if (bDate == null)
+                    return 1;
+
+                return bDate.getTime() - aDate.getTime();
+            });
+
+            for (const {url, excerpt, frontmatter, html, src} of blogPosts) {
+                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:imag");
+                const date = new Date(frontmatter.date);
+                if (Number.isNaN(date.getTime()))
+                    throw new Error(`Invalid date for blog post: ${url}`);
+                else if (frontmatter.title == null || frontmatter.title === "")
+                    throw new Error(`Invalid title for blog post: ${url}`);
+
+                feed.addItem({
+                    title: frontmatter.title,
+                    id: resolveHref(url),
+                    link: resolveHref(url),
+                    description: excerpt || frontmatter.description || undefined,
+                    content: html,
+                    author: [{
+                        name: frontmatter.author?.name,
+                        link: frontmatter.author?.link != null
+                            ? frontmatter.author?.link
+                            : frontmatter.author?.github != null
+                                ? `https://github.com/${frontmatter.author.github}`
+                                : undefined,
+                        email: frontmatter.author?.github != null
+                            ? (
+                                frontmatter.author?.github +
+                                "@users.noreply.github.com" + (
+                                    frontmatter.author?.name != null
+                                        ? ` (${frontmatter.author.name})`
+                                        : ""
+                                )
+                            )
+                            : undefined
+                    }],
+                    published: date,
+                    date: date,
+                    image: ogImageElement?.properties?.content as string | undefined,
+                    category: typeof frontmatter.category === "string"
+                        ? [{term: frontmatter.category}]
+                        : frontmatter.category instanceof Array
+                            ? frontmatter.category.map((category: string) => ({term: category}))
+                            : frontmatter.categories instanceof Array
+                                ? frontmatter.categories.map((category: string) => ({term: category}))
+                                : undefined
+                });
+            }
+
+            await fs.writeFile(feedFilePath, feed.atom1());
+        }
+
+        await addOgImages();
+
+        const indexPageIndex = blogPosts.findIndex((post) => post.url === "/blog/");
+        if (indexPageIndex < 0)
+            throw new Error("Blog index page not found");
+
+        blogPosts.splice(indexPageIndex, 1);
+
+        await addBlogRssFeed();
     }
 });
+
+function findElementInHtml(html: string | undefined, matcher: (element: HastElement) => boolean) {
+    function isElement(node: UnistNode): node is HastElement {
+        return node.type === "element";
+    }
+
+    function isParent(node: UnistNode): node is Parent {
+        return node.type === "element" || node.type === "root";
+    }
+
+    if (html == null)
+        return undefined;
+
+    const parsedHtml = rehype()
+        .parse(html);
+
+    const queue: Parent[] = [parsedHtml];
+    while (queue.length > 0) {
+        const item = queue.shift();
+        if (item == null)
+            continue;
+
+        if (isElement(item) && matcher(item))
+            return item;
+
+        if (item.children == null)
+            continue;
+
+        for (let i = 0; i < item.children.length; i++) {
+            const child = item.children[i];
+
+            if (isParent(child))
+                queue.push(child);
+        }
+    }
+
+    return undefined;
+}
 
 function getApiReferenceSidebar(): typeof typedocSidebar {
     return structuredClone(typedocSidebar)
@@ -286,7 +572,7 @@ function getApiReferenceSidebar(): typeof typedocSidebar {
 
                     if (item.items instanceof Array)
                         item.items = item.items.map((subItem) => {
-                            if ((subItem as {collapsed?: boolean}).collapsed)
+                            if ((subItem as { collapsed?: boolean }).collapsed)
                                 // @ts-ignore
                                 delete subItem.collapsed;
 
@@ -330,7 +616,7 @@ function applyOverrides(sidebar: typeof typedocSidebar) {
 
     const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
     if (llamaTextFunction != null) {
-        delete (llamaTextFunction as {link?: string}).link;
+        delete (llamaTextFunction as { link?: string }).link;
     }
 
     const classes = sidebar.find((item) => item.text === "Classes");
@@ -369,20 +655,20 @@ function orderClasses(sidebar: typeof typedocSidebar) {
         (item) => item === chatWrappersGroup,
         (item) => item.text !== baseChatWrapper && item.text?.endsWith(baseChatWrapper),
         {moveToEndIfGrouped: false, collapsed: false}
-    )
+    );
 
     groupItems(
         classes.items,
         (item) => item.text === "LlamaModelTokens",
         (item) => item.text != null && ["LlamaModelInfillTokens"].includes(item.text),
         {moveToEndIfGrouped: false}
-    )
+    );
     groupItems(
         classes.items,
         (item) => item.text === "LlamaModel",
         (item) => item.text != null && ["LlamaModelTokens"].includes(item.text),
         {moveToEndIfGrouped: false}
-    )
+    );
 
     let LlamaTextGroup = classes.items.find((item) => item.text === "LlamaText") as {
         text: string,
@@ -411,7 +697,7 @@ function orderClasses(sidebar: typeof typedocSidebar) {
             (item) => item === LlamaTextGroup,
             (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
             {moveToEndIfGrouped: false}
-        )
+        );
         sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
     }
 
@@ -506,7 +792,7 @@ function groupItems(
     items: DefaultTheme.SidebarItem[] | undefined,
     findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
     findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
+    {collapsed = true, moveToEndIfGrouped = true}: { collapsed?: boolean, moveToEndIfGrouped?: boolean } = {}
 ) {
     const children: DefaultTheme.SidebarItem[] = [];
 

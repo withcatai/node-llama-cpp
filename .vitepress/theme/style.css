@@ -82,7 +82,8 @@
 .VPLocalNav[class]:after {
     display: block;
     position: absolute;
-    width: 100%;
+    inset-inline-start: 0px;
+    inset-inline-end: 0px;
     height: 32px;
     background: linear-gradient(var(--vp-c-bg), transparent 70%);
     content: "";
@@ -293,4 +294,35 @@ div.search-keyboard-shortcuts[class] kbd {
 
 .DocSearch-Button .DocSearch-Button-Key + .DocSearch-Button-Key {
     border-radius: 0 8px 8px 0;
+}
+
+.vp-code-group .tabs:has(>label:only-of-type) {
+    box-shadow: inset 0 -24px 24px -24px var(--vp-code-tab-divider);
+}
+
+.dark .vp-code-group .tabs:has(>label:only-of-type) {
+    box-shadow: inset 0 -36px 36px -52px var(--vp-code-tab-divider);
+}
+
+.vp-code-group .tabs>label:only-of-type {
+    cursor: text;
+}
+
+.vp-code-group .tabs>label:only-of-type:after {
+    display: none;
+}
+
+.VPLocalNavOutlineDropdown>.items {
+    border-color: var(--vp-c-divider);
+    background-color: var(--vp-c-divider);
+}
+
+.VPButton.medium[class] {
+    border-radius: 12px;
+}
+
+p.blog-date {
+    opacity: 0.6;
+    margin-top: 8px;
+    margin-bottom: 24px;
 }
