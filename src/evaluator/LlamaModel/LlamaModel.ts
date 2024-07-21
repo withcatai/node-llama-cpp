@@ -15,10 +15,11 @@ import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {LlamaContextOptions} from "../LlamaContext/types.js";
 import {LlamaContext} from "../LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
-import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
+import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataTypes.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
+import {DeepPartialObject} from "../../utils/DeepPartialObject.js";
 
 export type LlamaModelOptions = {
     /** path to the model on the filesystem */
@@ -109,7 +110,16 @@ export type LlamaModelOptions = {
      *
      * Defaults to `false`.
      */
-    ignoreMemorySafetyChecks?: boolean
+    ignoreMemorySafetyChecks?: boolean,
+
+    /**
+     * Metadata overrides to load the model with.
+     *
+     * > **Note:** Most metadata value overrides aren't supported and overriding them will have no effect on `llama.cpp`.
+     * > Only use this for metadata values that are explicitly documented to be supported by `llama.cpp` to be overridden,
+     * > and only in cases when this is crucial, as this is not guaranteed to always work as expected.
+     */
+    metadataOverrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
 };
 
 const defaultUseMmap = true;
@@ -141,7 +151,7 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal
+        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number
     }, {
@@ -169,6 +179,7 @@ export class LlamaModel {
         this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
         this._defaultContextFlashAttention = _defaultContextFlashAttention;
         this._flashAttentionSupported = _flashAttentionSupported;
+        const overridesList = ggufMetadataOverridesToList(metadataOverrides);
         this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
             addonExports: this._llama._bindings,
             gpuLayers,
@@ -188,7 +199,10 @@ export class LlamaModel {
                         console.error(err);
                     }
                 },
-            hasLoadAbortSignal: loadSignal != null
+            hasLoadAbortSignal: loadSignal != null,
+            overridesList: overridesList.length > 0
+                ? overridesList
+                : undefined
         }));
         this._tokens = LlamaModelTokens._create(this._model, this._disposedState);
         this._filename = path.basename(modelPath);
@@ -616,6 +630,7 @@ export class LlamaModel {
             sourceType: "filesystem",
             signal: loadSignal
         });
+        applyGgufMetadataOverrides(fileInfo, modelOptions.metadataOverrides);
         const ggufInsights = await GgufInsights.from(fileInfo, _llama);
         const flashAttentionSupported = ggufInsights.flashAttentionSupported;
         const resolvedDefaultContextFlashAttention = flashAttentionSupported
@@ -1007,6 +1022,74 @@ export class LlamaModelInfillTokens {
     public static _create(model: AddonModel, disposedState: DisposedState) {
         return new LlamaModelInfillTokens(model, disposedState);
     }
+}
+
+function applyGgufMetadataOverrides(
+    ggufFileInfo: GgufFileInfo,
+    overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
+) {
+    function applyOverride(object: object, override?: object) {
+        if (override == null || object == null)
+            return;
+
+        if (object instanceof Array || typeof object !== "object" || typeof override !== "object")
+            return;
+
+        for (const [key, value] of Object.entries(override)) {
+            if (value instanceof Array || typeof value !== "object" || (
+                typeof value === "object" && typeof (object as any)[key] !== "object"
+            ))
+                (object as any)[key] = value;
+            else
+                applyOverride((object as any)[key], value);
+
+        }
+    }
+
+    applyOverride(ggufFileInfo.metadata, overrides);
+}
+
+function ggufMetadataOverridesToList(overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>) {
+    const maxStringLength = 127;
+    const maxKeyLength = 127;
+
+    const res: Array<[
+        key: string,
+        value: number | bigint | boolean | string,
+        type: 0 | 1 | undefined
+    ]> = [];
+
+    function addItem(object: number | bigint | boolean | string | object, path: string[]) {
+        if (object == null || object instanceof Array)
+            return;
+
+        if (typeof object !== "object") {
+            if (typeof object === "string" && object.length > maxStringLength)
+                throw new Error(`Metadata key "${path.join(".")}" override string value (${JSON.stringify(object)}) is longer than ${maxStringLength} characters`);
+
+            const key = path.join(".");
+            if (key.length > maxKeyLength)
+                throw new Error(`Metadata key "${key}" override path is longer than ${maxKeyLength} characters`);
+
+            let type: 0 | 1 | undefined = undefined;
+            if (typeof object === "number") {
+                if (typeof object === "bigint" || Number.isInteger(object))
+                    type = 0;
+                else
+                    type = 1;
+            }
+
+            res.push([key, object, type]);
+            return;
+        }
+
+        for (const [key, value] of Object.entries(object))
+            addItem(value, [...path, key]);
+    }
+
+    addItem(overrides ?? {}, []);
+
+    return res;
 }
 
 function disposeModelIfReferenced(modelRef: WeakRef<LlamaModel>) {

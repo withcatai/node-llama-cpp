@@ -295,6 +295,62 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonM
             hasLoadAbortSignal = options.Get("hasLoadAbortSignal").As<Napi::Boolean>().Value();
         }
 
+        if (options.Has("overridesList")) {
+            Napi::Array overridesList = options.Get("overridesList").As<Napi::Array>();
+            kv_overrides.reserve(overridesList.Length());
+
+            for (uint32_t i = 0; i < overridesList.Length(); i++) {
+                Napi::Array overrideItem = overridesList.Get(i).As<Napi::Array>();
+                auto key = overrideItem.Get((uint32_t)0).As<Napi::String>().Utf8Value();
+                auto value = overrideItem.Get((uint32_t)1);
+
+                if (key.length() > 127) {
+                    continue;
+                }
+
+                llama_model_kv_override kvo;
+                std::strncpy(kvo.key, key.c_str(), key.length());
+                kvo.key[key.length()] = 0;
+
+                if (value.IsString()) {
+                    auto valueString = value.As<Napi::String>().Utf8Value();
+                    if (valueString.length() > 127) {
+                        continue;
+                    }
+
+                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_STR;
+                    std::strncpy(kvo.val_str, valueString.c_str(), valueString.length());
+                    kvo.val_str[valueString.length()] = 0;
+
+                    fputs(std::string("Override: " + key + " = " + valueString + "\n").c_str(), stdout);
+                    fflush(stdout);
+                } else if (value.IsNumber() || value.IsBigInt()) {
+                    auto numberType = overrideItem.Get((uint32_t)2).As<Napi::Number>().Int32Value();
+                    if (numberType == 0) {
+                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_INT;
+                        kvo.val_i64 = value.As<Napi::Number>().Int64Value();
+                    } else {
+                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_FLOAT;
+                        kvo.val_f64 = value.As<Napi::Number>().DoubleValue();
+                    }
+
+                    continue;
+                } else if (value.IsBoolean()) {
+                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_BOOL;
+                    kvo.val_bool = value.As<Napi::Boolean>().Value();
+                }
+
+                kv_overrides.emplace_back(std::move(kvo));
+            }
+
+            if (!kv_overrides.empty()) {
+                kv_overrides.emplace_back();
+                kv_overrides.back().key[0] = 0;
+            }
+
+            model_params.kv_overrides = kv_overrides.data();
+        }
+
         if (onLoadProgressEventCallbackSet || hasLoadAbortSignal) {
             model_params.progress_callback_user_data = &(*this);
             model_params.progress_callback = llamaModelParamsProgressCallback;

@@ -11,7 +11,8 @@ export type BindingModule = {
             useMlock?: boolean,
             checkTensors?: boolean,
             onLoadProgress?(loadPercentage: number): void,
-            hasLoadAbortSignal?: boolean
+            hasLoadAbortSignal?: boolean,
+            overridesList?: Array<[key: string, value: number | bigint | boolean | string, type: 0 | 1 | undefined]>
         }): AddonModel
     },
     AddonModelLora: {

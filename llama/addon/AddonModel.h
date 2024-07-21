@@ -7,6 +7,7 @@
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
         llama_model_params model_params;
+        std::vector<llama_model_kv_override> kv_overrides;
         llama_model* model;
         uint64_t loadedModelSize;
         Napi::Reference<Napi::Object> addonExportsRef;
