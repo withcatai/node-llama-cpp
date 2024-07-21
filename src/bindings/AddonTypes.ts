@@ -14,6 +14,9 @@ export type BindingModule = {
             hasLoadAbortSignal?: boolean
         }): AddonModel
     },
+    AddonModelLora: {
+        new (model: AddonModel, filePath: string): AddonModelLora
+    },
     AddonContext: {
         new (model: AddonModel, params: {
             seed?: number,
@@ -29,7 +32,7 @@ export type BindingModule = {
     AddonGrammar: {
         new (grammarPath: string, params?: {
             addonExports?: BindingModule,
-            printGrammar?: boolean
+            debugPrintGrammar?: boolean
         }): AddonGrammar
     },
     AddonGrammarEvaluationState: {
@@ -66,7 +69,7 @@ export type BindingModule = {
 
 export type AddonModel = {
     init(): Promise<boolean>,
-    loadLora(loraFilePath: string, scale: number, threads: number, baseModelPath?: string): Promise<void>,
+    loadLora(lora: AddonModelLora): Promise<void>,
     abortActiveModelLoad(): void,
     dispose(): Promise<void>,
     tokenize(text: string, specialTokens: boolean): Uint32Array,
@@ -128,7 +131,8 @@ export type AddonContext = {
     canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean,
     getEmbedding(inputTokensLength: number): Float64Array,
     getStateSize(): number,
-    printTimings(): void
+    printTimings(): void,
+    setLora(lora: AddonModelLora, scale: number): void
 };
 
 export type BatchLogitIndex = number & {
@@ -141,6 +145,13 @@ export type AddonGrammar = "AddonGrammar" & {
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {
     __brand: never
+};
+
+export type AddonModelLora = {
+    usages: number,
+    readonly filePath: string,
+    readonly disposed: boolean,
+    dispose(): Promise<void>
 };
 
 export type ModelTypeDescription = `${AddonModelArchName} ${AddonModelTypeName} ${AddonModelFileTypeName}`;

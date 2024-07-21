@@ -3,7 +3,7 @@ import path from "path";
 import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token, Tokenizer} from "../../types.js";
-import {AddonModel, ModelTypeDescription} from "../../bindings/AddonTypes.js";
+import {AddonModel, AddonModelLora, ModelTypeDescription} from "../../bindings/AddonTypes.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
 import {LlamaLocks, LlamaLogLevel, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../../bindings/types.js";
 import {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
@@ -57,7 +57,6 @@ export type LlamaModelOptions = {
     /**
      * Use mmap if possible.
      * Defaults to `true`.
-     * If LoRA is used, this will always be set to `false`.
      */
     useMmap?: boolean,
 
@@ -73,39 +72,6 @@ export type LlamaModelOptions = {
      * Defaults to `false`.
      */
     checkTensors?: boolean,
-
-    /**
-     * Load the provided LoRA adapters onto the model after loading the model.
-     * LoRA adapters are used to modify the weights of a pretrained model to adapt to new tasks or domains
-     * without the need for extensive retraining from scratch.
-     *
-     * If a string is provided, it will be treated as a path to a single LoRA adapter file.
-     */
-    lora?: string | {
-        adapters: Array<{
-            loraFilePath: string,
-            baseModelPath?: string,
-
-            /**
-             * Defaults to `1`.
-             */
-            scale?: number
-        }>,
-
-        /**
-         * The number of threads to use when loading the LoRA adapters.
-         * set to 0 to use the maximum threads supported by the current machine hardware.
-         *
-         * Defaults to `6`.
-         */
-        threads?: number,
-
-        /**
-         * Called with the LoRA adapters load percentage when the LoRA adapters are being loaded.
-         * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
-         */
-        onLoadProgress?(loadProgress: number): void
-    },
 
     /**
      * Enable flash attention by default for contexts created with this model.
@@ -130,7 +96,6 @@ export type LlamaModelOptions = {
 
     /**
      * Called with the load percentage when the model is being loaded.
-     * > **Note:** This progress does not include the progress of loading the provided LoRA adapters (when `lora` is used)
      * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
      */
     onLoadProgress?(loadProgress: number): void,
@@ -147,8 +112,6 @@ export type LlamaModelOptions = {
     ignoreMemorySafetyChecks?: boolean
 };
 
-const defaultLoraThreads = 6;
-const defaultLoraScale = 1;
 const defaultUseMmap = true;
 const defaultContextFlashAttentionEnabled = false;
 
@@ -168,6 +131,7 @@ export class LlamaModel {
     /** @internal */ private readonly _defaultContextFlashAttentionOptionEnabled: boolean;
     /** @internal */ private readonly _defaultContextFlashAttention: boolean;
     /** @internal */ private readonly _flashAttentionSupported: boolean;
+    /** @internal */ private readonly _loraAdapters = new Map<string, AddonModelLora>();
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
@@ -244,6 +208,8 @@ export class LlamaModel {
             await this._model.dispose();
             this._llamaPreventDisposalHandle.dispose();
         });
+
+        this._removeLoraUsage = this._removeLoraUsage.bind(this);
 
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
@@ -604,19 +570,37 @@ export class LlamaModel {
     }
 
     /** @internal */
-    private async _loadLora({
-        loraFilePath, baseModelPath, scale, threads
-    }: {
-        loraFilePath: string, baseModelPath?: string, scale?: number, threads: number
-    }) {
-        await this._model.loadLora(
-            path.resolve(process.cwd(), loraFilePath),
-            scale ?? defaultLoraScale,
-            Math.max(0, Math.floor(threads)),
-            baseModelPath == null
-                ? undefined
-                : path.resolve(process.cwd(), baseModelPath)
-        );
+    public async _getOrLoadLora(filePath: string) {
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+        if (this._loraAdapters.has(resolvedPath))
+            return this._loraAdapters.get(resolvedPath)!;
+
+        return await withLock(this._loraAdapters, "modify", async () => {
+            if (this._loraAdapters.has(resolvedPath))
+                return this._loraAdapters.get(resolvedPath)!;
+
+            const lora = new this._llama._bindings.AddonModelLora(this._model, resolvedPath);
+            await this._model.loadLora(lora);
+            this._loraAdapters.set(resolvedPath, lora);
+
+            return lora;
+        });
+    }
+
+    /** @internal */
+    public async _removeLoraUsage(loraAdapters: Set<AddonModelLora>) {
+        return await withLock(this._loraAdapters, "modify", async () => {
+            await Promise.all(
+                [...loraAdapters].map(async (lora) => {
+                    lora.usages--;
+
+                    if (lora.usages <= 0 && this._loraAdapters.get(lora.filePath) === lora) {
+                        this._loraAdapters.delete(lora.filePath);
+                        await lora.dispose();
+                    }
+                })
+            );
+        });
     }
 
     /** @internal */
@@ -626,13 +610,7 @@ export class LlamaModel {
         _llama: Llama
     }) {
         const {loadSignal, defaultContextFlashAttention} = modelOptions;
-        let useMmap = modelOptions.useMmap ?? defaultUseMmap;
-        const loraOptions: LlamaModelOptions["lora"] = typeof modelOptions.lora === "string"
-            ? {adapters: [{loraFilePath: modelOptions.lora}]}
-            : modelOptions.lora;
-
-        if (loraOptions?.adapters != null && loraOptions.adapters.length > 0)
-            useMmap = false; // using LoRA with nmap crashes the process
+        const useMmap = modelOptions.useMmap ?? defaultUseMmap;
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
@@ -700,45 +678,6 @@ export class LlamaModel {
             loadSignal?.removeEventListener("abort", onAbort);
 
             logWarnings(model.getWarnings());
-
-            if (loraOptions != null && loraOptions.adapters.length > 0) {
-                const loraThreads = loraOptions.threads ?? defaultLoraThreads;
-                let loadedAdapters = 0;
-
-                for (const adapter of loraOptions.adapters) {
-                    try {
-                        await model._loadLora({
-                            loraFilePath: adapter.loraFilePath,
-                            baseModelPath: adapter.baseModelPath,
-                            scale: adapter.scale,
-                            threads: loraThreads
-                        });
-                        loadedAdapters++;
-
-                        try {
-                            loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
-                        } catch (err) {
-                            console.error(err);
-                        }
-                    } catch (err) {
-                        await model._model.dispose();
-                        throw err;
-                    }
-
-                    if (loadSignal?.aborted) {
-                        await model._model.dispose();
-                        throw loadSignal.reason;
-                    }
-                }
-
-                logWarnings(model.getWarnings());
-            } else if (loraOptions?.onLoadProgress != null) {
-                try {
-                    loraOptions.onLoadProgress(1);
-                } catch (err) {
-                    console.error(err);
-                }
-            }
 
             return model;
         } finally {

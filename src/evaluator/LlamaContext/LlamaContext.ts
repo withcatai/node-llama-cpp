@@ -1,20 +1,21 @@
 import {AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
-import {AddonContext, BatchLogitIndex} from "../../bindings/AddonTypes.js";
+import {AddonContext, AddonModelLora, BatchLogitIndex} from "../../bindings/AddonTypes.js";
 import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {compareTokens} from "../../utils/compareTokens.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {TokenBias} from "../TokenBias.js";
+import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import type {Llama} from "../../bindings/Llama.js";
-import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 
+const defaultLoraScale = 1;
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
@@ -33,6 +34,8 @@ export class LlamaContext {
     /** @internal */ private readonly _queuedDecodes: InternalQueuedDecode[] = [];
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _modelPreventDisposalHandle: DisposalPreventionHandle;
+    /** @internal */ private readonly _loraAdapters = new Set<AddonModelLora>();
+    /** @internal */ private readonly _gcRegistry: FinalizationRegistry<Set<AddonModelLora>>;
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
@@ -90,12 +93,15 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule,
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy
         };
+        this._gcRegistry = new FinalizationRegistry(this._model._removeLoraUsage);
+        this._gcRegistry.register(this, this._loraAdapters);
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
 
         this._disposeAggregator.add(() => {
             this._disposed = true;
         });
+        this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
         this._disposeAggregator.add(
@@ -103,6 +109,13 @@ export class LlamaContext {
                 disposeContextIfReferenced.bind(null, new WeakRef(this))
             )
         );
+        this._disposeAggregator.add((): Promise<void> | void => {
+            if (this._loraAdapters.size > 0) {
+                const loraAdapters = new Set(this._loraAdapters);
+                this._loraAdapters.clear();
+                return this._model._removeLoraUsage(loraAdapters);
+            }
+        });
 
         this._disposeAggregator.add(async () => {
             await this._backendContextDisposeGuard.acquireDisposeLock();
@@ -546,6 +559,21 @@ export class LlamaContext {
     }
 
     /** @internal */
+    private async _setLora({
+        filePath, scale
+    }: {
+        filePath: string, scale?: number
+    }) {
+        const lora = await this._model._getOrLoadLora(filePath);
+        this._ctx.setLora(lora, scale ?? defaultLoraScale);
+
+        if (!this._loraAdapters.has(lora)) {
+            this._loraAdapters.add(lora);
+            lora.usages++;
+        }
+    }
+
+    /** @internal */
     public static async _create(options: LlamaContextOptions, {_model}: {
         _model: LlamaModel
     }): Promise<LlamaContext> {
@@ -553,6 +581,10 @@ export class LlamaContext {
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
+        const loraOptions: LlamaContextOptions["lora"] = typeof options.lora === "string"
+            ? {adapters: [{filePath: options.lora}]}
+            : options.lora;
+
         const contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,
@@ -590,6 +622,42 @@ export class LlamaContext {
                 throw createSignal.reason;
             } else if (!contextLoaded)
                 throw new Error("Failed to create context");
+
+            contextCreationMemoryReservation?.dispose?.();
+
+            if (loraOptions != null && loraOptions.adapters.length > 0) {
+                let loadedAdapters = 0;
+
+                for (const adapter of loraOptions.adapters) {
+                    try {
+                        await context._setLora({
+                            filePath: adapter.filePath,
+                            scale: adapter.scale
+                        });
+                        loadedAdapters++;
+
+                        try {
+                            loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    } catch (err) {
+                        await context.dispose();
+                        throw err;
+                    }
+
+                    if (createSignal?.aborted) {
+                        await context.dispose();
+                        throw createSignal.reason;
+                    }
+                }
+            } else if (loraOptions?.onLoadProgress != null) {
+                try {
+                    loraOptions.onLoadProgress(1);
+                } catch (err) {
+                    console.error(err);
+                }
+            }
 
             return context;
         } finally {

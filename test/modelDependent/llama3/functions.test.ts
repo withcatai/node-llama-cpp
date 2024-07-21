@@ -6,7 +6,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("llama 3", () => {
     describe("functions", () => {
         test("get n-th word", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -51,7 +51,7 @@ describe("llama 3", () => {
         });
 
         test("async get n-th word", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -96,7 +96,7 @@ describe("llama 3", () => {
         });
 
         test("async get n-th word twice", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -144,7 +144,7 @@ describe("llama 3", () => {
 
     describe("functions and grammar", () => {
         test("get n-th word", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({

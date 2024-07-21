@@ -7,7 +7,7 @@ import {pushAll} from "../../../src/utils/pushAll.js";
 describe("llama 3", () => {
     describe("chat session", () => {
         test("stop on abort signal", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -39,7 +39,7 @@ describe("llama 3", () => {
         });
 
         test("custom stop trigger", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -65,7 +65,7 @@ describe("llama 3", () => {
         });
 
         test("preloading a prompt works", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -86,7 +86,7 @@ describe("llama 3", () => {
         });
 
         test("completing a prompt works", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
@@ -112,7 +112,7 @@ describe("llama 3", () => {
         test.skip("context shift works correctly", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const contextSize = 2048;
 
-            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
