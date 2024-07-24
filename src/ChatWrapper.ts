@@ -1,10 +1,11 @@
 import {
-    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperGenerateContextStateOptions,
-    ChatWrapperGeneratedContextState, ChatWrapperSettings
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperCheckModelCompatibilityParams,
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
 } from "./types.js";
 import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
+import {defaultChatSystemPrompt} from "./config.js";
 
 export abstract class ChatWrapper {
     public static defaultSettings: ChatWrapperSettings = {
@@ -213,9 +214,23 @@ export abstract class ChatWrapper {
         return res;
     }
 
+    public generateInitialChatHistory({
+        systemPrompt = defaultChatSystemPrompt
+    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
+        return [{
+            type: "system",
+            text: LlamaText(systemPrompt ?? defaultChatSystemPrompt).toJSON()
+        }];
+    }
+
     /** @internal */
     public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): Record<string | symbol, any>[] {
         return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
+    }
+
+    /** @internal */
+    public static _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
+        return true;
     }
 }
 

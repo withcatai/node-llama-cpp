@@ -1,5 +1,6 @@
 import {GbnfJsonSchema, GbnfJsonSchemaToType} from "./utils/gbnfJson/types.js";
 import {LlamaText, BuiltinSpecialTokenValue, LlamaTextJSON} from "./utils/LlamaText.js";
+import type {GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
 
 export type Token = number & {
     __token: never
@@ -87,6 +88,11 @@ export type ChatWrapperGenerateContextStateOptions = {
     documentFunctionParams?: boolean
 };
 
+export type ChatWrapperCheckModelCompatibilityParams = {
+    tokenizer?: Tokenizer,
+    fileInfo?: GgufFileInfo
+};
+
 export type ChatWrapperGeneratedContextState = {
     contextText: LlamaText,
     stopGenerationTriggers: LlamaText[],
@@ -95,6 +101,10 @@ export type ChatWrapperGeneratedContextState = {
         initiallyEngaged: boolean,
         disengageInitiallyEngaged: LlamaText[]
     }
+};
+
+export type ChatWrapperGenerateInitialHistoryOptions = {
+    systemPrompt?: string
 };
 
 export type ChatHistoryItem = ChatSystemMessage | ChatUserMessage | ChatModelResponse;

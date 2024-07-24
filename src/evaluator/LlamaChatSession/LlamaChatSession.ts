@@ -262,7 +262,7 @@ export class LlamaChatSession {
     public constructor({
         contextSequence,
         chatWrapper = "auto",
-        systemPrompt = defaultChatSystemPrompt,
+        systemPrompt,
         forceAddSystemPrompt = false,
         autoDisposeSequence = true,
         contextShift
@@ -283,10 +283,7 @@ export class LlamaChatSession {
 
         const chatWrapperSupportsSystemMessages = this._chat.chatWrapper.settings.supportsSystemMessages;
         if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || forceAddSystemPrompt)
-            this._chatHistory = [{
-                type: "system",
-                text: systemPrompt
-            }];
+            this._chatHistory = this._chat.chatWrapper.generateInitialChatHistory({systemPrompt});
         else
             this._chatHistory = [];
 

@@ -8,7 +8,7 @@ import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctio
 // source: https://github.com/meta-llama/llama-recipes/blob/79aa70442e97c3127e53c2d22c54438c32adcf5e/README.md
 // source: https://llama.meta.com/docs/model-cards-and-prompt-formats/meta-llama-3/
 export class Llama3ChatWrapper extends ChatWrapper {
-    public readonly wrapperName: string = "Llama3Chat";
+    public readonly wrapperName: string = "Llama 3";
 
     public override readonly settings: ChatWrapperSettings;
 
@@ -174,7 +174,6 @@ export class Llama3ChatWrapper extends ChatWrapper {
                     );
                 }
 
-                // void (item satisfies never);
                 return LlamaText(res);
             })
         );

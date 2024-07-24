@@ -10,13 +10,14 @@ import {GemmaChatWrapper} from "../GemmaChatWrapper.js";
 import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../generic/JinjaTemplateChatWrapper.js";
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
+import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llama3Chat", "llama2Chat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "llama3.1", "llama3", "llama2Chat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -34,7 +35,8 @@ export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNam
 
 const chatWrappers = {
     "general": GeneralChatWrapper,
-    "llama3Chat": Llama3ChatWrapper,
+    "llama3.1": Llama3_1ChatWrapper,
+    "llama3": Llama3ChatWrapper,
     "llama2Chat": Llama2ChatWrapper,
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
@@ -113,6 +115,27 @@ export function resolveChatWrapper({
         });
     }
 
+    function getModelLinageNames(): string[][] {
+        const res: string[][] = [];
+
+        if (fileInfo == null)
+            return res;
+
+        const currentModelInfo = [fileInfo.metadata?.general?.name, fileInfo.metadata?.general?.basename].filter((v): v is string => v != null);
+        if (currentModelInfo.length > 0)
+            res.push(currentModelInfo);
+
+        if (typeof fileInfo.metadata?.general?.base_model?.count === "number") {
+            for (let i = 0; i < fileInfo.metadata.general.base_model.count; i++) {
+                const baseModel = fileInfo.metadata.general.base_model[String(i) as `${bigint}`];
+                if (baseModel?.name != null)
+                    res.push([baseModel.name]);
+            }
+        }
+
+        return res;
+    }
+
     if (type !== "auto" && type != null) {
         if (isTemplateChatWrapperType(type)) {
             const Wrapper = chatWrappers[type];
@@ -172,6 +195,14 @@ export function resolveChatWrapper({
             const Wrapper = chatWrappers[specializedChatWrapperTypeName];
             const wrapperSettings = customWrapperSettings?.[specializedChatWrapperTypeName];
 
+            const isCompatible = Wrapper._checkModelCompatibility({
+                tokenizer,
+                fileInfo
+            });
+
+            if (!isCompatible)
+                continue;
+
             const testOptionConfigurations = Wrapper._getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate?.() ?? [];
             if (testOptionConfigurations.length === 0)
                 testOptionConfigurations.push({} as any);
@@ -209,11 +240,22 @@ export function resolveChatWrapper({
             return createSpecializedChatWrapper(Llama2ChatWrapper, {
                 addSpaceBeforeEos: modelJinjaTemplate.includes("' ' + eos_token")
             });
-        else if (modelJinjaTemplate.includes("<|start_header_id|>") && modelJinjaTemplate.includes("<|end_header_id|>"))
-            return createSpecializedChatWrapper(Llama3ChatWrapper);
-        else if (modelJinjaTemplate.includes("<start_of_turn>"))
+        else if (modelJinjaTemplate.includes("<|start_header_id|>") && modelJinjaTemplate.includes("<|end_header_id|>")) {
+            if (Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+                return createSpecializedChatWrapper(Llama3_1ChatWrapper);
+            else
+                return createSpecializedChatWrapper(Llama3ChatWrapper);
+        } else if (modelJinjaTemplate.includes("<start_of_turn>"))
             return createSpecializedChatWrapper(GemmaChatWrapper);
     }
+
+    for (const modelNames of getModelLinageNames()) {
+        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+            return createSpecializedChatWrapper(Llama3_1ChatWrapper);
+        else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
+            return createSpecializedChatWrapper(Llama3ChatWrapper);
+    }
+
 
     if (filename != null) {
         const {name, subType, fileType, otherInfo} = parseModelFileName(filename);
@@ -283,6 +325,25 @@ export function isSpecializedChatWrapperType(type: string): type is SpecializedC
 
 export function isTemplateChatWrapperType(type: string): type is TemplateChatWrapperTypeName {
     return templateChatWrapperTypeNames.includes(type as any);
+}
+
+function includesText(
+    value: string | string[] | null | undefined,
+    textToCheckFor: string | string[],
+    strictCase: boolean = false
+): boolean {
+    if (value instanceof Array)
+        return value.some((v) => includesText(v, textToCheckFor, strictCase));
+    else if (typeof value !== "string")
+        return false;
+
+    if (textToCheckFor instanceof Array)
+        return textToCheckFor.some((t) => includesText(value, t, strictCase));
+
+    if (strictCase)
+        return value.includes(textToCheckFor);
+
+    return value.toLowerCase().includes(textToCheckFor.toLowerCase());
 }
 
 // this is needed because TypeScript guards don't work automatically with class references

@@ -40,6 +40,7 @@ import {UnsupportedError} from "./utils/UnsupportedError.js";
 import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
 import {ChatWrapper} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
+import {Llama3_1ChatWrapper} from "./chatWrappers/Llama3_1ChatWrapper.js";
 import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
 import {Llama2ChatWrapper} from "./chatWrappers/Llama2ChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
@@ -76,7 +77,8 @@ import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
     type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty,
-    type ChatWrapperSettings, type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState
+    type ChatWrapperSettings, type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState,
+    type ChatWrapperGenerateInitialHistoryOptions
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
@@ -160,7 +162,9 @@ export {
     type ChatWrapperSettings,
     type ChatWrapperGenerateContextStateOptions,
     type ChatWrapperGeneratedContextState,
+    type ChatWrapperGenerateInitialHistoryOptions,
     EmptyChatWrapper,
+    Llama3_1ChatWrapper,
     Llama3ChatWrapper,
     Llama2ChatWrapper,
     GeneralChatWrapper,

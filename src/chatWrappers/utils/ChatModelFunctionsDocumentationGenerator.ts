@@ -1,5 +1,6 @@
 import {ChatModelFunctions} from "../../types.js";
 import {getTypeScriptTypeStringForGbnfJsonSchema} from "../../utils/getTypeScriptTypeStringForGbnfJsonSchema.js";
+import {jsonDumps} from "./jsonDumps.js";
 
 /**
  * Generate documentation about the functions that are available for a model to call.
@@ -16,7 +17,7 @@ export class ChatModelFunctionsDocumentationGenerator {
 
     /**
      * Example:
-     * ```typescript
+     * ```ts
      * // Retrieve the current date
      * function getDate();
      *
@@ -58,7 +59,7 @@ export class ChatModelFunctionsDocumentationGenerator {
 
     /**
      * Example:
-     * ```typescript
+     * ```ts
      * // Retrieve the current date
      * type getDate = () => any;
      *
@@ -97,6 +98,48 @@ export class ChatModelFunctionsDocumentationGenerator {
                     res += "_: " + getTypeScriptTypeStringForGbnfJsonSchema(functionDefinition.params);
 
                 res += ") => any;";
+
+                return res;
+            })
+            .join("\n\n");
+    }
+
+    /**
+     * Example:
+     * ```
+     * Use the function 'getDate' to: Retrieve the current date
+     * {"name": "getDate", "description": "Retrieve the current date"}
+     *
+     * Use the function 'getTime' to: Retrieve the current time
+     * {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}
+     * ```
+     * @param options
+     * @param [options.documentParams] - Whether to document the parameters of the functions
+     */
+    public getLlama3_1FunctionSignatures({documentParams = true}: {documentParams?: boolean} = {}) {
+        const chatModelFunctions = this.chatModelFunctions;
+
+        if (!this.hasAnyFunctions || chatModelFunctions == null)
+            return "";
+
+        const functionNames = Object.keys(chatModelFunctions);
+
+        return functionNames
+            .map((functionName) => {
+                const functionDefinition = chatModelFunctions[functionName];
+                let res = `Use the function '${functionName}'`;
+
+                const addDescription = functionDefinition?.description != null && functionDefinition.description.trim() !== "";
+                if (addDescription)
+                    res += " to: " + functionDefinition.description.split("\n").join("\n// ") + "\n";
+                else
+                    res += ".\n";
+
+                res += jsonDumps({
+                    name: functionName,
+                    ...(addDescription ? {description: functionDefinition.description} : {}),
+                    ...(documentParams && functionDefinition?.params != null ? {parameters: functionDefinition.params} : {})
+                });
 
                 return res;
             })
