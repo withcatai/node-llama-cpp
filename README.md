@@ -65,7 +65,7 @@ const a1 = await session.prompt(q1);
 console.log("AI: " + a1);
 
 
-const q2 = "Summerize what you said";
+const q2 = "Summarize what you said";
 console.log("User: " + q2);
 
 const a2 = await session.prompt(q2);
