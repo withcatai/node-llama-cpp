@@ -391,7 +391,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
     }
 
     if (use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-        llama_sample_grammar(ctx->ctx, &candidates_p, (grammar_evaluation_state)->grammar);
+        llama_grammar_sample((grammar_evaluation_state)->grammar, ctx->ctx, &candidates_p);
     }
 
     if (temperature <= 0) {
@@ -414,7 +414,7 @@ class LLAMAContextEvalWorker : Napi::AsyncWorker, Napi::Promise::Deferred {
     }
 
     if (new_token_id != eos_token && use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-        llama_grammar_accept_token(ctx->ctx, (grammar_evaluation_state)->grammar, new_token_id);
+        llama_grammar_accept_token((grammar_evaluation_state)->grammar, ctx->ctx, new_token_id);
     }
 
     result = new_token_id;
