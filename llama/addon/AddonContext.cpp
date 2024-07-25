@@ -351,7 +351,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             }
 
             if (use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-                llama_sample_grammar(ctx->ctx, &candidates_p, (grammar_evaluation_state)->grammar);
+                llama_grammar_sample((grammar_evaluation_state)->grammar, ctx->ctx, &candidates_p);
 
                 if ((candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) && useTokenBiases) {
                     // logit biases caused grammar sampling to fail, so sampling again without logit biases
@@ -383,7 +383,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             }
 
             if (!llama_token_is_eog(ctx->model->model, new_token_id) && use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-                llama_grammar_accept_token(ctx->ctx, (grammar_evaluation_state)->grammar, new_token_id);
+                llama_grammar_accept_token((grammar_evaluation_state)->grammar, ctx->ctx, new_token_id);
             }
 
             result = new_token_id;
@@ -657,7 +657,7 @@ Napi::Value AddonContext::AcceptGrammarEvaluationStateToken(const Napi::Callback
     llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
 
     if ((grammar_evaluation_state)->grammar != nullptr) {
-        llama_grammar_accept_token(ctx, (grammar_evaluation_state)->grammar, tokenId);
+        llama_grammar_accept_token((grammar_evaluation_state)->grammar, ctx, tokenId);
     }
 
     return info.Env().Undefined();
@@ -675,7 +675,7 @@ Napi::Value AddonContext::CanBeNextTokenForGrammarEvaluationState(const Napi::Ca
 
         llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
 
-        llama_sample_grammar(ctx, &candidates_p, (grammar_evaluation_state)->grammar);
+        llama_grammar_sample((grammar_evaluation_state)->grammar, ctx, &candidates_p);
 
         if (candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) {
             return Napi::Boolean::New(info.Env(), false);
