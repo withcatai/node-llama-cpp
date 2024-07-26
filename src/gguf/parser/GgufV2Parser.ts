@@ -8,6 +8,7 @@ import {GgufMetadata} from "../types/GgufMetadataTypes.js";
 import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {convertMetadataKeyValueRecordToNestedObject} from "../utils/convertMetadataKeyValueRecordToNestedObject.js";
 import {promisableLoop, Promisable, transformPromisable, transformPromisables} from "../../utils/transformPromisable.js";
+import {noDirectSubNestingGGufMetadataKeys} from "../consts.js";
 
 export class GgufV2Parser {
     private readonly _fileReader: GgufFileReader;
@@ -40,7 +41,8 @@ export class GgufV2Parser {
             : tensorReadResultPromisable;
         const metadata = convertMetadataKeyValueRecordToNestedObject(headerReadResult.metadata, {
             logOverrideWarnings: this._logWarnings,
-            ignoreKeys: this._ignoreKeys
+            ignoreKeys: this._ignoreKeys,
+            noDirectSubNestingKeys: noDirectSubNestingGGufMetadataKeys
         });
 
         return {

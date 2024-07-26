@@ -152,6 +152,8 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * such as the license text or the URL to the license.
      */
     readonly license?: string,
+    readonly "license.name"?: string,
+    readonly "license.link"?: string,
 
     /**
      * Information about where this model came from. This is useful for tracking
