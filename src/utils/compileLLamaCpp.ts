@@ -88,6 +88,8 @@ export async function compileLlamaCpp({
             }
         }
 
+        applyResultDirFixes(compiledResultDirPath, path.join(compiledResultDirPath, "__temp"));
+
         if (setUsedBinFlagArg) {
             await setUsedBinFlag("localBuildFromSource");
         }
@@ -164,4 +166,25 @@ async function getToolchainFileForArch(targetArch: string) {
         return filePath;
 
     return null;
+}
+
+async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
+    const releaseDirPath = path.join(resultDirPath, "Release");
+
+    if (await fs.pathExists(releaseDirPath)) {
+        await fs.remove(tempDirPath);
+        await fs.move(releaseDirPath, tempDirPath);
+
+        const itemNames = await fs.readdir(tempDirPath);
+
+        await Promise.all(
+            itemNames.map((itemName) => (
+                fs.move(path.join(tempDirPath, itemName), path.join(resultDirPath, itemName), {
+                    overwrite: true
+                })
+            ))
+        );
+
+        await fs.remove(tempDirPath);
+    }
 }
