@@ -38,6 +38,10 @@ describe("GemmaChatWrapper", () => {
         expect(contextText.values).toMatchInlineSnapshot(`
           [
             {
+              "type": "specialToken",
+              "value": "BOS",
+            },
+            {
               "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
@@ -62,6 +66,10 @@ describe("GemmaChatWrapper", () => {
 
         expect(contextText2.values).toMatchInlineSnapshot(`
           [
+            {
+              "type": "specialToken",
+              "value": "BOS",
+            },
             {
               "type": "specialTokensText",
               "value": "<start_of_turn>user
@@ -111,6 +119,10 @@ describe("GemmaChatWrapper", () => {
         expect(contextText3.values).toMatchInlineSnapshot(`
           [
             {
+              "type": "specialToken",
+              "value": "BOS",
+            },
+            {
               "type": "specialTokensText",
               "value": "<start_of_turn>user
           ",
@@ -133,6 +145,10 @@ describe("GemmaChatWrapper", () => {
 
         expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
           [
+            {
+              "type": "specialToken",
+              "value": "BOS",
+            },
             {
               "type": "specialTokensText",
               "value": "<start_of_turn>user

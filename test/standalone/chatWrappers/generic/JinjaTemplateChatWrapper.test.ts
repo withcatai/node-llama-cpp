@@ -552,16 +552,16 @@ describe("JinjaTemplateChatWrapper", () => {
               "type": "specialTokensText",
               "value": "(",
             },
-            "{"someKey":"someValue"}",
+            "{"someKey": "someValue"}",
             {
               "type": "specialTokensText",
               "value": ")",
             },
             "
 
-          Note that the || prefix is mandatory
+          Note that the || prefix is mandatory.
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
-          After calling a function, the raw result appears afterwards and is not part of the conversation
+          After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
             {
               "type": "specialTokensText",
@@ -626,11 +626,11 @@ describe("JinjaTemplateChatWrapper", () => {
           \`\`\`
 
           Calling any of the provided functions can be done like this:
-          [[call: getSomeInfo({"someKey":"someValue"})]]
+          [[call: getSomeInfo({"someKey": "someValue"})]]
 
-          Note that the || prefix is mandatory
+          Note that the || prefix is mandatory.
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
-          After calling a function, the raw result appears afterwards and is not part of the conversation
+          After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.
 
           ----
@@ -640,7 +640,7 @@ describe("JinjaTemplateChatWrapper", () => {
               "type": "specialTokensText",
               "value": " [/INST] ",
             },
-            "Hello![[call: func2({"message":"Hello","feeling":"good","words":1})]] [[result: {"yes":true,"message":"ok"}]]",
+            "Hello![[call: func2({"message": "Hello", "feeling": "good", "words": 1})]] [[result: {"yes": true, "message": "ok"}]]",
             {
               "type": "specialTokensText",
               "value": " ",
@@ -705,11 +705,11 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Calling any of the provided functions can be done like this:
 
-          Call function: getSomeInfo with params {"someKey":"someValue"}.
+          Call function: getSomeInfo with params {"someKey": "someValue"}.
 
-          Note that the || prefix is mandatory
+          Note that the || prefix is mandatory.
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
-          After calling a function, the raw result appears afterwards and is not part of the conversation
+          After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.
 
           ----
@@ -720,8 +720,8 @@ describe("JinjaTemplateChatWrapper", () => {
               "value": " [/INST] ",
             },
             "Hello!
-          Call function: func2 with params {"message":"Hello","feeling":"good","words":1}.
-          Function result: {"yes":true,"message":"ok"}
+          Call function: func2 with params {"message": "Hello", "feeling": "good", "words": 1}.
+          Function result: {"yes": true, "message": "ok"}
           ",
             {
               "type": "specialTokensText",

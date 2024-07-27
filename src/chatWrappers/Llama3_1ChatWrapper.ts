@@ -256,15 +256,15 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             return `${day} ${month} ${year}`;
         }
 
-        function formatMonthDate(date: Date) {
-            const today = new Date();
+        const formatMonthDate = (date: Date) => {
+            const today = this.todayDate ?? new Date();
             if (today.getUTCMonth() === date.getUTCMonth() && today.getUTCFullYear() === date.getUTCFullYear())
                 return formatDate(date);
 
             const month = date.toLocaleDateString("en-US", {month: "long", timeZone: "UTC"})
             const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: "UTC"});
             return `${month} ${year}`;
-        }
+        };
 
         let lines: string[] = [];
 
@@ -272,7 +272,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             lines.push(`Cutting Knowledge Date: ${formatMonthDate(this.cuttingKnowledgeDate)}`);
 
         if (this.todayDate != null)
-            lines.push(`Today Date: ${formatDate(new Date())}`);
+            lines.push(`Today Date: ${formatDate(this.todayDate)}`);
 
         lines.push("");
         lines.push("# Tool Instructions");

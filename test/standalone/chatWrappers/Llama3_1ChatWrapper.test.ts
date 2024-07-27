@@ -4,8 +4,9 @@ import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
 describe("Llama3_1ChatWrapper", () => {
+    const todayDate = new Date("2024-07-26T00:00:00Z");
     const conversationHistory: ChatHistoryItem[] = [
-        ...(new Llama3_1ChatWrapper()).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
+        ...(new Llama3_1ChatWrapper({todayDate})).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
         type: "user",
         text: "Hi there!"
     }, {
@@ -13,7 +14,7 @@ describe("Llama3_1ChatWrapper", () => {
         response: ["Hello!"]
     }];
     const conversationHistory2: ChatHistoryItem[] = [
-        ...(new Llama3_1ChatWrapper()).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
+        ...(new Llama3_1ChatWrapper({todayDate})).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
         type: "user",
         text: "Hi there!"
     }, {
@@ -53,7 +54,7 @@ describe("Llama3_1ChatWrapper", () => {
     };
 
     test("should generate valid context text", () => {
-        const chatWrapper = new Llama3_1ChatWrapper();
+        const chatWrapper = new Llama3_1ChatWrapper({todayDate});
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
         expect(contextText.values).toMatchInlineSnapshot(`
@@ -69,7 +70,7 @@ describe("Llama3_1ChatWrapper", () => {
           ",
             },
             "Cutting Knowledge Date: December 2023
-          Today Date: 24 Jul 2024
+          Today Date: 26 Jul 2024
 
           # Tool Instructions
           - When looking for real time information use relevant functions if available
@@ -103,7 +104,7 @@ describe("Llama3_1ChatWrapper", () => {
           ]
         `);
 
-        const chatWrapper2 = new Llama3_1ChatWrapper();
+        const chatWrapper2 = new Llama3_1ChatWrapper({todayDate});
         const {contextText: contextText2} = chatWrapper2.generateContextState({
             chatHistory: conversationHistory2,
             availableFunctions: conversationHistory2Functions
@@ -122,7 +123,7 @@ describe("Llama3_1ChatWrapper", () => {
           ",
             },
             "Cutting Knowledge Date: December 2023
-          Today Date: 24 Jul 2024
+          Today Date: 26 Jul 2024
 
           # Tool Instructions
           - When looking for real time information use relevant functions if available
@@ -240,7 +241,7 @@ describe("Llama3_1ChatWrapper", () => {
           ]
         `);
 
-        const chatWrapper3 = new Llama3_1ChatWrapper();
+        const chatWrapper3 = new Llama3_1ChatWrapper({todayDate});
         const {contextText: contextText3} = chatWrapper3.generateContextState({chatHistory: conversationHistory});
         const {contextText: contextText3WithOpenModelResponse} = chatWrapper3.generateContextState({
             chatHistory: [
@@ -265,7 +266,7 @@ describe("Llama3_1ChatWrapper", () => {
           ",
             },
             "Cutting Knowledge Date: December 2023
-          Today Date: 24 Jul 2024
+          Today Date: 26 Jul 2024
 
           # Tool Instructions
           - When looking for real time information use relevant functions if available
@@ -312,7 +313,7 @@ describe("Llama3_1ChatWrapper", () => {
           ",
             },
             "Cutting Knowledge Date: December 2023
-          Today Date: 24 Jul 2024
+          Today Date: 26 Jul 2024
 
           # Tool Instructions
           - When looking for real time information use relevant functions if available
