@@ -80,6 +80,7 @@ export class GemmaChatWrapper extends ChatWrapper {
         flush();
 
         const contextText = LlamaText(
+            new SpecialToken("BOS"),
             resultItems.map(({user, model}, index) => {
                 const isLastItem = index === resultItems.length - 1;
 
