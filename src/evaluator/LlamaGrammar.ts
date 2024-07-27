@@ -11,8 +11,11 @@ export type LlamaGrammarOptions = {
     /** GBNF grammar */
     grammar: string,
 
-    /** print the grammar to stdout */
-    printGrammar?: boolean,
+    /**
+     * print the parsed grammar to stdout.
+     * Useful for debugging.
+     */
+    debugPrintGrammar?: boolean,
 
     /** Consider any of these as EOS for the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
     stopGenerationTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
@@ -37,12 +40,12 @@ export class LlamaGrammar {
      * @param options
      */
     public constructor(llama: Llama, {
-        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, printGrammar = false
+        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, debugPrintGrammar = false
     }: LlamaGrammarOptions) {
         this._llama = llama;
         this._grammar = new this._llama._bindings.AddonGrammar(grammar, {
             addonExports: this._llama._bindings,
-            printGrammar
+            debugPrintGrammar
         });
         this._stopGenerationTriggers = stopGenerationTriggers ?? [];
         this._trimWhitespaceSuffix = trimWhitespaceSuffix;

@@ -129,7 +129,7 @@ if (GGML_METAL)
         )
 endif()
 
-file(GLOB SOURCE_FILES "addon.cpp" ${GPU_INFO_SOURCES})
+file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
 
 if(APPLE)
     set(CMAKE_SKIP_BUILD_RPATH  FALSE)

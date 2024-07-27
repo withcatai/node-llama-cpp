@@ -5,22 +5,31 @@ export function convertMetadataKeyValueRecordToNestedObject(
     keyValueRecord: MetadataKeyValueRecord,
     {
         logOverrideWarnings = true,
-        ignoreKeys = []
+        ignoreKeys = [],
+        noDirectSubNestingKeys
     }: {
         logOverrideWarnings?: boolean,
-        ignoreKeys?: string[]
+        ignoreKeys?: readonly string[],
+        noDirectSubNestingKeys?: readonly string[]
     } = {}
 ) {
     const nestedObject: Record<string, MetadataValue> = {};
     const ignoreKeySet = new Set(ignoreKeys);
+    const noDirectSubNestingKeysSet = new Set(noDirectSubNestingKeys);
 
     for (const [key, value] of Object.entries(keyValueRecord)) {
         if (ignoreKeySet.has(key))
             continue;
 
-        const {lastObject, lastKey} = getNestedObject(key, nestedObject);
-        if (Object.hasOwn(lastObject, lastKey) && logOverrideWarnings)
-            console.warn(getConsoleLogPrefix() + `Metadata key "${key}" is already occupied by a value. Overwriting it.`);
+        const {lastObject, lastKey} = getNestedObject(key, nestedObject, noDirectSubNestingKeysSet);
+        if (Object.hasOwn(lastObject, lastKey)) {
+            const currentValue = lastObject[lastKey];
+            delete lastObject[lastKey];
+            flattenNestedKeys(lastObject, lastKey, currentValue, logOverrideWarnings);
+
+            if (Object.hasOwn(lastObject, lastKey) && logOverrideWarnings)
+                console.warn(getConsoleLogPrefix() + `Metadata key "${key}" is already occupied by a value. Overwriting it.`);
+        }
 
         lastObject[lastKey] = value;
     }
@@ -28,14 +37,24 @@ export function convertMetadataKeyValueRecordToNestedObject(
     return nestedObject;
 }
 
-function getNestedObject(key: string, nestedObject: MetadataNestedObject) {
+function getNestedObject(key: string, nestedObject: MetadataNestedObject, noDirectSubNestingKeysSet: Set<string>) {
     const nestedKey = key.split(".");
-    const lastKey = nestedKey.pop()!;
+    let lastKey = "";
 
     let currentObject = nestedObject;
 
+    const previousKeys = [];
     while (nestedKey.length > 0) {
-        const currentKey = nestedKey.shift()!;
+        let currentKey = nestedKey.shift()!;
+
+        while (noDirectSubNestingKeysSet.has([...previousKeys, currentKey].join(".")) && nestedKey.length > 0)
+            currentKey += "." + nestedKey.shift()!;
+
+        if (nestedKey.length === 0) {
+            lastKey = currentKey;
+            break;
+        }
+
         if (!Object.hasOwn(currentObject, currentKey)) {
             const nextCurrentObject = {};
             currentObject[currentKey] = nextCurrentObject;
@@ -43,17 +62,52 @@ function getNestedObject(key: string, nestedObject: MetadataNestedObject) {
             currentObject = nextCurrentObject;
         } else {
             const value = currentObject[currentKey];
-            if (value instanceof Array || value == null || typeof value !== "object")
+            if (value instanceof Array || value == null || typeof value !== "object") {
+                if (nestedKey.length > 0) {
+                    nestedKey.unshift(currentKey + "." + nestedKey.shift()!);
+                    continue;
+                }
+
                 throw new Error(
                     `Cannot create nested object for key "${key}". The key "${currentKey}" is already occupied by a non-object value.`
                 );
+            }
 
             currentObject = value;
         }
+
+        previousKeys.push(currentKey);
     }
 
     return {
         lastObject: currentObject,
         lastKey
     };
+}
+
+function flattenNestedKeys(
+    parent: MetadataNestedObject,
+    newParentKey: string,
+    keyValue: MetadataValue | MetadataNestedObject,
+    logOverrideWarnings: boolean = false
+) {
+    if (typeof keyValue !== "object" || keyValue instanceof Array) {
+        parent[newParentKey] = keyValue;
+        return;
+    }
+
+    for (const [key, subValue] of (Object.entries(keyValue) as [string, MetadataValue | MetadataNestedObject][])) {
+        const newKey = newParentKey + "." + key;
+
+        if (Object.hasOwn(parent, newKey)) {
+            const currentValue = parent[newKey];
+            delete parent[newKey];
+            flattenNestedKeys(parent, newKey, currentValue, logOverrideWarnings);
+
+            if (Object.hasOwn(parent, newKey) && logOverrideWarnings)
+                console.warn(getConsoleLogPrefix() + `Metadata key "${newKey}" is already occupied by a value. Overwriting it.`);
+        }
+
+        parent[newKey] = subValue;
+    }
 }

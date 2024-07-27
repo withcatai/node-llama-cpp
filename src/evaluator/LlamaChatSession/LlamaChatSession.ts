@@ -1,8 +1,8 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {defaultChatSystemPrompt} from "../../config.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions, Token
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions,
+    Token
 } from "../../types.js";
 import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToChatHistory.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
@@ -57,7 +57,20 @@ export type LlamaChatSessionContextShiftOptions = {
 };
 
 export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions | undefined = ChatSessionModelFunctions | undefined> = {
+    /**
+     * Called as the model generates a response with the generated text chunk.
+     *
+     * Useful for streaming the generated response as it's being generated.
+     */
+    onTextChunk?: (text: string) => void,
+
+    /**
+     * Called as the model generates a response with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: (tokens: Token[]) => void,
+
     signal?: AbortSignal,
 
     /**
@@ -165,7 +178,20 @@ export type LLamaChatCompletePromptOptions = {
      */
     stopOnAbortSignal?: LLamaChatPromptOptions["stopOnAbortSignal"],
 
+    /**
+     * Called as the model generates a completion with the generated text chunk.
+     *
+     * Useful for streaming the generated completion as it's being generated.
+     */
+    onTextChunk?: LLamaChatPromptOptions["onTextChunk"],
+
+    /**
+     * Called as the model generates a completion with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: LLamaChatPromptOptions["onToken"],
+
     signal?: LLamaChatPromptOptions["signal"],
     temperature?: LLamaChatPromptOptions["temperature"],
     minP?: LLamaChatPromptOptions["minP"],
@@ -261,7 +287,7 @@ export class LlamaChatSession {
     public constructor({
         contextSequence,
         chatWrapper = "auto",
-        systemPrompt = defaultChatSystemPrompt,
+        systemPrompt,
         forceAddSystemPrompt = false,
         autoDisposeSequence = true,
         contextShift
@@ -282,10 +308,7 @@ export class LlamaChatSession {
 
         const chatWrapperSupportsSystemMessages = this._chat.chatWrapper.settings.supportsSystemMessages;
         if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || forceAddSystemPrompt)
-            this._chatHistory = [{
-                type: "system",
-                text: systemPrompt
-            }];
+            this._chatHistory = this._chat.chatWrapper.generateInitialChatHistory({systemPrompt});
         else
             this._chatHistory = [];
 
@@ -348,6 +371,7 @@ export class LlamaChatSession {
         functions,
         documentFunctionParams,
         maxParallelFunctionCalls,
+        onTextChunk,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -368,8 +392,8 @@ export class LlamaChatSession {
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
-            onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
-            tokenBias, customStopTriggers
+            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix,
+            repeatPenalty, tokenBias, customStopTriggers
         });
 
         return responseText;
@@ -383,6 +407,7 @@ export class LlamaChatSession {
         functions,
         documentFunctionParams,
         maxParallelFunctionCalls,
+        onTextChunk,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -411,6 +436,7 @@ export class LlamaChatSession {
             if (this._chat == null)
                 throw new DisposedError();
 
+            const supportsParallelFunctionCalling = this._chat.chatWrapper.settings.functions.parallelism != null;
             const abortController = wrapAbortSignal(signal);
             let lastEvaluation = this._lastEvaluation;
             let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
@@ -448,6 +474,7 @@ export class LlamaChatSession {
                     documentFunctionParams,
                     maxParallelFunctionCalls,
                     grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                    onTextChunk: safeEventCallback(onTextChunk),
                     onToken: safeEventCallback(onToken),
                     signal: abortController.signal,
                     stopOnAbortSignal,
@@ -545,6 +572,7 @@ export class LlamaChatSession {
 
                         newContextWindowChatHistory = lastEvaluation.contextWindow;
 
+                        let startNewChunk = supportsParallelFunctionCalling;
                         for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
                             newChatHistory = addFunctionCallToChatHistory({
                                 chatHistory: newChatHistory,
@@ -552,7 +580,8 @@ export class LlamaChatSession {
                                 functionDescription: functionDefinition.description,
                                 callParams: functionCall.params,
                                 callResult: functionCallResult,
-                                rawCall: functionCall.raw
+                                rawCall: functionCall.raw,
+                                startsNewChunk: startNewChunk
                             });
 
                             newContextWindowChatHistory = addFunctionCallToChatHistory({
@@ -561,8 +590,11 @@ export class LlamaChatSession {
                                 functionDescription: functionDefinition.description,
                                 callParams: functionCall.params,
                                 callResult: functionCallResult,
-                                rawCall: functionCall.raw
+                                rawCall: functionCall.raw,
+                                startsNewChunk: startNewChunk
                             });
+
+                            startNewChunk = false;
                         }
 
                         lastEvaluation.cleanHistory = newChatHistory;
@@ -653,6 +685,7 @@ export class LlamaChatSession {
 
         functions,
         documentFunctionParams,
+        onTextChunk,
         onToken,
         signal,
         temperature,
@@ -686,6 +719,7 @@ export class LlamaChatSession {
                     functions,
                     documentFunctionParams,
                     grammar,
+                    onTextChunk,
                     onToken,
                     signal: abortController.signal,
                     stopOnAbortSignal: true,
@@ -776,14 +810,16 @@ function addFunctionCallToChatHistory({
     functionDescription,
     callParams,
     callResult,
-    rawCall
+    rawCall,
+    startsNewChunk
 }: {
     chatHistory: ChatHistoryItem[],
     functionName: string,
     functionDescription?: string,
     callParams: any,
     callResult: any,
-    rawCall?: LlamaTextJSON
+    rawCall?: LlamaTextJSON,
+    startsNewChunk?: boolean
 }) {
     const newChatHistory = chatHistory.slice();
     if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
@@ -799,14 +835,19 @@ function addFunctionCallToChatHistory({
     const modelResponse = newLastModelResponseItem.response.slice();
     newLastModelResponseItem.response = modelResponse;
 
-    modelResponse.push({
+    const functionCall: ChatModelFunctionCall = {
         type: "functionCall",
         name: functionName,
         description: functionDescription,
         params: callParams,
         result: callResult,
         rawCall
-    });
+    };
+
+    if (startsNewChunk)
+        functionCall.startsNewChunk = true;
+
+    modelResponse.push(functionCall);
 
     return newChatHistory;
 }

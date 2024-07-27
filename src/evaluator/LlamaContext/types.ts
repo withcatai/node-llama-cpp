@@ -66,6 +66,30 @@ export type LlamaContextOptions = {
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions,
 
+    /**
+     * Load the provided LoRA adapters onto the context.
+     * LoRA adapters are used to modify the weights of a pretrained model to adapt to new tasks or domains
+     * without the need for extensive retraining from scratch.
+     *
+     * If a string is provided, it will be treated as a path to a single LoRA adapter file.
+     */
+    lora?: string | {
+        adapters: Array<{
+            filePath: string,
+
+            /**
+             * @default `1`
+             */
+            scale?: number
+        }>,
+
+        /**
+         * Called with the LoRA adapters load percentage when the LoRA adapters are being loaded.
+         * @param loadProgress - a number between 0 (exclusive) and 1 (inclusive).
+         */
+        onLoadProgress?(loadProgress: number): void
+    },
+
     /** An abort signal to abort the context creation */
     createSignal?: AbortSignal,
 

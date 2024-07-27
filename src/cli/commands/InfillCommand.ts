@@ -461,8 +461,8 @@ async function RunInfill({
                 : maxTokens <= 0
                     ? undefined
                     : maxTokens,
-            onToken(chunk) {
-                process.stdout.write(model.detokenize(chunk));
+            onTextChunk(chunk) {
+                process.stdout.write(chunk);
             }
         });
         process.stdout.write(endColor);

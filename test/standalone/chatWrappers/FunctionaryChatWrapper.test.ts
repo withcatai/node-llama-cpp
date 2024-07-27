@@ -240,7 +240,7 @@ describe("FunctionaryChatWrapper", () => {
                   "value": "
               ",
                 },
-                "{"min":1,"max":6}",
+                "{"min": 1, "max": 6}",
                 {
                   "type": "specialTokensText",
                   "value": "<|reserved_special_token_249|>",
@@ -251,7 +251,7 @@ describe("FunctionaryChatWrapper", () => {
                   "value": "
               ",
                 },
-                "{"min":1,"max":6}",
+                "{"min": 1, "max": 6}",
                 {
                   "type": "specialToken",
                   "value": "EOT",
@@ -578,7 +578,7 @@ describe("FunctionaryChatWrapper", () => {
                   "value": "
               <|content|>",
                 },
-                "{"min":1,"max":6}",
+                "{"min": 1, "max": 6}",
                 {
                   "type": "specialTokensText",
                   "value": "
@@ -591,7 +591,7 @@ describe("FunctionaryChatWrapper", () => {
                   "value": "
               <|content|>",
                 },
-                "{"min":1,"max":6}",
+                "{"min": 1, "max": 6}",
                 {
                   "type": "specialTokensText",
                   "value": "<|stop|>

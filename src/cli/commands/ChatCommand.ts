@@ -33,7 +33,7 @@ type ChatCommand = {
     header?: string[],
     gpu?: BuildGpu | "auto",
     systemInfo: boolean,
-    systemPrompt: string,
+    systemPrompt?: string,
     systemPromptFile?: string,
     prompt?: string,
     promptFile?: string,
@@ -108,8 +108,6 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("systemPrompt", {
                 alias: "s",
                 type: "string",
-                default: defaultChatSystemPrompt,
-                defaultDescription: " ",
                 description:
                     "System prompt to use against the model" +
                     (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
@@ -550,8 +548,8 @@ async function RunChat({
                 : maxTokens <= 0
                     ? undefined
                     : maxTokens,
-            onToken(chunk) {
-                let text = nextPrintLeftovers + model.detokenize(chunk);
+            onTextChunk(chunk) {
+                let text = nextPrintLeftovers + chunk;
                 nextPrintLeftovers = "";
 
                 if (trimWhitespace) {

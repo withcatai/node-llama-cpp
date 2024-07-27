@@ -1,9 +1,11 @@
 import {DisposedError} from "lifecycle-utils";
 import {Token, Tokenizer} from "../types.js";
+import {maxRecentDetokenizerTokens} from "../consts.js";
 import {pushAll} from "./pushAll.js";
 
 export class TokenStreamRegulator {
     /** @internal */ private readonly _queue: QueuedTokenRelease[] = [];
+    /** @internal */ private readonly _LastTokens: Token[] = [];
 
     public addChunk({tokens, text}: {tokens: Token[], text: string}) {
         const queuedRelease = QueuedTokenRelease._create(tokens, text);
@@ -16,8 +18,14 @@ export class TokenStreamRegulator {
     public popFreeChunkTokens() {
         const res: Token[] = [];
 
-        while (this._queue.length > 0 && this._queue[0].isFree)
-            pushAll(res, this._queue.shift()!.tokens);
+        while (this._queue.length > 0 && this._queue[0].isFree) {
+            const tokens = this._queue.shift()!.tokens;
+            pushAll(res, tokens);
+            pushAll(this._LastTokens, tokens);
+        }
+
+        if (this._LastTokens.length > maxRecentDetokenizerTokens)
+            this._LastTokens.splice(0, this._LastTokens.length - maxRecentDetokenizerTokens);
 
         return res;
     }
@@ -35,13 +43,13 @@ export class TokenStreamRegulator {
                 const tokens = queuedRelease.tokens.slice(0, queuedRelease.getFreeTokenIndex());
                 return {
                     tokens,
-                    text: tokenizer.detokenize(tokens)
+                    text: tokenizer.detokenize(tokens, false, this._LastTokens)
                 };
             }
 
             const freeTokenIndex = queuedRelease.getFreeTokenIndex();
             const tokens = queuedRelease.tokens.slice(0, freeTokenIndex);
-            const tokensText = tokenizer.detokenize(tokens);
+            const tokensText = tokenizer.detokenize(tokens, false, this._LastTokens);
 
             const freeTextIndex = queuedRelease.getFreeTextIndex();
             const text = queuedRelease.text.slice(0, freeTextIndex);
@@ -55,8 +63,10 @@ export class TokenStreamRegulator {
                 const resTokens: Token[] = [];
                 let resTokensText = "";
 
+                const lastTokens = this._LastTokens.slice();
                 for (const token of tokens) {
-                    const tokenText = tokenizer.detokenize([token]);
+                    const tokenText = tokenizer.detokenize([token], false, lastTokens);
+                    lastTokens.push(token);
 
                     if (resTokensText.length + tokenText.length > text.length) {
                         const remainingText = text.slice(resTokensText.length);
@@ -88,6 +98,18 @@ export class TokenStreamRegulator {
     }
 
     public getAllQueuedChunkTokens() {
+        return this._queue.flatMap((queuedRelease) => queuedRelease.tokens);
+    }
+
+    public getLastQueuedChunkTokens(maxTokens: number = maxRecentDetokenizerTokens) {
+        const res: Token[] = [];
+
+        for (let i = this._queue.length - 1; i >= 0 && res.length < maxTokens; i--) {
+            const tokens = this._queue[i].tokens;
+            for (let j = tokens.length - 1; j >= 0 && res.length < maxTokens; j--)
+                res.unshift(tokens[j]);
+        }
+
         return this._queue.flatMap((queuedRelease) => queuedRelease.tokens);
     }
 

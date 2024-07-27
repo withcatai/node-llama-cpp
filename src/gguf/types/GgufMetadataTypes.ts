@@ -132,6 +132,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * that the model is defined in.
      */
     readonly name?: string,
+    readonly basename?: string,
     readonly author?: string,
 
     /**
@@ -151,6 +152,8 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * such as the license text or the URL to the license.
      */
     readonly license?: string,
+    readonly "license.name"?: string,
+    readonly "license.link"?: string,
 
     /**
      * Information about where this model came from. This is useful for tracking
@@ -172,7 +175,21 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * An enumerated value describing the type of the majority of the tensors
      * in the file. Optional; can be inferred from the tensor types.
      */
-    readonly file_type?: GgufFileType | undefined
+    readonly file_type?: GgufFileType | undefined,
+
+    readonly base_model?: {
+        readonly count: number,
+        readonly [key: `${bigint}`]: {
+            readonly name?: string,
+            readonly author?: string,
+            readonly version?: string,
+            readonly organization?: string,
+            readonly url?: string,
+            readonly doi?: string,
+            readonly uuid?: string,
+            readonly repo_url?: string
+        }
+    }
 };
 
 export const enum GgufMetadataTokenizerTokenType {

@@ -114,8 +114,9 @@ export type LlamaOptions = {
     /**
      * Pad the available VRAM for the memory size calculations, as these calculations are not always accurate.
      * Recommended to ensure stability.
+     * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
      *
-     * Defaults to `1.5%` of the total VRAM or 300MB, whichever is lower.
+     * Defaults to `6%` of the total VRAM or 1GB, whichever is lower.
      * Set to `0` to disable.
      */
     vramPadding?: number | ((totalVram: number) => number),
@@ -168,7 +169,7 @@ export type LastBuildOptions = {
      * Recommended to ensure stability.
      * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
      *
-     * Defaults to `6%` of the total VRAM or 300MB, whichever is lower.
+     * Defaults to `6%` of the total VRAM or 1GB, whichever is lower.
      * Set to `0` to disable.
      */
     vramPadding?: number | ((totalVram: number) => number),
@@ -186,7 +187,7 @@ export type LastBuildOptions = {
 
 export const getLlamaFunctionName = "getLlama";
 
-export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 300 * 1024 * 1024));
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 1024 * 1024 * 1024));
 const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInElectron
     ? "never"
     : "auto";

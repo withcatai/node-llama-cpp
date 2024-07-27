@@ -1,9 +1,11 @@
 import {
-    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperGenerateContextStateOptions,
-    ChatWrapperGeneratedContextState, ChatWrapperSettings
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperCheckModelCompatibilityParams,
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
 } from "./types.js";
 import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
+import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
+import {defaultChatSystemPrompt} from "./config.js";
 
 export abstract class ChatWrapper {
     public static defaultSettings: ChatWrapperSettings = {
@@ -105,7 +107,7 @@ export abstract class ChatWrapper {
             (
                 params === undefined
                     ? ""
-                    : JSON.stringify(params)
+                    : jsonDumps(params)
             ),
             this.settings.functions.call.suffix
         ]);
@@ -120,7 +122,7 @@ export abstract class ChatWrapper {
 
                     return value
                         .replaceAll("{{functionName}}", functionName)
-                        .replaceAll("{{functionParams}}", functionParams === undefined ? "" : JSON.stringify(functionParams));
+                        .replaceAll("{{functionParams}}", functionParams === undefined ? "" : jsonDumps(functionParams));
                 });
         }
 
@@ -129,7 +131,7 @@ export abstract class ChatWrapper {
             (
                 result === undefined
                     ? "void"
-                    : JSON.stringify(result)
+                    : jsonDumps(result)
             ),
             resolveParameters(this.settings.functions.result.suffix)
         ]);
@@ -153,6 +155,9 @@ export abstract class ChatWrapper {
                 res.push(LlamaText(response));
                 continue;
             }
+
+            if (response.startsNewChunk)
+                addFunctionCalls();
 
             pendingFunctionCalls.push(response);
         }
@@ -181,9 +186,9 @@ export abstract class ChatWrapper {
             "Calling any of the provided functions can be done like this:",
             this.generateFunctionCall("getSomeInfo", {someKey: "someValue"}),
             "",
-            "Note that the || prefix is mandatory",
+            "Note that the || prefix is mandatory.",
             "The assistant does not inform the user about using functions and does not explain anything before calling a function.",
-            "After calling a function, the raw result appears afterwards and is not part of the conversation",
+            "After calling a function, the raw result appears afterwards and is not part of the conversation.",
             "To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax."
         ]);
     }
@@ -209,9 +214,23 @@ export abstract class ChatWrapper {
         return res;
     }
 
+    public generateInitialChatHistory({
+        systemPrompt = defaultChatSystemPrompt
+    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
+        return [{
+            type: "system",
+            text: LlamaText(systemPrompt ?? defaultChatSystemPrompt).toJSON()
+        }];
+    }
+
     /** @internal */
     public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): Record<string | symbol, any>[] {
         return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
+    }
+
+    /** @internal */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    public static _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
+        return true;
     }
 }
 

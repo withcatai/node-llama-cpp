@@ -1,7 +1,7 @@
 import {describe, expect, test} from "vitest";
 import {
     AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper,
-    Llama2ChatWrapper, Llama3ChatWrapper, resolveChatWrapper
+    Llama2ChatWrapper, Llama3_1ChatWrapper, resolveChatWrapper
 } from "../../../../src/index.js";
 
 
@@ -120,7 +120,7 @@ const llama2ChatJinjaTemplate = `
 {%- endfor -%}
 `.slice(1, -1);
 
-const llama3ChatJinjaTemplate = `
+const llama3_1ChatJinjaTemplate = `
 {%- set loop_messages = messages -%}
 {%- for message in loop_messages -%}
     {%- set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n'+ message['content'] | trim + eot_token -%}
@@ -236,11 +236,11 @@ describe("resolveChatWrapper", () => {
         const chatWrapper = resolveChatWrapper({
             customWrapperSettings: {
                 jinjaTemplate: {
-                    template: llama3ChatJinjaTemplate
+                    template: llama3_1ChatJinjaTemplate
                 }
             },
             fallbackToOtherWrappersOnJinjaError: false
         });
-        expect(chatWrapper).to.be.instanceof(Llama3ChatWrapper);
+        expect(chatWrapper).to.be.instanceof(Llama3_1ChatWrapper);
     });
 });

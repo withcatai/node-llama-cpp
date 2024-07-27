@@ -12,13 +12,14 @@ import {LlamaText, LlamaTextJSON, SpecialToken} from "../../utils/LlamaText.js";
 import {StopGenerationDetector} from "../../utils/StopGenerationDetector.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock, TokenStreamRegulator} from "../../utils/TokenStreamRegulator.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
-import {UNKNOWN_UNICODE_CHAR} from "../../consts.js";
+import {maxRecentDetokenizerTokens, UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {pushAll} from "../../utils/pushAll.js";
+import {resolveLastTokens} from "../../utils/resolveLastTokens.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -36,7 +37,20 @@ export type LlamaChatOptions = {
 };
 
 export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
+    /**
+     * Called as the model generates a response with the generated text chunk.
+     *
+     * Useful for streaming the generated response as it's being generated.
+     */
+    onTextChunk?: (text: string) => void,
+
+    /**
+     * Called as the model generates a response with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: (tokens: Token[]) => void,
+
     signal?: AbortSignal,
 
     /**
@@ -167,7 +181,20 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
      */
     stopOnAbortSignal?: boolean,
 
+    /**
+     * Called as the model generates a completion with the generated text chunk.
+     *
+     * Useful for streaming the generated completion as it's being generated.
+     */
+    onTextChunk?: LLamaChatGenerateResponseOptions<Functions>["onTextChunk"],
+
+    /**
+     * Called as the model generates a completion with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: LLamaChatGenerateResponseOptions<Functions>["onToken"],
+
     signal?: LLamaChatGenerateResponseOptions<Functions>["signal"],
     maxTokens?: LLamaChatGenerateResponseOptions<Functions>["maxTokens"],
     temperature?: LLamaChatGenerateResponseOptions<Functions>["temperature"],
@@ -331,6 +358,7 @@ export class LlamaChat {
         options: LLamaChatGenerateResponseOptions<Functions> = {}
     ): Promise<LlamaChatResponse<Functions>> {
         const {
+            onTextChunk,
             onToken,
             signal,
             stopOnAbortSignal = false,
@@ -361,6 +389,7 @@ export class LlamaChat {
             this._chatWrapper,
             history,
             {
+                onTextChunk,
                 onToken,
                 signal,
                 stopOnAbortSignal,
@@ -493,6 +522,7 @@ export class LlamaChat {
         const {
             initialUserPrompt = "",
             stopOnAbortSignal = false,
+            onTextChunk,
             onToken,
             signal,
             maxTokens = Math.min(256, Math.ceil(this.context.contextSize / 2)),
@@ -527,6 +557,7 @@ export class LlamaChat {
             this._chatWrapper,
             history,
             {
+                onTextChunk,
                 onToken,
                 signal,
                 stopOnAbortSignal,
@@ -1169,6 +1200,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly chatWrapper: ChatWrapper;
 
     private readonly history: ChatHistoryItem[];
+    private readonly onTextChunk: LLamaChatGenerateResponseOptions<Functions>["onTextChunk"];
     private readonly onToken: LLamaChatGenerateResponseOptions<Functions>["onToken"];
     private readonly signal: LLamaChatGenerateResponseOptions<Functions>["signal"];
     private readonly stopOnAbortSignal: LLamaChatGenerateResponseOptions<Functions>["stopOnAbortSignal"];
@@ -1265,6 +1297,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         chatWrapper: ChatWrapper,
         history: ChatHistoryItem[],
         {
+            onTextChunk,
             onToken,
             signal,
             stopOnAbortSignal = false,
@@ -1294,6 +1327,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.chatWrapper = chatWrapper;
 
         this.history = history;
+        this.onTextChunk = safeEventCallback(onTextChunk);
         this.onToken = safeEventCallback(onToken);
         this.signal = signal;
         this.stopOnAbortSignal = stopOnAbortSignal;
@@ -1451,13 +1485,18 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             let mostExhaustiveTriggeredStops: ReturnType<typeof this.ignoreStartTextDetector.getTriggeredStops> | null = null;
             let mostExhaustiveTriggeredStopsLeftoverTokens: Token[] = [];
 
+            const lastTokensForDetokenizer = resolveLastTokens([
+                this.contextWindowTokens,
+                this.ignoredStartTextTokens
+            ]);
             for (let i = 0; i < this.pendingTokens.length; i++) {
                 this.ignoreStartTextDetector.recordGeneration({
-                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]]),
+                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]], false, lastTokensForDetokenizer),
                     tokens: [this.pendingTokens[i]],
                     startNewChecks: i === 0,
                     triggerMustStartWithGeneration: true
                 });
+                lastTokensForDetokenizer.push(this.pendingTokens[i]);
 
                 if (this.ignoreStartTextDetector.hasTriggeredStops) {
                     mostExhaustiveTriggeredStops = this.ignoreStartTextDetector.getTriggeredStops();
@@ -1649,6 +1688,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 const prefixTokens = LlamaText(this.chatWrapper.settings.functions.call.prefix)
                     .tokenize(this.llamaChat.model.tokenizer, "trimLeadingSpace");
                 const prefixDetector = new StopGenerationDetector();
+                const prefixDetectorRecordedTokens: Token[] = [];
                 const afterPrefixLeftoverTokens: Token[] = [];
                 prefixDetector.addStopTrigger(
                     StopGenerationDetector.resolveLlamaTextTrigger(
@@ -1657,9 +1697,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     )
                 );
 
+                const lastTokensForDetokenizer = this.streamRegulator.getLastQueuedChunkTokens();
                 for (const prefixToken of prefixTokens) {
                     const tokens = [prefixToken];
-                    const text = this.llamaChat.model.detokenize(tokens);
+                    const text = this.llamaChat.model.detokenize(tokens, false, lastTokensForDetokenizer);
+                    pushAll(lastTokensForDetokenizer, tokens);
                     const disregardedPossibilities = this.disengageInitiallyEngagedFunctionMode
                         .getDisregardedPossibilitiesCountForAGeneration({
                             text,
@@ -1681,13 +1723,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (prefixDetector.hasTriggeredStops)
                         afterPrefixLeftoverTokens.push(prefixToken);
-                    else
+                    else {
                         prefixDetector.recordGeneration({
                             text: text,
                             tokens: tokens,
                             startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
                             triggerMustStartWithGeneration: true
                         });
+                        pushAll(prefixDetectorRecordedTokens, tokens);
+                    }
                 }
 
                 for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
@@ -1706,13 +1750,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (prefixDetector.hasTriggeredStops)
                         afterPrefixLeftoverTokens.push(token);
-                    else
+                    else {
                         prefixDetector.recordGeneration({
                             text: this.currentText,
                             tokens: this.currentTokens,
                             startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
                             triggerMustStartWithGeneration: true
                         });
+                        pushAll(prefixDetectorRecordedTokens, this.currentTokens);
+                    }
 
                     if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops ||
                         !this.disengageInitiallyEngagedFunctionMode.hasInProgressStops
@@ -1725,10 +1771,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     return abortRes;
 
                 if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops) {
+                    const lastTokensForDetokenizer = this.streamRegulator.getLastQueuedChunkTokens();
                     for (const token of this.currentFunctionCallCurrentPartTokens) {
                         this.currentToken = token;
                         this.currentTokens = [this.currentToken];
-                        this.currentText = this.llamaChat.model.detokenize(this.currentTokens);
+                        this.currentText = this.llamaChat.model.detokenize(this.currentTokens, false, lastTokensForDetokenizer);
+                        pushAll(lastTokensForDetokenizer, this.currentTokens);
 
                         this.currentQueuedTokenRelease = this.streamRegulator.addChunk({
                             tokens: this.currentTokens,
@@ -1744,11 +1792,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                 if (prefixDetector.hasTriggeredStops) {
                     const triggeredStops = prefixDetector.getTriggeredStops();
-                    const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+                    const {
+                        firstRemainingGenerationAfterStop,
+                        stopTrigger
+                    } = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
                     this.currentFunctionCallPreviousPartLeftoverText = StopGenerationDetector.detokenizeRemainingGeneration(
                         firstRemainingGenerationAfterStop,
-                        this.llamaChat.model.detokenize
-                    ) + this.llamaChat.model.detokenize(afterPrefixLeftoverTokens);
+                        stopTrigger,
+                        this.llamaChat.model.tokenizer
+                    ) + this.llamaChat.model.detokenize(afterPrefixLeftoverTokens, false, prefixDetectorRecordedTokens);
                 } else
                     this.currentFunctionCallPreviousPartLeftoverText = "";
 
@@ -1786,6 +1838,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         const leftoverTokens = this.llamaChat.model.tokenize(this.currentFunctionCallPreviousPartLeftoverText, false, "trimLeadingSpace");
                         this.currentFunctionCallPreviousPartLeftoverText = "";
 
+                        const lastTokens: Token[] = [];
                         for (const leftoverToken of leftoverTokens) {
                             const canBeNextToken = this.llamaChat.context._canBeNextTokenForGrammarEvaluationState(
                                 this.functionsEvaluationState,
@@ -1798,9 +1851,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                             this.llamaChat.context._acceptTokenOnGrammarEvaluationState(this.functionsEvaluationState, leftoverToken);
                             this.currentFunctionCallCurrentPartTokens.push(leftoverToken);
                             functionNameGenerationDoneDetector.recordGeneration({
-                                text: this.llamaChat.model.detokenize([leftoverToken]),
+                                text: this.llamaChat.model.detokenize([leftoverToken], false, lastTokens),
                                 tokens: [leftoverToken]
                             });
+                            lastTokens.push(leftoverToken);
                         }
                     }
                 }
@@ -1833,6 +1887,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     this.functionEvaluationFunctionName,
                     this.chatWrapper.settings.functions.call.paramsPrefix
                 ]);
+                const lastPartTokens = resolveLastTokens([this.currentFunctionCallCurrentPartTokens]);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
 
                 let params: any = undefined;
@@ -1878,7 +1933,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     if (abortRes != null)
                         return abortRes;
 
-                    const functionCallParamsText = this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens);
+                    const functionCallParamsText =
+                        this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens, false, lastPartTokens);
                     const parsedFunctionParams = functionParamsGrammar.parseParams(functionCallParamsText);
                     params = parsedFunctionParams.params;
                     paramsText = parsedFunctionParams.raw;
@@ -1989,12 +2045,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
         this.removeFoundStartIgnoreTextsFromPendingTokens(true);
 
-        if (this.pendingTokens.length > 0)
-            this.onToken?.(this.pendingTokens.slice());
-
-        pushAll(this.res, this.pendingTokens);
-        pushAll(this.contextWindowsRes, this.pendingTokens);
-        this.pendingTokens.length = 0;
+        this.pushPendingTokensAndCallOnToken();
 
         this.streamRegulator.clearQueue();
 
@@ -2147,7 +2198,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (this.currentIteration != null && this.currentIteration?.done !== true) {
             this.currentToken = this.currentIteration.value;
             this.currentTokens = [this.currentToken];
-            this.currentText = this.llamaChat.model.detokenize(this.currentTokens);
+            this.currentText = this.llamaChat.model.detokenize(this.currentTokens, false, this.getLastTokens());
 
             if (this.functionEvaluationMode === false)
                 this.currentQueuedTokenRelease = this.streamRegulator.addChunk({
@@ -2205,10 +2256,14 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             );
             pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
-            const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+            const {
+                firstRemainingGenerationAfterStop,
+                stopTrigger
+            } = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
             const remainingTextAfterStop = StopGenerationDetector.detokenizeRemainingGeneration(
                 firstRemainingGenerationAfterStop,
-                this.llamaChat.model.detokenize
+                stopTrigger,
+                this.llamaChat.model.tokenizer
             );
 
             this.currentFunctionCallPreviousPartLeftoverText = remainingTextAfterStop;
@@ -2253,16 +2308,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             );
             pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
-            const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+            const {firstRemainingGenerationAfterStop} = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
             this.removeFoundStartIgnoreTextsFromPendingTokens(true);
 
-            if (this.pendingTokens.length > 0)
-                this.onToken?.(this.pendingTokens.slice());
-
-            pushAll(this.res, this.pendingTokens);
-            pushAll(this.contextWindowsRes, this.pendingTokens);
-            this.pendingTokens.length = 0;
+            this.pushPendingTokensAndCallOnToken();
 
             let modelResponse = this.llamaChat.model.detokenize(this.res);
             let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
@@ -2319,8 +2369,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.ignoreStartTextDetector.clearInProgressStops();
             this.ignoreStartTextDetector.clearTriggeredStops();
 
+            const lastTokensForDetokenizer = resolveLastTokens([
+                this.contextWindowTokens,
+                this.ignoredStartTextTokens
+            ]);
             this.ignoreStartTextDetector.recordGeneration({
-                text: this.llamaChat.model.detokenize(this.pendingTokens),
+                text: this.llamaChat.model.detokenize(this.pendingTokens, false, lastTokensForDetokenizer),
                 tokens: this.pendingTokens
             });
         }
@@ -2335,12 +2389,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             if (removeFoundStartIgnoreTextsFromPendingTokens)
                 this.removeFoundStartIgnoreTextsFromPendingTokens();
 
-            if (this.pendingTokens.length > 0) {
-                this.onToken?.(this.pendingTokens.slice());
-                pushAll(this.res, this.pendingTokens);
-                pushAll(this.contextWindowsRes, this.pendingTokens);
-                this.pendingTokens.length = 0;
-            }
+            this.pushPendingTokensAndCallOnToken();
         }
     }
 
@@ -2423,4 +2472,26 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
         return undefined;
     }
+
+    private pushPendingTokensAndCallOnToken() {
+        if (this.pendingTokens.length === 0)
+            return;
+
+        this.onToken?.(this.pendingTokens.slice());
+        this.onTextChunk?.(this.llamaChat.model.detokenize(this.pendingTokens, false, this.res));
+        pushAll(this.res, this.pendingTokens);
+        pushAll(this.contextWindowsRes, this.pendingTokens);
+        this.pendingTokens.length = 0;
+    }
+
+    private getLastTokens(maxTokens: number = maxRecentDetokenizerTokens): Token[] {
+        return resolveLastTokens([
+            this.contextWindowTokens,
+            this.ignoredStartTextTokens,
+            this.pendingTokens,
+            this.streamRegulator.getLastQueuedChunkTokens(maxTokens),
+            this.getContextWindowFunctionCallsTokens()
+        ], maxTokens);
+    }
 }
+

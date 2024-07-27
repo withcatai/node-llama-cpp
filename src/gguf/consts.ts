@@ -8,3 +8,8 @@ export const ggufDefaultFetchRetryOptions: retry.Options = {
 } as const;
 
 export const defaultExtraAllocationSize = 1024 * 1024 * 1.5; // 1.5MB
+
+export const noDirectSubNestingGGufMetadataKeys: readonly string[] = [
+    "general.license",
+    "tokenizer.chat_template"
+];

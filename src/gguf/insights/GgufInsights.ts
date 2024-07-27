@@ -277,6 +277,11 @@ export class GgufInsights {
                     return res + tensor.dimensions.reduce((res: number, dim) => res + Number(dim), 0);
                 }, 0);
 
+            if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.phi3) {
+                // magic numbers for estimation. will be improved in the future
+                return (totalElements * 123 * (actualContextSize / 4096)) + defaultCalculationAdjustment;
+            }
+
             // magic numbers for estimation. will be improved in the future
             return (totalElements * 77.655 * (actualContextSize / 4096)) + defaultCalculationAdjustment;
         };

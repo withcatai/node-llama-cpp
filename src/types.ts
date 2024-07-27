@@ -1,12 +1,13 @@
 import {GbnfJsonSchema, GbnfJsonSchemaToType} from "./utils/gbnfJson/types.js";
 import {LlamaText, BuiltinSpecialTokenValue, LlamaTextJSON} from "./utils/LlamaText.js";
+import type {GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
 
 export type Token = number & {
     __token: never
 };
 
 export type Detokenizer = {
-    detokenize(tokens: readonly Token[], specialTokens?: boolean): string
+    detokenize(tokens: readonly Token[], specialTokens?: boolean, lastTokens?: readonly Token[]): string
 }["detokenize"];
 export type Tokenizer = {
     tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[],
@@ -87,6 +88,11 @@ export type ChatWrapperGenerateContextStateOptions = {
     documentFunctionParams?: boolean
 };
 
+export type ChatWrapperCheckModelCompatibilityParams = {
+    tokenizer?: Tokenizer,
+    fileInfo?: GgufFileInfo
+};
+
 export type ChatWrapperGeneratedContextState = {
     contextText: LlamaText,
     stopGenerationTriggers: LlamaText[],
@@ -95,6 +101,10 @@ export type ChatWrapperGeneratedContextState = {
         initiallyEngaged: boolean,
         disengageInitiallyEngaged: LlamaText[]
     }
+};
+
+export type ChatWrapperGenerateInitialHistoryOptions = {
+    systemPrompt?: string
 };
 
 export type ChatHistoryItem = ChatSystemMessage | ChatUserMessage | ChatModelResponse;
@@ -117,7 +127,14 @@ export type ChatModelFunctionCall = {
     description?: string,
     params: any,
     result: any,
-    rawCall?: LlamaTextJSON
+    rawCall?: LlamaTextJSON,
+
+    /**
+     * Whether this function call starts a new function calling chunk.
+     *
+     * Relevant only when parallel function calling is supported.
+     */
+    startsNewChunk?: boolean
 };
 
 export type ChatModelFunctions = {

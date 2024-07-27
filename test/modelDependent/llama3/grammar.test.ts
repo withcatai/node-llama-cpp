@@ -7,7 +7,7 @@ describe("llama 3", () => {
     describe("grammar", () => {
         describe("JSON schema", () => {
             test("find verb in message", {timeout: 1000 * 60 * 60 * 2}, async () => {
-                const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+                const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
                 const model = await llama.loadModel({
@@ -45,7 +45,7 @@ describe("llama 3", () => {
             });
 
             test("get an array of numbers", {timeout: 1000 * 60 * 60 * 2}, async () => {
-                const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct.Q4_K_M.gguf");
+                const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
                 const model = await llama.loadModel({

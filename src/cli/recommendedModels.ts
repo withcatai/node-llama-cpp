@@ -1,66 +1,86 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
-    name: "Llama 3 8B",
+    name: "Llama 3.1 8B",
     abilities: ["chat", "complete", "functionCalling"],
-    description: "Llama 3 model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+    description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
         "This is the 8 billion parameters version of the model.",
 
     fileOptions: [{
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-8B-Instruct.Q8_0.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-8B-Instruct.Q6_K.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct-Q5_K_L.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-8B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-8B-Instruct.Q4_K_S.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
         }
     }]
 }, {
-    name: "Llama 3 70B",
+    name: "Llama 3.1 70B",
     abilities: ["chat", "complete", "functionCalling"],
-    description: "Llama 3 model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
+    description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
         "This is the 70 billion parameters version of the model. " +
         "You need a GPU with a lot of VRAM to use this version.",
 
     fileOptions: [{
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-70B-Instruct.Q8_0.gguf.part1of2"
+            file: "Meta-Llama-3.1-70B-Instruct-Q8_0/Meta-Llama-3.1-70B-Instruct-Q8_0-00001-of-00002.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-70B-Instruct.Q6_K.gguf.part1of2"
+            file: "Meta-Llama-3.1-70B-Instruct-Q6_K_L/Meta-Llama-3.1-70B-Instruct-Q6_K_L-00001-of-00002.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-70B-Instruct.Q4_K_M.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf"
         }
     }, {
         huggingFace: {
-            model: "mradermacher/Meta-Llama-3-70B-Instruct-GGUF",
+            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3-70B-Instruct.Q4_K_S.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3.1-70B-Instruct-IQ4_XS.gguf"
+        }
+    }]
+}, {
+    name: "Llama 3.1 405B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This is the 405 billion parameters version of the model, and its capabilities are comparable and sometimes even surpass GPT-4o and Claude 3.5 Sonnet.\n" +
+        "You need a GPU with a lot of VRAM to use this version of Llama 3.1.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3.1-405B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3.1-405B-Instruct.Q3_K_L.gguf.part1of5"
         }
     }]
 }, {
@@ -71,15 +91,15 @@ export const recommendedModels: ModelRecommendation[] = [{
 
     fileOptions: [{
         huggingFace: {
-            model: "microsoft/Phi-3-mini-4k-instruct-gguf",
+            model: "bartowski/Phi-3.1-mini-4k-instruct-GGUF",
             branch: "main",
-            file: "Phi-3-mini-4k-instruct-fp16.gguf"
+            file: "Phi-3.1-mini-4k-instruct-Q8_0.gguf"
         }
     }, {
         huggingFace: {
-            model: "microsoft/Phi-3-mini-4k-instruct-gguf",
+            model: "bartowski/Phi-3.1-mini-4k-instruct-GGUF",
             branch: "main",
-            file: "Phi-3-mini-4k-instruct-q4.gguf"
+            file: "Phi-3.1-mini-4k-instruct-Q4_K_M.gguf"
         }
     }]
 }, {

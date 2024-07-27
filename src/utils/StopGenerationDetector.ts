@@ -1,4 +1,4 @@
-import {Detokenizer, Token, Tokenizer} from "../types.js";
+import {Token, Tokenizer} from "../types.js";
 import {SpecialToken, isLlamaText, LlamaText, SpecialTokensText} from "./LlamaText.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock} from "./TokenStreamRegulator.js";
 
@@ -338,18 +338,26 @@ export class StopGenerationDetector<T extends string = string> {
         );
     }
 
-    public static getFirstRemainingGenerationAfterStop(triggeredStops: TriggeredStop[]): string | Token[] | undefined {
-        const [firstRemainingGenerationAfterStop] = triggeredStops
-            .map((stopTrigger) => stopTrigger.remainingGeneration)
-            .filter((remainingGenerations) => remainingGenerations.length > 0)
-            .flat(1);
+    public static getFirstRemainingGenerationAfterStop(triggeredStops: TriggeredStop[]): {
+        stopTrigger: StopGenerationTrigger | undefined,
+        firstRemainingGenerationAfterStop: string | Token[] | undefined
+    } {
+        const [stopTrigger] = triggeredStops
+            .filter((stopTrigger) => (
+                stopTrigger.remainingGeneration.some((remainingGeneration) => remainingGeneration.length > 0)
+            ));
 
-        return firstRemainingGenerationAfterStop;
+        return {
+            stopTrigger: stopTrigger?.stopTrigger ?? triggeredStops?.[0]?.stopTrigger,
+            firstRemainingGenerationAfterStop:
+                stopTrigger?.remainingGeneration?.filter((remainingGeneration) => remainingGeneration.length > 0)?.[0]
+        };
     }
 
     public static detokenizeRemainingGeneration(
         remainingGeneration: string | Token[] | undefined,
-        detokenizer: Detokenizer,
+        stopTrigger: StopGenerationTrigger | undefined,
+        tokenizer: Tokenizer,
         specialTokens: boolean = false
     ) {
         if (remainingGeneration == null || remainingGeneration.length === 0)
@@ -358,7 +366,7 @@ export class StopGenerationDetector<T extends string = string> {
         if (typeof remainingGeneration === "string")
             return remainingGeneration;
 
-        return detokenizer(remainingGeneration, specialTokens);
+        return tokenizer.detokenize(remainingGeneration, specialTokens, tokenizeStopTrigger(stopTrigger, tokenizer, specialTokens));
     }
 }
 
@@ -382,6 +390,27 @@ function simplifyStopTrigger(stopTrigger: Readonly<StopGenerationTrigger>): Stop
 
     if (text !== "")
         res.push(text);
+
+    return res;
+}
+
+function tokenizeStopTrigger(
+    stopTrigger: StopGenerationTrigger | undefined,
+    tokenizer: Tokenizer,
+    specialTokens: boolean = false
+): Token[] {
+    if (stopTrigger == null)
+        return [];
+
+    const res: Token[] = [];
+
+    for (const item of stopTrigger) {
+        if (typeof item === "string") {
+            const tokens = tokenizer(item, specialTokens, "trimLeadingSpace");
+            res.push(...tokens);
+        } else
+            res.push(item);
+    }
 
     return res;
 }
