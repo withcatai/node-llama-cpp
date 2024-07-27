@@ -1,4 +1,4 @@
-import {Detokenizer, Token, Tokenizer} from "../types.js";
+import {Token, Tokenizer} from "../types.js";
 import {SpecialToken, isLlamaText, LlamaText, SpecialTokensText} from "./LlamaText.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock} from "./TokenStreamRegulator.js";
 

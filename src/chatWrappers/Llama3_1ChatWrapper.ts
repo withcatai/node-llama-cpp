@@ -4,9 +4,9 @@ import {
     ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
 } from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
+import {defaultChatSystemPrompt} from "../config.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./utils/jsonDumps.js";
-import {defaultChatSystemPrompt} from "../config.js";
 
 // source: https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_1
 export class Llama3_1ChatWrapper extends ChatWrapper {
@@ -54,17 +54,20 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
 
         this.cuttingKnowledgeDate = cuttingKnowledgeDate == null
             ? null
-            : new Date(cuttingKnowledgeDate)
+            : new Date(cuttingKnowledgeDate);
         this.todayDate = todayDate == null
             ? null
             : new Date(todayDate);
     }
 
-    public override addAvailableFunctionsSystemMessageToHistory(history: readonly ChatHistoryItem[], availableFunctions?: ChatModelFunctions, {
-        documentParams = true
-    }: {
-        documentParams?: boolean
-    } = {}) {
+    public override addAvailableFunctionsSystemMessageToHistory(
+        history: readonly ChatHistoryItem[],
+        availableFunctions?: ChatModelFunctions, {
+            documentParams = true
+        }: {
+            documentParams?: boolean
+        } = {}
+    ) {
         const availableFunctionNames = Object.keys(availableFunctions ?? {});
 
         if (availableFunctions == null || availableFunctionNames.length === 0)
@@ -232,7 +235,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                 new SpecialTokensText("<function="),
                 "example_function_name",
                 new SpecialTokensText(">"),
-                jsonDumps({example_name: "example_value"}),
+                jsonDumps({"example_name": "example_value"}),
                 new SpecialTokensText("</function>")
             ]),
             "",
@@ -250,8 +253,8 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         const res: ChatHistoryItem[] = [];
 
         function formatDate(date: Date) {
-            const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: "UTC"})
-            const month = date.toLocaleDateString("en-US", {month: "short", timeZone: "UTC"})
+            const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: "UTC"});
+            const month = date.toLocaleDateString("en-US", {month: "short", timeZone: "UTC"});
             const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: "UTC"});
             return `${day} ${month} ${year}`;
         }
@@ -261,12 +264,12 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             if (today.getUTCMonth() === date.getUTCMonth() && today.getUTCFullYear() === date.getUTCFullYear())
                 return formatDate(date);
 
-            const month = date.toLocaleDateString("en-US", {month: "long", timeZone: "UTC"})
+            const month = date.toLocaleDateString("en-US", {month: "long", timeZone: "UTC"});
             const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: "UTC"});
             return `${month} ${year}`;
         };
 
-        let lines: string[] = [];
+        const lines: string[] = [];
 
         if (this.cuttingKnowledgeDate != null)
             lines.push(`Cutting Knowledge Date: ${formatMonthDate(this.cuttingKnowledgeDate)}`);
@@ -294,7 +297,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     /** @internal */
     public static override _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         if (options.tokenizer != null) {
-            const tokens = options.tokenizer("<|eom_id|>", true, "trimLeadingSpace")
+            const tokens = options.tokenizer("<|eom_id|>", true, "trimLeadingSpace");
             return tokens.length === 1 && options.tokenizer.isSpecialToken(tokens[0]);
         }
 

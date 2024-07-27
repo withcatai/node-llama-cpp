@@ -228,7 +228,7 @@ export abstract class ChatWrapper {
         return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
     }
 
-    /** @internal */
+    /** @internal */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public static _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         return true;
     }

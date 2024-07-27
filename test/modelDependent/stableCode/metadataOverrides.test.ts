@@ -13,7 +13,7 @@ describe("stableCode", () => {
                 metadataOverrides: {
                     tokenizer: {
                         ggml: {
-                            add_bos_token: false
+                            "add_bos_token": false
                         }
                     }
                 }
@@ -34,7 +34,7 @@ describe("stableCode", () => {
                 metadataOverrides: {
                     tokenizer: {
                         ggml: {
-                            add_bos_token: true
+                            "add_bos_token": true
                         }
                     }
                 }

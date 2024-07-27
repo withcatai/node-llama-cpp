@@ -121,7 +121,8 @@ export function resolveChatWrapper({
         if (fileInfo == null)
             return res;
 
-        const currentModelInfo = [fileInfo.metadata?.general?.name, fileInfo.metadata?.general?.basename].filter((v): v is string => v != null);
+        const currentModelInfo = [fileInfo.metadata?.general?.name, fileInfo.metadata?.general?.basename]
+            .filter((v): v is string => v != null);
         if (currentModelInfo.length > 0)
             res.push(currentModelInfo);
 

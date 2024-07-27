@@ -7,35 +7,37 @@ describe("Llama3_1ChatWrapper", () => {
     const todayDate = new Date("2024-07-26T00:00:00Z");
     const conversationHistory: ChatHistoryItem[] = [
         ...(new Llama3_1ChatWrapper({todayDate})).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
-        type: "user",
-        text: "Hi there!"
-    }, {
-        type: "model",
-        response: ["Hello!"]
-    }];
+            type: "user",
+            text: "Hi there!"
+        }, {
+            type: "model",
+            response: ["Hello!"]
+        }
+    ];
     const conversationHistory2: ChatHistoryItem[] = [
         ...(new Llama3_1ChatWrapper({todayDate})).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
-        type: "user",
-        text: "Hi there!"
-    }, {
-        type: "model",
-        response: ["Hello!"]
-    }, {
-        type: "user",
-        text: "What is the time?"
-    }, {
-        type: "model",
-        response: [{
-            type: "functionCall",
-            name: "getTime",
-            description: "Retrieve the current time",
-            params: {
-                hours: "24",
-                seconds: true
-            },
-            result: "22:00:00"
-        }, "I'm good, how are you?"]
-    }];
+            type: "user",
+            text: "Hi there!"
+        }, {
+            type: "model",
+            response: ["Hello!"]
+        }, {
+            type: "user",
+            text: "What is the time?"
+        }, {
+            type: "model",
+            response: [{
+                type: "functionCall",
+                name: "getTime",
+                description: "Retrieve the current time",
+                params: {
+                    hours: "24",
+                    seconds: true
+                },
+                result: "22:00:00"
+            }, "I'm good, how are you?"]
+        }
+    ];
     const conversationHistory2Functions: ChatModelFunctions = {
         getTime: {
             description: "Retrieve the current time",

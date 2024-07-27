@@ -5,7 +5,13 @@
         "browser": false,
         "es6": true
     },
-    "ignorePatterns": ["/dist", "/llama", "/docs-site", "/packages/create-node-llama-cpp/dist"],
+    "ignorePatterns": [
+        "/dist",
+        "/llama",
+        "/docs-site",
+        "/packages/create-node-llama-cpp/dist",
+        "/packages/@node-llama-cpp/*/dist"
+    ],
     "extends": [
         "eslint:recommended",
         "plugin:jsdoc/recommended"
@@ -133,7 +139,9 @@
         "no-duplicate-imports": ["error", {
             "includeExports": true
         }],
-        "camelcase": ["warn"],
+        "camelcase": ["warn", {
+            "allow": ["\\d+_\\d+"]
+        }],
         "jsx-quotes": ["warn"],
         "yoda": ["error", "never", {
             "exceptRange": true

@@ -1,5 +1,4 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {defaultChatSystemPrompt} from "../../config.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {
     ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatSessionModelFunction, ChatSessionModelFunctions,

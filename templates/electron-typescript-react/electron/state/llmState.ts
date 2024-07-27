@@ -1,5 +1,7 @@
 import path from "node:path";
-import {getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel, Token} from "node-llama-cpp";
+import {
+    getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel
+} from "node-llama-cpp";
 import {withLock, State} from "lifecycle-utils";
 
 export const llmState = new State<LlmState>({
