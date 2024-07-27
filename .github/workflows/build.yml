@@ -229,12 +229,12 @@ jobs:
           
           EOF
 
-      - name: Cache UPX
-        id: cache-upx
-        uses: actions/cache@v4
-        with:
-          path: "upxInstallations/**"
-          key: cache-upx-${{ runner.os }}-${{ github.workflow }}
+#      - name: Cache UPX
+#        id: cache-upx
+#        uses: actions/cache@v4
+#        with:
+#          path: "upxInstallations/**"
+#          key: cache-upx-${{ runner.os }}-${{ github.workflow }}
 
 #      - name: Compress CUDA binary on Windows
 #        if: matrix.config.name == 'Windows for x64'
