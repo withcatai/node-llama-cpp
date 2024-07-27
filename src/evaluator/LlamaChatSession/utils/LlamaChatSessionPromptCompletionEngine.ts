@@ -140,15 +140,15 @@ export class LlamaChatSessionPromptCompletionEngine {
 
         const currentAbortController = this._currentCompletionAbortController;
         const currentAbortSignal = this._currentCompletionAbortController.signal;
-        const currentCompletion: Token[] = [];
+        let currentCompletion: string = "";
         void this._chatSession.completePrompt(promptToComplete, {
             ...this._completionOptions,
             stopOnAbortSignal: false,
             maxTokens: leftTokens,
             signal: currentAbortSignal,
-            onToken: (chunk) => {
-                pushAll(currentCompletion, chunk);
-                const completion = (existingCompletion ?? "") + this._chatSession.model.detokenize(currentCompletion);
+            onTextChunk: (chunk) => {
+                currentCompletion += chunk;
+                const completion = (existingCompletion ?? "") + currentCompletion;
                 completionCache.putCompletion(prompt, completion);
 
                 if (this._getCurrentCompletionCache() !== completionCache) {

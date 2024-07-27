@@ -7,7 +7,7 @@ export type Token = number & {
 };
 
 export type Detokenizer = {
-    detokenize(tokens: readonly Token[], specialTokens?: boolean): string
+    detokenize(tokens: readonly Token[], specialTokens?: boolean, lastTokens?: readonly Token[]): string
 }["detokenize"];
 export type Tokenizer = {
     tokenize(text: string, specialTokens?: boolean, options?: "trimLeadingSpace"): Token[],

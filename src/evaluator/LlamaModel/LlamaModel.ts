@@ -16,10 +16,11 @@ import {LlamaContextOptions} from "../LlamaContext/types.js";
 import {LlamaContext} from "../LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
 import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataTypes.js";
+import {DeepPartialObject} from "../../utils/DeepPartialObject.js";
+import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
-import {DeepPartialObject} from "../../utils/DeepPartialObject.js";
 
 export type LlamaModelOptions = {
     /** path to the model on the filesystem */
@@ -406,12 +407,29 @@ export class LlamaModel {
      * @param [specialTokens] - if set to `true`, special tokens will be detokenized to their corresponding token text representation.
      * Recommended for debugging purposes only.
      * Defaults to `false`.
+     * @param [lastTokens] - the last few tokens that preceded the tokens to detokenize.
+     * If provided, the last few tokens will be used to determine whether a space has to be added before the current tokens or not,
+     * and apply other detokenizer-specific heuristics to provide the correct text continuation to the existing tokens.
+     *
+     * Using it may have no effect with some models, but it is still recommended.
      */
-    public detokenize(tokens: readonly Token[], specialTokens: boolean = false): string {
+    public detokenize(tokens: readonly Token[], specialTokens: boolean = false, lastTokens?: readonly Token[]): string {
         this._ensureNotDisposed();
 
         if (tokens.length === 0)
             return "";
+
+        if (lastTokens == null || lastTokens.length === 0)
+            return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
+
+        const addedTokens = lastTokens.slice(-maxRecentDetokenizerTokens);
+        const addedTokensText = this._model.detokenize(Uint32Array.from(addedTokens), Boolean(specialTokens));
+        if (addedTokensText === "")
+            return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
+
+        const text = this._model.detokenize(Uint32Array.from([...addedTokens, ...tokens]), Boolean(specialTokens));
+        if (text.startsWith(addedTokensText))
+            return text.slice(addedTokensText.length);
 
         return this._model.detokenize(Uint32Array.from(tokens), Boolean(specialTokens));
     }

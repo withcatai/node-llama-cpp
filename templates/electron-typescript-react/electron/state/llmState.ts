@@ -70,7 +70,7 @@ let contextSequence: LlamaContextSequence | null = null;
 let chatSession: LlamaChatSession | null = null;
 let chatSessionCompletionEngine: LlamaChatSessionPromptCompletionEngine | null = null;
 let promptAbortController: AbortController | null = null;
-const inProgressResponse: Token[] = [];
+let inProgressResponse: string = "";
 
 export const llmFunctions = {
     async loadLlama() {
@@ -342,9 +342,8 @@ export const llmFunctions = {
                 await chatSession.prompt(message, {
                     signal: promptAbortController.signal,
                     stopOnAbortSignal: true,
-                    onToken(chunk) {
-                        for (const token of chunk)
-                            inProgressResponse.push(token);
+                    onTextChunk(chunk) {
+                        inProgressResponse += chunk;
 
                         llmState.state = {
                             ...llmState.state,
@@ -367,7 +366,7 @@ export const llmFunctions = {
                         }
                     }
                 };
-                inProgressResponse.length = 0;
+                inProgressResponse = "";
             });
         },
         stopActivePrompt() {
@@ -475,7 +474,7 @@ function getSimplifiedChatHistory(generatingResult: boolean, currentPrompt?: str
         if (inProgressResponse.length > 0)
             chatHistory.push({
                 type: "model",
-                message: chatSession.model.detokenize(inProgressResponse)
+                message: inProgressResponse
             });
     }
 

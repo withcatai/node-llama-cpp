@@ -548,8 +548,8 @@ async function RunChat({
                 : maxTokens <= 0
                     ? undefined
                     : maxTokens,
-            onToken(chunk) {
-                let text = nextPrintLeftovers + model.detokenize(chunk);
+            onTextChunk(chunk) {
+                let text = nextPrintLeftovers + chunk;
                 nextPrintLeftovers = "";
 
                 if (trimWhitespace) {

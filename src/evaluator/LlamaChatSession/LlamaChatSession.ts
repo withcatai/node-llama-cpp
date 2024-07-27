@@ -58,7 +58,20 @@ export type LlamaChatSessionContextShiftOptions = {
 };
 
 export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions | undefined = ChatSessionModelFunctions | undefined> = {
+    /**
+     * Called as the model generates a response with the generated text chunk.
+     *
+     * Useful for streaming the generated response as it's being generated.
+     */
+    onTextChunk?: (text: string) => void,
+
+    /**
+     * Called as the model generates a response with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: (tokens: Token[]) => void,
+
     signal?: AbortSignal,
 
     /**
@@ -166,7 +179,20 @@ export type LLamaChatCompletePromptOptions = {
      */
     stopOnAbortSignal?: LLamaChatPromptOptions["stopOnAbortSignal"],
 
+    /**
+     * Called as the model generates a completion with the generated text chunk.
+     *
+     * Useful for streaming the generated completion as it's being generated.
+     */
+    onTextChunk?: LLamaChatPromptOptions["onTextChunk"],
+
+    /**
+     * Called as the model generates a completion with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: LLamaChatPromptOptions["onToken"],
+
     signal?: LLamaChatPromptOptions["signal"],
     temperature?: LLamaChatPromptOptions["temperature"],
     minP?: LLamaChatPromptOptions["minP"],
@@ -346,6 +372,7 @@ export class LlamaChatSession {
         functions,
         documentFunctionParams,
         maxParallelFunctionCalls,
+        onTextChunk,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -366,8 +393,8 @@ export class LlamaChatSession {
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
-            onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix, repeatPenalty,
-            tokenBias, customStopTriggers
+            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix,
+            repeatPenalty, tokenBias, customStopTriggers
         });
 
         return responseText;
@@ -381,6 +408,7 @@ export class LlamaChatSession {
         functions,
         documentFunctionParams,
         maxParallelFunctionCalls,
+        onTextChunk,
         onToken,
         signal,
         stopOnAbortSignal = false,
@@ -447,6 +475,7 @@ export class LlamaChatSession {
                     documentFunctionParams,
                     maxParallelFunctionCalls,
                     grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                    onTextChunk: safeEventCallback(onTextChunk),
                     onToken: safeEventCallback(onToken),
                     signal: abortController.signal,
                     stopOnAbortSignal,
@@ -657,6 +686,7 @@ export class LlamaChatSession {
 
         functions,
         documentFunctionParams,
+        onTextChunk,
         onToken,
         signal,
         temperature,
@@ -690,6 +720,7 @@ export class LlamaChatSession {
                     functions,
                     documentFunctionParams,
                     grammar,
+                    onTextChunk,
                     onToken,
                     signal: abortController.signal,
                     stopOnAbortSignal: true,

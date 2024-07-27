@@ -24,7 +24,20 @@ export type LlamaCompletionOptions = {
 };
 
 export type LlamaCompletionGenerationOptions = {
+    /**
+     * Called as the model generates a completion with the generated text chunk.
+     *
+     * Useful for streaming the generated completion as it's being generated.
+     */
+    onTextChunk?: (text: string) => void,
+
+    /**
+     * Called as the model generates a completion with the generated tokens.
+     *
+     * Preferably, you'd want to use `onTextChunk` instead of this.
+     */
     onToken?: (tokens: Token[]) => void,
+
     signal?: AbortSignal,
     maxTokens?: number,
 
@@ -210,6 +223,7 @@ export class LlamaCompletion {
     public async generateCompletionWithMeta(
         input: Token[] | string | LlamaText,
         {
+            onTextChunk,
             onToken,
             signal,
             maxTokens,
@@ -290,6 +304,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
+                onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
@@ -343,6 +358,7 @@ export class LlamaCompletion {
         prefixInput: Token[] | string | LlamaText,
         suffixInput: Token[] | string | LlamaText,
         {
+            onTextChunk,
             onToken,
             signal,
             maxTokens,
@@ -473,6 +489,7 @@ export class LlamaCompletion {
                     : this._sequence.context.contextSize - inputTokens.length;
 
             return await this._generateResponse(inputTokens, {
+                onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),
                 signal,
                 maxTokens: resolvedMaxTokens,
@@ -508,6 +525,7 @@ export class LlamaCompletion {
     private async _generateResponse(
         tokens: Token[],
         {
+            onTextChunk,
             onToken,
             signal,
             maxTokens,
@@ -673,10 +691,12 @@ export class LlamaCompletion {
                     );
                     pushAll(pendingTokens, queuedTokensBeforeStopTrigger);
 
-                    const firstRemainingGenerationAfterStop = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+                    const {firstRemainingGenerationAfterStop} = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
 
-                    if (pendingTokens.length > 0)
+                    if (pendingTokens.length > 0) {
                         onToken?.(pendingTokens.slice());
+                        onTextChunk?.(model.detokenize(pendingTokens, false, res));
+                    }
 
                     pushAll(res, pendingTokens);
                     pendingTokens.length = 0;
@@ -711,6 +731,7 @@ export class LlamaCompletion {
 
                 if (pendingTokens.length > 0) {
                     onToken?.(pendingTokens.slice());
+                    onTextChunk?.(model.detokenize(pendingTokens, false, res));
                     pushAll(res, pendingTokens);
                     pendingTokens.length = 0;
                 }

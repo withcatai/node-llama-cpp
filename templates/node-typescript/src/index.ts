@@ -28,9 +28,9 @@ console.log(chalk.yellow("User: ") + q1);
 
 process.stdout.write(chalk.yellow("AI: "));
 const a1 = await session.prompt(q1, {
-    onToken(chunk) {
+    onTextChunk(chunk) {
         // stream the response to the console as it's being generated
-        process.stdout.write(model.detokenize(chunk));
+        process.stdout.write(chunk);
     }
 });
 process.stdout.write("\n");
