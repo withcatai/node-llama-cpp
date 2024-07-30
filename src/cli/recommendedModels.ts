@@ -8,27 +8,21 @@ export const recommendedModels: ModelRecommendation[] = [{
 
     fileOptions: [{
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct.Q8_0.gguf"
         }
     }, {
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct.Q6_K.gguf"
         }
     }, {
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-8B-Instruct-Q5_K_L.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
-            branch: "main",
-            file: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+            file: "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
         }
     }]
 }, {
@@ -40,33 +34,27 @@ export const recommendedModels: ModelRecommendation[] = [{
 
     fileOptions: [{
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-70B-Instruct-Q8_0/Meta-Llama-3.1-70B-Instruct-Q8_0-00001-of-00002.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct.Q8_0.gguf.part1of2"
         }
     }, {
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-70B-Instruct-Q6_K_L/Meta-Llama-3.1-70B-Instruct-Q6_K_L-00001-of-00002.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct.Q6_K.gguf.part1of2"
         }
     }, {
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct.Q4_K_M.gguf"
         }
     }, {
         huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
+            model: "mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF",
             branch: "main",
-            file: "Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "bartowski/Meta-Llama-3.1-70B-Instruct-GGUF",
-            branch: "main",
-            file: "Meta-Llama-3.1-70B-Instruct-IQ4_XS.gguf"
+            file: "Meta-Llama-3.1-70B-Instruct.Q4_K_S.gguf"
         }
     }]
 }, {
@@ -81,6 +69,12 @@ export const recommendedModels: ModelRecommendation[] = [{
             model: "mradermacher/Meta-Llama-3.1-405B-Instruct-GGUF",
             branch: "main",
             file: "Meta-Llama-3.1-405B-Instruct.Q3_K_L.gguf.part1of5"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Meta-Llama-3.1-405B-Instruct-GGUF",
+            branch: "main",
+            file: "Meta-Llama-3.1-405B-Instruct.Q3_K_M.gguf.part1of4"
         }
     }]
 }, {
