@@ -1,5 +1,6 @@
 import process from "process";
 import path from "path";
+import os from "os";
 import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
@@ -46,7 +47,11 @@ export type ModelDownloaderOptions = {
      *
      * Defaults to `4`.
      */
-    parallelDownloads?: number
+    parallelDownloads?: number,
+
+    tokens?: {
+        huggingFace?: string
+    }
 };
 
 /**
@@ -95,6 +100,7 @@ export class ModelDownloader {
     /** @internal */ private readonly _headers?: Record<string, string>;
     /** @internal */ private readonly _showCliProgress: boolean;
     /** @internal */ private readonly _onProgress?: ModelDownloaderOptions["onProgress"];
+    /** @internal */ private readonly _tokens?: ModelDownloaderOptions["tokens"];
     /** @internal */ private readonly _deleteTempFileOnCancel: boolean;
     /** @internal */ private readonly _skipExisting: boolean;
     /** @internal */ private readonly _parallelDownloads: number;
@@ -104,10 +110,11 @@ export class ModelDownloader {
     /** @internal */ private _entrypointFilename?: string;
     /** @internal */ private _splitBinaryParts?: number;
     /** @internal */ private _totalFiles?: number;
+    /** @internal */ private _tryHeaders: Record<string, string>[] = [];
 
     private constructor({
         modelUrl, dirPath = cliModelsDirectory, fileName, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
-        skipExisting = true, parallelDownloads = 4
+        skipExisting = true, parallelDownloads = 4, tokens
     }: ModelDownloaderOptions) {
         if (modelUrl == null || dirPath == null)
             throw new Error("modelUrl and dirPath cannot be null");
@@ -121,6 +128,7 @@ export class ModelDownloader {
         this._deleteTempFileOnCancel = deleteTempFileOnCancel;
         this._skipExisting = skipExisting;
         this._parallelDownloads = parallelDownloads;
+        this._tokens = tokens;
 
         this._onDownloadProgress = this._onDownloadProgress.bind(this);
     }
@@ -248,7 +256,28 @@ export class ModelDownloader {
     }
 
     /** @internal */
+    private async resolveTryHeaders() {
+        if (this._tokens == null)
+            return;
+
+        const {huggingFace} = this._tokens;
+
+        const [
+            hfToken
+        ] = await Promise.all([
+            resolveHfToken(huggingFace)
+        ]);
+
+        if (hfToken != null && hfToken !== "")
+            this._tryHeaders?.push({
+                ...(this._headers ?? {}),
+                "Authorization": `Bearer ${hfToken}`
+            });
+    }
+
+    /** @internal */
     public async _init() {
+        await this.resolveTryHeaders();
         const binarySplitPartUrls = resolveBinarySplitGgufPartUrls(this._modelUrl);
 
         await fs.ensureDir(this._dirPath);
@@ -258,7 +287,8 @@ export class ModelDownloader {
                 directory: this._dirPath,
                 fileName: this._fileName ?? getFilenameForBinarySplitGgufPartUrls(binarySplitPartUrls),
                 cliProgress: this._showCliProgress,
-                headers: this._headers ?? {}
+                headers: this._headers ?? {},
+                tryHeaders: this._tryHeaders.slice()
             });
             this._specificFileDownloaders.push(this._downloader);
 
@@ -279,7 +309,8 @@ export class ModelDownloader {
                 directory: this._dirPath,
                 fileName: this._fileName ?? undefined,
                 cliProgress: this._showCliProgress,
-                headers: this._headers ?? {}
+                headers: this._headers ?? {},
+                tryHeaders: this._tryHeaders.slice()
             });
             this._specificFileDownloaders.push(this._downloader);
 
@@ -298,7 +329,8 @@ export class ModelDownloader {
             fileName: this._fileName != null
                 ? createSplitPartFilename(this._fileName, index + 1, splitGgufPartUrls.length)
                 : undefined,
-            headers: this._headers ?? {}
+            headers: this._headers ?? {},
+            tryHeaders: this._tryHeaders.slice()
         }));
 
         this._downloader = await downloadSequence(
@@ -324,4 +356,28 @@ export class ModelDownloader {
     public static _create(options: ModelDownloaderOptions) {
         return new ModelDownloader(options);
     }
+}
+
+async function resolveHfToken(providedToken?: string) {
+    if (providedToken !== null)
+        return providedToken;
+
+    if (process.env.HF_TOKEN != null)
+        return process.env.HF_TOKEN;
+
+    const hfHomePath = process.env.HF_HOME ||
+        path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "huggingface");
+
+    const hfTokenPath = process.env.HF_TOKEN_PATH || path.join(hfHomePath, "token");
+    try {
+        if (await fs.pathExists(hfTokenPath)) {
+            const token = (await fs.readFile(hfTokenPath, "utf8")).trim();
+            if (token !== "")
+                return token;
+        }
+    } catch (err) {
+        // do nothing
+    }
+
+    return undefined;
 }

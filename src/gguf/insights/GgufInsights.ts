@@ -145,9 +145,9 @@ export class GgufInsights {
         const uint32TBytes = 4; // sizeof(uint32_t)
         const int32TBytes = 4; // sizeof(int32_t)
 
-        // source: `llama_get_state_size` in `llama.cpp`
+        // source: `llama_state_get_size` in `llama.cpp`
         const sRngSize = sizeTBytes;
-        const sRng = this._llama._consts.llamaMaxRngState;
+        const sRng = 64 * 1024; // LLAMA_MAX_RNG_STATE
         const sNOutputs = sizeTBytes;
         const sNOutputPos = batchSize * int32TBytes;
         const sLogitsSize = sizeTBytes;
