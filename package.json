@@ -165,7 +165,7 @@
     "filenamify": "^6.0.0",
     "fs-extra": "^11.2.0",
     "ignore": "^5.3.1",
-    "ipull": "^3.3.0",
+    "ipull": "^3.6.0",
     "is-unicode-supported": "^2.0.0",
     "lifecycle-utils": "^1.4.1",
     "log-symbols": "^6.0.0",
@@ -193,7 +193,7 @@
     }
   },
   "optionalDependencies": {
-    "@node-llama-cpp/win-x64-cuda": "0.1.0",
-    "@node-llama-cpp/linux-x64-cuda": "0.1.0"
+    "@node-llama-cpp/linux-x64-cuda": "0.1.0",
+    "@node-llama-cpp/win-x64-cuda": "0.1.0"
   }
 }
