@@ -9,22 +9,22 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         llama_model_params model_params;
         std::vector<llama_model_kv_override> kv_overrides;
         llama_model* model;
-        uint64_t loadedModelSize;
+        uint64_t loadedModelSize = 0;
         Napi::Reference<Napi::Object> addonExportsRef;
-        bool hasAddonExportsRef;
+        bool hasAddonExportsRef = false;
         AddonModelData* data;
 
         std::string modelPath;
-        bool modelLoaded;
-        bool abortModelLoad;
-        bool model_load_stopped;
-        float rawModelLoadPercentage;
-        unsigned modelLoadPercentage;
+        bool modelLoaded = false;
+        bool abortModelLoad = false;
+        bool model_load_stopped = false;
+        float rawModelLoadPercentage = 0;
+        unsigned modelLoadPercentage = 0;
         AddonThreadSafeProgressEventCallbackFunction addonThreadSafeOnLoadProgressEventCallback;
-        bool onLoadProgressEventCallbackSet;
-        bool hasLoadAbortSignal;
+        bool onLoadProgressEventCallbackSet = false;
+        bool hasLoadAbortSignal = false;
 
-        bool disposed;
+        bool disposed = false;
 
         AddonModel(const Napi::CallbackInfo& info);
         ~AddonModel();

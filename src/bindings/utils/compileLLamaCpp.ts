@@ -85,8 +85,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("GGML_VULKAN"))
                     cmakeCustomOptions.set("GGML_VULKAN", "1");
 
-                if (!cmakeCustomOptions.has("LLAMA_CCACHE"))
-                    cmakeCustomOptions.set("LLAMA_CCACHE", "OFF");
+                if (!cmakeCustomOptions.has("GGML_CCACHE"))
+                    cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                     cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);

@@ -398,16 +398,6 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 };
 
 AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonContext>(info) {
-    batchMemorySize = 0;
-    has_batch = false;
-    batch_n_tokens = 0;
-    n_cur = 0;
-
-    uint64_t loadedContextMemorySize = 0;
-    bool contextLoaded = false;
-
-    bool disposed = false;
-
     model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
     model->Ref();
 

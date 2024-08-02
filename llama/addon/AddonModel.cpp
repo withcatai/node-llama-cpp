@@ -224,17 +224,6 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
 };
 
 AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModel>(info) {
-    loadedModelSize = 0;
-    hasAddonExportsRef = false;
-    modelLoaded = false;
-    abortModelLoad = false;
-    model_load_stopped = false;
-    rawModelLoadPercentage = 0;
-    modelLoadPercentage = 0;
-    onLoadProgressEventCallbackSet = false;
-    hasLoadAbortSignal = false;
-    disposed = false;
-    
     data = new AddonModelData();
     model_params = llama_model_default_params();
 
@@ -456,18 +445,19 @@ Napi::Value AddonModel::Detokenize(const Napi::CallbackInfo& info) {
         ? info[1].As<Napi::Boolean>().Value()
         : false;
 
-    std::vector<char> result(8, 0);
-    const int n_length = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), result.data(), result.size(), false, decodeSpecialTokens);
+    std::string result;
+    result.resize(std::max(result.capacity(), tokens.ElementLength()));
 
-    if (n_length < 0) {
-        result.resize(-n_length);
-        int check = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), result.data(), result.size(), false, decodeSpecialTokens);
-        GGML_ASSERT(check == -n_length);
-    } else {
-        result.resize(n_length);
+    int n_chars = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
+    if (n_chars < 0) {
+        result.resize(-n_chars);
+        n_chars = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
+        GGML_ASSERT(n_chars <= result.size());  // whitespace trimming is performed after per-token detokenization
     }
 
-    return Napi::String::New(info.Env(), result.data(), result.size());
+    result.resize(n_chars);
+
+    return Napi::String::New(info.Env(), result);
 }
 
 Napi::Value AddonModel::GetTrainContextSize(const Napi::CallbackInfo& info) {

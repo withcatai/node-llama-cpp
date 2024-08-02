@@ -6,7 +6,7 @@
 class AddonGrammarEvaluationState : public Napi::ObjectWrap<AddonGrammarEvaluationState> {
     public:
         AddonGrammar* grammarDef;
-        llama_grammar* grammar;
+        llama_grammar* grammar = nullptr;
 
         AddonGrammarEvaluationState(const Napi::CallbackInfo& info);
         ~AddonGrammarEvaluationState();

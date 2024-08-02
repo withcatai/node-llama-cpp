@@ -6,8 +6,6 @@
 #include "AddonGrammar.h"
 
 AddonGrammarEvaluationState::AddonGrammarEvaluationState(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammarEvaluationState>(info) {
-    grammar = nullptr;
-
     grammarDef = Napi::ObjectWrap<AddonGrammar>::Unwrap(info[0].As<Napi::Object>());
     grammarDef->Ref();
 

@@ -8,7 +8,7 @@ class AddonModelLora : public Napi::ObjectWrap<AddonModelLora> {
         AddonModel* model;
         llama_lora_adapter * lora_adapter;
         std::string loraFilePath;
-        uint32_t usages;
+        uint32_t usages = 0;
 
         AddonModelLora(const Napi::CallbackInfo& info);
         ~AddonModelLora();

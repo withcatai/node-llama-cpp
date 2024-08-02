@@ -101,7 +101,7 @@ export class LlamaContext {
         this._disposeAggregator.add(() => {
             this._disposed = true;
         });
-        this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
+        this._disposeAggregator.add(() => void this._gcRegistry.unregister(this));
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
         this._disposeAggregator.add(

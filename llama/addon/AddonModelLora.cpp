@@ -42,8 +42,6 @@ class AddonModelLoraUnloadLoraWorker : public Napi::AsyncWorker {
 };
 
 AddonModelLora::AddonModelLora(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModelLora>(info) {
-    usages = 0;
-
     model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
     loraFilePath = info[1].As<Napi::String>().Utf8Value();
     lora_adapter = nullptr;
