@@ -9,15 +9,15 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         llama_context_params context_params;
         llama_context* ctx;
         llama_batch batch;
-        uint64_t batchMemorySize;
-        bool has_batch;
-        int32_t batch_n_tokens;
-        int n_cur;
+        uint64_t batchMemorySize = 0;
+        bool has_batch = false;
+        int32_t batch_n_tokens = 0;
+        int n_cur = 0;
 
-        uint64_t loadedContextMemorySize;
-        bool contextLoaded;
+        uint64_t loadedContextMemorySize = 0;
+        bool contextLoaded = false;
 
-        bool disposed;
+        bool disposed = false;
 
         AddonContext(const Napi::CallbackInfo& info);
         ~AddonContext();

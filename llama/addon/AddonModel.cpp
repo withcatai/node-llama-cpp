@@ -224,17 +224,6 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
 };
 
 AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModel>(info) {
-    loadedModelSize = 0;
-    hasAddonExportsRef = false;
-    modelLoaded = false;
-    abortModelLoad = false;
-    model_load_stopped = false;
-    rawModelLoadPercentage = 0;
-    modelLoadPercentage = 0;
-    onLoadProgressEventCallbackSet = false;
-    hasLoadAbortSignal = false;
-    disposed = false;
-    
     data = new AddonModelData();
     model_params = llama_model_default_params();
 

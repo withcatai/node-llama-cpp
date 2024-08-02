@@ -2,8 +2,6 @@
 #include "AddonGrammar.h"
 
 AddonGrammar::AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammar>(info) {
-    hasAddonExportsRef = false;
-    
     // Get the model path
     std::string grammarCode = info[0].As<Napi::String>().Utf8Value();
     bool should_print_grammar = false;

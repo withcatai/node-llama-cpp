@@ -9,7 +9,7 @@ class AddonGrammar : public Napi::ObjectWrap<AddonGrammar> {
     public:
         grammar_parser::parse_state parsed_grammar;
         Napi::Reference<Napi::Object> addonExportsRef;
-        bool hasAddonExportsRef;
+        bool hasAddonExportsRef = false;
 
         AddonGrammar(const Napi::CallbackInfo& info);
         ~AddonGrammar();
