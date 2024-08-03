@@ -70,7 +70,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
         res += buildHtmlHeading("h2", htmlEscape("Options"), "options");
 
         if (optionGroups.length === 1) {
-            res += renderOptionsGroupOptionsTable(optionGroups[0].options) + "\n";
+            res += renderOptionsGroupOptionsTable(optionGroups[0]!.options) + "\n";
         } else {
             for (const group of optionGroups) {
                 let groupName = group.name;

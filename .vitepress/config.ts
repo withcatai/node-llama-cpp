@@ -1,4 +1,4 @@
-import {DefaultTheme, defineConfig, HeadConfig, createContentLoader} from "vitepress";
+import {createContentLoader, DefaultTheme, defineConfig, HeadConfig} from "vitepress";
 import path from "path";
 import {createRequire} from "node:module";
 import process from "process";
@@ -221,7 +221,8 @@ export default defineConfig({
                             path.resolve(__dirname, "..", "node_modules", "@types")
                         ],
                         module: ts.ModuleKind.ES2022,
-                        target: ts.ScriptTarget.ES2022
+                        target: ts.ScriptTarget.ES2022,
+                        moduleDetection: ts.ModuleDetectionKind.Force
                     },
                     tsModule: ts
                 }
@@ -543,7 +544,7 @@ function findElementInHtml(html: string | undefined, matcher: (element: HastElem
             continue;
 
         for (let i = 0; i < item.children.length; i++) {
-            const child = item.children[i];
+            const child = item.children[i]!;
 
             if (isParent(child))
                 queue.push(child);

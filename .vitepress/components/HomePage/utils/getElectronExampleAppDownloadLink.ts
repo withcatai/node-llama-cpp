@@ -83,8 +83,8 @@ export async function getElectronExampleAppDownloadLink() {
                     .filter((asset) => asset.name.endsWith(".AppImage"))
             }
 
-            if (relevantAssets.length > 0 && relevantAssets[0].browser_download_url != null)
-                return relevantAssets[0].browser_download_url;
+            if (relevantAssets.length > 0 && relevantAssets[0]!.browser_download_url != null)
+                return relevantAssets[0]!.browser_download_url;
         } catch (err) {
             console.error(err);
         }

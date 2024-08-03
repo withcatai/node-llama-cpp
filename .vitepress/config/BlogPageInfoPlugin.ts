@@ -63,7 +63,7 @@ function findFrontmatterEndIndex(mdCode: string): number {
     let countedSeparators = 0;
 
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        const line = lines[lineIndex];
+        const line = lines[lineIndex]!;
 
         if (line.startsWith("---")) {
             countedSeparators++;
