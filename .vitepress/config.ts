@@ -16,6 +16,7 @@ import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
 
 import type {Node as UnistNode} from "unist";
+import type {ShikiTransformer} from "shiki";
 
 
 const require = createRequire(import.meta.url);
@@ -224,7 +225,7 @@ export default defineConfig({
                     },
                     tsModule: ts
                 }
-            })
+            }) as ShikiTransformer
         ]
     },
     themeConfig: {
