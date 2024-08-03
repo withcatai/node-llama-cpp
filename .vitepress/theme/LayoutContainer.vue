@@ -4,46 +4,61 @@ import {useData} from "vitepress";
 
 const {isDark} = useData();
 
-function enableThemeTransition() {
-    return (document as { startViewTransition?: any }).startViewTransition != null &&
-        window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
-}
-
-document.documentElement.classList.toggle("theme-transition", enableThemeTransition());
+const themeTransitionEnabled = (document as { startViewTransition?: any }).startViewTransition != null;
+document.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
 
 provide("toggle-appearance", async () => {
-    if (!enableThemeTransition()) {
+    if (!themeTransitionEnabled) {
         isDark.value = !isDark.value;
         return;
     }
 
     const showDark = !isDark.value;
-    const clipPathAnimation = [
-        "rect(0px 100% 0px 0px)",
-        "rect(0px 100% 100% 0px)"
-    ]
+    if (window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+        await (document as {
+            startViewTransition(callback: () => Promise<void>): {
+                ready: Promise<void>
+            }
+        })
+            .startViewTransition(async () => {
+                isDark.value = showDark;
+                await nextTick();
+            }).ready
 
-    await (document as {
-        startViewTransition(callback: () => Promise<void>): {
-            ready: Promise<void>
-        }
-    })
-        .startViewTransition(async () => {
-            isDark.value = showDark;
-            await nextTick();
-        }).ready
+        document.documentElement.animate({
+            clipPath: showDark
+                ? ["rect(0px 100% 0px 0px)", "rect(0px 100% 100% 0px)"]
+                : ["rect(0px 100% 100% 0px)", "rect(100% 100% 100% 0px)"]
+        }, {
+            duration: 300,
+            easing: "ease-in-out",
+            pseudoElement: showDark
+                ? "::view-transition-new(root)"
+                : "::view-transition-old(root)"
+        });
+    } else {
+        await (document as {
+            startViewTransition(callback: () => Promise<void>): {
+                ready: Promise<void>
+            }
+        })
+            .startViewTransition(async () => {
+                isDark.value = showDark;
+                await nextTick();
+            }).ready
 
-    document.documentElement.animate({
-        clipPath: showDark
-            ? ["rect(0px 100% 0px 0px)", "rect(0px 100% 100% 0px)"]
-            : ["rect(0px 100% 100% 0px)", "rect(100% 100% 100% 0px)"]
-    }, {
-        duration: 300,
-        easing: "ease-in-out",
-        pseudoElement: showDark
-            ? "::view-transition-new(root)"
-            : "::view-transition-old(root)"
-    });
+        document.documentElement.animate({
+            opacity: showDark
+                ? [0, 1]
+                : [1, 0]
+        }, {
+            duration: 300,
+            easing: "ease-in-out",
+            pseudoElement: showDark
+                ? "::view-transition-new(root)"
+                : "::view-transition-old(root)"
+        });
+    }
 })
 </script>
 
@@ -73,9 +88,7 @@ provide("toggle-appearance", async () => {
     z-index: 9999;
 }
 
-@media not (prefers-reduced-motion: no-preference) {
-    html.theme-transition .VPSwitch.VPSwitchAppearance>.check {
-        transition-duration: 0s !important;
-    }
+html.theme-transition .VPSwitch.VPSwitchAppearance>.check {
+    transition-duration: 0s !important;
 }
 </style>
