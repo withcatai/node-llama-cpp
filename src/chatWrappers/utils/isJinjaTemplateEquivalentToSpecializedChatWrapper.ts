@@ -55,7 +55,7 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
                 .slice()
                 .map((item, index, array) => {
                     if (item.type === "system") {
-                        if (index === 0 && array.length > 1 && array[1].type === "user") {
+                        if (index === 0 && array.length > 1 && array[1]!.type === "user") {
                             array[1] = {
                                 type: "user",
                                 text: LlamaText([
@@ -64,7 +64,7 @@ export function isJinjaTemplateEquivalentToSpecializedChatWrapper(
                                         convertSystemMessagesToUserMessagesTemplate.split("{{message}}")
                                     ),
                                     "\n\n",
-                                    array[1].text
+                                    array[1]!.text
                                 ]).toString()
                             } satisfies ChatHistoryItem;
                             return null;
@@ -166,7 +166,9 @@ function checkEquivalence(
 
                                     if (typeof item === "string" && typeof resolveTriggerItem === "string")
                                         return item === resolveTriggerItem;
-                                    else if (typeof item === "string" || typeof resolveTriggerItem === "string")
+                                    else if (typeof item === "string" || typeof resolveTriggerItem === "string" ||
+                                        resolveTriggerItem == null
+                                    )
                                         return false;
 
                                     return compareTokens(item, resolveTriggerItem);

@@ -57,7 +57,7 @@
     "test:standalone:interactive": "vitest watch ./test/standalone",
     "test:modelDependent": "vitest run ./test/modelDependent",
     "test:modelDependent:interactive": "vitest watch ./test/modelDependent",
-    "test:typescript": "tsc --build tsconfig.json --dry --force",
+    "test:typescript": "tsc --noEmit --project tsconfig.json",
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --ext .js --ext .ts --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",

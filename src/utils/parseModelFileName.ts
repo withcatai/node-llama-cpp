@@ -6,7 +6,7 @@ export function parseModelFileName(filename: string) {
     let contextSize: string | undefined;
 
     if (parts.length > 0) {
-        const lastPart = parts[parts.length - 1];
+        const lastPart = parts[parts.length - 1]!;
         const lastParts = lastPart.split(".");
         fileType = lastParts.pop();
         quantization = lastParts.pop();
@@ -23,7 +23,7 @@ export function parseModelFileName(filename: string) {
     const otherInfo: string[] = [];
 
     for (let i = 0; i < nextParts.length; i++) {
-        const part = nextParts[i];
+        const part = nextParts[i]!;
         if (isContextSizeText(part)) {
             contextSize = part.toUpperCase();
             nextParts.splice(i, 1);
@@ -63,7 +63,7 @@ function isContextSizeText(text: string) {
 
 function splitByModelParameters(parts: string[]) {
     for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
+        const part = parts[i]!;
         if (isParametersText(part)) {
             return {
                 parameters: part.toUpperCase() as `${number}B`,

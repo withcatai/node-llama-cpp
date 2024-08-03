@@ -114,6 +114,9 @@ export async function BuildLlamaCppCommand({
         const gpuToTry = buildGpusToTry[i];
         const isLastItem = i === buildGpusToTry.length - 1;
 
+        if (gpuToTry == null)
+            continue;
+
         logUsedGpuTypeOption(gpuToTry);
 
         if (!downloadedCmake) {

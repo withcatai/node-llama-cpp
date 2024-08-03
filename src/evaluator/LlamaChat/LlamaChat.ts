@@ -883,7 +883,7 @@ async function compressHistoryToFitContextSize({
 }
 
 function getLastTextModelResponseFromChatHistory(chatHistory: ChatHistoryItem[]) {
-    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "model")
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1]!.type !== "model")
         return "";
 
     const lastModelResponseItem = chatHistory[chatHistory.length - 1] as ChatModelResponse;
@@ -896,7 +896,7 @@ function getLastTextModelResponseFromChatHistory(chatHistory: ChatHistoryItem[])
 }
 
 function getLastUserTextFromChatHistory(chatHistory: readonly ChatHistoryItem[]) {
-    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "user")
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1]!.type !== "user")
         return "";
 
     return (chatHistory[chatHistory.length - 1] as ChatUserMessage).text;
@@ -904,7 +904,7 @@ function getLastUserTextFromChatHistory(chatHistory: readonly ChatHistoryItem[])
 
 function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
     const newChatHistory = chatHistory.slice();
-    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1]!.type !== "model")
         newChatHistory.push({
             type: "model",
             response: []
@@ -930,7 +930,7 @@ function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], t
 
 function setLastUserTextInChatHistory(chatHistory: readonly ChatHistoryItem[], userText: string) {
     const newChatHistory = chatHistory.slice();
-    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "user")
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1]!.type !== "user")
         newChatHistory.push({
             type: "user",
             text: ""
@@ -1035,12 +1035,12 @@ async function getContextWindow({
         const newContextWindow = lastEvaluationContextWindowHistory.slice();
 
         if (endWithUserText) {
-            if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "user")
+            if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1]!.type !== "user")
                 newContextWindow.push({
                     type: "user",
                     text: ""
                 });
-        } else if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1].type !== "model")
+        } else if (newContextWindow.length === 0 || newContextWindow[newContextWindow.length - 1]!.type !== "model")
             newContextWindow.push({
                 type: "model",
                 response: []
@@ -1419,7 +1419,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public ensureLastHistoryItemIsModel() {
-        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1].type !== "model")
+        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1]!.type !== "model")
             this.resolvedHistory.push({
                 type: "model",
                 response: []
@@ -1427,7 +1427,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public ensureLastHistoryItemIsUser() {
-        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1].type !== "user")
+        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1]!.type !== "user")
             this.resolvedHistory.push({
                 type: "user",
                 text: ""
@@ -1495,12 +1495,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             ]);
             for (let i = 0; i < this.pendingTokens.length; i++) {
                 this.ignoreStartTextDetector.recordGeneration({
-                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]], false, lastTokensForDetokenizer),
-                    tokens: [this.pendingTokens[i]],
+                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]!], false, lastTokensForDetokenizer),
+                    tokens: [this.pendingTokens[i]!],
                     startNewChecks: i === 0,
                     triggerMustStartWithGeneration: true
                 });
-                lastTokensForDetokenizer.push(this.pendingTokens[i]);
+                lastTokensForDetokenizer.push(this.pendingTokens[i]!);
 
                 if (this.ignoreStartTextDetector.hasTriggeredStops) {
                     mostExhaustiveTriggeredStops = this.ignoreStartTextDetector.getTriggeredStops();
@@ -1561,7 +1561,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             text.push(this.chatWrapper.settings.functions.parallelism.call.sectionPrefix);
 
         for (let i = 0; i < this.resFunctionCalls.length; i++) {
-            const call = this.resFunctionCalls[i];
+            const call = this.resFunctionCalls[i]!;
 
             if (i > 0)
                 text.push(this.chatWrapper.settings.functions?.parallelism?.call?.betweenCalls ?? "");
@@ -2363,7 +2363,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 metadata: {
                     remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
                     stopReason: "customStopTrigger",
-                    customStopTrigger: triggeredStops[0].stopTrigger
+                    customStopTrigger: triggeredStops[0]!.stopTrigger
                 }
             } satisfies LlamaChatResponse<Functions>;
         }

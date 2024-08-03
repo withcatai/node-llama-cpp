@@ -80,7 +80,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             text: this.generateAvailableFunctionsSystemText(availableFunctions, {documentParams}).toJSON()
         };
 
-        if (res.length >= 2 && res[0].type === "system" && res[1].type === "system")
+        if (res.length >= 2 && res[0]!.type === "system" && res[1]!.type === "system")
             res.splice(1, 0, functionsSystemMessage);
         else
             res.unshift({
@@ -298,7 +298,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public static override _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         if (options.tokenizer != null) {
             const tokens = options.tokenizer("<|eom_id|>", true, "trimLeadingSpace");
-            return tokens.length === 1 && options.tokenizer.isSpecialToken(tokens[0]);
+            return tokens.length === 1 && options.tokenizer.isSpecialToken(tokens[0]!);
         }
 
         return true;

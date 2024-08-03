@@ -62,13 +62,13 @@ export function parseTextTemplate<const Parts extends readonly TextTemplatePart[
 
     let partIndex = 0;
     for (let i = 0; i < templateParts.length; i++) {
-        const textPart = templateParts[i];
+        const textPart = templateParts[i]!;
 
         if (typeof textPart === "string")
             continue;
 
         for (; partIndex < parts.length; partIndex++) {
-            const part = parts[partIndex];
+            const part = parts[partIndex]!;
 
             if (textPart.separator === part.text) {
                 const previousItem = i > 0
@@ -111,7 +111,7 @@ export function parseTextTemplate<const Parts extends readonly TextTemplatePart[
     }
 
     for (; partIndex < parts.length; partIndex++) {
-        const part = parts[partIndex];
+        const part = parts[partIndex]!;
 
         if (part.optional == true) {
             result[part.key as Parts[number]["key"]] = undefined;

@@ -23,7 +23,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
         let logLine = "";
 
         for (let i = 0; i < this._columns.length; i++) {
-            const column = this._columns[i];
+            const column = this._columns[i]!;
             const canSpanOverEmptyColumns = column.canSpanOverEmptyColumns ?? false;
             let title = column.title ?? " ";
             let columnSize = getColumnWidth(column);
@@ -34,7 +34,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
 
             while (title.length > columnSize && canSpanOverEmptyColumns && i < this._columns.length - 1) {
                 i++;
-                const nextColumn = this._columns[i];
+                const nextColumn = this._columns[i]!;
 
                 if (nextColumn.title != null) {
                     i--;
@@ -67,7 +67,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
         let logLine = "";
 
         for (let i = 0; i < this._columns.length; i++) {
-            const column = this._columns[i];
+            const column = this._columns[i]!;
             let value = data[column.key as keyof typeof data];
             const canSpanOverEmptyColumns = column.canSpanOverEmptyColumns ?? false;
 
@@ -84,7 +84,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
 
             while (valueWithoutAnsi.length > columnSize && canSpanOverEmptyColumns && i < this._columns.length - 1) {
                 i++;
-                const nextColumn = this._columns[i];
+                const nextColumn = this._columns[i]!;
                 const nextValue = data[nextColumn.key as keyof typeof data];
 
                 if (nextValue != null) {

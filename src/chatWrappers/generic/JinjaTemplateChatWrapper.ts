@@ -314,7 +314,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 for (let i = splitJinjaParts.length - 1; i >= 0; i--) {
                     const part = splitJinjaParts[i];
 
-                    if (typeof part === "string")
+                    if (part == null || typeof part === "string")
                         continue;
 
                     if (modelMessageIds.has(part.separator)) {

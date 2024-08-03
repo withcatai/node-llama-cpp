@@ -59,16 +59,16 @@ export async function basicChooseFromListConsoleInteraction<T>({
         if (isDone)
             return;
 
-        while (canFocusItem != null && focusIndex > 0 && !canFocusItem(items[focusIndex]))
+        while (canFocusItem != null && focusIndex > 0 && !canFocusItem(items[focusIndex]!))
             focusIndex--;
 
-        while (canFocusItem != null && focusIndex < items.length - 1 && !canFocusItem(items[focusIndex]))
+        while (canFocusItem != null && focusIndex < items.length - 1 && !canFocusItem(items[focusIndex]!))
             focusIndex++;
 
         const maxWidth = (process.stdout.columns ?? 80) - 2;
         const maxHeight = (process.stdout.rows ?? 24) - 2;
 
-        const focusedItem = items[focusIndex];
+        const focusedItem = items[focusIndex]!;
         const titleLines = splitAnsiToLines(title instanceof Function ? title(focusedItem, scheduleRerender) : title, maxWidth);
         const footerLines = splitAnsiToLines(footer instanceof Function ? footer(focusedItem, scheduleRerender) : footer, maxWidth);
 
@@ -94,20 +94,20 @@ export async function basicChooseFromListConsoleInteraction<T>({
     try {
         consoleInteraction.onKey(ConsoleInteractionKey.upArrow, () => {
             let newFocusIndex = Math.max(0, focusIndex - 1);
-            while (newFocusIndex > 0 && canFocusItem != null && !canFocusItem(items[newFocusIndex]))
+            while (newFocusIndex > 0 && canFocusItem != null && !canFocusItem(items[newFocusIndex]!))
                 newFocusIndex--;
 
-            if (canFocusItem == null || canFocusItem(items[newFocusIndex])) {
+            if (canFocusItem == null || canFocusItem(items[newFocusIndex]!)) {
                 focusIndex = newFocusIndex;
                 renderScreen();
             }
         });
         consoleInteraction.onKey(ConsoleInteractionKey.downArrow, () => {
             let newFocusIndex = Math.min(items.length - 1, focusIndex + 1);
-            while (newFocusIndex < items.length - 1 && canFocusItem != null && !canFocusItem(items[newFocusIndex]))
+            while (newFocusIndex < items.length - 1 && canFocusItem != null && !canFocusItem(items[newFocusIndex]!))
                 newFocusIndex++;
 
-            if (canFocusItem == null || canFocusItem(items[newFocusIndex])) {
+            if (canFocusItem == null || canFocusItem(items[newFocusIndex]!)) {
                 focusIndex = newFocusIndex;
                 renderScreen();
             }
@@ -118,8 +118,8 @@ export async function basicChooseFromListConsoleInteraction<T>({
 
         const res = await new Promise<T | null>((resolve) => {
             consoleInteraction.onKey(ConsoleInteractionKey.enter, () => {
-                if (canSelectItem == null || canSelectItem(items[focusIndex]))
-                    resolve(items[focusIndex]);
+                if (canSelectItem == null || canSelectItem(items[focusIndex]!))
+                    resolve(items[focusIndex]!);
             });
 
             consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, () => {

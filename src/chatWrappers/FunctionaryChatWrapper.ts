@@ -150,6 +150,9 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         const response = item.response[index];
                         const isLastResponse = index === item.response.length - 1;
 
+                        if (response == null)
+                            continue;
+
                         if (typeof response === "string") {
                             addPendingFunctions();
                             res.push(
@@ -290,6 +293,9 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                     for (let index = 0; index < item.response.length; index++) {
                         const response = item.response[index];
                         const isFirstResponse = index === 0;
+
+                        if (response == null)
+                            continue;
 
                         if (typeof response === "string") {
                             addPendingFunctions();

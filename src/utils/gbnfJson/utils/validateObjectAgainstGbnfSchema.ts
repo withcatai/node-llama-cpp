@@ -95,7 +95,7 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
 
     let res = true;
     for (const key of schemaKeys)
-        res &&= validateObjectWithGbnfSchema(object[key], schema.properties[key]);
+        res &&= validateObjectWithGbnfSchema(object[key], schema.properties[key]!);
 
     return res;
 }

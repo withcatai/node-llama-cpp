@@ -311,6 +311,9 @@ export async function getLlamaForOptions({
             const gpu = buildGpusToTry[i];
             const isLastItem = i === buildGpusToTry.length - 1;
 
+            if (gpu == null)
+                continue;
+
             const buildOptions: BuildOptions = {
                 customCmakeOptions: resolveCustomCmakeOptions(cmakeOptions),
                 progressLogs,
@@ -363,13 +366,16 @@ export async function getLlamaForOptions({
 
         if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
             const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-            llamaCppInfo.release = await resolveGithubRelease(owner, name, llamaCppInfo.release);
+            llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
         }
     }
 
     for (let i = 0; i < buildGpusToTry.length; i++) {
         const gpu = buildGpusToTry[i];
         const isLastItem = i === buildGpusToTry.length - 1;
+
+        if (gpu == null)
+            continue;
 
         const buildOptions: BuildOptions = {
             customCmakeOptions: resolveCustomCmakeOptions(cmakeOptions),

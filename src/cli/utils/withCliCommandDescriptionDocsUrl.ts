@@ -18,7 +18,7 @@ export function withoutCliCommandDescriptionDocsUrl(description: string | boolea
         return description;
 
     const lines = description.split("\n");
-    if (lines.length > 0 && lines[lines.length - 1].startsWith(documentationPageUrls.CLI.index))
+    if (lines.length > 0 && lines[lines.length - 1]!.startsWith(documentationPageUrls.CLI.index))
         return lines
             .slice(0, -1)
             .join("\n")

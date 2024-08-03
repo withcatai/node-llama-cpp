@@ -132,13 +132,15 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
         ? []
         : await getGpuTypesToUseForOption(gpu, {platform, arch});
     const [githubOwner, githubRepo] = repo.split("/");
+    if (githubOwner == null || githubRepo == null)
+        throw new Error(`Invalid GitHub repository: ${repo}`);
 
     let downloadedCmake = false;
 
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
     if (!skipBuild) {
-        logUsedGpuTypeOption(buildGpusToTry[0]);
+        logUsedGpuTypeOption(buildGpusToTry[0]!);
     }
     console.log();
 
@@ -172,6 +174,9 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
         for (let i = 0; i < buildGpusToTry.length; i++) {
             const gpuToTry = buildGpusToTry[i];
             const isLastItem = i === buildGpusToTry.length - 1;
+
+            if (gpuToTry == null)
+                continue;
 
             if (i > 0) // we already logged the first gpu before
                 logUsedGpuTypeOption(gpuToTry);
@@ -246,7 +251,7 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
             arch: arch
                 ? arch as typeof process.arch
                 : process.arch,
-            gpu: buildGpusToTry[0],
+            gpu: buildGpusToTry[0]!,
             llamaCpp: {
                 repo,
                 release: githubReleaseTag!

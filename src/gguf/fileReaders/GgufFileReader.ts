@@ -102,7 +102,7 @@ export abstract class GgufFileReader {
             const res: string[] = [];
 
             for (let i = resolvedOffset; i < resolvedOffset + readLength && i < this._buffer.length; i++)
-                res.push(String.fromCharCode(this._buffer[i]));
+                res.push(String.fromCharCode(this._buffer[i]!));
 
             return res.join("");
         });

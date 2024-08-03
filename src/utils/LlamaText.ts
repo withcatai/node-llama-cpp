@@ -49,7 +49,7 @@ class LlamaText {
         const newValues: LlamaTextValue[] = [];
 
         for (let i = 0; i < this.values.length; i++) {
-            newValues.push(this.values[i]);
+            newValues.push(this.values[i]!);
 
             if (i !== this.values.length - 1) {
                 if (isLlamaText(separator))
@@ -123,7 +123,7 @@ class LlamaText {
         const newValues = this.values.slice();
 
         while (newValues.length > 0) {
-            const firstValue = newValues[0];
+            const firstValue = newValues[0]!;
 
             if (firstValue instanceof SpecialToken)
                 break;
@@ -161,7 +161,7 @@ class LlamaText {
         const newValues = this.values.slice();
 
         while (newValues.length > 0) {
-            const lastValue = newValues[newValues.length - 1];
+            const lastValue = newValues[newValues.length - 1]!;
 
             if (lastValue instanceof SpecialToken)
                 break;
@@ -197,9 +197,9 @@ class LlamaText {
 
     public includes(value: LlamaText): boolean {
         for (let i = 0; i <= this.values.length - value.values.length; i++) {
-            const thisValue = this.values[i];
+            const thisValue = this.values[i]!;
 
-            let startMatch = compareLlamaTextValues(thisValue, value.values[0]);
+            let startMatch = compareLlamaTextValues(thisValue, value.values[0]!);
 
             if (!startMatch && thisValue instanceof SpecialTokensText && value.values[0] instanceof SpecialTokensText) {
                 startMatch = value.values.length > 1
@@ -216,8 +216,8 @@ class LlamaText {
             if (startMatch) {
                 let j = 1;
                 for (; j < value.values.length; j++) {
-                    const thisValue = this.values[i + j];
-                    const valueValue = value.values[j];
+                    const thisValue = this.values[i + j]!;
+                    const valueValue = value.values[j]!;
 
                     let endMatch = compareLlamaTextValues(thisValue, valueValue);
 
@@ -294,7 +294,7 @@ class LlamaText {
             return false;
 
         for (let i = 0; i < a.values.length; i++) {
-            if (!compareLlamaTextValues(a.values[i], b.values[i]))
+            if (!compareLlamaTextValues(a.values[i]!, b.values[i]))
                 return false;
         }
 
@@ -365,7 +365,7 @@ class LlamaText {
         const newValues: (LlamaTextInputValue | LlamaText)[] = [];
 
         for (let i = 0; i < values.length; i++) {
-            const value = values[i];
+            const value = values[i]!;
 
             if (i !== 0)
                 newValues.push(separator);
@@ -660,7 +660,7 @@ function createHistoryFromStringsAndValues(values: readonly LlamaTextInputValue[
         .reduce(squashAdjacentItems, []);
 }
 
-function compareLlamaTextValues(a: LlamaTextValue, b: LlamaTextValue) {
+function compareLlamaTextValues(a?: LlamaTextValue, b?: LlamaTextValue) {
     if (a instanceof SpecialTokensText && b instanceof SpecialTokensText)
         return a.value === b.value;
     else if (a instanceof SpecialToken && b instanceof SpecialToken)

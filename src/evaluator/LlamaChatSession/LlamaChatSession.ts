@@ -826,7 +826,7 @@ function addFunctionCallToChatHistory({
     startsNewChunk?: boolean
 }) {
     const newChatHistory = chatHistory.slice();
-    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1]!.type !== "model")
         newChatHistory.push({
             type: "model",
             response: []
@@ -857,7 +857,7 @@ function addFunctionCallToChatHistory({
 }
 
 function getLastModelResponseItem(chatHistory: ChatHistoryItem[]) {
-    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "model")
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1]!.type !== "model")
         throw new Error("Expected chat history to end with a model response");
 
     return chatHistory[chatHistory.length - 1] as ChatModelResponse;

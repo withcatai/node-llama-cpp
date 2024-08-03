@@ -190,7 +190,7 @@ export class ModelDownloader {
             if (this._specificFileDownloaders.length === 1 && await fs.pathExists(this.entrypointFilePath)) {
                 const fileStat = await fs.stat(this.entrypointFilePath);
 
-                if (this._specificFileDownloaders[0].status.totalBytes === fileStat.size)
+                if (this._specificFileDownloaders[0]!.status.totalBytes === fileStat.size)
                     return this.entrypointFilePath;
             } else {
                 // TODO: skip existing split files
@@ -305,7 +305,7 @@ export class ModelDownloader {
         const splitGgufPartUrls = resolveSplitGgufParts(this._modelUrl);
         if (splitGgufPartUrls.length === 1) {
             this._downloader = await downloadFile({
-                url: splitGgufPartUrls[0],
+                url: splitGgufPartUrls[0]!,
                 directory: this._dirPath,
                 fileName: this._fileName ?? undefined,
                 cliProgress: this._showCliProgress,
@@ -340,7 +340,7 @@ export class ModelDownloader {
             },
             ...partDownloads
         );
-        const firstDownload = await partDownloads[0];
+        const firstDownload = await partDownloads[0]!;
         this._specificFileDownloaders = await Promise.all(partDownloads);
 
         this._entrypointFilename = firstDownload.fileName;

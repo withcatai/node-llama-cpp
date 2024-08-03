@@ -372,7 +372,7 @@ export class LlamaContext {
                 }
 
                 for (let i = 0; i < this._queuedDecodes.length; i++) {
-                    const queuedDecode = this._queuedDecodes[i];
+                    const queuedDecode = this._queuedDecodes[i]!;
                     if (queuedDecodesToDelete.has(queuedDecode)) {
                         this._queuedDecodes.splice(i, 1);
                         this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
@@ -543,7 +543,7 @@ export class LlamaContext {
         }
 
         for (let i = 0; i < this._queuedDecodes.length; i++) {
-            const item = this._queuedDecodes[i];
+            const item = this._queuedDecodes[i]!;
             if (queuedDecodes.has(item)) {
                 this._queuedDecodes.splice(i, 1);
                 this._queuedDecodeSequenceIds.delete(item.sequenceId);
@@ -818,7 +818,7 @@ export class LlamaContextSequence {
                     if (ranges.length === 0)
                         return [range];
 
-                    const lastRange = ranges[ranges.length - 1];
+                    const lastRange = ranges[ranges.length - 1]!;
                     if (lastRange.end >= range.start) {
                         lastRange.end = Math.max(lastRange.end, range.end);
                         return ranges;

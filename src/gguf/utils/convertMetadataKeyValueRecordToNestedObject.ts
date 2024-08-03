@@ -88,9 +88,12 @@ function getNestedObject(key: string, nestedObject: MetadataNestedObject, noDire
 function flattenNestedKeys(
     parent: MetadataNestedObject,
     newParentKey: string,
-    keyValue: MetadataValue | MetadataNestedObject,
+    keyValue: MetadataValue | MetadataNestedObject | undefined,
     logOverrideWarnings: boolean = false
 ) {
+    if (keyValue === undefined)
+        return;
+
     if (typeof keyValue !== "object" || keyValue instanceof Array) {
         parent[newParentKey] = keyValue;
         return;

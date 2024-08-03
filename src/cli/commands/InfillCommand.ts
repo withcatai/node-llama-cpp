@@ -443,7 +443,7 @@ async function RunInfill({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor);
+        process.stdout.write(startColor!);
         await completion.generateInfillCompletion(prefixInput, suffixInput, {
             temperature,
             minP,
@@ -465,7 +465,7 @@ async function RunInfill({
                 process.stdout.write(chunk);
             }
         });
-        process.stdout.write(endColor);
+        process.stdout.write(endColor!);
         console.log();
 
         if (printTimings) {

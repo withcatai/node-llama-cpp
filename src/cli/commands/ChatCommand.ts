@@ -530,7 +530,7 @@ async function RunChat({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor);
+        process.stdout.write(startColor!);
         await session.prompt(input, {
             grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
             temperature,
@@ -576,7 +576,7 @@ async function RunChat({
                 : undefined,
             trimWhitespaceSuffix: trimWhitespace
         });
-        process.stdout.write(endColor);
+        process.stdout.write(endColor!);
         console.log();
 
         if (printTimings) {

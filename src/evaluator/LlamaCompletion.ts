@@ -730,7 +730,7 @@ export class LlamaCompletion {
                         metadata: {
                             remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
                             stopReason: "customStopTrigger",
-                            customStopTrigger: triggeredStops[0].stopTrigger
+                            customStopTrigger: triggeredStops[0]!.stopTrigger
                         }
                     };
                 }

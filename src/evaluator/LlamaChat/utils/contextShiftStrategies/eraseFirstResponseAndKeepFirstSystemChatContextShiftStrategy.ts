@@ -36,13 +36,13 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
 
             function compressFunctionCalls() {
                 for (let i = res.length - 1; i >= 0 && charactersLeftToRemove > 0; i--) {
-                    const historyItem = res[i];
+                    const historyItem = res[i]!;
 
                     if (historyItem.type !== "model")
                         continue;
 
                     for (let t = historyItem.response.length - 1; t >= 0 && charactersLeftToRemove > 0; t--) {
-                        const item = historyItem.response[t];
+                        const item = historyItem.response[t]!;
 
                         if (typeof item === "string" || item.type !== "functionCall")
                             continue;
@@ -68,6 +68,9 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
             function removeHistoryThatLedToModelResponseAtIndex(index: number) {
                 for (let i = index - 1; i >= 0; i--) {
                     const historyItem = res[i];
+
+                    if (historyItem == null)
+                        continue;
 
                     if (historyItem.type === "model")
                         break; // stop removing history items if we reach another model response
@@ -99,14 +102,14 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
 
             function compressFirstModelResponse() {
                 for (let i = 0; i < res.length && charactersLeftToRemove > 0; i++) {
-                    const historyItem = res[i];
+                    const historyItem = res[i]!;
                     const isLastHistoryItem = i === res.length - 1;
 
                     if (historyItem.type !== "model")
                         continue;
 
                     for (let t = 0; t < historyItem.response.length && charactersLeftToRemove > 0; t++) {
-                        const item: Readonly<typeof historyItem.response[number]> = historyItem.response[t];
+                        const item: Readonly<typeof historyItem.response[number]> = historyItem.response[t]!;
                         const isLastText = t === historyItem.response.length - 1;
 
                         if (isLastHistoryItem && isLastText)

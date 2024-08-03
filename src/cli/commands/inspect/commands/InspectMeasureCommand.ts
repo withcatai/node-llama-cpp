@@ -639,7 +639,7 @@ async function runTestWorkerLogic() {
                 });
 
                 if (currentContextSizeCheck == null) {
-                    currentContextSizeCheck = contextSizeCheckPlan[contextSizeCheckPlan.length - 1];
+                    currentContextSizeCheck = contextSizeCheckPlan[contextSizeCheckPlan.length - 1]!;
                     continue;
                 }
             }
@@ -751,7 +751,7 @@ function getContextSizesCheckPlan(trainContextSize: number, tests: number = 10, 
         }
 
         const stepSizesLeft = Math.floor(
-            (trainContextSize - Math.min(lastSize, attemptToCoverSizes[attemptToCoverSizes.length - 1])) / (tests - res.length)
+            (trainContextSize - Math.min(lastSize, attemptToCoverSizes[attemptToCoverSizes.length - 1]!)) / (tests - res.length)
         );
 
         let stopAddingAttemptedSizes = false;

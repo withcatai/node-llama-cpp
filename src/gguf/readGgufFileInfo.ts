@@ -92,11 +92,14 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     const allSplitPartPaths = resolveSplitGgufParts(pathOrUrl);
 
     if (allSplitPartPaths.length === 1)
-        return await readSingleFile(allSplitPartPaths[0]);
+        return await readSingleFile(allSplitPartPaths[0]!);
 
     const [first, ...rest] = await Promise.all(
         allSplitPartPaths.map((partPath) => readSingleFile(partPath))
     );
+
+    if (first == null)
+        throw new Error("First part of the split GGUF file is missing");
 
     return {
         version: first.version,

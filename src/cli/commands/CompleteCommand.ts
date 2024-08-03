@@ -398,7 +398,7 @@ async function RunCompletion({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor);
+        process.stdout.write(startColor!);
         await completion.generateCompletion(input, {
             temperature,
             minP,
@@ -420,7 +420,7 @@ async function RunCompletion({
                 process.stdout.write(chunk);
             }
         });
-        process.stdout.write(endColor);
+        process.stdout.write(endColor!);
         console.log();
 
         if (printTimings) {
