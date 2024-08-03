@@ -8,12 +8,15 @@ import fs from "fs-extra";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const argv = await yargs(hideBin(process.argv))
-    .option("saveToFile", {
+    .option("saveReleaseToFile", {
+        type: "string"
+    })
+    .option("saveVersionToFile", {
         type: "string"
     })
     .argv;
 
-const {saveToFile} = argv;
+const {saveReleaseToFile, saveVersionToFile} = argv;
 
 const res = await semanticRelease({
     dryRun: true
@@ -23,9 +26,22 @@ const res = await semanticRelease({
 
 console.log("Result:", res);
 
-if (saveToFile != null) {
-    const resolvedPath = path.resolve(process.cwd(), saveToFile);
+if (saveReleaseToFile != null) {
+    const resolvedPath = path.resolve(process.cwd(), saveReleaseToFile);
 
-    console.info("Writing to file:", resolvedPath);
+    console.info("Writing release to file:", resolvedPath);
     await fs.writeFile(resolvedPath, JSON.stringify(res), "utf8");
+}
+
+if (saveVersionToFile != null) {
+    const resolvedPath = path.resolve(process.cwd(), saveVersionToFile);
+
+    console.info("Writing version to file:", resolvedPath);
+    await fs.writeFile(
+        resolvedPath,
+        res === false
+            ? "false"
+            : res.nextRelease.version,
+        "utf8"
+    );
 }
