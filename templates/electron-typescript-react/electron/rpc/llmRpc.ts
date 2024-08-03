@@ -28,7 +28,7 @@ export class ElectronLlmRpc {
             if (!res.canceled && res.filePaths.length > 0) {
                 llmState.state = {
                     ...llmState.state,
-                    selectedModelFilePath: path.resolve(res.filePaths[0]),
+                    selectedModelFilePath: path.resolve(res.filePaths[0]!),
                     chatSession: {
                         loaded: false,
                         generatingResult: false,
