@@ -1,10 +1,9 @@
 import {ChatWrapper} from "../ChatWrapper.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatSystemMessage, ChatWrapperCheckModelCompatibilityParams,
-    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings
 } from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
-import {defaultChatSystemPrompt} from "../config.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./utils/jsonDumps.js";
 
@@ -12,8 +11,9 @@ import {jsonDumps} from "./utils/jsonDumps.js";
 export class Llama3_1ChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Llama 3.1";
 
-    public readonly cuttingKnowledgeDate?: Date | null;
-    public readonly todayDate: Date | null;
+    public readonly cuttingKnowledgeDate?: Date | (() => Date) | null;
+    public readonly todayDate: Date | (() => Date) | null;
+    public readonly noToolInstructions: boolean;
 
     public override readonly settings: ChatWrapperSettings = {
         supportsSystemMessages: true,
@@ -36,28 +36,36 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
      */
     public constructor({
         cuttingKnowledgeDate = new Date("2023-12-01T00:00:00Z"),
-        todayDate = new Date()
+        todayDate = () => new Date(),
+        noToolInstructions = false
     }: {
         /**
          * Set to `null` to disable
          * @default December 2023
          */
-        cuttingKnowledgeDate?: Date | number | string | null,
+        cuttingKnowledgeDate?: Date | (() => Date) | number | string | null,
 
         /**
          * Set to `null` to disable
          * @default current date
          */
-        todayDate?: Date | number | string | null
+        todayDate?: Date | (() => Date) | number | string | null,
+
+        noToolInstructions?: boolean
     } = {}) {
         super();
 
         this.cuttingKnowledgeDate = cuttingKnowledgeDate == null
             ? null
-            : new Date(cuttingKnowledgeDate);
+            : cuttingKnowledgeDate instanceof Function
+                ? cuttingKnowledgeDate
+                : new Date(cuttingKnowledgeDate);
         this.todayDate = todayDate == null
             ? null
-            : new Date(todayDate);
+            : todayDate instanceof Function
+                ? todayDate
+                : new Date(todayDate);
+        this.noToolInstructions = noToolInstructions;
     }
 
     public override addAvailableFunctionsSystemMessageToHistory(
@@ -94,7 +102,8 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public override generateContextState({
         chatHistory, availableFunctions, documentFunctionParams
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
-        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistory, availableFunctions, {
+        const chatHistoryWithPreamble = this.prependPreambleToChatHistory(chatHistory);
+        const historyWithFunctions = this.addAvailableFunctionsSystemMessageToHistory(chatHistoryWithPreamble, availableFunctions, {
             documentParams: documentFunctionParams
         });
 
@@ -247,49 +256,61 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         ]);
     }
 
-    public override generateInitialChatHistory({
-        systemPrompt = defaultChatSystemPrompt
-    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
-        const res: ChatHistoryItem[] = [];
+    public prependPreambleToChatHistory(chatHistory: readonly ChatHistoryItem[]): readonly ChatHistoryItem[] {
+        const res = chatHistory.slice();
 
-        function formatDate(date: Date) {
-            const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: "UTC"});
-            const month = date.toLocaleDateString("en-US", {month: "short", timeZone: "UTC"});
-            const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: "UTC"});
+        function formatDate(date: Date, timezone?: "UTC") {
+            const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: timezone});
+            const month = date.toLocaleDateString("en-US", {month: "short", timeZone: timezone});
+            const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: timezone});
             return `${day} ${month} ${year}`;
         }
 
-        const formatMonthDate = (date: Date) => {
-            const today = this.todayDate ?? new Date();
-            if (today.getUTCMonth() === date.getUTCMonth() && today.getUTCFullYear() === date.getUTCFullYear())
-                return formatDate(date);
+        const formatMonthDate = (date: Date, timezone?: "UTC") => {
+            const today = this.todayDate instanceof Function
+                ? this.todayDate()
+                : (this.todayDate ?? new Date());
 
-            const month = date.toLocaleDateString("en-US", {month: "long", timeZone: "UTC"});
-            const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: "UTC"});
+            if (today.getUTCMonth() === date.getUTCMonth() && today.getUTCFullYear() === date.getUTCFullYear())
+                return formatDate(date, timezone);
+
+            const month = date.toLocaleDateString("en-US", {month: "long", timeZone: timezone});
+            const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: timezone});
             return `${month} ${year}`;
         };
 
         const lines: string[] = [];
 
-        if (this.cuttingKnowledgeDate != null)
-            lines.push(`Cutting Knowledge Date: ${formatMonthDate(this.cuttingKnowledgeDate)}`);
+        if (this.cuttingKnowledgeDate != null) {
+            const date = this.cuttingKnowledgeDate instanceof Function
+                ? this.cuttingKnowledgeDate()
+                : this.cuttingKnowledgeDate;
 
-        if (this.todayDate != null)
-            lines.push(`Today Date: ${formatDate(this.todayDate)}`);
+            lines.push(`Cutting Knowledge Date: ${formatMonthDate(date, "UTC")}`);
+        }
 
-        lines.push("");
-        lines.push("# Tool Instructions");
-        lines.push("- When looking for real time information use relevant functions if available");
-        lines.push("");
-        lines.push("");
+        if (this.todayDate != null) {
+            const date = this.todayDate instanceof Function
+                ? this.todayDate()
+                : this.todayDate;
+            lines.push(`Today Date: ${formatDate(date, undefined)}`);
+        }
 
-        res.push({
-            type: "system",
-            text: LlamaText.joinValues("\n", lines).toJSON()
-        }, {
-            type: "system",
-            text: LlamaText(systemPrompt ?? defaultChatSystemPrompt).toJSON()
-        });
+        if (!this.noToolInstructions) {
+            if (lines.length > 0)
+                lines.push("");
+
+            lines.push("# Tool Instructions");
+            lines.push("- When looking for real time information use relevant functions if available");
+            lines.push("");
+            lines.push("");
+        }
+
+        if (lines.length > 0)
+            res.unshift({
+                type: "system",
+                text: LlamaText.joinValues("\n", lines).toJSON()
+            });
 
         return res;
     }
@@ -302,5 +323,20 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         }
 
         return true;
+    }
+
+    /** @internal */
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+        return [
+            {},
+            [{todayDate: null}, {}],
+            [{cuttingKnowledgeDate: null}, {}],
+            [{noToolInstructions: true}, {}],
+            [{todayDate: null, cuttingKnowledgeDate: null}, {}],
+            [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}]
+        ] satisfies Array<
+            Partial<ConstructorParameters<typeof this>[0]> |
+            [Partial<ConstructorParameters<typeof this>[0]>, Partial<ConstructorParameters<typeof this>[0]>]
+        >;
     }
 }

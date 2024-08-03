@@ -224,7 +224,9 @@ export abstract class ChatWrapper {
     }
 
     /** @internal */
-    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): Record<string | symbol, any>[] {
+    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): (
+        Array<Record<string | symbol, any> | [testConfig: Record<string | symbol, any>, applyConfig: Record<string | symbol, any>]>
+    ) {
         return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
     }
 

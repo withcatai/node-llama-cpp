@@ -208,15 +208,26 @@ export function resolveChatWrapper({
             if (testOptionConfigurations.length === 0)
                 testOptionConfigurations.push({} as any);
 
-            for (const testConfiguration of testOptionConfigurations) {
+            for (const testConfigurationOrPair of testOptionConfigurations) {
+                const testConfig = testConfigurationOrPair instanceof Array
+                    ? (testConfigurationOrPair[0]! ?? {})
+                    : testConfigurationOrPair;
+                const applyConfig = testConfigurationOrPair instanceof Array
+                    ? (testConfigurationOrPair[1]! ?? {})
+                    : testConfigurationOrPair;
+
                 const testChatWrapperSettings = {
                     ...(wrapperSettings ?? {}),
-                    ...(testConfiguration ?? {})
+                    ...(testConfig ?? {})
+                };
+                const applyChatWrapperSettings = {
+                    ...(wrapperSettings ?? {}),
+                    ...(applyConfig ?? {})
                 };
                 const chatWrapper = new (Wrapper as any)(testChatWrapperSettings);
 
                 if (isJinjaTemplateEquivalentToSpecializedChatWrapper(jinjaTemplateChatWrapperOptions, chatWrapper, tokenizer))
-                    return new (Wrapper as any)(testChatWrapperSettings);
+                    return new (Wrapper as any)(applyChatWrapperSettings);
             }
         }
 
