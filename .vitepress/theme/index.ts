@@ -31,6 +31,11 @@ export default {
     },
     enhanceApp({app, router, siteData}: EnhanceAppContext) {
         app.use(TwoslashFloatingVue);
-        app.use(NolebaseGitChangelogPlugin);
+        app.use(NolebaseGitChangelogPlugin, {
+            displayAuthorsInsideCommitLine: true,
+            hideChangelogHeader: true,
+            hideSortBy: true,
+            hideContributorsHeader: true
+        });
     }
 };

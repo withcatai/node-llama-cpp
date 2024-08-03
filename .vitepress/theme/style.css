@@ -326,3 +326,32 @@ p.blog-date {
     margin-top: 8px;
     margin-bottom: 24px;
 }
+
+div.vp-nolebase-git-changelog {
+    margin: 64px -24px -48px -24px;
+    padding-left: 22px;
+    padding-right: 22px;
+    border-radius: 0px;
+    background-color: var(--vp-code-block-bg);
+}
+
+@media (min-width: 640px) {
+    div.vp-nolebase-git-changelog {
+        margin: 64px 0px -48px 0px;
+        border-radius: 12px;
+    }
+}
+
+div.vp-nolebase-git-changelog>div {
+    font-size: 1em;
+    line-height: initial;
+}
+
+div.vp-nolebase-git-changelog .text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.vp-nolebase-git-changelog-title {
+    min-height: 24px;
+}
