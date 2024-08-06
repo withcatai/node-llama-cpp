@@ -29,22 +29,20 @@ export async function compileLlamaCpp({
         const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
         const cmakeCustomOptions = new Map<string, string>();
 
-        if ((metal && process.platform === "darwin") || process.env.LLAMA_METAL === "1") cmakeCustomOptions.set("LLAMA_METAL", "1");
-        else cmakeCustomOptions.set("LLAMA_METAL", "OFF");
+        if ((metal && process.platform === "darwin") || process.env.GGML_METAL === "1") cmakeCustomOptions.set("GGML_METAL", "1");
+        else cmakeCustomOptions.set("GGML_METAL", "OFF");
 
-        if (cuda || process.env.LLAMA_CUBLAS === "1") cmakeCustomOptions.set("LLAMA_CUBLAS", "1");
+        if (cuda || process.env.GGML_CUDA === "1") cmakeCustomOptions.set("GGML_CUDA", "1");
 
-        if (process.env.LLAMA_MPI === "1") cmakeCustomOptions.set("LLAMA_MPI", "1");
-        if (process.env.LLAMA_OPENBLAS === "1") cmakeCustomOptions.set("LLAMA_OPENBLAS", "1");
-        if (process.env.LLAMA_BLAS_VENDOR != null) cmakeCustomOptions.set("LLAMA_BLAS_VENDOR", process.env.LLAMA_BLAS_VENDOR);
-        if (process.env.LLAMA_CUDA_FORCE_DMMV != null) cmakeCustomOptions.set("LLAMA_CUDA_FORCE_DMMV", process.env.LLAMA_CUDA_FORCE_DMMV);
-        if (process.env.LLAMA_CUDA_DMMV_X != null) cmakeCustomOptions.set("LLAMA_CUDA_DMMV_X", process.env.LLAMA_CUDA_DMMV_X);
-        if (process.env.LLAMA_CUDA_MMV_Y != null) cmakeCustomOptions.set("LLAMA_CUDA_MMV_Y", process.env.LLAMA_CUDA_MMV_Y);
-        if (process.env.LLAMA_CUDA_F16 != null) cmakeCustomOptions.set("LLAMA_CUDA_F16", process.env.LLAMA_CUDA_F16);
-        if (process.env.LLAMA_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.set("LLAMA_CUDA_KQUANTS_ITER", process.env.LLAMA_CUDA_KQUANTS_ITER);
-        if (process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.set("LLAMA_CUDA_PEER_MAX_BATCH_SIZE", process.env.LLAMA_CUDA_PEER_MAX_BATCH_SIZE);
-        if (process.env.LLAMA_HIPBLAS === "1") cmakeCustomOptions.set("LLAMA_HIPBLAS", "1");
-        if (process.env.LLAMA_CLBLAST === "1") cmakeCustomOptions.set("LLAMA_CLBLAST", "1");
+        if (process.env.GGML_OPENBLAS === "1") cmakeCustomOptions.set("GGML_OPENBLAS", "1");
+        if (process.env.GGML_BLAS_VENDOR != null) cmakeCustomOptions.set("GGML_BLAS_VENDOR", process.env.GGML_BLAS_VENDOR);
+        if (process.env.GGML_CUDA_FORCE_DMMV != null) cmakeCustomOptions.set("GGML_CUDA_FORCE_DMMV", process.env.GGML_CUDA_FORCE_DMMV);
+        if (process.env.GGML_CUDA_DMMV_X != null) cmakeCustomOptions.set("GGML_CUDA_DMMV_X", process.env.GGML_CUDA_DMMV_X);
+        if (process.env.GGML_CUDA_MMV_Y != null) cmakeCustomOptions.set("GGML_CUDA_MMV_Y", process.env.GGML_CUDA_MMV_Y);
+        if (process.env.GGML_CUDA_F16 != null) cmakeCustomOptions.set("GGML_CUDA_F16", process.env.GGML_CUDA_F16);
+        if (process.env.GGML_CUDA_KQUANTS_ITER != null) cmakeCustomOptions.set("GGML_CUDA_KQUANTS_ITER", process.env.GGML_CUDA_KQUANTS_ITER);
+        if (process.env.GGML_CUDA_PEER_MAX_BATCH_SIZE != null) cmakeCustomOptions.set("GGML_CUDA_PEER_MAX_BATCH_SIZE", process.env.GGML_CUDA_PEER_MAX_BATCH_SIZE);
+        if (process.env.GGML_HIPBLAS === "1") cmakeCustomOptions.set("GGML_HIPBLAS", "1");
 
         if (toolchainFile != null)
             cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
