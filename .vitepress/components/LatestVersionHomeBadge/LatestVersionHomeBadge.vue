@@ -86,4 +86,20 @@ const resolvedLink = props.link != null
     color: var(--vp-button-alt-hover-text);
     background-color: color-mix(in srgb, var(--vp-button-alt-bg) 72%, transparent);
 }
+
+:global(html.start-animation) {
+    .latestVersionBadge.forDesktop {
+        @media (width >= 960px) {
+            transition: color 0.25s, border-color 0.25s, background-color 0.25s, opacity 1s, transform 1s, display 1s ease-in-out;
+            transition-behavior: allow-discrete;
+            transform: translateY(0px);
+            opacity: 1;
+
+            @starting-style {
+                transform: translateY(-8px);
+                opacity: 0;
+            }
+        }
+    }
+}
 </style>

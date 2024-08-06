@@ -43,6 +43,10 @@
     }
 }
 
+.VPNavBar .divider-line {
+    position: relative;
+}
+
 .VPNavBar .divider-line:after {
     display: block;
     position: absolute;
@@ -50,7 +54,7 @@
     height: 32px;
     background: linear-gradient(var(--vp-c-bg), transparent 70%);
     content: "";
-    transition: opacity 0.5s;
+    transition: opacity 0.25s;
     opacity: 0;
     pointer-events: none;
     z-index: -1;

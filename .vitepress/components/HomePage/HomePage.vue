@@ -110,6 +110,7 @@ getElectronExampleAppDownloadLink()
                 pointer-events: none;
                 --gradient-size: 128px;
                 background-image: linear-gradient(to bottom, transparent, var(--vp-c-bg-soft) var(--gradient-size), var(--vp-c-bg-soft) calc(100% - var(--gradient-size)), transparent);
+                /* background-image: radial-gradient(200% 50% at 50% 50%, var(--vp-c-bg-soft), var(--vp-c-bg-soft) calc(80% - var(--gradient-size)), transparent); */
             }
 
             .code {
@@ -238,6 +239,45 @@ getElectronExampleAppDownloadLink()
                     }
                 }
             }
+        }
+    }
+}
+
+:global(html.start-animation) {
+    .content {
+        transition: opacity 0.5s 0.25s, transform 0.5s 0.25s, translate 0.5s, display 1s ease-in-out;
+        transition-behavior: allow-discrete;
+        translate: 0px 0px;
+        transform: translateY(0px);
+        opacity: 1;
+
+        @starting-style {
+            translate: 0px 8px;
+            transform: translateY(8px);
+            opacity: 0;
+        }
+    }
+
+    :global(#app>.Layout) {
+        transition: background-color 0.5s, transform 0.5s ease-in-out, opacity 0.5s ease-in-out, display 1s ease-in-out;
+        transition-behavior: allow-discrete;
+        transform: translateY(0px);
+        opacity: 1;
+
+        @starting-style {
+            transform: translateY(-8px);
+            opacity: 0;
+        }
+    }
+
+    :global(.VPHome img.VPImage) {
+        transition: scale 0.5s ease-in-out, display 1s ease-in-out;
+        transition-behavior: allow-discrete;
+        transform-origin: 0% 0%;
+        scale: 1;
+
+        @starting-style {
+            scale: 1.01;
         }
     }
 }

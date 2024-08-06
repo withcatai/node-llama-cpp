@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import {provide, nextTick} from "vue";
+import {provide, nextTick, onBeforeMount} from "vue";
 import {useData} from "vitepress";
 
 const {isDark} = useData();
 
 const themeTransitionEnabled = (document as { startViewTransition?: any }).startViewTransition != null;
 document.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
+
+onBeforeMount(() => {
+    document.documentElement.classList.add("start-animation");
+
+    setTimeout(() => {
+        document.documentElement.classList.remove("start-animation");
+    }, 1000 * 2);
+});
 
 provide("toggle-appearance", async () => {
     if (!themeTransitionEnabled) {
