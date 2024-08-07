@@ -27,6 +27,7 @@ import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -530,54 +531,76 @@ async function RunChat({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor!);
-        await session.prompt(input, {
-            grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
-            temperature,
-            minP,
-            topK,
-            topP,
-            repeatPenalty: {
-                penalty: repeatPenalty,
-                frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
-                presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
-                penalizeNewLine: penalizeRepeatingNewLine,
-                lastTokens: lastTokensRepeatPenalty
-            },
-            maxTokens: maxTokens === -1
-                ? context.contextSize
-                : maxTokens <= 0
-                    ? undefined
-                    : maxTokens,
-            onTextChunk(chunk) {
-                let text = nextPrintLeftovers + chunk;
-                nextPrintLeftovers = "";
-
-                if (trimWhitespace) {
-                    if (!hadNoWhitespaceTextInThisIteration) {
-                        text = text.trimStart();
-
-                        if (text.length > 0)
-                            hadNoWhitespaceTextInThisIteration = true;
-                    }
-
-                    const textWithTrimmedEnd = text.trimEnd();
-
-                    if (textWithTrimmedEnd.length < text.length) {
-                        nextPrintLeftovers = text.slice(textWithTrimmedEnd.length);
-                        text = textWithTrimmedEnd;
-                    }
-                }
-
-                process.stdout.write(text);
-            },
-            functions: (grammar == null && environmentFunctions)
-                ? defaultEnvironmentFunctions
-                : undefined,
-            trimWhitespaceSuffix: trimWhitespace
+        const abortController = new AbortController();
+        const consoleInteraction = new ConsoleInteraction();
+        consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
+            abortController.abort();
+            consoleInteraction.stop();
         });
-        process.stdout.write(endColor!);
-        console.log();
+
+        try {
+            process.stdout.write(startColor!);
+            consoleInteraction.start();
+            await session.prompt(input, {
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                temperature,
+                minP,
+                topK,
+                topP,
+                signal: abortController.signal,
+                stopOnAbortSignal: true,
+                repeatPenalty: {
+                    penalty: repeatPenalty,
+                    frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
+                    presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
+                    penalizeNewLine: penalizeRepeatingNewLine,
+                    lastTokens: lastTokensRepeatPenalty
+                },
+                maxTokens: maxTokens === -1
+                    ? context.contextSize
+                    : maxTokens <= 0
+                        ? undefined
+                        : maxTokens,
+                onTextChunk(chunk) {
+                    let text = nextPrintLeftovers + chunk;
+                    nextPrintLeftovers = "";
+
+                    if (trimWhitespace) {
+                        if (!hadNoWhitespaceTextInThisIteration) {
+                            text = text.trimStart();
+
+                            if (text.length > 0)
+                                hadNoWhitespaceTextInThisIteration = true;
+                        }
+
+                        const textWithTrimmedEnd = text.trimEnd();
+
+                        if (textWithTrimmedEnd.length < text.length) {
+                            nextPrintLeftovers = text.slice(textWithTrimmedEnd.length);
+                            text = textWithTrimmedEnd;
+                        }
+                    }
+
+                    process.stdout.write(text);
+                },
+                functions: (grammar == null && environmentFunctions)
+                    ? defaultEnvironmentFunctions
+                    : undefined,
+                trimWhitespaceSuffix: trimWhitespace
+            });
+        } catch (err) {
+            if (!(abortController.signal.aborted && err === abortController.signal.reason))
+                throw err;
+        } finally {
+            consoleInteraction.stop();
+
+            if (abortController.signal.aborted)
+                process.stdout.write(endColor! + chalk.yellow("[generation aborted by user]"));
+            else
+                process.stdout.write(endColor!);
+
+            console.log();
+        }
 
         if (printTimings) {
             if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))

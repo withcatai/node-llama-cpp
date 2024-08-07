@@ -18,6 +18,7 @@ import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../config.js";
+import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 
 type CompleteCommand = {
     modelPath?: string,
@@ -398,30 +399,51 @@ async function RunCompletion({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor!);
-        await completion.generateCompletion(input, {
-            temperature,
-            minP,
-            topK,
-            topP,
-            repeatPenalty: {
-                penalty: repeatPenalty,
-                frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
-                presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
-                penalizeNewLine: penalizeRepeatingNewLine,
-                lastTokens: lastTokensRepeatPenalty
-            },
-            maxTokens: maxTokens === -1
-                ? context.contextSize
-                : maxTokens <= 0
-                    ? undefined
-                    : maxTokens,
-            onTextChunk(chunk) {
-                process.stdout.write(chunk);
-            }
+        const abortController = new AbortController();
+        const consoleInteraction = new ConsoleInteraction();
+        consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
+            abortController.abort();
+            consoleInteraction.stop();
         });
-        process.stdout.write(endColor!);
-        console.log();
+
+        try {
+            process.stdout.write(startColor!);
+            consoleInteraction.start();
+            await completion.generateCompletion(input, {
+                temperature,
+                minP,
+                topK,
+                topP,
+                signal: abortController.signal,
+                repeatPenalty: {
+                    penalty: repeatPenalty,
+                    frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
+                    presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
+                    penalizeNewLine: penalizeRepeatingNewLine,
+                    lastTokens: lastTokensRepeatPenalty
+                },
+                maxTokens: maxTokens === -1
+                    ? context.contextSize
+                    : maxTokens <= 0
+                        ? undefined
+                        : maxTokens,
+                onTextChunk(chunk) {
+                    process.stdout.write(chunk);
+                }
+            });
+        } catch (err) {
+            if (!(abortController.signal.aborted && err === abortController.signal.reason))
+                throw err;
+        } finally {
+            consoleInteraction.stop();
+
+            if (abortController.signal.aborted)
+                process.stdout.write(endColor! + chalk.yellow("[generation aborted by user]"));
+            else
+                process.stdout.write(endColor!);
+
+            console.log();
+        }
 
         if (printTimings) {
             if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))
