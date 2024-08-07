@@ -92,6 +92,7 @@ import {
     type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, isGgufMetadataOfArchitectureType
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
+import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
 
 
 export {
@@ -254,5 +255,6 @@ export {
     createModelDownloader,
     ModelDownloader,
     type ModelDownloaderOptions,
+    type ModelFileAccessTokens,
     jsonDumps
 };

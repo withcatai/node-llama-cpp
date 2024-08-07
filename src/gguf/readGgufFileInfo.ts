@@ -1,5 +1,6 @@
 import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
+import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -21,11 +22,13 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     fetchRetryOptions = ggufDefaultFetchRetryOptions,
     fetchHeaders = {},
     spliceSplitFiles = true,
-    signal
+    signal,
+    tokens
 }: {
     /**
-     * Whether to read the tensor info from the file's header
-     * Enabled by default.
+     * Whether to read the tensor info from the file's header.
+     *
+     * Defaults to `true`.
      */
     readTensorInfo?: boolean,
 
@@ -41,7 +44,11 @@ export async function readGgufFileInfo(pathOrUrl: string, {
      */
     ignoreKeys?: string[],
 
-    /** Whether to log warnings */
+    /**
+     * Whether to log warnings
+     *
+     * Defaults to `true`.
+     */
     logWarnings?: boolean,
 
     /** Relevant only when fetching from a network */
@@ -50,10 +57,16 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     /** Relevant only when fetching from a network */
     fetchHeaders?: Record<string, string>,
 
-    /** When split files are detected, read the metadata of the first file and splice the tensor info from all the parts */
+    /**
+     * When split files are detected, read the metadata of the first file and splice the tensor info from all the parts.
+     *
+     * Defaults to `true`.
+     */
     spliceSplitFiles?: boolean,
 
-    signal?: AbortSignal
+    signal?: AbortSignal,
+
+    tokens?: ModelFileAccessTokens
 } = {}) {
     const useNetworkReader = sourceType === "network" || (sourceType == null && isUrl(pathOrUrl));
 
@@ -63,7 +76,8 @@ export async function readGgufFileInfo(pathOrUrl: string, {
                 url: normalizeGgufDownloadUrl(pathOrUrl),
                 retryOptions: fetchRetryOptions,
                 headers: fetchHeaders,
-                signal
+                signal,
+                tokens
             });
         } else if (sourceType === "filesystem" || sourceType == null) {
             return new GgufFsFileReader({

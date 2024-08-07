@@ -1,6 +1,5 @@
 import process from "process";
 import path from "path";
-import os from "os";
 import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
@@ -8,6 +7,8 @@ import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/reso
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {cliModelsDirectory} from "../config.js";
 import {safeEventCallback} from "./safeEventCallback.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
+import {pushAll} from "./pushAll.js";
 
 export type ModelDownloaderOptions = {
     modelUrl: string,
@@ -49,9 +50,7 @@ export type ModelDownloaderOptions = {
      */
     parallelDownloads?: number,
 
-    tokens?: {
-        huggingFace?: string
-    }
+    tokens?: ModelFileAccessTokens
 };
 
 /**
@@ -100,7 +99,7 @@ export class ModelDownloader {
     /** @internal */ private readonly _headers?: Record<string, string>;
     /** @internal */ private readonly _showCliProgress: boolean;
     /** @internal */ private readonly _onProgress?: ModelDownloaderOptions["onProgress"];
-    /** @internal */ private readonly _tokens?: ModelDownloaderOptions["tokens"];
+    /** @internal */ private readonly _tokens?: ModelFileAccessTokens;
     /** @internal */ private readonly _deleteTempFileOnCancel: boolean;
     /** @internal */ private readonly _skipExisting: boolean;
     /** @internal */ private readonly _parallelDownloads: number;
@@ -260,19 +259,7 @@ export class ModelDownloader {
         if (this._tokens == null)
             return;
 
-        const {huggingFace} = this._tokens;
-
-        const [
-            hfToken
-        ] = await Promise.all([
-            resolveHfToken(huggingFace)
-        ]);
-
-        if (hfToken != null && hfToken !== "")
-            this._tryHeaders?.push({
-                ...(this._headers ?? {}),
-                "Authorization": `Bearer ${hfToken}`
-            });
+        pushAll(this._tryHeaders, await resolveModelFileAccessTokensTryHeaders(this._modelUrl, this._tokens, this._headers));
     }
 
     /** @internal */
@@ -356,28 +343,4 @@ export class ModelDownloader {
     public static _create(options: ModelDownloaderOptions) {
         return new ModelDownloader(options);
     }
-}
-
-async function resolveHfToken(providedToken?: string) {
-    if (providedToken !== null)
-        return providedToken;
-
-    if (process.env.HF_TOKEN != null)
-        return process.env.HF_TOKEN;
-
-    const hfHomePath = process.env.HF_HOME ||
-        path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "huggingface");
-
-    const hfTokenPath = process.env.HF_TOKEN_PATH || path.join(hfHomePath, "token");
-    try {
-        if (await fs.pathExists(hfTokenPath)) {
-            const token = (await fs.readFile(hfTokenPath, "utf8")).trim();
-            if (token !== "")
-                return token;
-        }
-    } catch (err) {
-        // do nothing
-    }
-
-    return undefined;
 }
