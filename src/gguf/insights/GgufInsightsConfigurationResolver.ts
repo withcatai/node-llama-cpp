@@ -8,6 +8,8 @@ import {resolveContextContextSizeOption} from "./utils/resolveContextContextSize
 import {scoreLevels} from "./utils/scoreLevels.js";
 import type {GgufInsights} from "./GgufInsights.js";
 
+export const defaultTrainContextSizeForEstimationPurposes = 4096;
+
 
 export class GgufInsightsConfigurationResolver {
     /** @internal */ private readonly _ggufInsights: GgufInsights;
@@ -86,8 +88,6 @@ export class GgufInsightsConfigurationResolver {
             totalVramUsage: number
         }
     }> {
-        const defaultTrainContextSize = 4096;
-
         const [
             vramState,
             ramState
@@ -95,12 +95,18 @@ export class GgufInsightsConfigurationResolver {
             getVramState(),
             getRamState()
         ]);
-        const resolvedGpuLayers = await this.resolveModelGpuLayers("auto", {
-            getVramState: async () => vramState,
-            llamaVramPaddingSize,
-            llamaGpu,
-            llamaSupportsGpuOffloading
-        });
+        const resolvedGpuLayers = await this.resolveModelGpuLayers(
+            embeddingContext
+                ? {fitContext: {embeddingContext: true}}
+                : "auto",
+            {
+                getVramState: async () => vramState,
+                llamaVramPaddingSize,
+                llamaGpu,
+                llamaSupportsGpuOffloading,
+                defaultContextFlashAttention: flashAttention
+            }
+        );
         const canUseGpu = llamaSupportsGpuOffloading && llamaGpu !== false;
         const estimatedModelResourceUsage = this._ggufInsights.estimateModelResourceRequirements({
             gpuLayers: resolvedGpuLayers
@@ -114,7 +120,8 @@ export class GgufInsightsConfigurationResolver {
             llamaGpu,
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers,
-            modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSize
+            modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes,
+            flashAttention
         });
         const estimatedContextResourceUsage = this._ggufInsights.estimateContextResourceRequirements({
             contextSize: resolvedContextSize,

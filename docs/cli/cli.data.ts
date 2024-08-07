@@ -12,6 +12,7 @@ import {DownloadCommand} from "../../src/cli/commands/source/commands/DownloadCo
 import {BuildCommand} from "../../src/cli/commands/source/commands/BuildCommand.js";
 import {ClearCommand} from "../../src/cli/commands/source/commands/ClearCommand.js";
 import {InspectMeasureCommand} from "../../src/cli/commands/inspect/commands/InspectMeasureCommand.js";
+import {InspectEstimateCommand} from "../../src/cli/commands/inspect/commands/InspectEstimateCommand.js";
 import {InitCommand} from "../../src/cli/commands/InitCommand.js";
 import {cliBinName, npxRunPrefix} from "../../src/config.js";
 import {htmlEscape} from "../../.vitepress/utils/htmlEscape.js";
@@ -54,6 +55,9 @@ export default {
                     parentCommand: InspectCommand
                 }),
                 measure: await getCommandHtmlDoc(InspectMeasureCommand, {
+                    parentCommand: InspectCommand
+                }),
+                estimate: await getCommandHtmlDoc(InspectEstimateCommand, {
                     parentCommand: InspectCommand
                 })
             },

@@ -35,6 +35,7 @@ export const enum GgufArchitectureType {
     openelm = "openelm",
     arctic = "arctic",
     deepseek2 = "deepseek2",
+    chatglm = "chatglm",
     bitnet = "bitnet",
     t5 = "t5",
     jais = "jais",
@@ -101,7 +102,12 @@ export enum GgufFileType {
     MOSTLY_IQ3_M = 27,
     MOSTLY_IQ2_S = 28,
     MOSTLY_IQ2_M = 29,
-    MOSTLY_IQ4_XS = 30
+    MOSTLY_IQ4_XS = 30,
+    MOSTLY_IQ1_M = 31,
+    MOSTLY_BF16 = 32,
+    MOSTLY_Q4_0_4_4 = 33,
+    MOSTLY_Q4_0_4_8 = 34,
+    MOSTLY_Q4_0_8_8 = 35
 }
 
 
@@ -133,6 +139,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      */
     readonly name?: string,
     readonly basename?: string,
+    readonly size_label?: string,
     readonly author?: string,
 
     /**

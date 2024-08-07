@@ -108,7 +108,8 @@ export const documentationPageUrls = {
             index: documentationCliUrl + "/inspect",
             GPU: documentationCliUrl + "/inspect/gpu",
             GGUF: documentationCliUrl + "/inspect/gguf",
-            Measure: documentationCliUrl + "/inspect/measure"
+            Measure: documentationCliUrl + "/inspect/measure",
+            Estimate: documentationCliUrl + "/inspect/estimate"
         },
         Source: {
             index: documentationCliUrl + "/source",

@@ -333,7 +333,8 @@ export default defineConfig({
                         items: [
                             {text: "GPU", link: "/inspect/gpu"},
                             {text: "GGUF", link: "/inspect/gguf"},
-                            {text: "Measure", link: "/inspect/measure"}
+                            {text: "Measure", link: "/inspect/measure"},
+                            {text: "Estimate", link: "/inspect/estimate"}
                         ]
                     }
                 ]
