@@ -2215,7 +2215,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public waitOnPartialCharactersOrWhiteSpaceTokens() {
-        if (this.currentText === UNKNOWN_UNICODE_CHAR || (
+        if (this.currentText.endsWith(UNKNOWN_UNICODE_CHAR) || (
             (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) && this.currentText?.trim() === ""
         )) {
             if (this.currentQueuedTokenRelease != null)

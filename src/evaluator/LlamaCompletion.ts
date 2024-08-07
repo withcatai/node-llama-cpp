@@ -662,7 +662,7 @@ export class LlamaCompletion {
                 const text = model.detokenize([token]);
                 const queuedTokenRelease = streamRegulator.addChunk({tokens, text});
 
-                if (text === UNKNOWN_UNICODE_CHAR || (
+                if (text.endsWith(UNKNOWN_UNICODE_CHAR) || (
                     (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && text.trim() === ""
                 )) {
                     locksToReleaseOnValidGeneration.push(queuedTokenRelease.createTextIndexLock(0));
