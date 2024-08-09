@@ -664,6 +664,8 @@ export class LlamaCompletion {
 
                 if (text.endsWith(UNKNOWN_UNICODE_CHAR) || (
                     (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && text.trim() === ""
+                ) || (
+                    text === "" && locksToReleaseOnValidGeneration.length > 0 && !model.isSpecialToken(token)
                 )) {
                     locksToReleaseOnValidGeneration.push(queuedTokenRelease.createTextIndexLock(0));
                 } else {

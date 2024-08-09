@@ -2217,6 +2217,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public waitOnPartialCharactersOrWhiteSpaceTokens() {
         if (this.currentText.endsWith(UNKNOWN_UNICODE_CHAR) || (
             (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) && this.currentText?.trim() === ""
+        ) || (
+            this.currentText === "" && this.locksToReleaseOnValidGeneration.length > 0 &&
+            !this.llamaChat.model.isSpecialToken(this.currentToken)
         )) {
             if (this.currentQueuedTokenRelease != null)
                 this.locksToReleaseOnValidGeneration.push(this.currentQueuedTokenRelease.createTextIndexLock(0));
