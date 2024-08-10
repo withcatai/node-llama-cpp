@@ -34,9 +34,12 @@ provide("toggle-appearance", async () => {
             }).ready
 
         document.documentElement.animate({
-            clipPath: showDark
-                ? ["rect(0px 100% 0px 0px)", "rect(0px 100% 100% 0px)"]
-                : ["rect(0px 100% 100% 0px)", "rect(100% 100% 100% 0px)"]
+            // clipPath: showDark
+            //     ? ["rect(0px 100% 0px 0px)", "rect(0px 100% 100% 0px)"]
+            //     : ["rect(0px 100% 100% 0px)", "rect(100% 100% 100% 0px)"],
+            maskPosition: showDark
+                ? ["0% 150%", "0% 75%"]
+                : ["0% 25%", "0% -52%"]
         }, {
             duration: 300,
             easing: "ease-in-out",
@@ -93,6 +96,7 @@ provide("toggle-appearance", async () => {
 
 ::view-transition-old(root),
 .dark::view-transition-new(root) {
+    mask: linear-gradient(to bottom, rgb(0 0 0 / 0%) 0%, black calc((50 / 300) * 100%), black calc((1 - (50 / 300)) * 100%), rgb(0 0 0 / 0%) 100%) content-box 0 75% / 100% 300% no-repeat;
     z-index: 9999;
 }
 
