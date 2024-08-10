@@ -15,6 +15,8 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public readonly todayDate: Date | (() => Date) | null;
     public readonly noToolInstructions: boolean;
 
+    /** @internal */ private readonly _specialTokensTextForPreamble: boolean;
+
     public override readonly settings: ChatWrapperSettings = {
         supportsSystemMessages: true,
         functions: {
@@ -37,7 +39,9 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public constructor({
         cuttingKnowledgeDate = new Date("2023-12-01T00:00:00Z"),
         todayDate = () => new Date(),
-        noToolInstructions = false
+        noToolInstructions = false,
+
+        _specialTokensTextForPreamble = false
     }: {
         /**
          * Set to `null` to disable
@@ -51,7 +55,10 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
          */
         todayDate?: Date | (() => Date) | number | string | null,
 
-        noToolInstructions?: boolean
+        noToolInstructions?: boolean,
+
+        /** @internal */
+        _specialTokensTextForPreamble?: boolean
     } = {}) {
         super();
 
@@ -66,6 +73,8 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                 ? todayDate
                 : new Date(todayDate);
         this.noToolInstructions = noToolInstructions;
+
+        this._specialTokensTextForPreamble = _specialTokensTextForPreamble;
     }
 
     public override addAvailableFunctionsSystemMessageToHistory(
@@ -118,12 +127,17 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         let modelTexts: LlamaText[] = [];
         let currentAggregateFocus: "system" | "user" | "model" | null = null;
 
-        function flush() {
+        const flush = () => {
             if (systemTexts.length > 0 || userTexts.length > 0 || modelTexts.length > 0)
                 resultItems.push({
                     system: systemTexts.length === 0
                         ? null
-                        : LlamaText.joinValues("\n\n", systemTexts),
+                        : LlamaText.joinValues(
+                            resultItems.length === 0 && this._specialTokensTextForPreamble
+                                ? LlamaText(new SpecialTokensText("\n\n"))
+                                : "\n\n",
+                            systemTexts
+                        ),
                     user: userTexts.length === 0
                         ? null
                         : LlamaText.joinValues("\n\n", userTexts),
@@ -135,7 +149,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             systemTexts = [];
             userTexts = [];
             modelTexts = [];
-        }
+        };
 
         for (const item of historyWithFunctions) {
             if (item.type === "system") {
@@ -309,7 +323,9 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         if (lines.length > 0)
             res.unshift({
                 type: "system",
-                text: LlamaText.joinValues("\n", lines).toJSON()
+                text: this._specialTokensTextForPreamble
+                    ? LlamaText(new SpecialTokensText(lines.join("\n"))).toJSON()
+                    : LlamaText.joinValues("\n", lines).toJSON()
             });
 
         return res;
@@ -333,7 +349,19 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             [{cuttingKnowledgeDate: null}, {}],
             [{noToolInstructions: true}, {}],
             [{todayDate: null, cuttingKnowledgeDate: null}, {}],
-            [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}]
+            [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
+            [{todayDate: new Date("2023-07-26T00:00:00"), cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
+            [{
+                todayDate: new Date("2024-07-26T00:00:00"),
+                cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
+                noToolInstructions: true
+            }, {}],
+            [{
+                todayDate: new Date("2024-07-26T00:00:00"),
+                cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
+                noToolInstructions: true,
+                _specialTokensTextForPreamble: true
+            }, {}]
         ] satisfies Array<
             Partial<ConstructorParameters<typeof this>[0]> |
             [Partial<ConstructorParameters<typeof this>[0]>, Partial<ConstructorParameters<typeof this>[0]>]
