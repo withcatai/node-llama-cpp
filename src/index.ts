@@ -43,6 +43,7 @@ import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {Llama3_1ChatWrapper} from "./chatWrappers/Llama3_1ChatWrapper.js";
 import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
 import {Llama2ChatWrapper} from "./chatWrappers/Llama2ChatWrapper.js";
+import {MistralChatWrapper} from "./chatWrappers/MistralChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
 import {ChatMLChatWrapper} from "./chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
@@ -168,6 +169,7 @@ export {
     Llama3_1ChatWrapper,
     Llama3ChatWrapper,
     Llama2ChatWrapper,
+    MistralChatWrapper,
     GeneralChatWrapper,
     ChatMLChatWrapper,
     FalconChatWrapper,

@@ -11,13 +11,14 @@ import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../gene
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
+import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llama3.1", "llama3", "llama2Chat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -38,6 +39,7 @@ const chatWrappers = {
     "llama3.1": Llama3_1ChatWrapper,
     "llama3": Llama3ChatWrapper,
     "llama2Chat": Llama2ChatWrapper,
+    "mistral": MistralChatWrapper,
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
@@ -243,6 +245,17 @@ export function resolveChatWrapper({
         }
     }
 
+    for (const modelNames of getModelLinageNames()) {
+        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+            return createSpecializedChatWrapper(Llama3_1ChatWrapper);
+        else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
+            return createSpecializedChatWrapper(Llama3ChatWrapper);
+        else if (includesText(modelNames, ["Mistral", "Mistral Large", "Mistral Large Instruct", "Mistral-Large", "Codestral"]))
+            return createSpecializedChatWrapper(MistralChatWrapper);
+        else if (includesText(modelNames, ["Gemma", "Gemma 2"]))
+            return createSpecializedChatWrapper(GemmaChatWrapper);
+    }
+
     // try to find a pattern in the Jinja template to resolve to a specialized chat wrapper,
     // with a logic similar to `llama.cpp`'s `llama_chat_apply_template_internal` function
     if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
@@ -260,14 +273,6 @@ export function resolveChatWrapper({
         } else if (modelJinjaTemplate.includes("<start_of_turn>"))
             return createSpecializedChatWrapper(GemmaChatWrapper);
     }
-
-    for (const modelNames of getModelLinageNames()) {
-        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
-            return createSpecializedChatWrapper(Llama3_1ChatWrapper);
-        else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
-            return createSpecializedChatWrapper(Llama3ChatWrapper);
-    }
-
 
     if (filename != null) {
         const {name, subType, fileType, otherInfo} = parseModelFileName(filename);
@@ -310,6 +315,14 @@ export function resolveChatWrapper({
         }
     }
 
+    if (bosString !== "" && bosString != null) {
+        if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
+            return createSpecializedChatWrapper(Llama2ChatWrapper);
+        } else if ("<|im_start|>system\n".startsWith(bosString)) {
+            return createSpecializedChatWrapper(ChatMLChatWrapper);
+        }
+    }
+
     if (fileInfo != null) {
         const arch = fileInfo.metadata.general?.architecture;
 
@@ -317,15 +330,8 @@ export function resolveChatWrapper({
             return createSpecializedChatWrapper(GeneralChatWrapper);
         else if (arch === "falcon")
             return createSpecializedChatWrapper(FalconChatWrapper);
-    }
-
-    if (bosString === "" || bosString == null)
-        return null;
-
-    if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
-        return createSpecializedChatWrapper(Llama2ChatWrapper);
-    } else if ("<|im_start|>system\n".startsWith(bosString)) {
-        return createSpecializedChatWrapper(ChatMLChatWrapper);
+        else if (arch === "gemma" || arch === "gemma2")
+            return createSpecializedChatWrapper(GemmaChatWrapper);
     }
 
     return null;
