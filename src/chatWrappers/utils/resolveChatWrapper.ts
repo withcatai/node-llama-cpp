@@ -146,10 +146,11 @@ export function resolveChatWrapper({
             if (isClassReference(Wrapper, TemplateChatWrapper)) {
                 const wrapperSettings = customWrapperSettings?.template;
                 if (wrapperSettings == null || wrapperSettings?.template == null || wrapperSettings?.historyTemplate == null ||
-                    wrapperSettings?.modelRoleName == null || wrapperSettings?.userRoleName == null
+                    wrapperSettings.historyTemplate.system == null || wrapperSettings.historyTemplate.user == null ||
+                    wrapperSettings.historyTemplate.model == null
                 ) {
                     if (warningLogs)
-                        console.warn(getConsoleLogPrefix() + "Template chat wrapper settings must have a template, historyTemplate, modelRoleName, and userRoleName. Falling back to resolve other chat wrapper types.");
+                        console.warn(getConsoleLogPrefix() + "Template chat wrapper settings must have a template, historyTemplate, historyTemplate.system, historyTemplate.user, and historyTemplate.model. Falling back to resolve other chat wrapper types.");
                 } else
                     return new TemplateChatWrapper(wrapperSettings);
             } else if (isClassReference(Wrapper, JinjaTemplateChatWrapper)) {
