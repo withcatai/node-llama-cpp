@@ -604,7 +604,11 @@ async function runTestWorkerLogic() {
             try {
                 const preContextVramUsage = (await llama.getVramState()).used;
                 const context = await model.createContext({
-                    contextSize: currentContextSizeCheck ?? undefined,
+                    contextSize: currentContextSizeCheck ?? (
+                        maxContextSize != null
+                            ? {max: maxContextSize}
+                            : undefined
+                    ),
                     ignoreMemorySafetyChecks: currentContextSizeCheck != null,
                     flashAttention,
                     failedCreationRemedy: false
@@ -640,7 +644,7 @@ async function runTestWorkerLogic() {
                 });
 
                 if (currentContextSizeCheck == null) {
-                    currentContextSizeCheck = contextSizeCheckPlan[contextSizeCheckPlan.length - 1]!;
+                    currentContextSizeCheck = contextSizeCheckPlan[0]!;
                     continue;
                 }
             }
