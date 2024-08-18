@@ -102,6 +102,32 @@ export type LlamaContextOptions = {
     ignoreMemorySafetyChecks?: boolean,
 
     /**
+     * On failed context creation, retry the creation with a smaller context size.
+     *
+     * Only works if `contextSize` is set to `"auto"`, left as default or set to an object with `min` and/or `max` properties.
+     *
+     * Set `retries` to `false` to disable.
+     */
+    failedCreationRemedy?: false | {
+        /**
+         * Retries to attempt to create the context.
+         *
+         * Defaults to `6`.
+         */
+        retries?: number,
+
+        /**
+         * The percentage to decrease the context size by on each retry.
+         * Should be a number between `0` and `1`.
+         *
+         * If a function is provided, it will be called with the current context size and should return the new context size.
+         *
+         * Defaults to `0.16`.
+         */
+        autoContextSizeShrink?: number | ((contextSize: number) => number)
+    },
+
+    /**
      * embedding mode only
      * @internal
      */

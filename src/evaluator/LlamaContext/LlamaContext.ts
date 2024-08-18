@@ -16,6 +16,11 @@ import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItems
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
+const shrinkRetriesMinContextSize = 4096;
+const defaultFailedCreationRemedy = {
+    retries: 6,
+    autoContextSizeShrink: 0.16
+} as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
@@ -581,11 +586,17 @@ export class LlamaContext {
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
-        const loraOptions: LlamaContextOptions["lora"] = typeof options.lora === "string"
-            ? {adapters: [{filePath: options.lora}]}
-            : options.lora;
+        const loraOptions = typeof options.lora === "string"
+            ? {adapters: [{filePath: options.lora}]} satisfies LlamaContextOptions["lora"]
+            : options.lora satisfies LlamaContextOptions["lora"];
+        let failedCreationRetries = options.failedCreationRemedy === false
+            ? 0
+            : Math.max(0, options.failedCreationRemedy?.retries ?? defaultFailedCreationRemedy.retries);
+        const failedCreationAutoContextSizeShrink = options.failedCreationRemedy === false
+            ? 0
+            : options.failedCreationRemedy?.autoContextSizeShrink ?? defaultFailedCreationRemedy.autoContextSizeShrink;
 
-        const contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
+        let contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,
             modelGpuLayers: _model.gpuLayers,
@@ -596,73 +607,113 @@ export class LlamaContext {
             ignoreMemorySafetyChecks: options.ignoreMemorySafetyChecks,
             isEmbeddingContext: options._embeddings
         });
-        const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
-        const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
-            contextSize,
-            sequences,
-            isEmbeddingContext: options._embeddings,
-            modelGpuLayers: _model.gpuLayers,
-            batchSize,
-            flashAttention
-        }).gpuVram;
-
-        const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
+        const minContextSize = options.contextSize === "auto"
+            ? shrinkRetriesMinContextSize
+            : (typeof options.contextSize === "object" && typeof options.contextSize.min === "number")
+                ? options.contextSize.min
+                : typeof options.contextSize === "number"
+                    ? options.contextSize
+                    : shrinkRetriesMinContextSize;
         const {createSignal} = options;
-        const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
-            ? null
-            : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-        try {
-            const contextLoaded = await context._ctx.init();
+        async function createContext(contextSize: number) {
+            const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
+            const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
+                contextSize,
+                sequences,
+                isEmbeddingContext: options._embeddings,
+                modelGpuLayers: _model.gpuLayers,
+                batchSize,
+                flashAttention
+            }).gpuVram;
 
-            if (createSignal?.aborted) {
-                if (contextLoaded)
-                    await context._ctx.dispose();
+            const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
+            const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
+                ? null
+                : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-                throw createSignal.reason;
-            } else if (!contextLoaded)
-                throw new Error("Failed to create context");
+            try {
+                if (createSignal?.aborted)
+                    throw createSignal.reason;
 
-            contextCreationMemoryReservation?.dispose?.();
+                const contextLoaded = await context._ctx.init();
 
-            if (loraOptions != null && loraOptions.adapters.length > 0) {
-                let loadedAdapters = 0;
+                if (createSignal?.aborted) {
+                    if (contextLoaded)
+                        await context._ctx.dispose();
 
-                for (const adapter of loraOptions.adapters) {
-                    try {
-                        await context._setLora({
-                            filePath: adapter.filePath,
-                            scale: adapter.scale
-                        });
-                        loadedAdapters++;
+                    throw createSignal.reason;
+                } else if (!contextLoaded)
+                    throw new Error("Failed to create context");
 
+                contextCreationMemoryReservation?.dispose?.();
+
+                if (loraOptions != null && loraOptions.adapters.length > 0) {
+                    let loadedAdapters = 0;
+
+                    for (const adapter of loraOptions.adapters) {
                         try {
-                            loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                            await context._setLora({
+                                filePath: adapter.filePath,
+                                scale: adapter.scale
+                            });
+                            loadedAdapters++;
+
+                            try {
+                                loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                            } catch (err) {
+                                console.error(err);
+                            }
                         } catch (err) {
-                            console.error(err);
+                            await context.dispose();
+                            throw err;
                         }
+
+                        if (createSignal?.aborted) {
+                            await context.dispose();
+                            throw createSignal.reason;
+                        }
+                    }
+                } else if (loraOptions?.onLoadProgress != null) {
+                    try {
+                        loraOptions.onLoadProgress(1);
                     } catch (err) {
-                        await context.dispose();
-                        throw err;
+                        console.error(err);
                     }
+                }
 
-                    if (createSignal?.aborted) {
-                        await context.dispose();
-                        throw createSignal.reason;
-                    }
-                }
-            } else if (loraOptions?.onLoadProgress != null) {
-                try {
-                    loraOptions.onLoadProgress(1);
-                } catch (err) {
-                    console.error(err);
-                }
+                return context;
+            } finally {
+                contextCreationMemoryReservation?.dispose?.();
             }
-
-            return context;
-        } finally {
-            contextCreationMemoryReservation?.dispose?.();
         }
+
+        while (failedCreationRetries >= 0) {
+            try {
+                return await createContext(contextSize);
+            } catch (err) {
+                if (failedCreationRetries === 0 || (createSignal?.aborted && err === createSignal.reason))
+                    throw err;
+
+                failedCreationRetries--;
+                let newContextSize = typeof failedCreationAutoContextSizeShrink === "number"
+                    ? Math.floor(contextSize * (1 - failedCreationAutoContextSizeShrink))
+                    : Math.floor(failedCreationAutoContextSizeShrink(contextSize));
+
+                if (!Number.isFinite(newContextSize))
+                    throw err;
+
+                if (newContextSize < minContextSize)
+                    newContextSize = minContextSize;
+
+                if (newContextSize >= contextSize)
+                    throw err;
+
+                contextSize = newContextSize;
+            }
+        }
+
+        throw new Error("Failed to create context");
     }
 }
 

@@ -606,7 +606,8 @@ async function runTestWorkerLogic() {
                 const context = await model.createContext({
                     contextSize: currentContextSizeCheck ?? undefined,
                     ignoreMemorySafetyChecks: currentContextSizeCheck != null,
-                    flashAttention
+                    flashAttention,
+                    failedCreationRemedy: false
                 });
 
                 if (evaluateText != null && evaluateText != "") {
