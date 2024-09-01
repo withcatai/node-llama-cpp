@@ -2,6 +2,7 @@ import {AsyncDisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
 import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
+import {LlamaEmbedding} from "./LlamaEmbedding.js";
 import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
@@ -79,10 +80,9 @@ export class LlamaEmbeddingContext {
                 "Try to increase the context size or use another model that supports longer contexts."
             );
         else if (resolvedInput.length === 0)
-            return {
-                type: "embedding",
+            return new LlamaEmbedding({
                 vector: []
-            } as LlamaEmbedding;
+            });
 
         return await withLock(this, "evaluate", async () => {
             await this._sequence.eraseContextTokenRanges([{
@@ -99,10 +99,9 @@ export class LlamaEmbeddingContext {
             const embedding = this._llamaContext._ctx.getEmbedding(resolvedInput.length);
             const embeddingVector = Array.from(embedding);
 
-            return {
-                type: "embedding",
+            return new LlamaEmbedding({
                 vector: embeddingVector
-            } as LlamaEmbedding;
+            });
         });
     }
 
@@ -146,8 +145,3 @@ export class LlamaEmbeddingContext {
         });
     }
 }
-
-export type LlamaEmbedding = {
-    type: "embedding",
-    vector: number[]
-};
