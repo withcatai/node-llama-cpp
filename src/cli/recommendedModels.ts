@@ -374,9 +374,47 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
+    name: "CodeGemma 2B",
+    abilities: ["code", "complete", "infill"],
+    description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
+        "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This is the 2 billion parameters version of the model.\n",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q4_K_M.gguf"
+        }
+    }]
+}, {
     name: "Stable Code Instruct 3B",
     abilities: ["chat", "complete", "infill"],
-    description: "Stable Code model were created by Stability AI and are optimized for code completion.",
+    description: "Stable Code models were created by Stability AI and are optimized for code completion.",
 
     fileOptions: [{
         huggingFace: {

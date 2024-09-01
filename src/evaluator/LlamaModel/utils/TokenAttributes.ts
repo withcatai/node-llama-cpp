@@ -3,16 +3,16 @@ import {Token} from "../../../types.js";
 // updated against `enum llama_token_attr` from `llama.h`
 export const enum TokenAttribute {
     undefined = 0,
-    unknown = 1 << 1,
-    unused = 1 << 2,
-    normal = 1 << 3,
-    control = 1 << 4,  // SPECIAL
-    userDefined = 1 << 5,
-    byte = 1 << 6,
-    normalized = 1 << 7,
-    lstrip = 1 << 8,
-    rstrip = 1 << 9,
-    singleWord = 1 << 10,
+    unknown = 1 << 0,
+    unused = 1 << 1,
+    normal = 1 << 2,
+    control = 1 << 3,  // SPECIAL
+    userDefined = 1 << 4,
+    byte = 1 << 5,
+    normalized = 1 << 6,
+    lstrip = 1 << 7,
+    rstrip = 1 << 8,
+    singleWord = 1 << 9
 }
 
 export class TokenAttributes {

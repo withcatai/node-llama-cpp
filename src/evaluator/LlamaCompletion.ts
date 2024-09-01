@@ -10,11 +10,13 @@ import {UNKNOWN_UNICODE_CHAR} from "../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeStopTrigger.js";
 import {safeEventCallback} from "../utils/safeEventCallback.js";
 import {pushAll} from "../utils/pushAll.js";
+import {GgufArchitectureType} from "../gguf/types/GgufMetadataTypes.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
 import {LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 import {TokenBias} from "./TokenBias.js";
+import {LlamaModel} from "./LlamaModel/LlamaModel.js";
 
 export type LlamaCompletionOptions = {
     contextSequence: LlamaContextSequence,
@@ -207,8 +209,7 @@ export class LlamaCompletion {
             throw new DisposedError();
 
         return this._sequence.model.tokens.infill.prefix != null &&
-            this._sequence.model.tokens.infill.suffix != null &&
-            this._sequence.model.tokens.infill.middle != null;
+            this._sequence.model.tokens.infill.suffix != null;
     }
 
     /**
@@ -390,23 +391,23 @@ export class LlamaCompletion {
         const bosToken = this._sequence.model.tokens.bos;
         const shouldPrependBosToken = this._sequence.model.tokens.shouldPrependBosToken;
 
-        if (prefixToken == null || suffixToken == null || middleToken == null)
+        if (prefixToken == null || suffixToken == null)
             throw new UnsupportedError("Infill completions are not supported by this model");
+
+        const extraEosTokens = getExtraInfillEosTokens(this._sequence.model);
 
         async function fitInputIntoContext({
             maxTokens, prefixTokens, suffixTokens, sequence
         }: {
             maxTokens: number, prefixTokens: Token[], suffixTokens: Token[], sequence: LlamaContextSequence
         }): Promise<Token[]> {
-            if (prefixToken == null || suffixToken == null || middleToken == null)
+            if (prefixToken == null || suffixToken == null)
                 throw new UnsupportedError("Infill completions are not supported by this model");
 
-            // 3 - InfillPrefix token, InfillSuffix token, InfillMiddle token
-            const specialTokensInContext = 3 + (
-                (shouldPrependBosToken && bosToken != null)
-                    ? 1
-                    : 0
-            );
+            // 2 - InfillPrefix token, InfillSuffix token
+            const specialTokensInContext = 2 +
+                (middleToken != null ? 1 : 0) +
+                ((shouldPrependBosToken && bosToken != null) ? 1 : 0);
             const resolvedMaxTokens = maxTokens - specialTokensInContext;
             let sizeLeftToFill = resolvedMaxTokens;
 
@@ -448,13 +449,21 @@ export class LlamaCompletion {
             if (shouldPrependBosToken && bosToken != null)
                 newContextState.push(bosToken);
 
-            newContextState.push(prefixToken);
-            pushAll(newContextState, resolvedPrefixTokens);
+            if (middleToken != null) {
+                newContextState.push(prefixToken);
+                pushAll(newContextState, resolvedPrefixTokens);
 
-            newContextState.push(suffixToken);
-            pushAll(newContextState, resolvedSuffixTokens);
+                newContextState.push(suffixToken);
+                pushAll(newContextState, resolvedSuffixTokens);
 
-            newContextState.push(middleToken);
+                newContextState.push(middleToken);
+            } else {
+                newContextState.push(suffixToken);
+                pushAll(newContextState, resolvedSuffixTokens);
+
+                newContextState.push(prefixToken);
+                pushAll(newContextState, resolvedPrefixTokens);
+            }
 
             return newContextState;
         }
@@ -520,7 +529,8 @@ export class LlamaCompletion {
                             sequence
                         })
                     };
-                }
+                },
+                extraEosTokens
             });
         });
     }
@@ -546,14 +556,16 @@ export class LlamaCompletion {
             customStopTriggers
         }: LlamaCompletionGenerationOptions,
         {
-            contextShift
+            contextShift,
+            extraEosTokens = new Set()
         }: {
             contextShift(state: {
                 shiftSize: number,
                 res: Token[],
                 pendingTokens: Token[],
                 sequence: LlamaContextSequence
-            }): Promise<{newContextState: Token[]}>
+            }): Promise<{newContextState: Token[]}>,
+            extraEosTokens?: Set<Token>
         }
     ): Promise<LlamaCompletionResponse> {
         if (this._sequence == null)
@@ -680,10 +692,13 @@ export class LlamaCompletion {
                 stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
                 customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
 
+                if (model.isEogToken(token) || extraEosTokens.has(token))
+                    queuedTokenRelease.createTokenIndexLock(0);
+
                 pushAll(pendingTokens, streamRegulator.popFreeChunkTokens());
 
                 if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
-                    model.isEogToken(token)
+                    model.isEogToken(token) || extraEosTokens.has(token)
                 ) {
                     const triggeredStops  = stopGenerationDetector.hasTriggeredStops
                         ? stopGenerationDetector.getTriggeredStops()
@@ -712,7 +727,7 @@ export class LlamaCompletion {
                     if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
                         modelResponse = modelResponse.trimEnd();
 
-                    const isEogToken = model.isEogToken(token);
+                    const isEogToken = model.isEogToken(token) || extraEosTokens.has(token);
 
                     if (isEogToken || stopGenerationDetector.hasTriggeredStops)
                         return {
@@ -805,4 +820,22 @@ async function resolveContextShiftSize(
         );
 
     return defaultContextShiftSize(sequence);
+}
+
+function getExtraInfillEosTokens(model: LlamaModel) {
+    const extraEosTokens = new Set<Token>();
+
+    if (model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma ||
+        model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2
+    ) {
+        for (const token of model.iterateAllTokens()) {
+            const tokenText = model.detokenize([token], true);
+            if (tokenText === "<|file_separator|>") {
+                extraEosTokens.add(token);
+                break;
+            }
+        }
+    }
+
+    return extraEosTokens;
 }

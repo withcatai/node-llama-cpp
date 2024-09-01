@@ -2288,6 +2288,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             tokens: this.currentTokens,
             queuedTokenRelease: this.currentQueuedTokenRelease
         });
+
+        if (this.llamaChat.model.isEogToken(this.currentToken))
+            this.currentQueuedTokenRelease?.createTokenIndexLock(0);
     }
 
     public popStreamRegulatorFreeTokens() {

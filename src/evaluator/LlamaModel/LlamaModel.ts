@@ -319,7 +319,7 @@ export class LlamaModel {
                 case "BOS": return this.tokens.bos == null ? [] : [this.tokens.bos];
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
-                case "EOT": return this.tokens.infill.eot == null ? [] : [this.tokens.infill.eot];
+                case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
             }
 
             void (builtinToken satisfies never);
@@ -343,8 +343,8 @@ export class LlamaModel {
                         ? [this.tokens.eos, this.tokens.eosString]
                         : (this.tokens.nl != null && this.tokens.nlString != null)
                             ? [this.tokens.nl, this.tokens.nlString]
-                            : (this.tokens.infill.eot != null && this.tokens.infill.eotString != null)
-                                ? [this.tokens.infill.eot, this.tokens.infill.eotString]
+                            : (this.tokens.eot != null && this.tokens.eotString != null)
+                                ? [this.tokens.eot, this.tokens.eotString]
                                 : [null, null];
 
                 if (workaroundToken != null && workaroundTokenString != null) {
@@ -440,6 +440,9 @@ export class LlamaModel {
     }
 
     public getTokenAttributes(token: Token): TokenAttributes {
+        if (token == null)
+            throw new Error("Token cannot be null");
+
         if (this.vocabularyType === LlamaVocabularyType.none)
             return TokenAttributes._create(token, TokenAttribute.undefined);
 
@@ -467,7 +470,7 @@ export class LlamaModel {
         if (token == null)
             return false;
 
-        return token === this.tokens.eos || token === this.tokens.infill.eot || this._model.isEogToken(token);
+        return token === this.tokens.eos || token === this.tokens.eot || this._model.isEogToken(token);
     }
 
     public async createContext(options: LlamaContextOptions = {}) {
@@ -717,9 +720,11 @@ export class LlamaModelTokens {
     /** @internal */ private _infillTokens?: LlamaModelInfillTokens;
     /** @internal */ private _bosToken?: Token;
     /** @internal */ private _eosToken?: Token;
+    /** @internal */ private _eotToken?: Token;
     /** @internal */ private _nlToken?: Token;
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
+    /** @internal */ private _eotString?: string;
     /** @internal */ private _nlString?: string;
     /** @internal */ private _shouldPrependBosToken?: boolean;
 
@@ -771,6 +776,21 @@ export class LlamaModelTokens {
     }
 
     /**
+     * @returns The EOT (End Of Turn) token.
+     */
+    public get eot(): Token | null {
+        this._ensureNotDisposed();
+
+        if (this._eotToken == null)
+            this._eotToken = this._model.eotToken();
+
+        if (this._eotToken === -1)
+            return null;
+
+        return this._eotToken;
+    }
+
+    /**
      * @returns The NL (New Line) token.
      */
     public get nl(): Token | null {
@@ -786,7 +806,7 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The BOS (Beginning Of Sequence) token as a string.
+     * @returns The BOS (Beginning Of Sequence) token text representation.
      */
     public get bosString(): string | null {
         this._ensureNotDisposed();
@@ -803,7 +823,7 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The EOS (End Of Sequence) token as a string.
+     * @returns The EOS (End Of Sequence) token text representation.
      */
     public get eosString(): string | null {
         this._ensureNotDisposed();
@@ -820,7 +840,24 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The NL (New Line) token as a string.
+     * @returns The EOT (End Of Turn) token text representation.
+     */
+    public get eotString(): string | null {
+        this._ensureNotDisposed();
+
+        const eotToken = this.eot;
+
+        if (eotToken == null)
+            return null;
+
+        if (this._eotString == null)
+            this._eotString = this._model.getTokenString(eotToken);
+
+        return this._eotString;
+    }
+
+    /**
+     * @returns The NL (New Line) token text representation.
      */
     public get nlString(): string | null {
         this._ensureNotDisposed();
@@ -866,11 +903,9 @@ export class LlamaModelInfillTokens {
     /** @internal */ private _prefixToken?: Token;
     /** @internal */ private _middleToken?: Token;
     /** @internal */ private _suffixToken?: Token;
-    /** @internal */ private _eotToken?: Token;
     /** @internal */ private _prefixString?: string;
     /** @internal */ private _middleString?: string;
     /** @internal */ private _suffixString?: string;
-    /** @internal */ private _eotString?: string;
 
     private constructor(model: AddonModel, disposedState: DisposedState) {
         this._model = model;
@@ -923,21 +958,6 @@ export class LlamaModelInfillTokens {
     }
 
     /**
-     * @returns End of infill middle token (End Of Text).
-     */
-    public get eot(): Token | null {
-        this._ensureNotDisposed();
-
-        if (this._eotToken == null)
-            this._eotToken = this._model.eotToken();
-
-        if (this._eotToken === -1)
-            return null;
-
-        return this._eotToken;
-    }
-
-    /**
      * @returns The beginning of infill prefix token as a string.
      */
     public get prefixString(): string | null {
@@ -986,23 +1006,6 @@ export class LlamaModelInfillTokens {
             this._suffixString = this._model.getTokenString(suffixToken);
 
         return this._suffixString;
-    }
-
-    /**
-     * @returns End of infill middle token (End Of Text) as a string.
-     */
-    public get eotString(): string | null {
-        this._ensureNotDisposed();
-
-        const eotToken = this.eot;
-
-        if (eotToken == null)
-            return null;
-
-        if (this._eotString == null)
-            this._eotString = this._model.getTokenString(eotToken);
-
-        return this._eotString;
     }
 
     /** @internal */
