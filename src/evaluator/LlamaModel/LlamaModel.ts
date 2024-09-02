@@ -16,7 +16,7 @@ import {LlamaContextOptions} from "../LlamaContext/types.js";
 import {LlamaContext} from "../LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
 import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataTypes.js";
-import {DeepPartialObject} from "../../utils/DeepPartialObject.js";
+import {OverridesObject} from "../../utils/OverridesObject.js";
 import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
@@ -128,7 +128,7 @@ export type LlamaModelOptions = {
      * > Only use this for metadata values that are explicitly documented to be supported by `llama.cpp` to be overridden,
      * > and only in cases when this is crucial, as this is not guaranteed to always work as expected.
      */
-    metadataOverrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
+    metadataOverrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 };
 
 const defaultUseMmap = true;
@@ -1054,7 +1054,7 @@ export class LlamaModelInfillTokens {
 
 function applyGgufMetadataOverrides(
     ggufFileInfo: GgufFileInfo,
-    overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
+    overrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 ) {
     function applyOverride(object: object, override?: object) {
         if (override == null || object == null)
@@ -1077,7 +1077,7 @@ function applyGgufMetadataOverrides(
     applyOverride(ggufFileInfo.metadata, overrides);
 }
 
-function ggufMetadataOverridesToList(overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>) {
+function ggufMetadataOverridesToList(overrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>) {
     const maxStringLength = 127;
     const maxKeyLength = 127;
 

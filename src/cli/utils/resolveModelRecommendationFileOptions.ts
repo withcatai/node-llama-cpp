@@ -2,7 +2,7 @@ import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUr
 
 export type ModelRecommendation = {
     name: string,
-    abilities: ("chat" | "complete" | "infill" | "functionCalling")[],
+    abilities: ("code" | "chat" | "complete" | "infill" | "functionCalling")[],
     description?: string,
 
     /**

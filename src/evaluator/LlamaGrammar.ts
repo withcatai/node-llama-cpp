@@ -64,7 +64,7 @@ export class LlamaGrammar {
         return this._trimWhitespaceSuffix;
     }
 
-    public static async getFor(llama: Llama, type: "json" | "list" | "arithmetic" | "japanese" | "chess") {
+    public static async getFor(llama: Llama, type: "json" | "json_arr" | "list" | "c" | "arithmetic" | "japanese" | "chess") {
         const grammarsFolder = await getGrammarsFolder(llama.buildType);
 
         const grammarFile = path.join(grammarsFolder, type + ".gbnf");

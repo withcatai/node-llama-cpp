@@ -95,6 +95,7 @@ import {
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
 import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
+import {type OverridesObject} from "./utils/OverridesObject.js";
 
 
 export {
@@ -261,5 +262,6 @@ export {
     ModelDownloader,
     type ModelDownloaderOptions,
     type ModelFileAccessTokens,
-    jsonDumps
+    jsonDumps,
+    type OverridesObject
 };
