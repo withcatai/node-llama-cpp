@@ -27,8 +27,8 @@ type InspectEstimateCommand = {
     modelPath: string,
     header?: string[],
     gpu?: BuildGpu | "auto",
-    gpuLayers?: number,
-    contextSize?: number,
+    gpuLayers?: number | "max",
+    contextSize?: number | "train",
     embedding?: boolean
 };
 
@@ -72,7 +72,14 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
-                description: "number of layers to store in VRAM",
+                description: "number of layers to store in VRAM. Set to `max` to use all the layers the model has",
+                string: true,
+                coerce: (value): InspectEstimateCommand["gpuLayers"] => {
+                    if (value === "max")
+                        return -2;
+
+                    return parseInt(value);
+                },
                 default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
@@ -80,7 +87,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             .option("contextSize", {
                 alias: "c",
                 type: "number",
-                description: "Context size to use for the model context",
+                description: "Context size to use for the model context. Set to `max` or `train` to use the training context size. " +
+                    "Note that the train context size is not necessarily what you should use for inference, " +
+                    "and a big context size will use a lot of memory",
+                string: true,
+                coerce: (value): InspectEstimateCommand["contextSize"] => {
+                    if (value === "max" || value === "train")
+                        return -2;
+
+                    return parseInt(value);
+                },
                 default: -1,
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
@@ -94,10 +110,12 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize, embedding
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding
     }: InspectEstimateCommand) {
-        if (contextSize === -1) contextSize = undefined;
         if (gpuLayers === -1) gpuLayers = undefined;
+        if (gpuLayers === -2) gpuLayers = "max";
+        if (contextSizeArg === -1) contextSizeArg = undefined;
+        if (contextSizeArg === -2) contextSizeArg = "train";
 
         const isPathUrl = isUrl(ggufPath);
         const resolvedGgufPath = isPathUrl
@@ -134,6 +152,10 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
         });
         const ggufInsights = await GgufInsights.from(ggufFileInfo, llama);
+
+        const contextSize = contextSizeArg === "train"
+            ? ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes
+            : contextSizeArg;
 
         async function resolveCompatibilityScore(flashAttention: boolean) {
             const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
