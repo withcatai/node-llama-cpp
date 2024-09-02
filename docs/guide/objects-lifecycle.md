@@ -1,3 +1,6 @@
+---
+outline: [2, 3]
+---
 # Objects Lifecycle
 Every object in `node-llama-cpp` has a ` .dispose()` function you can call to free up its resources.
 
@@ -104,3 +107,52 @@ export async function logVramState() {
 }
 ```
 :::
+
+## Reusing Existing Context Sequence State
+When prompting a model using [`LlamaChatSession`](../api/classes/LlamaChatSession.md) or [`LlamaChat`](../api/classes/LlamaChat.md),
+it attempts to use the existing context sequence state as much as possible to avoid redundant evaluations,
+but when needed, it'll flush irrelevant parts of the state (or all of it) to perform the requested evaluation.
+
+You can reuse a context sequence for a new [`LlamaChatSession`](../api/classes/LlamaChatSession.md) or [`LlamaChat`](../api/classes/LlamaChat.md)
+without worrying about data leakage between different chat sessions.
+
+You'll probably want to do so to utilize the existing state for faster evaluation using the new chat,
+since the preamble system prompt and other chat history items may have already been evaluated in the existing context sequence,
+so reusing the context sequence for a new chat will allow it to automatically continue evaluation from the first difference in the existing state,
+thus reducing the time needed to start generating output.
+
+::: warning
+It's important to make sure you don't use the same context sequence for multiple chats _at the same time_,
+as it'll cause the chats to compete for the same resources and may lead to unexpected results.
+
+Always make sure you're done with the existing chat before reusing the context sequence for a new chat.
+:::
+
+## Objects Relationship
+### [`Llama`](../api/classes/Llama.md)
+The main class returned by the [`getLlama()`](../api/functions/getLlama.md) method that provides access to `llama.cpp` APIs as well as additional native APIs.
+
+### [`LlamaModel`](../api/classes/LlamaModel.md)
+A model loaded using the [`.loadModel()`](../api/classes/Llama.md#loadmodel) method of a [`Llama`](../api/classes/Llama.md) instance.
+
+### [`LlamaContext`](../api/classes/LlamaContext.md)
+A context created using the [`.createContext()`](../api/classes/LlamaModel.md#createcontext) method of a [`LlamaModel`](../api/classes/LlamaModel.md) instance.
+
+A context can hold [multiple context sequences](./batching.md).
+
+Having multiple context sequences is more efficient and performant than creating multiple contexts, and allows using [batching](./batching.md).
+
+### [`LlamaContextSequence`](../api/classes/LlamaContextSequence.md)
+A context sequence created using the [`.createContextSequence()`](../api/classes/LlamaContext.md#createcontextsequence) method of a [`LlamaContext`](../api/classes/LlamaContext.md) instance.
+
+A context sequence holds a state ([usually tokens](../api/classes/LlamaContextSequence.md#contexttokens)) of the conversation and is used to generate completions and evaluate inputs.
+
+All context sequences are independent of each other and do not share data between them.
+
+### [`LlamaChatSession`](../api/classes/LlamaChatSession.md)
+A chat session created with a [`LlamaContextSequence`](../api/classes/LlamaContextSequence.md) instance.
+
+A chat session is used to prompt a model with a conversation history and generate responses.
+
+The existing state of the context sequence will be overridden if it cannot be reused for the chat session.
+You don't need to provide a clean context sequence for a [`LlamaChatSession`](../api/classes/LlamaChatSession.md) to work as expected.
