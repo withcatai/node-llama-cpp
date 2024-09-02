@@ -477,6 +477,18 @@ export class LlamaModel {
         return false;
     }
 
+    public *iterateAllTokens() {
+        if (this.vocabularyType === LlamaVocabularyType.none)
+            return;
+
+        const totalTokens = this.fileInfo.metadata?.tokenizer?.ggml?.tokens?.length;
+        if (typeof totalTokens !== "number")
+            return;
+
+        for (let i = 0; i < totalTokens; i++)
+            yield i as Token;
+    }
+
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */
     public isEogToken(token: Token | undefined): boolean {
         if (token == null)
