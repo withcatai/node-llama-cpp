@@ -53,11 +53,18 @@ export type LlamaModelOptions = {
         }
     },
 
-    /** only load the vocabulary, no weights */
+    /**
+     * Only load the vocabulary, not weight tensors.
+     *
+     * Useful when you only want to use the model to use its tokenizer but not for evaluation.
+     *
+     * Defaults to `false`.
+     */
     vocabOnly?: boolean,
 
     /**
      * Use mmap if possible.
+     *
      * Defaults to `true`.
      */
     useMmap?: boolean,
@@ -71,6 +78,7 @@ export type LlamaModelOptions = {
     /**
      * Check for tensor validity before actually loading the model.
      * Using it increases the time it takes to load the model.
+     *
      * Defaults to `false`.
      */
     checkTensors?: boolean,
@@ -135,6 +143,7 @@ export class LlamaModel {
     /** @internal */ private readonly _fileInfo: GgufFileInfo;
     /** @internal */ private readonly _fileInsights: GgufInsights;
     /** @internal */ private readonly _gpuLayers: number;
+    /** @internal */ private readonly _vocabOnly: boolean;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -152,7 +161,7 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number
     }, {
@@ -175,6 +184,7 @@ export class LlamaModel {
         this._modelPath = path.resolve(process.cwd(), modelPath);
         this._fileInsights = _fileInsights;
         this._gpuLayers = gpuLayers;
+        this._vocabOnly = vocabOnly ?? false;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
         this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
@@ -184,7 +194,7 @@ export class LlamaModel {
         this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
             addonExports: this._llama._bindings,
             gpuLayers,
-            vocabOnly,
+            vocabOnly: this._vocabOnly,
             useMmap,
             useMlock: _llama.supportsMlock
                 ? useMlock
@@ -474,6 +484,9 @@ export class LlamaModel {
     }
 
     public async createContext(options: LlamaContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
@@ -485,6 +498,9 @@ export class LlamaModel {
     }
 
     public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {

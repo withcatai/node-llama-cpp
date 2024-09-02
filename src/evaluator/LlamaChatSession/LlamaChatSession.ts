@@ -705,8 +705,12 @@ export class LlamaChatSession {
     }: LLamaChatCompletePromptOptions = {}) {
         this._ensureNotDisposed();
 
-        if (grammar != null && grammar._llama !== this.model._llama)
-            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+        if (grammar != null) {
+            if (grammar._llama == null)
+                throw new Error("The grammar passed to this function is not a LlamaGrammar instance.");
+            else if (grammar._llama !== this.model._llama)
+                throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+        }
 
         const abortController = wrapAbortSignal(signal);
         this._preloadAndCompleteAbortControllers.add(abortController);

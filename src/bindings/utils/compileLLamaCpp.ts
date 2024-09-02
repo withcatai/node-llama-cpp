@@ -190,7 +190,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 linuxPackages: {apt: ["cmake"], apk: ["cmake"]},
                 macOsPackages: {brew: ["cmake"]}
             });
-        } else if (platform === "mac" && await which("clang", {nothrow: true}) == null)
+        } else if (platform === "mac" && (
+            (await which("clang", {nothrow: true})) == null || (
+                err instanceof SpawnError &&
+                err.combinedStd.toLowerCase().includes('"/usr/bin/cc" is not able to compile a simple test program')
+            )
+        ))
             console.info("\n" +
                 getConsoleLogPrefix(true) +
                 chalk.yellow("It seems that Xcode command line tools are not installed in your system. Install it to resolve build issues\n") +
