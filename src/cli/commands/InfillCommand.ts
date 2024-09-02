@@ -32,7 +32,7 @@ type InfillCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
-    threads: number,
+    threads?: number,
     temperature: number,
     minP: number,
     topK: number,
@@ -124,7 +124,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
             })
             .option("threads", {
                 type: "number",
-                default: 6,
+                defaultDescription: "Number of cores that are useful for math on the current machine",
                 description: "Number of threads to use for the evaluation of tokens"
             })
             .option("temperature", {
@@ -339,7 +339,7 @@ async function RunInfill({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads,
+                threads: threads === null ? undefined : threads,
                 ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
             });
         } finally {

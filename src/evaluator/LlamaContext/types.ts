@@ -59,7 +59,7 @@ export type LlamaContextOptions = {
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware.
      *
-     * Defaults to `6`.
+     * Defaults to the number of CPU cores that are useful for math on the current machine (`llama.cpuMathCores`).
      */
     threads?: number,
 

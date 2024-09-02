@@ -46,7 +46,7 @@ type ChatCommand = {
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
-    threads: number,
+    threads?: number,
     temperature: number,
     minP: number,
     topK: number,
@@ -175,7 +175,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             })
             .option("threads", {
                 type: "number",
-                default: 6,
+                defaultDescription: "Number of cores that are useful for math on the current machine",
                 description: "Number of threads to use for the evaluation of tokens"
             })
             .option("temperature", {
@@ -397,7 +397,7 @@ async function RunChat({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads,
+                threads: threads === null ? undefined : threads,
                 ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
             });
         } finally {

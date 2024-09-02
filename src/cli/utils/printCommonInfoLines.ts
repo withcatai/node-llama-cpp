@@ -82,6 +82,9 @@ export async function printCommonInfoLines({
             title: "Size",
             value: String(context.contextSize)
         }, {
+            title: "Threads",
+            value: String(context.threads)
+        }, {
             show: logBatchSize,
             title: "Batch size",
             value: bytes(context.batchSize)

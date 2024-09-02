@@ -37,6 +37,7 @@ export class Llama {
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
     /** @internal */ private readonly _supportsMmap: boolean;
     /** @internal */ private readonly _supportsMlock: boolean;
+    /** @internal */ private readonly _mathCores: number;
     /** @internal */ private readonly _llamaCppRelease: {
         readonly repo: string,
         readonly release: string
@@ -75,6 +76,7 @@ export class Llama {
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
+        this._mathCores = bindings.getMathCores();
         this._consts = bindings.getConsts();
         this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
@@ -137,6 +139,11 @@ export class Llama {
 
     public get supportsMlock() {
         return this._supportsMlock;
+    }
+
+    /** The number of CPU cores that are useful for math */
+    public get cpuMathCores() {
+        return this._mathCores;
     }
 
     public get logLevel() {

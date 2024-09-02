@@ -404,7 +404,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params = llama_context_default_params();
     context_params.seed = -1;
     context_params.n_ctx = 4096;
-    context_params.n_threads = 6;
+    context_params.n_threads = std::max(cpu_get_num_math(), 1);
     context_params.n_threads_batch = context_params.n_threads;
 
     if (info.Length() > 1 && info[1].IsObject()) {
@@ -438,8 +438,8 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("threads")) {
-            const auto n_threads = options.Get("threads").As<Napi::Number>().Uint32Value();
-            const auto resolved_n_threads = n_threads == 0 ? std::thread::hardware_concurrency() : n_threads;
+            const auto n_threads = options.Get("threads").As<Napi::Number>().Int32Value();
+            const auto resolved_n_threads = n_threads == 0 ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads) : n_threads;
 
             context_params.n_threads = resolved_n_threads;
             context_params.n_threads_batch = resolved_n_threads;
@@ -718,6 +718,15 @@ Napi::Value AddonContext::GetStateSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_state_get_size(ctx));
 }
 
+Napi::Value AddonContext::GetThreads(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    return Napi::Number::From(info.Env(), llama_n_threads(ctx));
+}
+
 Napi::Value AddonContext::PrintTimings(const Napi::CallbackInfo& info) {
     llama_print_timings(ctx);
     llama_reset_timings(ctx);
@@ -753,6 +762,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("canBeNextTokenForGrammarEvaluationState", &AddonContext::CanBeNextTokenForGrammarEvaluationState),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                 InstanceMethod("getStateSize", &AddonContext::GetStateSize),
+                InstanceMethod("getThreads", &AddonContext::GetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),
                 InstanceMethod("setLora", &AddonContext::SetLora),
                 InstanceMethod("dispose", &AddonContext::Dispose),

@@ -27,6 +27,10 @@ Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(info.Env(), llama_supports_mlock());
 }
 
+Napi::Value addonGetMathCores(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), cpu_get_num_math());
+}
+
 Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
     const int ggmlType = info[0].As<Napi::Number>().Int32Value();
 
@@ -189,6 +193,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
         Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
         Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
+        Napi::PropertyDescriptor::Function("getMathCores", addonGetMathCores),
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),

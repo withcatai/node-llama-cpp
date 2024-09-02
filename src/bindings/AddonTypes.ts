@@ -43,6 +43,7 @@ export type BindingModule = {
     getSupportsGpuOffloading(): boolean,
     getSupportsMmap(): boolean,
     getSupportsMlock(): boolean,
+    getMathCores(): number,
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
     getTypeSizeForGgmlType(ggmlType: number): number | undefined,
     getConsts(): {
@@ -50,7 +51,6 @@ export type BindingModule = {
         ggmlTypeF16Size: number,
         ggmlTypeF32Size: number,
         ggmlTensorOverhead: number,
-        llamaMaxRngState: number,
         llamaPosSize: number,
         llamaSeqIdSize: number
     },
@@ -132,6 +132,7 @@ export type AddonContext = {
     canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean,
     getEmbedding(inputTokensLength: number): Float64Array,
     getStateSize(): number,
+    getThreads(): number,
     printTimings(): void,
     setLora(lora: AddonModelLora, scale: number): void
 };

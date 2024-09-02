@@ -60,7 +60,7 @@ export class LlamaContext {
         contextSize,
         batchSize,
         flashAttention = _model.defaultContextFlashAttention,
-        threads = 6,
+        threads,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
@@ -90,7 +90,9 @@ export class LlamaContext {
             batchSize: this._batchSize,
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
-            threads: Math.max(0, Math.floor(threads)),
+            threads: threads == null
+                ? undefined
+                : Math.max(0, Math.floor(threads)),
             embeddings: _embeddings,
             noSeed: _noSeed
         }));
@@ -171,6 +173,13 @@ export class LlamaContext {
         this._ensureNotDisposed();
 
         return this._ctx.getStateSize();
+    }
+
+    /** The number of threads used to evaluate tokens */
+    public get threads() {
+        this._ensureNotDisposed();
+
+        return this._ctx.getThreads();
     }
 
     public getAllocatedContextSize(): number {
