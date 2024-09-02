@@ -34,7 +34,7 @@ export const resolvableChatWrapperTypeNames = Object.freeze([
 ] as const);
 export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNames)[number];
 
-const chatWrappers = {
+export const chatWrappers = Object.freeze({
     "general": GeneralChatWrapper,
     "llama3.1": Llama3_1ChatWrapper,
     "llama3": Llama3ChatWrapper,
@@ -47,13 +47,15 @@ const chatWrappers = {
     "gemma": GemmaChatWrapper,
     "template": TemplateChatWrapper,
     "jinjaTemplate": JinjaTemplateChatWrapper
-} as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>;
+} as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>);
 const chatWrapperToConfigType = new Map(
     Object.entries(chatWrappers)
         .map(([configType, Wrapper]) => (
             [Wrapper, configType as keyof typeof chatWrappers]
         ))
 );
+
+export type BuiltInChatWrapperType = InstanceType<typeof chatWrappers[keyof typeof chatWrappers]>;
 
 export type ResolveChatWrapperOptions = {
     /**
@@ -71,11 +73,21 @@ export type ResolveChatWrapperOptions = {
     customWrapperSettings?: {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     },
+
+    /**
+     * Defaults to `true`.
+     */
     warningLogs?: boolean,
+
+    /**
+     * Defaults to `true`.
+     */
     fallbackToOtherWrappersOnJinjaError?: boolean,
 
     /**
      * Don't resolve to a Jinja chat wrapper unless `type` is set to a Jinja chat wrapper type.
+     *
+     * Defaults to `false`.
      */
     noJinja?: boolean
 };
@@ -92,6 +104,20 @@ export type ResolveChatWrapperOptions = {
  * When loading a Jinja chat template from either `fileInfo` or `customWrapperSettings.jinjaTemplate.template`,
  * if the chat template format is invalid, it fallbacks to resolve other chat wrappers,
  * unless `fallbackToOtherWrappersOnJinjaError` is set to `false` (in which case, it will throw an error).
+ * @example
+ *```typescript
+ * import {getLlama, resolveChatWrapper, GeneralChatWrapper} from "node-llama-cpp";
+ *
+ * const llama = await getLlama();
+ * const model = await llama.loadModel({modelPath: "path/to/model.gguf"});
+ *
+ * const chatWrapper = resolveChatWrapper({
+ *     bosString: model.tokens.bosString,
+ *     filename: model.filename,
+ *     fileInfo: model.fileInfo,
+ *     tokenizer: model.tokenizer
+ * }) ?? new GeneralChatWrapper()
+ * ```
  */
 export function resolveChatWrapper({
     type = "auto",
@@ -103,11 +129,11 @@ export function resolveChatWrapper({
     warningLogs = true,
     fallbackToOtherWrappersOnJinjaError = true,
     noJinja = false
-}: ResolveChatWrapperOptions) {
+}: ResolveChatWrapperOptions): BuiltInChatWrapperType | null {
     function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
         specializedChatWrapper: T,
         defaultSettings: ConstructorParameters<T>[0] = {}
-    ) {
+    ): InstanceType<T> {
         const chatWrapperConfigType = chatWrapperToConfigType.get(specializedChatWrapper) as SpecializedChatWrapperTypeName;
         const chatWrapperSettings = customWrapperSettings?.[chatWrapperConfigType];
 

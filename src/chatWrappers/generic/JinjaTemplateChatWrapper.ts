@@ -76,6 +76,22 @@ const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: JinjaTemplate
  * from the `ChatWrapper` class and implement a custom chat wrapper of your own in TypeScript.
  *
  * For a simpler way to create a chat wrapper, see the `TemplateChatWrapper` class.
+ * @example
+ * <span v-pre>
+ *
+ * ```ts
+ * import {JinjaTemplateChatWrapper} from "node-llama-cpp";
+ *
+ * const chatWrapper = new JinjaTemplateChatWrapper({
+ *     template: "<Jinja template here>",
+ *     // functionCallMessageTemplate: { // optional
+ *     //     call: "[[call: {{functionName}}({{functionParams}})]]",
+ *     //     result: " [[result: {{functionCallResult}}]]"
+ *     // }
+ * });
+ * ```
+ *
+ * </span>
  */
 export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly wrapperName = "JinjaTemplate";
@@ -91,6 +107,9 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
     /** @internal */ private readonly _jinjaTemplate: Template;
 
+    /**
+     * @param options
+     */
     public constructor({
         template,
         modelRoleName = "assistant",
@@ -272,23 +291,37 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         idToContent.set(eosTokenId, new SpecialToken("EOS"));
         idToContent.set(eotTokenId, new SpecialToken("EOT"));
 
+        function tryOptions<const T extends (() => any)[]>(options: T): ReturnType<T[number]> {
+            for (let i = 0; i < options.length; i++) {
+                if (i === options.length - 1)
+                    return options[i]!();
+
+                try {
+                    return options[i]!();
+                } catch (err) {
+                    // do nothing
+                }
+            }
+
+            throw new Error("All options failed");
+        }
+
         const renderJinjaText = () => {
-            try {
-                return this._jinjaTemplate.render({
+            return tryOptions([
+                () => this._jinjaTemplate.render({
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId
-                });
-            } catch (err) {
-                return this._jinjaTemplate.render({
+                }),
+                () => this._jinjaTemplate.render({
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId,
                     "add_generation_prompt": true
-                });
-            }
+                })
+            ]);
         };
 
         const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string[]>>) => {

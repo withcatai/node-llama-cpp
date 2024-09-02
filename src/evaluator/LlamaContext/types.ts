@@ -10,6 +10,7 @@ export type LlamaContextOptions = {
      * This is beneficial for performance, as multiple sequences can be evaluated in parallel (on the same batch).
      *
      * Each sequence increases the memory usage of the context.
+     *
      * Defaults to `1`.
      */
     sequences?: number,
@@ -36,6 +37,7 @@ export type LlamaContextOptions = {
 
     /**
      * The number of tokens that can be processed at once by the GPU.
+     *
      * Defaults to `512` or `contextSize` if `contextSize` is less than `512`.
      */
     batchSize?: number,
@@ -78,7 +80,7 @@ export type LlamaContextOptions = {
             filePath: string,
 
             /**
-             * @default `1`
+             * Defaults to `1`
              */
             scale?: number
         }>,
@@ -144,21 +146,24 @@ export type LlamaContextSequenceRepeatPenalty = {
     punishTokens: Token[] | (() => Token[]),
 
     /**
-     * The relative amount to lower the probability of the tokens in `punishTokens` by
+     * The relative amount to lower the probability of the tokens in `punishTokens` by.
+     *
      * Defaults to `1.1`.
      * Set to `1` to disable.
      */
     penalty?: number,
 
     /**
-     * For n time a token is in the `punishTokens` array, lower its probability by `n * frequencyPenalty`
+     * For n time a token is in the `punishTokens` array, lower its probability by `n * frequencyPenalty`.
+     *
      * Disabled by default (`0`).
      * Set to a value between `0` and `1` to enable.
      */
     frequencyPenalty?: number,
 
     /**
-     * Lower the probability of all the tokens in the `punishTokens` array by `presencePenalty`
+     * Lower the probability of all the tokens in the `punishTokens` array by `presencePenalty`.
+     *
      * Disabled by default (`0`).
      * Set to a value between `0` and `1` to enable.
      */

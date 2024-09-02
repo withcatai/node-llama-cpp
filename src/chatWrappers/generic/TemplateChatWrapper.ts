@@ -18,7 +18,11 @@ export type TemplateChatWrapperOptions = {
 /**
  * A chat wrapper based on a simple template.
  * @example
- * ```typescript
+ * <span v-pre>
+ *
+ * ```ts
+ * import {TemplateChatWrapper} from "node-llama-cpp";
+ *
  * const chatWrapper = new TemplateChatWrapper({
  *     template: "{{systemPrompt}}\n{{history}}model:{{completion}}\nuser:",
  *     historyTemplate: {
@@ -32,6 +36,8 @@ export type TemplateChatWrapperOptions = {
  *     // }
  * });
  * ```
+ *
+ * </span>
  *
  * **<span v-pre>`{{systemPrompt}}`</span>** is optional and is replaced with the first system message
  * (when is does, that system message is not included in the history).

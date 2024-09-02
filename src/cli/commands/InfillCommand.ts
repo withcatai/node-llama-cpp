@@ -60,7 +60,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
             .option("modelPath", {
                 alias: ["m", "model", "path", "url"],
                 type: "string",
-                description: "Llama model file to use for the infill. Can be a path to a local file or a URL of a model file to download"
+                description: "Model file to use for the infill. Can be a path to a local file or a URL of a model file to download"
             })
             .option("header", {
                 alias: ["H"],

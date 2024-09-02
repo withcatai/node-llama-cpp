@@ -58,7 +58,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
             .option("modelPath", {
                 alias: ["m", "model", "path", "url"],
                 type: "string",
-                description: "Llama model file to use for the completion. Can be a path to a local file or a URL of a model file to download"
+                description: "Model file to use for the completion. Can be a path to a local file or a URL of a model file to download"
             })
             .option("header", {
                 alias: ["H"],

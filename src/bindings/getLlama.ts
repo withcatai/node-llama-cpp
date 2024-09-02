@@ -73,7 +73,7 @@ export type LlamaOptions = {
      * - **`"forceRebuild"`**: Always build from source.
      * Be cautious with this option, as it will cause the build to fail on Windows when the binaries are in use by another process.
      *
-     * If running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
+     * When running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
      * To allow building from source in Electron apps, make sure you ship `node-llama-cpp` as an unpacked module.
      *
      * Defaults to `"auto"`.
@@ -200,6 +200,21 @@ const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInE
  *
  * Pass `"lastBuild"` to default to use the last successful build created
  * using the `source download` or `source build` CLI commands if one exists.
+ *
+ * The difference between using `"lastBuild"` and not using it is that `"lastBuild"` will use the binary built using a CLI command
+ * with the configuration used to build that binary (like using its GPU type),
+ * while not using `"lastBuild"` will only attempt to only use a binary that complies with the given options.
+ *
+ * For example, if your machine supports both CUDA and Vulkan, and you run the `source download --gpu vulkan` command,
+ * calling `getLlama("lastBuild")` will return the binary you built with Vulkan,
+ * while calling `getLlama()` will return a binding from a pre-built binary with CUDA,
+ * since CUDA is preferable on systems that support it.
+ *
+ * For example, if your machine supports CUDA, and you run the `source download --gpu cuda` command,
+ * calling `getLlama("lastBuild")` will return the binary you built with CUDA,
+ * and calling `getLlama()` will also return that same binary you built with CUDA.
+ *
+ * You should prefer to use `getLlama()` without `"lastBuild"` unless you have a specific reason to use the last build.
  */
 export async function getLlama(options?: LlamaOptions): Promise<Llama>;
 export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOptions): Promise<Llama>;

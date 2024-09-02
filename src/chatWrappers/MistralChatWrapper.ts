@@ -7,7 +7,10 @@ import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js"
 import {jsonDumps} from "./utils/jsonDumps.js";
 import {chunkChatItems} from "./utils/chunkChatItems.js";
 
-
+// source:
+// https://github.com/mistralai/platform-docs-public/blob/02c3f50e427ce5cf96bba9710501598f621babea/docs/guides/tokenization.mdx#v3-tokenizer
+//
+// source: https://docs.mistral.ai/guides/tokenization/#v3-tokenizer
 export class MistralChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Mistral";
 
@@ -135,7 +138,7 @@ export class MistralChatWrapper extends ChatWrapper {
 
     public override generateInitialChatHistory({
         systemPrompt
-    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
+    }: ChatWrapperGenerateInitialHistoryOptions = {}): ChatHistoryItem[] {
         if (systemPrompt == null || systemPrompt.trim() === "")
             return [];
 

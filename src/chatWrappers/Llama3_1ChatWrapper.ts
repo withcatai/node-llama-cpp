@@ -45,13 +45,15 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     }: {
         /**
          * Set to `null` to disable
-         * @default December 2023
+         *
+         * Defaults to December 2023
          */
         cuttingKnowledgeDate?: Date | (() => Date) | number | string | null,
 
         /**
          * Set to `null` to disable
-         * @default current date
+         *
+         * Defaults to current date
          */
         todayDate?: Date | (() => Date) | number | string | null,
 

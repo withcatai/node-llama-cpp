@@ -1274,7 +1274,7 @@ function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenB
     if (tokenBias instanceof Function)
         tokenBias = tokenBias();
 
-    if (tokenBias._model !== currentModel)
+    if (tokenBias._tokenizer !== currentModel.tokenizer)
         throw new Error(
             "This TokenBias instance was created with a different model than the one used by this context. " +
             "Make sure you use the model instance of the context sequence for the TokenBias you use it with."

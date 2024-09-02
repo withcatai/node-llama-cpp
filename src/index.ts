@@ -59,7 +59,7 @@ import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/uti
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
-    type ResolveChatWrapperOptions
+    type ResolveChatWrapperOptions, type BuiltInChatWrapperType, chatWrappers
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
@@ -187,6 +187,7 @@ export {
     type JinjaTemplateChatWrapperOptionsConvertMessageFormat,
     type ChatHistoryFunctionCallMessageTemplate,
     resolveChatWrapper,
+    type BuiltInChatWrapperType,
     type ResolveChatWrapperOptions,
     resolvableChatWrapperTypeNames,
     type ResolvableChatWrapperTypeName,
@@ -194,6 +195,7 @@ export {
     type SpecializedChatWrapperTypeName,
     templateChatWrapperTypeNames,
     type TemplateChatWrapperTypeName,
+    chatWrappers,
     ChatModelFunctionsDocumentationGenerator,
     LlamaText,
     SpecialTokensText,

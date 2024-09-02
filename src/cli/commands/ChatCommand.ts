@@ -68,7 +68,7 @@ type ChatCommand = {
 export const ChatCommand: CommandModule<object, ChatCommand> = {
     command: "chat [modelPath]",
     describe: withCliCommandDescriptionDocsUrl(
-        "Chat with a Llama model",
+        "Chat with a model",
         documentationPageUrls.CLI.Chat
     ),
     builder(yargs) {
@@ -78,7 +78,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("modelPath", {
                 alias: ["m", "model", "path", "url"],
                 type: "string",
-                description: "Llama model file to use for the chat. Can be a path to a local file or a URL of a model file to download"
+                description: "Model file to use for the chat. Can be a path to a local file or a URL of a model file to download"
             })
             .option("header", {
                 alias: ["H"],
@@ -111,7 +111,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "string",
                 description:
                     "System prompt to use against the model" +
-                    (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
+                    (isInDocumentationMode ? "" : (". [the default value is determined by the chat wrapper, but is usually: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
             })
             .option("systemPromptFile", {
                 type: "string",

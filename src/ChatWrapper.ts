@@ -216,7 +216,7 @@ export abstract class ChatWrapper {
 
     public generateInitialChatHistory({
         systemPrompt = defaultChatSystemPrompt
-    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
+    }: ChatWrapperGenerateInitialHistoryOptions = {}): ChatHistoryItem[] {
         return [{
             type: "system",
             text: LlamaText(systemPrompt ?? defaultChatSystemPrompt).toJSON()

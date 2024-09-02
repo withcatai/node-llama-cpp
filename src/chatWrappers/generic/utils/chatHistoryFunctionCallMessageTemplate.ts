@@ -67,7 +67,7 @@ export function parseFunctionCallMessageTemplate(
  * 2. The function call result template.
  *
  * For example:
- * ```typescript
+ * ```ts
  * const template: ChatHistoryFunctionCallMessageTemplate = {
  *     call: "[[call: {{functionName}}({{functionParams}})]]",
  *     result: " [[result: {{functionCallResult}}]]"
