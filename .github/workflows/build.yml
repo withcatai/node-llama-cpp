@@ -643,9 +643,14 @@ jobs:
           node-version: "20"
       - name: Install modules
         run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
       - name: Move artifacts
         run: |
           mv artifacts/build dist/
+          
+          cp -r artifacts/llama.cpp/llama.cpp llama/llama.cpp
 
           rm -f ./llama/binariesGithubRelease.json
           mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
