@@ -14,6 +14,16 @@ const commandDoc = docs.source.build;
 If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.
 :::
 
+::: details Programmatically calling the `source build` command in your code
+To programmatically call this command in your code, call the `BuildLlamaCppCommand` function:
+```typescript
+import {BuildLlamaCppCommand} from "node-llama-cpp/commands";
+await BuildLlamaCppCommand({});
+```
+> **Note:** The `node-llama-cpp/commands` import is subject to change and is unsupported inside Electron
+
+:::
+
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>
 <div v-html="commandDoc.options"></div>

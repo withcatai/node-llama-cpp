@@ -1,11 +1,11 @@
-# Building from source
+# Building From Source
 `node-llama-cpp` ships with pre-built binaries for macOS, Linux and Windows.
 
 In case binaries are not available for your platform or fail to load,
 it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 
-## Downloading a release
-To download a release of `llama.cpp` and build it from source you can use the [CLI `source download` command](../cli/source/download.md).
+## Downloading a Release
+To download a release of `llama.cpp` and build it from source you can use the CLI [`source download`](../cli/source/download.md) command.
 
 ```shell
 npx --no node-llama-cpp source download
@@ -31,7 +31,7 @@ If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile
 
 :::
 
-## `source download` and `source build` commands
+## `source download` and `source build` Commands
 The difference between the [`source download`](../cli/source/download.md) and [`source build`](../cli/source/build.md) commands
 is that the `source download` command downloads a release of `llama.cpp` and builds it,
 while the `source build` command builds the `llama.cpp` release that's already downloaded.
@@ -43,17 +43,80 @@ To only download a release of `llama.cpp` without building it, use the `source d
 npx --no node-llama-cpp source download --skipBuild
 ```
 
-## Customizing the build
+## Building Inside Your App
+The best way to use a customized build is by customizing the options passed to the [`getLlama`](../api/functions/getLlama.md).
+
+If there's no existing binary that matches the provided options (either a local build or a pre-built binary),
+it'll automatically download a release of `llama.cpp` (if it's not already downloaded) and build it from source.
+
+You can pass custom cmake options you want the binary be compiled with by using the [`cmakeOptions`](../api/type-aliases/LlamaOptions.md#cmakeoptions) option:
+```typescript
+import {getLlama} from "node-llama-cpp";
+// ---cut---
+const llama = await getLlama({
+    cmakeOptions: {
+        OPTION_NAME: "OPTION_VALUE"
+    },
+    
+    // force a build if the pre-built binary doesn't
+    // match all the provided options, such as the cmakeOptions
+    existingPrebuiltBinaryMustMatchBuildOptions: true
+});
+```
+
+You can also force it to build a new binary by setting the [`build`](../api/type-aliases/LlamaOptions.md#build) option to `"forceRebuild"`:
+```typescript
+import {getLlama} from "node-llama-cpp";
+// ---cut---
+const llama = await getLlama({
+    build: "forceRebuild"
+});
+```
+
+::: info Electron support for building from source
+When running in Electron, the [`build`](../api/type-aliases/LlamaOptions.md#build) option defaults to `"never"` as 
+we cannot assume that the user has the necessary build tools installed on their machine, and the user won't be able to
+see the build process to troubleshoot any issues that may arise.
+
+You can manually set it to be `"auto"` to allow building from source in Electron.
+
+When running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
+To allow building from source in Electron apps, make sure you ship `node-llama-cpp` as an unpacked module.
+
+If you want to use a build with custom cmake options in your Electron app,
+make sure you build `node-llama-cpp` with your desired cmake options _before_ building your Electron app,
+and make sure you pass the same cmake options to the [`getLlama`](../api/functions/getLlama.md) function in your Electron app so it'll use the binary you built.
+:::
+
+## Customizing the Build {#customize-build}
 > **Meta:** To configure Metal support see the [Metal support guide](./Metal.md).
 > 
 > **CUDA:** To configure CUDA support see the [CUDA support guide](./CUDA.md).
+> 
+> **Vulkan:** To configure Vulkan support see the [Vulkan support guide](./Vulkan.md).
 
-`llama.cpp` has cmake build options that can be configured to customize the build.
-You can find documentation for these options [here](https://github.com/ggerganov/llama.cpp#blas-build).
+<script setup lang="ts">
+import {data} from "./cmakeOptions.data.js";
+const cmakeOptionsTable = data.cmakeOptionsTable;
+const cmakeOptionsFileUrl = data.cmakeOptionsFileUrl;
+</script>
+
+`llama.cpp` has CMake build options that can be configured to customize the build.
+
+:::details `llama.cpp` CMake build options
+
+<div v-html="cmakeOptionsTable"></div>
+
+> Source: <a :href="cmakeOptionsFileUrl">`CMakeLists`</a>
+
+:::
 
 To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_` before running the [`source download`](../cli/source/download.md) or [`source build`](../cli/source/build.md) commands.
 
-## Downloading a newer release
+To use that customized build in your code, you can either use `getLlama("lastBuild")` to get the last build that was built,
+or pass the code snippet that is printed after the build finishes.
+
+## Downloading a Newer Release {#download-new-release}
 Every new release of `node-llama-cpp` ships with the latest release of `llama.cpp` that was available at the time of the release,
 so relying on the latest version of `node-llama-cpp` should be enough for most use cases.
 

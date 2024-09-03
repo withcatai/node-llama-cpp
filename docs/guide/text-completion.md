@@ -1,4 +1,4 @@
-# Text Completion
+# Text Completion {#title}
 To generate text completions, you can use the [`LlamaCompletion`](../api/classes/LlamaCompletion.md) class.
 
 Here are usage examples of [`LlamaCompletion`](../api/classes/LlamaCompletion.md):

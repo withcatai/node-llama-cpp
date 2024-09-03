@@ -51,7 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     "cuda-nvtx-${INSTALL_CUDA_VERSION//./-}" \
     "libcusparse-${INSTALL_CUDA_VERSION//./-}" \
     "libcublas-${INSTALL_CUDA_VERSION//./-}" \
-    git cmake clang \
+    git cmake clang libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-mark hold "libcublas-${INSTALL_CUDA_VERSION//./-}"
@@ -76,7 +76,7 @@ FROM node:22
 
 SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends mesa-vulkan-drivers libegl1 git cmake clang && \
+    apt-get install -y --no-install-recommends mesa-vulkan-drivers libegl1 git cmake clang libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NVIDIA_VISIBLE_DEVICES=all
@@ -96,7 +96,7 @@ FROM node:22
 
 SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git cmake clang && \
+    apt-get install -y --no-install-recommends git cmake clang libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 

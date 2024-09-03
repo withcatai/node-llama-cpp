@@ -33,7 +33,7 @@ features:
   - icon: 🚀
     title: Metal, CUDA and Vulkan support
     details: Adapts to your hardware automatically to run models with maximum performance
-    link: /guide/#cuda-and-metal-support
+    link: /guide/#gpu-support
     linkText: Learn more
   - icon: 📦
     title: Native binaries
@@ -43,7 +43,7 @@ features:
   - icon: <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M600-160q-17 0-28.5-11.5T560-200q0-17 11.5-28.5T600-240h80q17 0 28.5-11.5T720-280v-80q0-38 22-69t58-44v-14q-36-13-58-44t-22-69v-80q0-17-11.5-28.5T680-720h-80q-17 0-28.5-11.5T560-760q0-17 11.5-28.5T600-800h80q50 0 85 35t35 85v80q0 17 11.5 28.5T840-560t28.5 11.5Q880-537 880-520v80q0 17-11.5 28.5T840-400t-28.5 11.5Q800-377 800-360v80q0 50-35 85t-85 35h-80Zm-320 0q-50 0-85-35t-35-85v-80q0-17-11.5-28.5T120-400t-28.5-11.5Q80-423 80-440v-80q0-17 11.5-28.5T120-560t28.5-11.5Q160-583 160-600v-80q0-50 35-85t85-35h80q17 0 28.5 11.5T400-760q0 17-11.5 28.5T360-720h-80q-17 0-28.5 11.5T240-680v80q0 38-22 69t-58 44v14q36 13 58 44t22 69v80q0 17 11.5 28.5T280-240h80q17 0 28.5 11.5T400-200q0 17-11.5 28.5T360-160h-80Z"/></svg>
     title: Powerful features
     details: Force a model to generate output according to a JSON schema, give the model functions it can call on demand, and much more
-    link: /guide/grammar
+    link: /guide/grammar#json-schema
     linkText: Learn more
 ---
 
@@ -68,36 +68,38 @@ npx -y node-llama-cpp inspect gpu
 </template>
 <template v-slot:features-list>
 
-* Embedding
+* [Embedding](./guide/embedding.md)
 * [Grammar](./guide/grammar.md)
-* JSON schema grammar
-* Function calling
-* CUDA support
-* Metal support
-* Vulkan support
-* Adapts to your hardware
-* Model downloader
-* Prebuilt binaries
-* Electron support
-* Prompt preloading
-* Automatic chat wrapper
-* Template chat wrapper
-* Text completion
-* Fill in the middle (infill)
-* Jinja support
-* Smart context shift
-* Token bias
+* [JSON schema grammar](./guide/index.md#chatbot-with-json-schema)
+* [Function calling](./guide/index.md#chatbot-with-json-schema)
+* [CUDA support](./guide/CUDA.md)
+* [Metal support](./guide/Metal.md)
+* [Vulkan support](./guide/Vulkan.md)
+* [Adapts to your hardware](./guide/index.md#gpu-support)
+* [Model downloader](./cli/pull.md)
+* [Prebuilt binaries](./guide/building-from-source.md)
+* [Electron support](./guide/electron.md)
+* [Prompt preloading](./guide/chat-session.md#preload-prompt)
+* [Automatic chat wrapper](./guide/chat-wrapper.md#chat-wrappers)
+* [Template chat wrapper](./guide/chat-wrapper.md#template)
+* [Text completion](./guide/text-completion.md#complete)
+* [Fill in the middle (infill)](./guide/text-completion.md#infill)
+* [Jinja support](./guide/chat-wrapper.md#jinja)
+* [Smart context shift](./guide/chat-wrapper.md#smart-context-shift)
+* [Token bias](./guide/token-bias.md)
 * Windows on Arm support
-* Apple Silicon support
-* Inspect GGUF files
-* Custom CMake options
-* Automatic batching
-* TypeScript type-safety
+* [Apple Silicon support](./guide/Metal.md)
+* [Inspect GGUF files](./cli/inspect/gguf.md)
+* [Custom CMake options](./guide/building-from-source.md#customize-build)
+* [Automatic batching](./guide/batching.md)
+* [TypeScript type-safety](./api/functions/getLlama.md)
+* [LoRA](./api/type-aliases/LlamaContextOptions.md#lora)
+* [Remote GGUF reader](./api/functions/readGgufFileInfo.md)
 
 </template>
 <template v-slot:simple-code>
 
-```TypeScript twoslash
+```TypeScript
 import {fileURLToPath} from "url";
 import path from "path";
 import {getLlama, LlamaChatSession} from "node-llama-cpp";
@@ -126,7 +128,7 @@ console.log("AI: " + a1);
 </template>
 <template v-slot:simple-embedding>
 
-```TypeScript twoslash
+```TypeScript
 import {fileURLToPath} from "url";
 import path from "path";
 import {getLlama} from "node-llama-cpp";
@@ -155,7 +157,7 @@ console.log("Embedding vector:", embedding.vector);
 </template>
 <template v-slot:json-schema>
 
-```TypeScript twoslash
+```TypeScript
 import {fileURLToPath} from "url";
 import path from "path";
 import {getLlama, LlamaChatSession} from "node-llama-cpp";
@@ -216,7 +218,7 @@ console.log(
 </template>
 <template v-slot:function-calling>
 
-```TypeScript twoslash
+```TypeScript
 import {fileURLToPath} from "url";
 import path from "path";
 import {

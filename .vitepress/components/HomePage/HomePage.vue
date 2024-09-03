@@ -53,7 +53,7 @@ getElectronExampleAppDownloadLink()
                     <p>Integrate <code>node-llama-cpp</code> in your codebase and prompt models</p>
                     <div class="code">
                         <slot name="simple-code" />
-                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/guide/#usage')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
                 <div class="panel">
@@ -61,7 +61,7 @@ getElectronExampleAppDownloadLink()
                     <p>Get embedding for a given text</p>
                     <div class="code">
                         <slot name="simple-embedding" />
-                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/guide/embedding')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
             </div>
@@ -73,7 +73,7 @@ getElectronExampleAppDownloadLink()
                     <p>Force a model response to follow your JSON schema</p>
                     <div class="code">
                         <slot name="json-schema" />
-                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/guide/#chatbot-with-json-schema')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
                 <div class="panel">
@@ -81,7 +81,7 @@ getElectronExampleAppDownloadLink()
                     <p>Let a model call functions to retrieve data or perform actions</p>
                     <div class="code">
                         <slot name="function-calling" />
-                        <p><a class="learn-more" :href="withBase('/cli/inspect/gpu')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                        <p><a class="learn-more" :href="withBase('/guide/#chatbot-with-function-calling')">Learn more <span class="vpi-arrow-right"></span></a></p>
                     </div>
                 </div>
             </div>
@@ -97,6 +97,7 @@ getElectronExampleAppDownloadLink()
 
     .container {
         position: relative;
+        isolation: isolate;
 
         &.other-color {
             margin-bottom: calc(96px * 1.5 - (24px + 16px));

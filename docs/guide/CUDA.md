@@ -1,86 +1,167 @@
-# Enabling CUDA support
+---
+outline: [2, 3]
+---
+# CUDA Support
+> CUDA is a parallel computing platform and API created by NVIDIA for NVIDIA GPUs
+
+`node-llama-cpp` ships with pre-built binaries with CUDA support for Windows and Linux,
+and these are automatically used when CUDA is detected on your machine.
+
+To use `node-llama-cpp`'s CUDA support with your NVIDIA GPU,
+make sure you have [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.2 or higher installed on your machine.
+
+If the pre-built binaries don't work with your CUDA installation,
+`node-llama-cpp` will automatically download a release of `llama.cpp` and build it from source with CUDA support.
+Building from source with CUDA support is slow and can take up to an hour.
+
+The pre-built binaries are compiled with CUDA Toolkit 12.2,
+so any version of CUDA Toolkit that is 12.2 or higher should work with the pre-built binaries.
+If you have an older version of CUDA Toolkit installed on your machine,
+consider updating it to avoid having to wait the long build time.
+
+## Testing CUDA Support
+To check whether the CUDA support works on your machine, run this command:
+```shell
+npx --no node-llama-cpp inspect gpu
+```
+
+You should see an output like this:
+```ansi
+[33mCUDA:[39m [32mavailable[39m
+
+[33mCUDA device:[39m NVIDIA RTX A6000[39m
+[33mCUDA used VRAM:[39m 0.54% [90m(266.88MB/47.65GB)[39m
+[33mCUDA free VRAM:[39m 99.45% [90m(47.39GB/47.65GB)[39m
+
+[33mCPU model:[39m Intel(R) Xeon(R) Gold 5315Y CPU @ 3.20GHz[39m
+[33mUsed RAM:[39m 2.51% [90m(1.11GB/44.08GB)[39m
+[33mFree RAM:[39m 97.48% [90m(42.97GB/44.08GB)[39m
+```
+
+If you see `CUDA used VRAM` in the output, it means that CUDA support is working on your machine.
+
 ## Prerequisites
-* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.0 or higher
+* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.2 or higher
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 
-## Building `node-llama-cpp` with CUDA support
+## Manually Building `node-llama-cpp` With CUDA Support {#building}
 Run this command inside of your project:
-```bash
-npx --no node-llama-cpp source download --cuda
+```shell
+npx --no node-llama-cpp source download --gpu cuda
 ```
 
 > If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
 
-> If you see the message `cuBLAS not found` during the build process,
+> If you see the message `CUDA not found` during the build process,
 > it means that CUDA Toolkit is not installed on your machine or that it is not detected by the build process.
 
-### Custom `llama.cpp` cmake options
-`llama.cpp` has some options you can use to customize your CUDA build, you can find these [here](https://github.com/ggerganov/llama.cpp/tree/master#cublas).
+### Custom `llama.cpp` CMake Options
+<script setup lang="ts">
+import {data} from "./cmakeOptions.data.js";
+const cmakeOptionsFileUrl = data.cmakeOptionsFileUrl;
+const cudaCmakeOptionsTable = data.cudaCmakeOptionsTable;
+</script>
+
+`llama.cpp` has some options you can use to customize your CUDA build.
+
+:::details `llama.cpp` CUDA CMake build options
+
+<div v-html="cudaCmakeOptionsTable"></div>
+
+> Source: <a :href="cmakeOptionsFileUrl">`CMakeLists`</a> (filtered for only CUDA-related options)
+> 
+> You can see all the available `llama.cpp` CMake build options [here](/guide/building-from-source#customize-build)
+
+:::
 
 To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_`.
 
-### Fix the `Failed to detect a default CUDA architecture` build error
+### Fix the `Failed to detect a default CUDA architecture` Build Error
 To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler.
 
 For example, if you have installed CUDA Toolkit 12.2, you have to run a command like this:
 ::: code-group
-```bash [Linux]
+```shell [Linux]
 export CUDACXX=/usr/local/cuda-12.2/bin/nvcc
 ```
 
-```bash [Windows]
+```cmd [Windows]
 set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\bin\nvcc.exe
 ```
 :::
 
 Then run the build command again to check whether setting the `CUDACXX` environment variable fixed the issue.
 
-### Fix the `The CUDA compiler identification is unknown` build error
+### Fix the `The CUDA compiler identification is unknown` Build Error
 The solution to this error is the same as [the solution to the `Failed to detect a default CUDA architecture` error](#fix-the-failed-to-detect-a-default-cuda-architecture-build-error).
 
-### Fix the `A single input file is required for a non-link phase when an outputfile is specified` build error
+### Fix the `A single input file is required for a non-link phase when an outputfile is specified` Build Error
 To fix this issue you have to set the `CMAKE_GENERATOR_TOOLSET` cmake option to the CUDA home directory, usually already set as the `CUDA_PATH` environment variable.
 
 To do this, set the `NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET` environment variable to the path of your CUDA home directory:
 
 ::: code-group
-```bash [Linux]
+```shell [Linux]
 export NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$CUDA_PATH
 ```
 
-```bash [Windows]
+```cmd [Windows]
 set NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=%CUDA_PATH%
 ```
 :::
 
 Then run the build command again to check whether setting the `CMAKE_GENERATOR_TOOLSET` cmake option fixed the issue.
 
-## Using `node-llama-cpp` with CUDA
-After you build `node-llama-cpp` with CUDA support, you can use it normally.
+## Using `node-llama-cpp` With CUDA
+It's recommended to use [`getLlama`](../api/functions/getLlama) without specifying a GPU type,
+so it'll detect the available GPU types and use the best one automatically.
 
-To configure how much layers of the model are run on the GPU, configure `gpuLayers` on `LlamaModel` in your code:
+To do this, just use [`getLlama`](../api/functions/getLlama) without any parameters:
 ```typescript
-const model = new LlamaModel({
+import {getLlama} from "node-llama-cpp";
+// ---cut---
+const llama = await getLlama();
+console.log("GPU type:", llama.gpu);
+```
+
+To force it to use CUDA, you can use the [`gpu`](../api/type-aliases/LlamaOptions#gpu) option:
+```typescript
+import {getLlama} from "node-llama-cpp";
+// ---cut---
+const llama = await getLlama({
+    gpu: "cuda"
+});
+console.log("GPU type:", llama.gpu);
+```
+
+By default, `node-llama-cpp` will offload as many layers of the model to the GPU as it can fit in the VRAM.
+
+To force it to offload a specific number of layers, you can use the [`gpuLayers`](../api/type-aliases/LlamaModelOptions.md#gpulayers) option:
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const modelPath = path.join(__dirname, "my-model.gguf")
+
+const llama = await getLlama({
+    gpu: "cuda"
+});
+
+// ---cut---
+const model = await llama.loadModel({
     modelPath,
-    gpuLayers: 64 // or any other number of layers you want
+    gpuLayers: 33 // or any other number of layers you want
 });
 ```
 
-You'll see logs like these in the console when the model loads:
-```
-llm_load_tensors: ggml ctx size =    0.09 MB
-llm_load_tensors: using CUDA for GPU acceleration
-llm_load_tensors: mem required  =   41.11 MB (+ 2048.00 MB per state)
-llm_load_tensors: offloading 32 repeating layers to GPU
-llm_load_tensors: offloading non-repeating layers to GPU
-llm_load_tensors: offloading v cache to GPU
-llm_load_tensors: offloading k cache to GPU
-llm_load_tensors: offloaded 35/35 layers to GPU
-llm_load_tensors: VRAM used: 4741 MB
-```
+::: warning
+Attempting to offload more layers to the GPU than the available VRAM can fit will result in an [`InsufficientMemoryError`](../api/classes/InsufficientMemoryError.md) error.
+:::
 
 On Linux, you can monitor GPU usage with this command:
-```bash
+```shell
 watch -d nvidia-smi
 ```
