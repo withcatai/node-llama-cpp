@@ -44,6 +44,51 @@ describe("llama 3", () => {
                 expect(parsedRes.positiveWordsInUserMessage).to.eql(["great"]);
             });
 
+            test("find person names", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
+                const llama = await getTestLlama();
+
+                const model = await llama.loadModel({
+                    modelPath
+                });
+                const context = await model.createContext({
+                    contextSize: 4096
+                });
+                const chatSession = new LlamaChatSession({
+                    contextSequence: context.getSequence()
+                });
+
+                const grammar = await llama.createGrammarForJsonSchema({
+                    type: "object",
+                    properties: {
+                        "positiveWordsInUserMessage": {
+                            type: "array",
+                            items: {
+                                type: "string"
+                            }
+                        },
+                        "userMessagePositivityScoreFromOneToTen": {
+                            enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+                        },
+                        "nameOfUser": {
+                            oneOf: [{
+                                type: "null"
+                            }, {
+                                type: "string"
+                            }]
+                        }
+                    }
+                });
+
+                const res = await chatSession.prompt("Hi there! I'm John. Nice to meet you! Are you Nicole?", {
+                    grammar
+                });
+                const parsedRes = grammar.parse(res);
+                expect(parsedRes.nameOfUser).to.eq("John");
+                expect(parsedRes.positiveWordsInUserMessage).to.eql(["nice", "meet"]);
+                expect(parsedRes.userMessagePositivityScoreFromOneToTen).to.eq(8);
+            });
+
             test("get an array of numbers", {timeout: 1000 * 60 * 60 * 2}, async () => {
                 const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
                 const llama = await getTestLlama();
