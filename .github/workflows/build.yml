@@ -299,7 +299,7 @@ jobs:
       - name: Generate docs with updated version
         if: steps.set-npm-url.outputs.npm-url != ''
         env:
-          DOCS_URL_BASE: "/node-llama-cpp/"
+          DOCS_URL_BASE: "/"
         run: |
           export DOCS_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
           npm run docs:build
