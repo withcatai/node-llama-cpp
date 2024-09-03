@@ -205,6 +205,15 @@ div[align="center"] > img[alt="Star please"][src$="assets/star.please.png"] ~ p[
     text-wrap: wrap;
 }
 
+span.twoslash-popup-docs-tag-value>code:has(>pre>code) {
+    background-color: transparent;
+}
+
+.twoslash-highlighted {
+    border-width: 2px;
+    border-radius: 6px;
+}
+
 .VPFeature {
     border-radius: 16px;
 }
@@ -249,6 +258,10 @@ div.VPLocalSearchBox > .shell > .results > li > .result {
 
 div.search-keyboard-shortcuts[class] kbd {
     border-radius: 8px;
+}
+
+div.search-keyboard-shortcuts[class] kbd:last-of-type {
+    margin-right: 2px;
 }
 
 .vp-doc [class*='language-'] > button.copy {
