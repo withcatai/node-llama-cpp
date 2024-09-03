@@ -26,10 +26,10 @@
 * Up-to-date with the latest version of `llama.cpp`. Download and compile the latest release with a single CLI command.
 * Force a model to generate output in a parseable format, like JSON, or even force it to follow a specific JSON schema
 
-## [Documentation](https://withcatai.github.io/node-llama-cpp/)
-* [Getting started guide](https://withcatai.github.io/node-llama-cpp/guide/)
-* [API reference](https://withcatai.github.io/node-llama-cpp/api/classes/LlamaModel)
-* [CLI help](https://withcatai.github.io/node-llama-cpp/guide/cli/)
+## [Documentation](https://node-llama-cpp.withcat.ai/)
+* [Getting started guide](https://node-llama-cpp.withcat.ai/guide/)
+* [API reference](https://node-llama-cpp.withcat.ai/api/classes/LlamaModel)
+* [CLI help](https://node-llama-cpp.withcat.ai/guide/cli/)
 * [Changelog](https://github.com/withcatai/node-llama-cpp/releases)
 * [Roadmap](https://github.com/orgs/withcatai/projects/1)
 
@@ -72,10 +72,10 @@ const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
 
-> For more examples, see the [getting started guide](https://withcatai.github.io/node-llama-cpp/guide/)
+> For more examples, see the [getting started guide](https://node-llama-cpp.withcat.ai/guide/)
 
 ## Contributing
-To contribute to `node-llama-cpp` read the [contribution guide](https://withcatai.github.io/node-llama-cpp/guide/contributing).
+To contribute to `node-llama-cpp` read the [contribution guide](https://node-llama-cpp.withcat.ai/guide/contributing).
 
 ## Acknowledgements
 * llama.cpp: [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
