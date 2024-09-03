@@ -96,7 +96,7 @@
   "bugs": {
     "url": "https://github.com/withcatai/node-llama-cpp/issues"
   },
-  "homepage": "https://withcatai.github.io/node-llama-cpp/",
+  "homepage": "https://node-llama-cpp.withcat.ai",
   "devDependencies": {
     "@commitlint/cli": "^17.7.1",
     "@commitlint/config-conventional": "^17.7.0",

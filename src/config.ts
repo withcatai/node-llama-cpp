@@ -59,7 +59,7 @@ export const defaultChatSystemPrompt = "You are a helpful, respectful and honest
 export const cliBinName = "node-llama-cpp";
 export const npxRunPrefix = "npx --no ";
 
-const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
+const documentationUrl = "https://node-llama-cpp.withcat.ai";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA"
 } as const;

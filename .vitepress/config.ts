@@ -14,7 +14,7 @@ const urlBase = env.get("DOCS_URL_BASE").asString();
 const packageVersion = env.get("DOCS_PACKAGE_VERSION").default(packageJson.version).asString();
 const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
-const hostname = "https://withcatai.github.io/node-llama-cpp/";
+const hostname = "https://node-llama-cpp.withcat.ai/";
 
 const chatWrappersOrder = [
     "GeneralChatPromptWrapper",

@@ -29,4 +29,4 @@
 - [ ] This pull request links relevant issues as `Fixes #0000`
 - [ ] There are new or updated unit tests validating the change
 - [ ] Documentation has been updated to reflect this change
-- [ ] The new commits and pull request title follow conventions explained in [pull request guidelines](https://withcatai.github.io/node-llama-cpp/guide/contributing) (PRs that do not follow this convention will not be merged)
+- [ ] The new commits and pull request title follow conventions explained in [pull request guidelines](https://node-llama-cpp.withcat.ai/guide/contributing) (PRs that do not follow this convention will not be merged)
