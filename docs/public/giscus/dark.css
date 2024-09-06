@@ -1,0 +1,27 @@
+@import "./original/dark.css";
+@import "./style.css";
+
+main {
+    --vp-c-bg: #1b1b1f;
+    --vp-c-bg-alt: #161618;
+    --vp-c-bg-elv: #202127;
+    --vp-c-bg-soft: #202127;
+
+    --vp-c-text-1: rgba(255, 255, 245, 0.86);
+    --vp-c-text-2: rgba(235, 235, 245, 0.6);
+    --vp-c-text-3: rgba(235, 235, 245, 0.38);
+
+    --vp-c-border: #3c3f44;
+    --vp-c-divider: #2e2e32;
+    --vp-c-gutter: #000000;
+
+    --vp-c-brand-1: #ffc7a8;
+    --vp-c-brand-2: #e78e5c;
+    --vp-c-brand-3: #dd773e;
+    --vp-c-brand-soft: rgb(255 156 100 / 16%);
+
+    --g-comment-bg: var(--vp-c-bg);
+    --g-comment-bg-alt: var(--vp-c-bg-alt);
+    --color-btn-primary-disabled-text: var(--vp-c-text-3);
+    --color-btn-primary-disabled-bg: color-mix(in srgb, var(--vp-c-brand-3) 24%, transparent);
+}

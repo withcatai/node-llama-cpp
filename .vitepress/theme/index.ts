@@ -3,6 +3,7 @@ import Theme from "vitepress/theme";
 import TwoslashFloatingVue from "@shikijs/vitepress-twoslash/client";
 import "@shikijs/vitepress-twoslash/style.css";
 import LatestVersionHomeBadge from "../components/LatestVersionHomeBadge/LatestVersionHomeBadge.vue";
+import CommentsSection from "../components/CommentsSection/CommentsSection.vue";
 import {NolebaseGitChangelogPlugin} from "@nolebase/vitepress-plugin-git-changelog/client";
 import LayoutContainer from "./LayoutContainer.vue";
 
@@ -26,7 +27,8 @@ export default {
             "home-hero-actions-after": () => h(LatestVersionHomeBadge, {
                 type: "mobile",
                 text, link, hideDate
-            })
+            }),
+            "doc-after": () => h(CommentsSection)
         }));
     },
     enhanceApp({app, router, siteData}: EnhanceAppContext) {
