@@ -3,7 +3,7 @@ import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {cliModelsDirectory, documentationPageUrls} from "../../config.js";
-import {createModelDownloader} from "../../utils/createModelDownloader.js";
+import {combineModelDownloaders, createModelDownloader} from "../../utils/createModelDownloader.js";
 import {getReadablePath} from "../utils/getReadablePath.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {getIsInDocumentationMode} from "../../state.js";
@@ -11,33 +11,37 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type PullCommand = {
-    url: string,
+    urls: string[],
     header?: string[],
     override: boolean,
     noProgress: boolean,
     noTempFile: boolean,
     directory: string,
-    filename?: string
+    filename?: string,
+    parallel?: number
 };
 
 export const PullCommand: CommandModule<object, PullCommand> = {
-    command: "pull [url]",
+    command: "pull [urls..]",
     aliases: ["get"],
     describe: withCliCommandDescriptionDocsUrl(
-        "Download a model from a URL",
+        "Download models from URLs",
         documentationPageUrls.CLI.Pull
     ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 
         return yargs
-            .option("url", {
+            .option("urls", {
                 type: "string",
+                alias: ["url"],
+                array: true,
                 description: [
                     "A `.gguf` model URL to pull.",
-                    "Automatically handles split and binary-split models files.",
-                    "If a file already exists and its size matches the expected size, it will not be downloaded again unless the `--override` flag is used."
-                ].join(
+                    !isInDocumentationMode && "Automatically handles split and binary-split models files, so only pass the URL to the first file of a model.",
+                    !isInDocumentationMode && "If a file already exists and its size matches the expected size, it will not be downloaded again unless the `--override` flag is used.",
+                    "Pass multiple URLs to download multiple models at once."
+                ].filter(Boolean).join(
                     isInDocumentationMode
                         ? "\n"
                         : " "
@@ -55,7 +59,7 @@ export const PullCommand: CommandModule<object, PullCommand> = {
             .option("override", {
                 alias: ["o"],
                 type: "boolean",
-                description: "Override the model file if it already exists",
+                description: "Override existing model files",
                 default: false,
                 group: "Optional:"
             })
@@ -85,62 +89,109 @@ export const PullCommand: CommandModule<object, PullCommand> = {
             .option("filename", {
                 alias: ["n", "name"],
                 type: "string",
-                description: "Filename to save the model as",
+                description: "Filename to save the model as. Can only be used if a single URL is passed",
+                group: "Optional:"
+            })
+            .option("parallel", {
+                alias: ["p"],
+                type: "number",
+                description: "Maximum parallel downloads",
+                default: 4,
                 group: "Optional:"
             });
     },
-    async handler({url, header: headerArg, override, noProgress, noTempFile, directory, filename}: PullCommand) {
+    async handler({urls, header: headerArg, override, noProgress, noTempFile, directory, filename, parallel}: PullCommand) {
         const headers = resolveHeaderFlag(headerArg);
 
-        const downloader = await createModelDownloader({
-            modelUrl: url,
-            dirPath: directory,
-            headers,
-            showCliProgress: !noProgress,
-            deleteTempFileOnCancel: noTempFile,
-            skipExisting: !override,
-            fileName: filename || undefined
-        });
+        if (urls.length === 0)
+            throw new Error("At least one URL must be provided");
+        else if (urls.length > 1 && filename != null)
+            throw new Error("The `--filename` flag can only be used when a single URL is passed");
 
-        if (downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {
-            const fileStats = await fs.stat(downloader.entrypointFilePath);
+        if (urls.length === 1) {
+            const downloader = await createModelDownloader({
+                modelUrl: urls[0]!,
+                dirPath: directory,
+                headers,
+                showCliProgress: !noProgress,
+                deleteTempFileOnCancel: noTempFile,
+                skipExisting: !override,
+                fileName: filename || undefined,
+                parallelDownloads: parallel
+            });
 
-            if (downloader.totalSize === fileStats.size) {
-                console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
+            if (!override && downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {
+                const fileStats = await fs.stat(downloader.entrypointFilePath);
 
-                if (noProgress)
-                    console.info(downloader.entrypointFilePath);
-                else
+                if (downloader.totalSize === fileStats.size) {
+                    console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
                     console.info("Skipping download of an existing file: " + chalk.yellow(getReadablePath(downloader.entrypointFilePath)));
 
-                process.exit(0);
+                    process.exit(0);
+                }
             }
-        }
 
-        const consoleInteraction = new ConsoleInteraction();
-        consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
-            await downloader.cancel();
-            consoleInteraction.stop();
-            process.exit(0);
-        });
+            const consoleInteraction = new ConsoleInteraction();
+            consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
+                await downloader.cancel();
+                consoleInteraction.stop();
+                process.exit(0);
+            });
 
-        if (!noProgress) {
-            console.info(`Downloading to ${chalk.yellow(getReadablePath(directory))}${
-                downloader.splitBinaryParts != null
-                    ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
-                    : ""
-            }`);
-            consoleInteraction.start();
-        }
+            if (!noProgress) {
+                console.info(`Downloading to ${chalk.yellow(getReadablePath(directory))}${
+                    downloader.splitBinaryParts != null
+                        ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
+                        : ""
+                }`);
+                consoleInteraction.start();
+            }
 
-        await downloader.download();
+            await downloader.download();
 
-        if (!noProgress)
-            consoleInteraction.stop();
+            if (!noProgress)
+                consoleInteraction.stop();
 
-        if (noProgress)
-            console.info(downloader.entrypointFilePath);
-        else
             console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+        } else {
+            const downloader = await combineModelDownloaders(
+                urls.map((url) => createModelDownloader({
+                    modelUrl: url,
+                    dirPath: directory,
+                    headers,
+                    showCliProgress: false,
+                    deleteTempFileOnCancel: noTempFile,
+                    skipExisting: !override,
+                    fileName: filename || undefined
+                })),
+                {
+                    showCliProgress: !noProgress,
+                    parallelDownloads: parallel
+                }
+            );
+
+            const consoleInteraction = new ConsoleInteraction();
+            consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
+                await downloader.cancel();
+                consoleInteraction.stop();
+                process.exit(0);
+            });
+
+            if (!noProgress) {
+                console.info(`Downloading to ${chalk.yellow(getReadablePath(directory))}`);
+                consoleInteraction.start();
+            }
+
+            await downloader.download();
+
+            if (!noProgress)
+                consoleInteraction.stop();
+
+            console.info(
+                `Downloaded ${downloader.modelDownloaders.length} models to ${chalk.yellow(getReadablePath(directory))}\n${chalk.gray("*")} ` +
+                downloader.modelDownloaders.map((downloader) => chalk.yellow(downloader.entrypointFilename))
+                    .join(`\n${chalk.gray("*")} `)
+            );
+        }
     }
 };

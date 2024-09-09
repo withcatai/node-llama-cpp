@@ -92,7 +92,7 @@ export const npxRunPrefix = "npx --no ";
 // The submodules of the repo are not being used for the compilation for the supported backends, so there's no need to clone them.
 export const enableRecursiveClone = false;
 
-const documentationUrl = "https://withcatai.github.io/node-llama-cpp";
+const documentationUrl = "https://node-llama-cpp.withcat.ai";
 const documentationCliUrl = documentationUrl + "/cli";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",

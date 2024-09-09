@@ -585,6 +585,9 @@ export function isLlamaText(value: unknown): value is LlamaText {
     return LlamaText.isLlamaText(value);
 }
 
+/**
+ * Tokenize the given input using the given tokenizer, whether it's a `string` or a `LlamaText`
+ */
 export function tokenizeText(text: string | LlamaText, tokenizer: Tokenizer) {
     if (typeof text === "string")
         return tokenizer(text, false);

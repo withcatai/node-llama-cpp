@@ -81,13 +81,62 @@ export type ModelDownloaderOptions = {
  * const modelPath = await downloader.download();
  *
  * const llama = await getLlama();
- * const model = llama.loadModel({
+ * const model = await llama.loadModel({
  *     modelPath
  * });
  * ```
  */
 export async function createModelDownloader(options: ModelDownloaderOptions) {
     const downloader = ModelDownloader._create(options);
+    await downloader._init();
+    return downloader;
+}
+
+/**
+ * Combine multiple models downloaders to a single downloader to download everything using as much parallelism as possible.
+ *
+ * You can check each individual model downloader for its download progress,
+ * but only the `onProgress` passed to the combined downloader will be called during the download.
+ * @example
+ * ```typescript
+ * import {fileURLToPath} from "url";
+ * import path from "path";
+ * import {createModelDownloader, combineModelDownloaders, getLlama} from "node-llama-cpp";
+ *
+ * const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ *
+ * const downloaders = [
+ *     createModelDownloader({
+ *         modelUrl: "https://example.com/model1.gguf",
+ *         dirPath: path.join(__dirname, "models")
+ *     }),
+ *     createModelDownloader({
+ *         modelUrl: "https://example.com/model2.gguf",
+ *         dirPath: path.join(__dirname, "models")
+ *     })
+ * ];
+ * const combinedDownloader = await combineModelDownloaders(downloaders, {
+ *     showCliProgress: true // show download progress in the CLI
+ * });
+ * const [
+ *     model1Path,
+ *     model2Path
+ * ] = await combinedDownloader.download();
+ *
+ * const llama = await getLlama();
+ * const model1 = await llama.loadModel({
+ *     modelPath: model1Path!
+ * });
+ * const model2 = await llama.loadModel({
+ *     modelPath: model2Path!
+ * });
+ * ```
+ */
+export async function combineModelDownloaders(
+    downloaders: (ModelDownloader | Promise<ModelDownloader>)[],
+    options?: CombinedModelDownloaderOptions
+) {
+    const downloader =  CombinedModelDownloader._create(await Promise.all(downloaders), options);
     await downloader._init();
     return downloader;
 }
@@ -100,12 +149,12 @@ export class ModelDownloader {
     /** @internal */ private readonly _showCliProgress: boolean;
     /** @internal */ private readonly _onProgress?: ModelDownloaderOptions["onProgress"];
     /** @internal */ private readonly _tokens?: ModelFileAccessTokens;
-    /** @internal */ private readonly _deleteTempFileOnCancel: boolean;
+    /** @internal */ public readonly _deleteTempFileOnCancel: boolean;
     /** @internal */ private readonly _skipExisting: boolean;
     /** @internal */ private readonly _parallelDownloads: number;
 
+    /** @internal */ public _specificFileDownloaders: DownloadEngineNodejs[] = [];
     /** @internal */ private _downloader?: DownloadEngineMultiDownload | DownloadEngineNodejs;
-    /** @internal */ private _specificFileDownloaders: DownloadEngineNodejs[] = [];
     /** @internal */ private _entrypointFilename?: string;
     /** @internal */ private _splitBinaryParts?: number;
     /** @internal */ private _totalFiles?: number;
@@ -163,14 +212,14 @@ export class ModelDownloader {
     }
 
     public get totalSize() {
-        return this._downloader!.downloadStatues
-            .map(status => status.totalBytes)
+        return this._specificFileDownloaders
+            .map((downloader) => downloader.status.totalBytes)
             .reduce((acc, totalBytes) => acc + totalBytes, 0);
     }
 
     public get downloadedSize() {
-        return this._downloader!.downloadStatues
-            .map(status => status.transferredBytes)
+        return this._specificFileDownloaders
+            .map((downloader) => downloader.status.transferredBytes)
             .reduce((acc, transferredBytes) => acc + transferredBytes, 0);
     }
 
@@ -184,17 +233,6 @@ export class ModelDownloader {
     } = {}) {
         if (signal?.aborted)
             throw signal.reason;
-
-        if (this._skipExisting) {
-            if (this._specificFileDownloaders.length === 1 && await fs.pathExists(this.entrypointFilePath)) {
-                const fileStat = await fs.stat(this.entrypointFilePath);
-
-                if (this._specificFileDownloaders[0]!.status.totalBytes === fileStat.size)
-                    return this.entrypointFilePath;
-            } else {
-                // TODO: skip existing split files
-            }
-        }
 
         const onAbort = () => {
             signal?.removeEventListener("abort", onAbort);
@@ -275,7 +313,8 @@ export class ModelDownloader {
                 fileName: this._fileName ?? getFilenameForBinarySplitGgufPartUrls(binarySplitPartUrls),
                 cliProgress: this._showCliProgress,
                 headers: this._headers ?? {},
-                tryHeaders: this._tryHeaders.slice()
+                tryHeaders: this._tryHeaders.slice(),
+                skipExisting: this._skipExisting
             });
             this._specificFileDownloaders.push(this._downloader);
 
@@ -297,7 +336,8 @@ export class ModelDownloader {
                 fileName: this._fileName ?? undefined,
                 cliProgress: this._showCliProgress,
                 headers: this._headers ?? {},
-                tryHeaders: this._tryHeaders.slice()
+                tryHeaders: this._tryHeaders.slice(),
+                skipExisting: this._skipExisting
             });
             this._specificFileDownloaders.push(this._downloader);
 
@@ -317,7 +357,8 @@ export class ModelDownloader {
                 ? createSplitPartFilename(this._fileName, index + 1, splitGgufPartUrls.length)
                 : undefined,
             headers: this._headers ?? {},
-            tryHeaders: this._tryHeaders.slice()
+            tryHeaders: this._tryHeaders.slice(),
+            skipExisting: this._skipExisting
         }));
 
         this._downloader = await downloadSequence(
@@ -342,5 +383,172 @@ export class ModelDownloader {
     /** @internal */
     public static _create(options: ModelDownloaderOptions) {
         return new ModelDownloader(options);
+    }
+}
+
+export type CombinedModelDownloaderOptions = {
+    /**
+     * Defaults to `false`.
+     */
+    showCliProgress?: boolean,
+
+    onProgress?: (status: {totalSize: number, downloadedSize: number}) => void,
+
+    /**
+     * The number of parallel downloads to use fo files.
+     *
+     * Defaults to `4`.
+     */
+    parallelDownloads?: number
+};
+
+export class CombinedModelDownloader {
+    /** @internal */ private readonly _downloaders: readonly ModelDownloader[];
+    /** @internal */ private readonly _showCliProgress: boolean;
+    /** @internal */ private readonly _onProgress?: CombinedModelDownloaderOptions["onProgress"];
+    /** @internal */ private readonly _parallelDownloads: number;
+    /** @internal */ private readonly _lock = {};
+    /** @internal */ private _downloader?: DownloadEngineMultiDownload;
+
+    /**
+     * When combining `ModelDownloader` instances, the following options on each individual `ModelDownloader` are ignored:
+     * - `showCliProgress`
+     * - `onProgress`
+     * - `parallelDownloads`
+     *
+     * To set any of those options for the combined downloader, you have to pass them to the combined downloader instance
+     */
+    public constructor(downloaders: ModelDownloader[], options?: CombinedModelDownloaderOptions) {
+        const {
+            showCliProgress = false,
+            onProgress,
+            parallelDownloads = 4
+        } = options ?? {};
+
+        this._downloaders = Object.freeze(downloaders);
+        this._showCliProgress = showCliProgress;
+        this._onProgress = onProgress;
+        this._parallelDownloads = parallelDownloads;
+
+        this._onDownloadProgress = this._onDownloadProgress.bind(this);
+    }
+
+    public async cancel() {
+        for (const modelDownloader of await Promise.all(this._downloaders)) {
+            if (modelDownloader._specificFileDownloaders.every(
+                (downloader) => downloader.status.downloadStatus === "Finished"
+            ))
+                continue;
+
+            for (const downloader of modelDownloader._specificFileDownloaders) {
+                if (modelDownloader._deleteTempFileOnCancel)
+                    await downloader.closeAndDeleteFile();
+                else
+                    await downloader.close();
+            }
+        }
+    }
+
+    /**
+     * @returns The paths to the entrypoint files that should be used to load the models
+     */
+    public async download({
+        signal
+    }: {
+        signal?: AbortSignal
+    } = {}) {
+        if (signal?.aborted)
+            throw signal.reason;
+
+        const onAbort = () => {
+            signal?.removeEventListener("abort", onAbort);
+            this.cancel();
+        };
+
+        if (signal != null)
+            signal.addEventListener("abort", onAbort);
+
+        try {
+            if (this._onProgress)
+                this._downloader!.on("progress", this._onDownloadProgress);
+
+            await this._downloader!.download();
+        } catch (err) {
+            if (signal?.aborted)
+                throw signal.reason;
+
+            throw err;
+        } finally {
+            if (this._onProgress)
+                this._downloader!.off("progress", this._onDownloadProgress);
+
+            if (signal != null)
+                signal.removeEventListener("abort", onAbort);
+        }
+
+        return this.entrypointFilePaths;
+    }
+
+    public get modelDownloaders() {
+        return this._downloaders;
+    }
+
+    /**
+     * The filename of the entrypoint files that should be used to load the models.
+     */
+    public get entrypointFilenames() {
+        return this._downloaders.map((downloader) => downloader.entrypointFilename);
+    }
+
+    /**
+     * The full paths to the entrypoint files that should be used to load the models.
+     */
+    public get entrypointFilePaths() {
+        return this._downloaders.map((downloader) => downloader.entrypointFilePath);
+    }
+
+    /**
+     * The accumulation of `totalFiles` of all the model downloaders
+     */
+    public get totalFiles() {
+        return this._downloaders
+            .map((downloader) => downloader.totalFiles)
+            .reduce((acc, totalFiles) => acc + totalFiles, 0);
+    }
+
+    public get totalSize() {
+        return this._downloaders
+            .map((downloader) => downloader.totalSize)
+            .reduce((acc, totalBytes) => acc + totalBytes, 0);
+    }
+
+    public get downloadedSize() {
+        return this._downloaders
+            .map((downloader) => downloader.downloadedSize)
+            .reduce((acc, transferredBytes) => acc + transferredBytes, 0);
+    }
+
+    /** @internal */
+    private _onDownloadProgress() {
+        this._onProgress?.({
+            totalSize: this.totalSize,
+            downloadedSize: this.downloadedSize
+        });
+    }
+
+    /** @internal */
+    public async _init() {
+        this._downloader = await downloadSequence(
+            {
+                cliProgress: this._showCliProgress,
+                parallelDownloads: this._parallelDownloads
+            },
+            ...(await Promise.all(this._downloaders)).flatMap((downloader) => downloader._specificFileDownloaders)
+        );
+    }
+
+    /** @internal */
+    public static _create(downloaders: ModelDownloader[], options?: CombinedModelDownloaderOptions) {
+        return new CombinedModelDownloader(downloaders, options);
     }
 }

@@ -72,7 +72,10 @@ import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
 import {GgufInsightsConfigurationResolver} from "./gguf/insights/GgufInsightsConfigurationResolver.js";
-import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
+import {
+    createModelDownloader, ModelDownloader, type ModelDownloaderOptions, combineModelDownloaders, CombinedModelDownloader,
+    type CombinedModelDownloaderOptions
+} from "./utils/createModelDownloader.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 
 import {
@@ -264,6 +267,9 @@ export {
     ModelDownloader,
     type ModelDownloaderOptions,
     type ModelFileAccessTokens,
+    combineModelDownloaders,
+    CombinedModelDownloader,
+    type CombinedModelDownloaderOptions,
     jsonDumps,
     type OverridesObject
 };

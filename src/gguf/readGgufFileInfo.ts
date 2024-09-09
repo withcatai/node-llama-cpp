@@ -13,6 +13,8 @@ import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
 /**
  * Read a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`).
  * Only the parts of the file required for the metadata and tensor info are read.
+ * @param pathOrUrl
+ * @param options
  */
 export async function readGgufFileInfo(pathOrUrl: string, {
     readTensorInfo = true,

@@ -119,17 +119,19 @@ export type ResolveChatWrapperOptions = {
  * }) ?? new GeneralChatWrapper()
  * ```
  */
-export function resolveChatWrapper({
-    type = "auto",
-    bosString,
-    filename,
-    fileInfo,
-    tokenizer,
-    customWrapperSettings,
-    warningLogs = true,
-    fallbackToOtherWrappersOnJinjaError = true,
-    noJinja = false
-}: ResolveChatWrapperOptions): BuiltInChatWrapperType | null {
+export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInChatWrapperType | null {
+    const {
+        type = "auto",
+        bosString,
+        filename,
+        fileInfo,
+        tokenizer,
+        customWrapperSettings,
+        warningLogs = true,
+        fallbackToOtherWrappersOnJinjaError = true,
+        noJinja = false
+    } = options;
+
     function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
         specializedChatWrapper: T,
         defaultSettings: ConstructorParameters<T>[0] = {}

@@ -9,8 +9,10 @@ export type LlamaGrammarEvaluationStateOptions = {
 
 /**
  * Grammar evaluation state is used to track the model response to determine the next allowed characters for the model to generate.
+ *
  * Create a new grammar evaluation state for every response you generate with the model.
- * This is only needed when using the `LlamaContext` class directly, as `LlamaChatSession` already handles this for you.
+ *
+ * This is only needed when using the `LlamaContext` class directly, since `LlamaChatSession` already handles this for you.
  */
 export class LlamaGrammarEvaluationState {
     /** @internal */ public readonly _llama: Llama;
