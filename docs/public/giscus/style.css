@@ -70,6 +70,30 @@ body, #__next {
     .gsc-comment-box-write {
         border-radius: 8px;
     }
+
+    .gsc-reactions:after {
+        content: "";
+        display: block;
+        height: 1px;
+        background: var(--vp-c-divider);
+        margin-top: 24px;
+    }
+
+    .gsc-reactions-count {
+        display: none;
+
+        + div {
+            margin-top: 0px;
+        }
+    }
+
+    .gsc-main {
+        gap: 64px;
+    }
+}
+
+html {
+    color-scheme: light dark;
 }
 
 main {

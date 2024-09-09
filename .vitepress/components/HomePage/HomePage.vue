@@ -281,5 +281,33 @@ getElectronExampleAppDownloadLink()
             scale: 1.01;
         }
     }
+
+    :global(.VPHome .VPHero .container .main) {
+        > :global(.name) {
+            transition: font-weight 0.5s ease-in-out;
+
+            @starting-style {
+                text-rendering: optimizeSpeed;
+                font-weight: 725;
+            }
+        }
+
+        > :global(.text) {
+            transition: font-weight 0.5s ease-in-out;
+
+            @starting-style {
+                text-rendering: optimizeSpeed;
+                font-weight: 675;
+            }
+        }
+
+        > :global(.tagline) {
+            transition: transform 0.5s ease-in-out;
+
+            @starting-style {
+                transform: translateY(2px);
+            }
+        }
+    }
 }
 </style>

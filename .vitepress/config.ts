@@ -1,4 +1,4 @@
-import {createContentLoader, DefaultTheme, defineConfig, HeadConfig} from "vitepress";
+import {createContentLoader, defineConfig, HeadConfig} from "vitepress";
 import path from "path";
 import {createRequire} from "node:module";
 import process from "process";
@@ -10,10 +10,12 @@ import envVar from "env-var";
 import {Feed} from "feed";
 import {rehype} from "rehype";
 import {Element as HastElement, Parent} from "hast";
+import sharp from "sharp";
 import {GitChangelog, GitChangelogMarkdownSection} from "@nolebase/vitepress-plugin-git-changelog/vite";
 import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-image/vitepress";
-import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
+import {Resvg, initWasm as initResvgWasm, ResvgRenderOptions} from "@resvg/resvg-wasm";
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
+import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
 
 import type {Node as UnistNode} from "unist";
 import type {ShikiTransformer} from "shiki";
@@ -32,32 +34,11 @@ const packageVersion = env.get("DOCS_PACKAGE_VERSION")
     .asString();
 const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
-const hostname = "https://withcatai.github.io/node-llama-cpp/";
+const hostname = "https://node-llama-cpp.withcat.ai/";
 
 const socialPosterLink = hostname + "social.poster.jpg";
 const defaultPageTitle = "node-llama-cpp - node.js bindings for llama.cpp";
 const defaultPageDescription = "Run AI models locally on your machine with node.js bindings for llama.cpp";
-
-const chatWrappersOrder = [
-    "GeneralChatWrapper",
-    "Llama3ChatWrapper",
-    "Llama2ChatWrapper",
-    "ChatMLChatWrapper",
-    "FalconChatWrapper"
-] as const;
-
-const categoryOrder = [
-    "Functions",
-    "Classes",
-    "Types",
-    "Enums"
-] as const;
-
-const functionsOrder = [
-    "getLlama",
-    "defineChatSessionFunction",
-    "LlamaText"
-] as const;
 
 function resolveHref(href: string) {
     if (urlBase == null)
@@ -65,6 +46,9 @@ function resolveHref(href: string) {
 
     if (urlBase.endsWith("/") && href.startsWith("/"))
         return urlBase.slice(0, -1) + href;
+
+    if (href.startsWith("http://") || href.startsWith("https://"))
+        return href;
 
     return urlBase + href;
 }
@@ -116,7 +100,15 @@ export default defineConfig({
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
         ["meta", {name: "og:type", content: "website"}],
         ["meta", {name: "og:locale", content: "en"}],
-        ["meta", {name: "og:site_name", content: "node-llama-cpp"}]
+        ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
+        ["script", {async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-Q2SWE5Z1ST"}],
+        [
+            "script",
+            {},
+            "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());" +
+            "gtag('config','G-Q2SWE5Z1ST');"
+        ],
+        ["style", {}],
     ],
     transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
@@ -132,6 +124,21 @@ export default defineConfig({
             .filter(Boolean)
             .join(" - ") || defaultPageTitle;
         const description = pageData.description || defaultPageDescription;
+
+        if (pageData.filePath.startsWith("blog/") && pageData.frontmatter.image != null) {
+            if (typeof pageData.frontmatter.image === "string")
+                head.push(["meta", {name: "og:image", content: resolveHref(pageData.frontmatter.image)}]);
+            else if (typeof pageData.frontmatter.image === "object") {
+                if (typeof pageData.frontmatter.image.url === "string")
+                    head.push(["meta", {name: "og:image", content: resolveHref(pageData.frontmatter.image.url)}]);
+
+                if (pageData.frontmatter.image.width != null)
+                    head.push(["meta", {name: "og:image:width", content: String(pageData.frontmatter.image.width)}]);
+
+                if (pageData.frontmatter.image.height != null)
+                    head.push(["meta", {name: "og:image:height", content: String(pageData.frontmatter.image.height)}]);
+            }
+        }
 
         head.push(["meta", {name: "og:title", content: title}]);
         head.push(["meta", {name: "og:description", content: description}]);
@@ -178,7 +185,8 @@ export default defineConfig({
         pageData.frontmatter.head ??= [];
         pageData.frontmatter.head.push([
             "link",
-            {rel: "canonical", href: canonicalUrl}
+            {rel: "canonical", href: canonicalUrl},
+            {rel: "giscus:backlink", href: canonicalUrl}
         ]);
     },
     vite: {
@@ -280,7 +288,7 @@ export default defineConfig({
             }
         },
         sidebar: {
-            "/api/": orderApiReferenceSidebar(getApiReferenceSidebar()),
+            "/api/": getApiReferenceSidebar(),
 
             "/guide/": [{
                 text: "Guide",
@@ -294,6 +302,7 @@ export default defineConfig({
                     {text: "Embedding", link: "/embedding"},
                     {text: "Text Completion", link: "/text-completion"},
                     {text: "Choosing a Model", link: "/choosing-a-model"},
+                    {text: "Downloading Models", link: "/downloading-models"}
                 ]
             }, {
                 text: "Advanced",
@@ -370,14 +379,9 @@ export default defineConfig({
         })
             .load();
 
-        async function addOgImages() {
-            const svgImages: Record<string, Buffer> = {
-                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png":
-                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.roundEdges.png"))
-            };
-
+        async function loadSvgFontBuffers() {
             const interFontFilesDirectoryPath = path.join(require.resolve("@fontsource/inter"), "..", "files");
-            const interFontFilesToLoad = [
+            const interFontFilePaths = [
                 "inter-latin-400-normal.woff2",
                 "inter-latin-500-normal.woff2",
                 "inter-latin-600-normal.woff2",
@@ -388,8 +392,80 @@ export default defineConfig({
                 "inter-latin-ext-700-normal.woff2",
             ];
 
+            return await Promise.all(
+                interFontFilePaths.map((filename) => (
+                    fs.readFile(path.join(interFontFilesDirectoryPath, filename))
+                ))
+            );
+        }
+
+        async function loadInnerSvgImages() {
+            const svgImages: Record<string, Buffer> = {
+                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.png":
+                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.v3.roundEdges.png")),
+                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.png":
+                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.v3.png"))
+            };
+
+            return svgImages;
+        }
+
+        const svgFontBuffers = loadSvgFontBuffers();
+        const innerSvgImages = loadInnerSvgImages();
+
+        async function renderSvg(svgPath: string, destPngPath: string, options: ResvgRenderOptions) {
+            console.info(`Rendering "${svgPath}" to "${destPngPath}"`)
+
+            const svgContent = await fs.readFile(svgPath, "utf8");
+            const svgImages = await innerSvgImages;
+
+            const resvg = new Resvg(svgContent, {
+                ...(options ?? {}),
+                font: {
+                    ...(options.font ?? {}),
+                    fontBuffers: await svgFontBuffers,
+                    loadSystemFonts: false
+                }
+            });
+
+            for (const url of resvg.imagesToResolve()) {
+                if (svgImages[url] != null)
+                    resvg.resolveImage(url, svgImages[url]);
+                else {
+                    console.info(`Fetching image: "${url}" for SVG "${svgPath}"`);
+                    const fetchRes = await fetch(url);
+                    if (!fetchRes.ok)
+                        throw new Error(`Failed to fetch image: ${url}`);
+
+                    resvg.resolveImage(url, Buffer.from(await fetchRes.arrayBuffer()));
+                }
+            }
+
+            const res = resvg.render();
+
+            await fs.writeFile(destPngPath, res.asPng(), "binary");
+        }
+
+        async function convertPngToJpg(pngPath: string, jpgPath: string, quality: number = 75) {
+            console.info(`Converting "${pngPath}" to "${jpgPath}" with quality ${quality}`);
+
+            const pngBuffer = await fs.readFile(pngPath);
+            const jpgBuffer = await sharp(pngBuffer)
+                .jpeg({quality})
+                .toBuffer();
+
+            await fs.writeFile(jpgPath, jpgBuffer, "binary");
+        }
+
+        async function addOgImages() {
+            const svgImages = await innerSvgImages;
+
+            let baseUrl = resolveHref("");
+            if (baseUrl.endsWith("/"))
+                baseUrl = baseUrl.slice(0, -"/".length);
+
             await buildEndGenerateOpenGraphImages({
-                baseUrl: resolveHref(""),
+                baseUrl,
                 category: {
                     byCustomGetter(page) {
                         if (page.link?.startsWith("/api/")) return "API";
@@ -407,14 +483,11 @@ export default defineConfig({
 
                     throw new Error(`Unknown SVG image URL: ${imageUrl}`);
                 },
-                svgFontBuffers: await Promise.all(
-                    interFontFilesToLoad.map((fontFilename) => (
-                        fs.readFile(path.join(interFontFilesDirectoryPath, fontFilename))
-                    ))
-                ),
+                svgFontBuffers: await svgFontBuffers,
                 templateSvgPath: path.join(__dirname, "assets", "ogTemplate.svg"),
                 resultImageWidth: 1200,
-                maxCharactersPerLine: 20
+                maxCharactersPerLine: 20,
+                overrideExistingMetaTags: false
             })({
                 ...siteConfig,
                 site: {
@@ -532,6 +605,28 @@ export default defineConfig({
         blogPosts.splice(indexPageIndex, 1);
 
         await addBlogRssFeed();
+
+        try {
+            await initResvgWasm(await fs.readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
+        } catch (err) {
+            // do nothing if wasm is already loaded
+        }
+
+        await renderSvg(
+            path.join(__dirname, "assets", "social.poster.svg"),
+            path.join(siteConfig.outDir, "social.poster.png"),
+            {
+                fitTo: {
+                    mode: "height",
+                    value: 2048
+                }
+            }
+        );
+        await convertPngToJpg(
+            path.join(siteConfig.outDir, "social.poster.png"),
+            path.join(siteConfig.outDir, "social.poster.jpg"),
+            75
+        );
     }
 });
 
@@ -573,320 +668,3 @@ function findElementInHtml(html: string | undefined, matcher: (element: HastElem
     return undefined;
 }
 
-function getApiReferenceSidebar(): typeof typedocSidebar {
-    return structuredClone(typedocSidebar)
-        .map((item) => {
-            switch (item.text) {
-                case "README":
-                case "API":
-                    return null;
-
-                case "Classes":
-                case "Type Aliases":
-                case "Functions":
-                    if (item.text === "Type Aliases")
-                        item.text = "Types";
-
-                    if (item.collapsed)
-                        item.collapsed = false;
-
-                    if (item.items instanceof Array)
-                        item.items = item.items.map((subItem) => {
-                            if ((subItem as { collapsed?: boolean }).collapsed)
-                                // @ts-ignore
-                                delete subItem.collapsed;
-
-                            return subItem;
-                        });
-
-                    return item;
-
-                case "Enumerations":
-                    item.text = "Enums";
-
-                    if (item.collapsed)
-                        item.collapsed = false;
-                    return item;
-
-                case "Variables":
-                    if (item.collapsed)
-                        item.collapsed = false;
-
-                    return item;
-            }
-
-            return item;
-        })
-        .filter((item) => item != null) as typeof typedocSidebar;
-}
-
-function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
-    applyOverrides(sidebar);
-    orderClasses(sidebar);
-    orderTypes(sidebar);
-    orderFunctions(sidebar);
-
-    sortItemsInOrder(sidebar, categoryOrder);
-
-    return sidebar;
-}
-
-function applyOverrides(sidebar: typeof typedocSidebar) {
-    const functions = sidebar.find((item) => item.text === "Functions");
-
-    const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
-    if (llamaTextFunction != null) {
-        delete (llamaTextFunction as { link?: string }).link;
-    }
-
-    const classes = sidebar.find((item) => item.text === "Classes");
-    if (classes != null && classes.items instanceof Array && !classes.items.some((item) => item.text === "LlamaText")) {
-        classes.items.push({
-            text: "LlamaText",
-            link: "/api/classes/LlamaText.md"
-        });
-    }
-}
-
-function orderClasses(sidebar: typeof typedocSidebar) {
-    const baseChatWrapper = "ChatWrapper";
-    const chatWrapperItems: DefaultTheme.SidebarItem[] = [];
-
-    const classes = sidebar.find((item) => item.text === "Classes");
-
-    if (classes == null || !(classes.items instanceof Array))
-        return;
-
-    const chatWrappersGroup = {
-        text: "Chat wrappers",
-        collapsed: false,
-        items: chatWrapperItems
-    };
-    (classes.items as DefaultTheme.SidebarItem[]).unshift(chatWrappersGroup);
-
-    moveItem(
-        classes.items,
-        (item) => item.text === baseChatWrapper,
-        0
-    );
-
-    groupItems(
-        classes.items,
-        (item) => item === chatWrappersGroup,
-        (item) => item.text !== baseChatWrapper && item.text?.endsWith(baseChatWrapper),
-        {moveToEndIfGrouped: false, collapsed: false}
-    );
-
-    groupItems(
-        classes.items,
-        (item) => item.text === "LlamaModelTokens",
-        (item) => item.text != null && ["LlamaModelInfillTokens"].includes(item.text),
-        {moveToEndIfGrouped: false}
-    );
-    groupItems(
-        classes.items,
-        (item) => item.text === "LlamaModel",
-        (item) => item.text != null && ["LlamaModelTokens"].includes(item.text),
-        {moveToEndIfGrouped: false}
-    );
-
-    let LlamaTextGroup = classes.items.find((item) => item.text === "LlamaText") as {
-        text: string,
-        collapsed?: boolean,
-        items?: []
-    } | undefined;
-    if (LlamaTextGroup == null) {
-        LlamaTextGroup = {
-            text: "LlamaText",
-            collapsed: true,
-            items: []
-        };
-        (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
-    }
-
-    if (LlamaTextGroup != null) {
-        LlamaTextGroup.collapsed = true;
-
-        if (LlamaTextGroup.items == null)
-            LlamaTextGroup.items = [];
-
-        const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
-
-        groupItems(
-            classes.items,
-            (item) => item === LlamaTextGroup,
-            (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
-            {moveToEndIfGrouped: false}
-        );
-        sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
-    }
-
-    sortItemsInOrder(chatWrapperItems, chatWrappersOrder);
-}
-
-function orderTypes(sidebar: typeof typedocSidebar) {
-    const types = sidebar.find((item) => item.text === "Types");
-
-    if (types == null || !(types.items instanceof Array))
-        return;
-
-    groupItems(
-        types.items,
-        (item) => item.text === "BatchingOptions",
-        (item) => (
-            item.text === "BatchItem" ||
-            item.text === "CustomBatchingDispatchSchedule" ||
-            item.text === "CustomBatchingPrioritizationStrategy" ||
-            item.text === "PrioritizedBatchItem"
-        ),
-        {collapsed: false}
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaContextOptions",
-        (item) => item.text === "BatchingOptions"
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "GbnfJsonSchema",
-        (item) => item.text?.startsWith("GbnfJson")
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaChatSessionOptions",
-        (item) => item.text != null && ["LlamaChatSessionContextShiftOptions"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LLamaChatPromptOptions",
-        (item) => item.text != null && ["LlamaChatSessionRepeatPenalty", "ChatSessionModelFunctions"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "ChatModelResponse",
-        (item) => item.text === "ChatModelFunctionCall"
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "ChatHistoryItem",
-        (item) => item.text != null && ["ChatSystemMessage", "ChatUserMessage", "ChatModelResponse"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaChatResponse",
-        (item) => item.text === "LlamaChatResponseFunctionCall"
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaText",
-        (item) => item.text?.startsWith("LlamaText")
-    );
-
-    moveCollapseItemsToTheEnd(types.items);
-}
-
-function orderFunctions(sidebar: typeof typedocSidebar) {
-    const functions = sidebar.find((item) => item.text === "Functions");
-
-    if (functions == null || !(functions.items instanceof Array))
-        return;
-
-    groupItems(
-        functions.items,
-        (item) => item.text === "LlamaText",
-        (item) => item.text != null && ["isLlamaText", "tokenizeText"].includes(item.text)
-    );
-
-    sortItemsInOrder(functions.items, functionsOrder);
-
-    moveCollapseItemsToTheEnd(functions.items);
-}
-
-
-function groupItems(
-    items: DefaultTheme.SidebarItem[] | undefined,
-    findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    {collapsed = true, moveToEndIfGrouped = true}: { collapsed?: boolean, moveToEndIfGrouped?: boolean } = {}
-) {
-    const children: DefaultTheme.SidebarItem[] = [];
-
-    if (items == null || !(items instanceof Array))
-        return;
-
-    const parent = items.find(findParent) as DefaultTheme.SidebarItem | null;
-
-    if (parent == null)
-        return;
-
-    for (const item of items.slice()) {
-        if (item === parent || !findChildren(item))
-            continue;
-
-        items.splice(items.indexOf(item), 1);
-        children.push(item);
-    }
-
-    if (children.length > 0) {
-        parent.collapsed = collapsed;
-        parent.items = children;
-
-        if (moveToEndIfGrouped) {
-            items.splice(items.indexOf(parent as typeof items[number]), 1);
-            items.push(parent as typeof items[number]);
-        }
-    }
-}
-
-function moveItem(
-    items: DefaultTheme.SidebarItem[] | undefined,
-    findItem: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    newIndex: number
-) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    const item = items.find(findItem);
-    if (item != null) {
-        items.splice(items.indexOf(item), 1);
-        items.splice(newIndex, 0, item);
-    }
-}
-
-function moveCollapseItemsToTheEnd(items: DefaultTheme.SidebarItem[] | undefined) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    items.sort((a, b) => {
-        if (a.collapsed && !b.collapsed)
-            return 1;
-        if (!a.collapsed && b.collapsed)
-            return -1;
-
-        return 0;
-    });
-}
-
-function sortItemsInOrder(items: DefaultTheme.SidebarItem[] | undefined, order: readonly string[]) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    items.sort((a, b) => {
-        const aIndex = order.indexOf(a.text as typeof order[number]);
-        const bIndex = order.indexOf(b.text as typeof order[number]);
-
-        if (aIndex < 0 && bIndex < 0)
-            return 0;
-        if (aIndex < 0)
-            return 1;
-        if (bIndex < 0)
-            return -1;
-
-        return aIndex - bIndex;
-    });
-}

@@ -33,6 +33,7 @@
     "include": [
         "./config.ts",
         "./utils",
+        "./config",
         "./components/**/*.vue",
         "./components.d.ts",
         "./theme",

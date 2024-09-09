@@ -3,8 +3,8 @@ outline: deep
 ---
 # Getting Started
 
-## Installation
-### Scaffold a New Project
+## Installation {#installation}
+### Scaffold a New Project {#scaffold-new-project}
 To create a new `node-llama-cpp` project with everything set up, run this command:
 ```shell
 npm create node-llama-cpp@latest
@@ -15,7 +15,7 @@ You will be asked to enter a project name, select a template, and choose a model
 
 If this is your first time running models on your machine, we recommend starting with the `Node + TypeScript` template.
 
-### Existing Project
+### Existing Project {#add-to-existing-project}
 Inside of your node.js project directory, run this command:
 ```shell
 npm install node-llama-cpp
@@ -26,7 +26,7 @@ npm install node-llama-cpp
 > If binaries are not available for your platform, it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 > To disable this behavior, set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
 
-## ESM Usage
+## ESM Usage {#esm-usage}
 `node-llama-cpp` is an [ES module](https://nodejs.org/api/esm.html#modules-ecmascript-modules), so can only use `import` to load it and cannot use `require`.
 
 To make sure you can use it in your project, make sure your `package.json` file has `"type": "module"` in it.
@@ -298,11 +298,14 @@ console.log("AI: " + a1.trim());
 ```
 
 ## Next Steps {#next-steps}
-Now that you have a basic knowledge of how to use `node-llama-cpp`,
-you can delve deeper into more advanced topics by reading more guides (see the _Guide_ section in the sidebar).
+Now that you've learned the basics of `node-llama-cpp`,
+you can explore more advanced topics by reading the guides in the _Guide_ section of the sidebar.
 
-Use the [GitHub Discussions](https://github.com/withcatai/node-llama-cpp/discussions) to ask questions if you get stuck,<br/>
+Use [GitHub Discussions](https://github.com/withcatai/node-llama-cpp/discussions) to ask questions if you get stuck,<br/>
 and [give `node-llama-cpp` a star on GitHub](https://github.com/withcatai/node-llama-cpp) if you found it useful.
 
 Explore the [API reference](../api/functions/getLlama.md) to learn more about the available functions and classes,
-and use the search bar to find documentation for a specific topic or API.
+and use the search bar (press <kbd class="doc-kbd">/</kbd>) to find documentation for a specific topic or API.
+
+Check out the [roadmap](https://github.com/orgs/withcatai/projects/1) to see what's coming next,<br/>
+and consider [sponsoring `node-llama-cpp`](https://github.com/sponsors/giladgd) to accelerate the development of new features.

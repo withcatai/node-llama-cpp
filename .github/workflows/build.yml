@@ -629,7 +629,7 @@ jobs:
     concurrency: update-documentation-website-${{ github.ref }}
     environment:
       name: Documentation website
-      url: "https://withcatai.github.io/node-llama-cpp/"
+      url: "https://node-llama-cpp.withcat.ai"
     needs:
       - build
       - resolve-next-release
@@ -668,7 +668,7 @@ jobs:
           fi
       - name: Generate docs with updated version
         env:
-          DOCS_URL_BASE: "/node-llama-cpp/"
+          DOCS_URL_BASE: "/"
         run: |
           export DOCS_PACKAGE_VERSION="$(cat ./docsVersion.txt)"
           echo "Package version: $DOCS_PACKAGE_VERSION"
@@ -685,4 +685,4 @@ jobs:
           artifact_name: pages-docs
       - name: Update feed
         run: |
-          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://withcatai.github.io/node-llama-cpp/blog/feed.atom"
+          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"

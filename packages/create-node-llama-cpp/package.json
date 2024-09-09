@@ -46,7 +46,7 @@
     "type": "github",
     "url": "https://github.com/sponsors/giladgd"
   },
-  "homepage": "https://withcatai.github.io/node-llama-cpp/",
+  "homepage": "https://node-llama-cpp.withcat.ai",
   "devDependencies": {
     "typescript": "^5.2.2"
   },

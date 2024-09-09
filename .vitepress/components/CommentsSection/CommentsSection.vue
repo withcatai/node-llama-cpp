@@ -7,6 +7,7 @@ const {frontmatter, title, isDark} = useData();
 
 const commentsEnabled = ref(false);
 const reactionsEnabled = ref(false);
+const isBlog = ref(false);
 const needToResendTheme = ref(true);
 const commentsRenderKey = ref("");
 
@@ -33,7 +34,7 @@ function getCommentsRenderKey() {
 }
 
 function getTheme(dark: boolean) {
-    if (typeof location === "undefined")
+    if (typeof location === "undefined" || typeof document === "undefined")
         return dark
             ? "dark"
             : "light";
@@ -44,10 +45,11 @@ function getTheme(dark: boolean) {
 }
 
 function updateState() {
+    isBlog.value = route?.path !== "/blog/" && route?.path?.startsWith("/blog/") || false;
     commentsEnabled.value = frontmatter.value.comments !== false && (
         route?.path === "/guide" ||
         route?.path?.startsWith("/guide/") ||
-        (route?.path !== "/blog/" && route?.path?.startsWith("/blog/"))
+        isBlog.value
     ) || false;
     reactionsEnabled.value = frontmatter.value.comments?.reactions !== false && (
         route?.path === "/blog" ||
@@ -98,7 +100,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div :key="commentsRenderKey" v-if="commentsEnabled" class="giscus">
+    <div :key="commentsRenderKey" v-if="commentsEnabled" :class="{
+        giscus: true,
+        isBlog: isBlog
+    }">
         <component
             :is="'script'"
             src="https://giscus.app/client.js"
@@ -123,9 +128,42 @@ onUnmounted(() => {
 <style scoped>
 .giscus {
     color-scheme: light;
+    position: relative;
+    border: none;
+    border-top: 1px solid transparent;
+
+    &:has(iframe) {
+        border-top-color: var(--vp-c-divider);
+        margin-top: 24px;
+
+        &.isBlog {
+            margin-top: 64px;
+        }
+    }
+
+    &:not(:has(iframe)):before,
+    &:has(iframe.giscus-frame.giscus-frame--loading):before {
+        content: "Loading comments...";
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--vp-c-text-1);
+        opacity: 0.6;
+        user-select: none;
+    }
+
+    &:has(iframe.giscus-frame.giscus-frame--loading):before {
+        position: absolute;
+    }
 
     > :global(iframe) {
-        margin-top: 64px;
+        margin-top: 24px;
+        width: 100%;
+    }
+
+    &.isBlog > :global(iframe) {
+        margin-top: 24px;
     }
 }
 </style>

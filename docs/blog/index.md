@@ -27,5 +27,6 @@ const entries = data.entries;
         :description="item.description"
         :link="item.link"
         :date="item.date"
+        :image="item.image"
     />
 </div>

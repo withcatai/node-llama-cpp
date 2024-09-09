@@ -8,7 +8,7 @@ import {data as docs} from "./cli.data.js";
 const commandDoc = docs.chat;
 </script>
 
-<p><div v-html="commandDoc.description"></div></p>
+<p v-html="commandDoc.description"></p>
 
 ## Usage
 <div v-html="commandDoc.usageHtml"></div>

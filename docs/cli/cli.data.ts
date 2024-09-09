@@ -1,5 +1,4 @@
 import {CommandModule} from "yargs";
-import {createMarkdownRenderer} from "vitepress";
 import {PullCommand} from "../../src/cli/commands/PullCommand.js";
 import {ChatCommand} from "../../src/cli/commands/ChatCommand.js";
 import {CompleteCommand} from "../../src/cli/commands/CompleteCommand.js";
@@ -22,6 +21,7 @@ import {buildHtmlTable} from "../../.vitepress/utils/buildHtmlTable.js";
 import {setIsInDocumentationMode} from "../../src/state.js";
 import {htmlEscapeWithCodeMarkdown} from "../../.vitepress/utils/htmlEscapeWithCodeMarkdown.js";
 import {getInlineCodeBlockHtml} from "../../.vitepress/utils/getInlineCodeBlockHtml.js";
+import {getMarkdownRenderer} from "../../.vitepress/utils/getMarkdownRenderer.js";
 import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
 export default {
@@ -81,7 +81,7 @@ export default {
 
 async function buildIndexTable(commands: [pageLink: string, command: CommandModule<any, any>][], cliName: string = cliBinName) {
     let res = "";
-    const markdownRenderer = await createMarkdownRenderer(process.cwd());
+    const markdownRenderer = await getMarkdownRenderer();
 
     res += buildHtmlHeading("h2", htmlEscape("Commands"), "commands");
     res += buildHtmlTable(

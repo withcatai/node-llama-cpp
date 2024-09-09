@@ -8,7 +8,7 @@ import {data as docs} from "../cli.data.js";
 const commandDoc = docs.source.build;
 </script>
 
-<p><div v-html="commandDoc.description"></div></p>
+<p v-html="commandDoc.description"></p>
 
 ::: info
 If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.

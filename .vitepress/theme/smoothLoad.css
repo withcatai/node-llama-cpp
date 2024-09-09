@@ -1,0 +1,8 @@
+#app {
+    animation: app-show backwards 0.3s 0.3s ease-in-out;
+}
+
+@keyframes app-show {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}

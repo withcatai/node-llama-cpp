@@ -1,14 +1,46 @@
 <script setup lang="ts">
 import {provide, nextTick, onBeforeMount} from "vue";
-import {useData} from "vitepress";
+import {useData, useRoute} from "vitepress";
 
 const {isDark} = useData();
+const route = useRoute();
 
-const themeTransitionEnabled = (document as { startViewTransition?: any }).startViewTransition != null;
-document.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
+const appShowAnimationName = "app-show";
+const appShowAnimationDelay = 300;
+
+const themeTransitionEnabled = typeof document === "undefined"
+    ? false
+    : (document as { startViewTransition?: any })?.startViewTransition != null;
+
+if (typeof document !== "undefined")
+    document?.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
 
 onBeforeMount(() => {
+    if (typeof document === "undefined")
+        return;
+
     document.documentElement.classList.add("start-animation");
+
+    // ensure homepage starting style animations are played on production builds
+    if (route.path === "/") {
+        document.querySelector("#app")?.animate({
+            display: ["none", "initial"]
+        }, {
+            duration: 1,
+            easing: "linear"
+        });
+
+        const appShowAnimation = (document.querySelector("#app").getAnimations?.() ?? [])
+            .find(animation => animation instanceof CSSAnimation && animation.animationName === appShowAnimationName);
+
+        appShowAnimation?.cancel();
+    } else {
+        const appShowAnimation = (document.querySelector("#app").getAnimations?.() ?? [])
+            .find(animation => animation instanceof CSSAnimation && animation.animationName === appShowAnimationName);
+
+        if (appShowAnimation != null && appShowAnimation.currentTime < appShowAnimationDelay)
+            appShowAnimation.currentTime = appShowAnimationDelay;
+    }
 
     setTimeout(() => {
         document.documentElement.classList.remove("start-animation");
@@ -16,7 +48,7 @@ onBeforeMount(() => {
 });
 
 provide("toggle-appearance", async () => {
-    if (!themeTransitionEnabled) {
+    if (!themeTransitionEnabled || typeof document === "undefined") {
         isDark.value = !isDark.value;
         return;
     }

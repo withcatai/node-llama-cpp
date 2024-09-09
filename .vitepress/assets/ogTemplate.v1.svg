@@ -70,7 +70,7 @@
         <rect fill="white" x="3072" y="1024" width="768" height="768" rx="128"/>
     </mask>
     <circle id="logo-glow" fill="url(#LogoGlowGradient)" cx="3456" cy="1408" r="1472" />
-    <image id="logo" href="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.roundEdges.png" x="3072" y="1024" width="768" height="768" mask="url(#LogoMask)"/>
+    <image id="logo" href="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.png" x="3072" y="1024" width="768" height="768" mask="url(#LogoMask)"/>
 
     <text id="logo-text" x="256" y="1792" font-size="90" font-weight="700" fill="url(#ThemeGradient)" alignment-baseline="baseline" font-family="Inter, sans-serif">node-llama-cpp</text>
 

@@ -1,3 +1,5 @@
+import "./smoothLoad.css";
+
 import {h} from "vue";
 import Theme from "vitepress/theme";
 import TwoslashFloatingVue from "@shikijs/vitepress-twoslash/client";

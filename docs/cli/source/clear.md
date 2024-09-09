@@ -8,7 +8,7 @@ import {data as docs} from "../cli.data.js";
 const commandDoc = docs.source.clear;
 </script>
 
-<p><div v-html="commandDoc.description"></div></p>
+<p v-html="commandDoc.description"></p>
 
 ::: details Programmatically calling the `source clear` command in your code
 To programmatically call this command in your code, call the `ClearLlamaCppBuildCommand` function:
