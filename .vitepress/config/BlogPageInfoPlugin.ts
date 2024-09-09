@@ -1,4 +1,4 @@
-import {createMarkdownRenderer, MarkdownEnv, Plugin} from "vitepress";
+import {MarkdownEnv, Plugin} from "vitepress";
 import path from "path";
 import {htmlEscape} from "../utils/htmlEscape.js";
 import {getMarkdownRenderer} from "../utils/getMarkdownRenderer.js";
