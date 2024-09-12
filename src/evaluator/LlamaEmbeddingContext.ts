@@ -136,8 +136,7 @@ export class LlamaEmbeddingContext {
             threads,
             createSignal,
             ignoreMemorySafetyChecks,
-            _embeddings: true,
-            _noSeed: true
+            _embeddings: true
         });
 
         return new LlamaEmbeddingContext({

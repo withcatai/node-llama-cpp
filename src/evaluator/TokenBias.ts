@@ -42,11 +42,19 @@ export class TokenBias {
                 ? probabilityToLogit(bias)
                 : bias.logit;
 
-        for (const token of tokenizeInput(input, this._tokenizer))
-            this._biases.set(token, resolvedLogit);
+        for (const token of tokenizeInput(input, this._tokenizer)) {
+            if (this._tokenizer.isEogToken(token))
+                continue;
 
-        for (const token of tokenizeInput(input, this._tokenizer, "trimLeadingSpace"))
             this._biases.set(token, resolvedLogit);
+        }
+
+        for (const token of tokenizeInput(input, this._tokenizer, "trimLeadingSpace")) {
+            if (this._tokenizer.isEogToken(token))
+                continue;
+
+            this._biases.set(token, resolvedLogit);
+        }
 
         return this;
     }

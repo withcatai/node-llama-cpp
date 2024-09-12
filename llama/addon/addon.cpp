@@ -3,6 +3,7 @@
 #include "AddonModelLora.h"
 #include "AddonGrammar.h"
 #include "AddonGrammarEvaluationState.h"
+#include "AddonSampler.h"
 #include "AddonContext.h"
 #include "globals/addonLog.h"
 #include "globals/addonProgress.h"
@@ -210,6 +211,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
+    AddonSampler::init(exports);
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);
 

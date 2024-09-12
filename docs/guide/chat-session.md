@@ -169,7 +169,8 @@ console.log("User: " + q1);
 const a1 = await session.prompt(q1, {
     temperature: 0.8,
     topK: 40,
-    topP: 0.02
+    topP: 0.02,
+    seed: 2462
 });
 console.log("AI: " + a1);
 ```

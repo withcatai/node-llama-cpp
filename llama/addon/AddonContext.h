@@ -2,6 +2,7 @@
 #include "llama.h"
 #include "napi.h"
 #include "addonGlobals.h"
+#include "AddonSampler.h"
 
 class AddonContext : public Napi::ObjectWrap<AddonContext> {
     public:
@@ -37,10 +38,6 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value ShiftSequenceTokenCells(const Napi::CallbackInfo& info);
         Napi::Value DecodeBatch(const Napi::CallbackInfo& info);
         Napi::Value SampleToken(const Napi::CallbackInfo& info);
-
-        Napi::Value AcceptGrammarEvaluationStateToken(const Napi::CallbackInfo& info);
-
-        Napi::Value CanBeNextTokenForGrammarEvaluationState(const Napi::CallbackInfo& info);
 
         Napi::Value GetEmbedding(const Napi::CallbackInfo& info);
         Napi::Value GetStateSize(const Napi::CallbackInfo& info);

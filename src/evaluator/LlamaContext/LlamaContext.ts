@@ -13,10 +13,12 @@ import {
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
+import {LlamaSampler} from "./LlamaSampler.js";
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
 const shrinkRetriesMinContextSize = 4096;
+const defaultMaxPunishTokens = 64;
 const defaultFailedCreationRemedy = {
     retries: 6,
     autoContextSizeShrink: 0.16
@@ -56,7 +58,6 @@ export class LlamaContext {
         _model: LlamaModel
     }, {
         sequences,
-        seed = null,
         contextSize,
         batchSize,
         flashAttention = _model.defaultContextFlashAttention,
@@ -65,8 +66,7 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
-        _embeddings,
-        _noSeed
+        _embeddings
     }: LlamaContextOptions & {
         sequences: number,
         contextSize: number,
@@ -85,7 +85,6 @@ export class LlamaContext {
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
-            seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             sequences: this._totalSequences,
@@ -93,8 +92,7 @@ export class LlamaContext {
             threads: threads == null
                 ? undefined
                 : Math.max(0, Math.floor(threads)),
-            embeddings: _embeddings,
-            noSeed: _noSeed
+            embeddings: _embeddings
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
@@ -496,16 +494,6 @@ export class LlamaContext {
             this._unusedSequenceIds.push(sequenceId);
             this._onReclaimUnusedSequenceId.dispatchEvent();
         });
-    }
-
-    /** @internal */
-    public _acceptTokenOnGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
-        this._ctx.acceptGrammarEvaluationStateToken(grammarEvaluationState._state, token);
-    }
-
-    /** @internal */
-    public _canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
-        return this._ctx.canBeNextTokenForGrammarEvaluationState(grammarEvaluationState._state, token);
     }
 
     /** @internal */
@@ -920,6 +908,17 @@ export class LlamaContextSequence {
 
     public evaluate(tokens: Token[], options: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
+
+        /**
+         * Used to control the randomness of the generated text.
+         *
+         * Change the seed to get different results.
+         *
+         * Defaults to the current epoch time.
+         *
+         * Only relevant when using `temperature`.
+         */
+        seed?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
@@ -959,6 +958,7 @@ export class LlamaContextSequence {
             minP = 0,
             topK = 40,
             topP = 0.95,
+            seed,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -977,6 +977,7 @@ export class LlamaContextSequence {
             minP,
             topK,
             topP,
+            seed,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -1038,6 +1039,7 @@ export class LlamaContextSequence {
         minP = 0,
         topK = 40,
         topP = 0.95,
+        seed,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias,
@@ -1048,7 +1050,7 @@ export class LlamaContextSequence {
 
         _noSampling = false
     }: {
-        temperature?: number, minP?: number, topK?: number, topP?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
@@ -1062,65 +1064,92 @@ export class LlamaContextSequence {
         if (evalTokens.length === 0)
             return;
 
-        while (true) {
-            this._ensureNotDisposed();
+        const sampler = new LlamaSampler(this.model);
+        try {
+            while (true) {
+                this._ensureNotDisposed();
 
-            // Evaluate to get the next token.
-            const nextToken: Token | null = await this._decodeTokens(
-                evalTokens,
-                generateNewTokens,
-                evaluationPriority,
-                this._tokenMeter,
-                contextShiftOptions,
-                (batchLogitIndex) => {
-                    if (_noSampling)
-                        return null;
+                // Evaluate to get the next token.
+                const nextToken: Token | null = await this._decodeTokens(
+                    evalTokens,
+                    generateNewTokens,
+                    evaluationPriority,
+                    this._tokenMeter,
+                    contextShiftOptions,
+                    (batchLogitIndex) => {
+                        if (_noSampling)
+                            return null;
 
-                    const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
-                        ? repeatPenalty.punishTokens()
-                        : repeatPenalty?.punishTokens;
+                        const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
+                            ? repeatPenalty.punishTokens()
+                            : repeatPenalty?.punishTokens;
 
-                    const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
-                        ? grammarEvaluationState()
-                        : grammarEvaluationState;
+                        const maxPunishTokens = Math.max(
+                            repeatPenalty?.maxPunishTokens ?? defaultMaxPunishTokens,
+                            repeatPenaltyTokens?.length ?? 0
+                        );
 
-                    if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
-                        throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+                        const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+                            ? grammarEvaluationState()
+                            : grammarEvaluationState;
 
-                    const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
+                        if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
+                            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
-                    return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
-                        temperature,
-                        minP,
-                        topK,
-                        topP,
-                        repeatPenalty: repeatPenalty?.penalty,
-                        repeatPenaltyTokens: repeatPenaltyTokens != null
-                            ? Uint32Array.from(repeatPenaltyTokens)
-                            : undefined,
-                        repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
-                        repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
-                        tokenBiasKeys,
-                        tokenBiasValues,
-                        grammarEvaluationState: resolvedGrammarEvaluationState?._state
-                    }));
-                }
-            );
+                        const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
 
-            if (nextToken == null)
-                return;
+                        sampler.applyConfig(removeNullFields({
+                            temperature,
+                            minP,
+                            topK,
+                            topP,
+                            seed: Math.max(
+                                0,
+                                Number.isFinite(seed)
+                                    ? Math.floor(seed ?? (Date.now() / 1000))
+                                    : Math.floor(Date.now() / 1000)
+                            ),
+                            repeatPenalty: repeatPenalty?.penalty,
+                            repeatPenaltyMaxTokens: maxPunishTokens,
+                            repeatPenaltyTokens: repeatPenaltyTokens != null
+                                ? Uint32Array.from(repeatPenaltyTokens)
+                                : undefined,
+                            repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
+                            repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+                            tokenBiasKeys,
+                            tokenBiasValues,
+                            grammarEvaluationState: resolvedGrammarEvaluationState?._state
+                        }));
 
-            // the model finished generating text
-            if (!yieldEogToken && this._context.model.isEogToken(nextToken))
-                break;
+                        return withLock(sampler, "sample", async () => {
+                            if (sampler.disposed)
+                                return null;
 
-            const replacementToken = (yield nextToken) as undefined | Token;
+                            return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                        });
+                    }
+                );
 
-            // set the tokens for the next evaluation
-            if (replacementToken != null)
-                evalTokens = [replacementToken];
-            else
-                evalTokens = [nextToken];
+                if (nextToken === -1)
+                    throw new Error("Failed to sample next token");
+
+                if (nextToken == null)
+                    return;
+
+                // the model finished generating text
+                if (!yieldEogToken && this._context.model.isEogToken(nextToken))
+                    break;
+
+                const replacementToken = (yield nextToken) as undefined | Token;
+
+                // set the tokens for the next evaluation
+                if (replacementToken != null)
+                    evalTokens = [replacementToken];
+                else
+                    evalTokens = [nextToken];
+            }
+        } finally {
+            void withLock(sampler, "sample", sampler.asyncDispose);
         }
     }
 

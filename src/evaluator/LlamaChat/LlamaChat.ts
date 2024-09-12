@@ -20,6 +20,7 @@ import {TokenBias} from "../TokenBias.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {resolveLastTokens} from "../../utils/resolveLastTokens.js";
+import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -109,6 +110,15 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
      * Only relevant when `temperature` is set to a value greater than `0`.
      */
     topP?: number,
+
+    /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
 
     /**
      * Trim whitespace from the end of the generated text
@@ -205,6 +215,7 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
     minP?: LLamaChatGenerateResponseOptions<Functions>["minP"],
     topK?: LLamaChatGenerateResponseOptions<Functions>["topK"],
     topP?: LLamaChatGenerateResponseOptions<Functions>["topP"],
+    seed?: LLamaChatGenerateResponseOptions<Functions>["seed"],
     trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
     repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
     tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
@@ -371,6 +382,7 @@ export class LlamaChat {
             minP,
             topK,
             topP,
+            seed,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -402,6 +414,7 @@ export class LlamaChat {
                 minP,
                 topK,
                 topP,
+                seed,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
@@ -514,7 +527,7 @@ export class LlamaChat {
 
                 throw new Error("The context size is too small to generate a response");
             } finally {
-                generateResponseState.dispose();
+                await generateResponseState.dispose();
             }
         });
     }
@@ -534,6 +547,7 @@ export class LlamaChat {
             minP,
             topK,
             topP,
+            seed,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -570,6 +584,7 @@ export class LlamaChat {
                 minP,
                 topK,
                 topP,
+                seed,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
@@ -706,7 +721,7 @@ export class LlamaChat {
 
                 throw new Error("The context size is too small to generate a completion");
             } finally {
-                generateResponseState.dispose();
+                await generateResponseState.dispose();
             }
         });
     }
@@ -1213,6 +1228,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly minP: LLamaChatGenerateResponseOptions<Functions>["minP"];
     private readonly topK: LLamaChatGenerateResponseOptions<Functions>["topK"];
     private readonly topP: LLamaChatGenerateResponseOptions<Functions>["topP"];
+    private readonly seed: LLamaChatGenerateResponseOptions<Functions>["seed"];
     public readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
     private readonly trimWhitespaceSuffix: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"];
     private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
@@ -1310,6 +1326,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             minP,
             topK,
             topP,
+            seed,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -1340,6 +1357,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.minP = minP;
         this.topK = topK;
         this.topP = topP;
+        this.seed = seed;
         this.grammar = grammar;
         this.trimWhitespaceSuffix = trimWhitespaceSuffix;
         this.tokenBias = tokenBias;
@@ -1377,7 +1395,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.lastModelResponse = getLastTextModelResponseFromChatHistory(this.resolvedHistory);
         this.repeatPenaltyEnabled = this.resolvedRepeatPenalty.lastTokens > 0;
         this.grammarEvaluationState = this.grammar != null
-            ? new LlamaGrammarEvaluationState({grammar: this.grammar})
+            ? new LlamaGrammarEvaluationState({model: this.llamaChat.model, grammar: this.grammar})
             : undefined;
         this.functionNameGrammar = this.functionsEnabled
             ? new FunctionCallNameGrammar(this.llamaChat.model._llama, this.functions as NonNullable<Functions>, this.chatWrapper)
@@ -1410,12 +1428,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.getPenaltyTokens = this.getPenaltyTokens.bind(this);
     }
 
-    public dispose() {
-
+    public async dispose() {
+        await this.evaluationIterator?.return();
     }
 
-    public [Symbol.dispose]() {
-        this.dispose();
+    public async [Symbol.asyncDispose]() {
+        await this.dispose();
     }
 
     public ensureLastHistoryItemIsModel() {
@@ -1826,6 +1844,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 );
                 this.functionsGrammar = functionNameGrammar;
                 this.functionsEvaluationState = new LlamaGrammarEvaluationState({
+                    model: this.llamaChat.model,
                     grammar: this.functionsGrammar
                 });
 
@@ -1844,15 +1863,21 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                         const lastTokens: Token[] = [];
                         for (const leftoverToken of leftoverTokens) {
-                            const canBeNextToken = this.llamaChat.context._canBeNextTokenForGrammarEvaluationState(
-                                this.functionsEvaluationState,
-                                leftoverToken
-                            );
+                            const canBeNextToken =
+                                LlamaSampler._canBeNextTokenForGrammarEvaluationState(
+                                    this.llamaChat.model._llama,
+                                    this.functionsEvaluationState,
+                                    leftoverToken
+                                );
 
                             if (!canBeNextToken)
                                 break;
 
-                            this.llamaChat.context._acceptTokenOnGrammarEvaluationState(this.functionsEvaluationState, leftoverToken);
+                            LlamaSampler._acceptTokenOnGrammarEvaluationState(
+                                this.llamaChat.model._llama,
+                                this.functionsEvaluationState,
+                                leftoverToken
+                            );
                             this.currentFunctionCallCurrentPartTokens.push(leftoverToken);
                             functionNameGenerationDoneDetector.recordGeneration({
                                 text: this.llamaChat.model.detokenize([leftoverToken], false, lastTokens),
@@ -1915,6 +1940,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     );
                     this.functionsGrammar = functionParamsGrammar;
                     this.functionsEvaluationState = new LlamaGrammarEvaluationState({
+                        model: this.llamaChat.model,
                         grammar: this.functionsGrammar
                     });
 
@@ -2174,6 +2200,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             minP: this.minP,
             topK: this.topK,
             topP: this.topP,
+            seed: this.seed,
             grammarEvaluationState: () => {
                 if (this.functionEvaluationMode !== false)
                     return this.functionsEvaluationState;
@@ -2182,6 +2209,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             },
             repeatPenalty: !this.repeatPenaltyEnabled ? undefined : {
                 punishTokens: this.getPenaltyTokens,
+                maxPunishTokens: this.resolvedRepeatPenalty.lastTokens,
                 penalty: this.resolvedRepeatPenalty.penalty,
                 frequencyPenalty: this.resolvedRepeatPenalty.frequencyPenalty,
                 presencePenalty: this.resolvedRepeatPenalty.presencePenalty

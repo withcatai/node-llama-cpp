@@ -2,9 +2,7 @@
 #include "AddonGrammar.h"
 
 AddonGrammar::AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonGrammar>(info) {
-    // Get the model path
-    std::string grammarCode = info[0].As<Napi::String>().Utf8Value();
-    bool should_print_grammar = false;
+    grammarCode = info[0].As<Napi::String>().Utf8Value();
 
     if (info.Length() > 1 && info[1].IsObject()) {
         Napi::Object options = info[1].As<Napi::Object>();
@@ -14,21 +12,20 @@ AddonGrammar::AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
             hasAddonExportsRef = true;
         }
 
-        if (options.Has("debugPrintGrammar")) {
-            should_print_grammar = options.Get("debugPrintGrammar").As<Napi::Boolean>().Value();
+        if (options.Has("rootRuleName")) {
+            rootRuleName = options.Get("rootRuleName").As<Napi::String>().Utf8Value();
         }
     }
 
-    parsed_grammar = grammar_parser::parse(grammarCode.c_str());
-    // will be empty (default) if there are parse errors
-    if (parsed_grammar.rules.empty()) {
+    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str());
+    
+    // will be empty if there are parse errors
+    if (parsed_grammar == nullptr) {
         Napi::Error::New(info.Env(), "Failed to parse grammar").ThrowAsJavaScriptException();
         return;
     }
 
-    if (should_print_grammar) {
-        grammar_parser::print_grammar(stderr, parsed_grammar);
-    }
+    llama_grammar_free_impl(parsed_grammar);
 }
 AddonGrammar::~AddonGrammar() {
     if (hasAddonExportsRef) {

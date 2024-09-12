@@ -91,6 +91,15 @@ export type LlamaCompletionGenerationOptions = {
     topP?: number,
 
     /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
+
+    /**
      * Trim whitespace from the end of the generated text
      * Disabled by default.
      */
@@ -236,6 +245,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -317,6 +327,7 @@ export class LlamaCompletion {
                 minP,
                 topK,
                 topP,
+                seed,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -371,6 +382,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -510,6 +522,7 @@ export class LlamaCompletion {
                 minP,
                 topK,
                 topP,
+                seed,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -547,6 +560,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -578,7 +592,7 @@ export class LlamaCompletion {
         const res: Token[] = [];
         const pendingTokens: Token[] = [];
         const grammarEvaluationState = grammar != null
-            ? new LlamaGrammarEvaluationState({grammar})
+            ? new LlamaGrammarEvaluationState({model, grammar})
             : undefined;
         const {
             lastTokens: repeatPenaltyLastTokens = 64,
@@ -657,10 +671,11 @@ export class LlamaCompletion {
             }
 
             const evaluationIterator = sequence.evaluate(inputTokens, removeNullFields({
-                temperature, minP, topK, topP,
+                temperature, minP, topK, topP, seed,
                 grammarEvaluationState,
                 repeatPenalty: !repeatPenaltyEnabled ? undefined : {
                     punishTokens: getPenaltyTokens,
+                    maxPunishTokens: repeatPenaltyLastTokens,
                     penalty,
                     frequencyPenalty,
                     presencePenalty

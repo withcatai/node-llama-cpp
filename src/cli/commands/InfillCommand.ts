@@ -37,6 +37,7 @@ type InfillCommand = {
     minP: number,
     topK: number,
     topP: number,
+    seed?: number,
     gpuLayers?: number,
     repeatPenalty: number,
     lastTokensRepeatPenalty: number,
@@ -151,6 +152,11 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 default: 0.95,
                 description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`."
             })
+            .option("seed", {
+                type: "number",
+                description: "Used to control the randomness of the generated text. Only relevant when using `temperature`.",
+                defaultDescription: "The current epoch time"
+            })
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
@@ -213,14 +219,14 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
         flashAttention, threads, temperature, minP, topK,
-        topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
         debug, meter, printTimings
     }) {
         try {
             await RunInfill({
                 modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-                threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty,
+                threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 debug, meter, printTimings
             });
@@ -235,7 +241,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 async function RunInfill({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-    threads, temperature, minP, topK, topP, gpuLayers,
+    threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     maxTokens, debug, meter, printTimings
 }: InfillCommand) {
@@ -459,6 +465,7 @@ async function RunInfill({
                 minP,
                 topK,
                 topP,
+                seed: seed ?? undefined,
                 signal: abortController.signal,
                 repeatPenalty: {
                     penalty: repeatPenalty,

@@ -131,6 +131,15 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     topP?: number,
 
     /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
+
+    /**
      * Trim whitespace from the end of the generated text
      * Disabled by default.
      */
@@ -201,6 +210,7 @@ export type LLamaChatCompletePromptOptions = {
     minP?: LLamaChatPromptOptions["minP"],
     topK?: LLamaChatPromptOptions["topK"],
     topP?: LLamaChatPromptOptions["topP"],
+    seed?: LLamaChatPromptOptions["seed"],
     trimWhitespaceSuffix?: LLamaChatPromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatPromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatPromptOptions["repeatPenalty"],
@@ -383,6 +393,7 @@ export class LlamaChatSession {
             minP,
             topK,
             topP,
+            seed,
             grammar,
             trimWhitespaceSuffix = false,
             repeatPenalty,
@@ -396,7 +407,7 @@ export class LlamaChatSession {
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
-            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix,
+            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar, trimWhitespaceSuffix,
             repeatPenalty, tokenBias, customStopTriggers
         });
 
@@ -420,6 +431,7 @@ export class LlamaChatSession {
         minP,
         topK,
         topP,
+        seed,
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
@@ -486,6 +498,7 @@ export class LlamaChatSession {
                     minP,
                     topK,
                     topP,
+                    seed,
                     tokenBias,
                     customStopTriggers,
                     maxTokens,
@@ -696,6 +709,7 @@ export class LlamaChatSession {
         minP,
         topK,
         topP,
+        seed,
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
@@ -735,6 +749,7 @@ export class LlamaChatSession {
                     minP,
                     topK,
                     topP,
+                    seed,
                     tokenBias,
                     customStopTriggers,
                     maxTokens,

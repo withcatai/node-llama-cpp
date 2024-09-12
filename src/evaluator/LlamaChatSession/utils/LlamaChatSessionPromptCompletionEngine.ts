@@ -24,6 +24,7 @@ export type LLamaChatPromptCompletionEngineOptions = {
     minP?: LLamaChatCompletePromptOptions["minP"],
     topK?: LLamaChatCompletePromptOptions["topK"],
     topP?: LLamaChatCompletePromptOptions["topP"],
+    seed?: LLamaChatCompletePromptOptions["seed"],
     trimWhitespaceSuffix?: LLamaChatCompletePromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatCompletePromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatCompletePromptOptions["repeatPenalty"],

@@ -1,9 +1,11 @@
 import {Llama} from "../bindings/Llama.js";
 import {AddonGrammarEvaluationState} from "../bindings/AddonTypes.js";
-import {LlamaGrammar} from "./LlamaGrammar.js";
+import type {LlamaGrammar} from "./LlamaGrammar.js";
+import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 
 
 export type LlamaGrammarEvaluationStateOptions = {
+    model: LlamaModel,
     grammar: LlamaGrammar
 };
 
@@ -21,8 +23,12 @@ export class LlamaGrammarEvaluationState {
     /**
      * @param options
      */
-    public constructor({grammar}: LlamaGrammarEvaluationStateOptions) {
-        this._llama = grammar._llama;
-        this._state = new grammar._llama._bindings.AddonGrammarEvaluationState(grammar._grammar);
+    public constructor({model, grammar}: LlamaGrammarEvaluationStateOptions) {
+        this._llama = model._llama;
+
+        if (model._llama !== grammar._llama)
+            throw new Error("The given LlamaModel and LlamaGrammar must be from the same Llama instance");
+
+        this._state = new model._llama._bindings.AddonGrammarEvaluationState(model._model, grammar._grammar);
     }
 }

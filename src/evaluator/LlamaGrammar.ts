@@ -11,25 +11,27 @@ export type LlamaGrammarOptions = {
     /** GBNF grammar */
     grammar: string,
 
-    /**
-     * print the parsed grammar to stdout.
-     * Useful for debugging.
-     */
-    debugPrintGrammar?: boolean,
-
     /** Consider any of these as EOS for the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
     stopGenerationTriggers?: readonly (LlamaText | string | readonly (string | Token)[])[],
 
     /** Trim whitespace from the end of the generated text. Only supported by `LlamaChat` and `LlamaChatSession` */
-    trimWhitespaceSuffix?: boolean
+    trimWhitespaceSuffix?: boolean,
+
+    /**
+     * Root rule name.
+     *
+     * Defaults to `"root"`.
+     */
+    rootRuleName?: string
 };
 
 export class LlamaGrammar {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _grammar: AddonGrammar;
-    private readonly _stopGenerationTriggers: readonly (LlamaText | string | readonly (string | Token)[])[];
-    private readonly _trimWhitespaceSuffix: boolean;
-    private readonly _grammarText: string;
+    /** @internal */ private readonly _stopGenerationTriggers: readonly (LlamaText | string | readonly (string | Token)[])[];
+    /** @internal */ private readonly _trimWhitespaceSuffix: boolean;
+    /** @internal */ private readonly _grammarText: string;
+    /** @internal */ private readonly _rootRuleName: string;
 
     /**
      * > GBNF files are supported.
@@ -40,20 +42,25 @@ export class LlamaGrammar {
      * @param options
      */
     public constructor(llama: Llama, {
-        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, debugPrintGrammar = false
+        grammar, stopGenerationTriggers = [], trimWhitespaceSuffix = false, rootRuleName = "root"
     }: LlamaGrammarOptions) {
         this._llama = llama;
         this._grammar = new this._llama._bindings.AddonGrammar(grammar, {
             addonExports: this._llama._bindings,
-            debugPrintGrammar
+            rootRuleName
         });
         this._stopGenerationTriggers = stopGenerationTriggers ?? [];
         this._trimWhitespaceSuffix = trimWhitespaceSuffix;
         this._grammarText = grammar;
+        this._rootRuleName = rootRuleName;
     }
 
     public get grammar(): string {
         return this._grammarText;
+    }
+
+    public get rootRuleName(): string {
+        return this._rootRuleName;
     }
 
     public get stopGenerationTriggers() {

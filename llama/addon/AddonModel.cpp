@@ -1,7 +1,8 @@
 #include <sstream>
 #include "addonGlobals.h"
 #include "globals/addonLog.h"
-#include "common.h"
+#include "globals/addonProgress.h"
+#include "common/common.h"
 #include "llama.h"
 #include "AddonModel.h"
 #include "AddonModelData.h"

@@ -15,9 +15,6 @@ export type LlamaContextOptions = {
      */
     sequences?: number,
 
-    /** If null, a random seed will be used */
-    seed?: number | null,
-
     /**
      * The number of tokens the model can see at once.
      * - **`"auto"`** - adapt to the current VRAM state and attemp to set the context size as high as possible up to the size
@@ -133,17 +130,22 @@ export type LlamaContextOptions = {
      * embedding mode only
      * @internal
      */
-    _embeddings?: boolean,
-
-    /**
-     * disable the seed generation
-     * @internal
-     */
-    _noSeed?: boolean
+    _embeddings?: boolean
 };
 export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */
     punishTokens: Token[] | (() => Token[]),
+
+    /**
+     * The maximum number of tokens that will be provided in the `punishTokens` array.
+     *
+     * This is used as a hint for a performance optimization for avoiding frequent memory deallocation and reallocation.
+     *
+     * Don't set this value too high, as it can allocate too much memory.
+     *
+     * Defaults to `64`.
+     */
+    maxPunishTokens?: number,
 
     /**
      * The relative amount to lower the probability of the tokens in `punishTokens` by.

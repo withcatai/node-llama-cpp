@@ -51,6 +51,7 @@ type ChatCommand = {
     minP: number,
     topK: number,
     topP: number,
+    seed?: number,
     gpuLayers?: number,
     repeatPenalty: number,
     lastTokensRepeatPenalty: number,
@@ -202,6 +203,11 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: 0.95,
                 description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`."
             })
+            .option("seed", {
+                type: "number",
+                description: "Used to control the randomness of the generated text. Only relevant when using `temperature`.",
+                defaultDescription: "The current epoch time"
+            })
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
@@ -277,14 +283,14 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
-        topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
         environmentFunctions, debug, meter, printTimings
     }) {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP,
+                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
             });
@@ -300,7 +306,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
     contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
-    threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
+    threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
@@ -547,6 +553,7 @@ async function RunChat({
                 minP,
                 topK,
                 topP,
+                seed: seed ?? undefined,
                 signal: abortController.signal,
                 stopOnAbortSignal: true,
                 repeatPenalty: {

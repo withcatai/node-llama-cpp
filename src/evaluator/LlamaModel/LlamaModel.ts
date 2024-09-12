@@ -239,9 +239,11 @@ export class LlamaModel {
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
         this.isSpecialToken = this.isSpecialToken.bind(this);
+        this.isEogToken = this.isEogToken.bind(this);
 
         (this.tokenize as Tokenizer as Writable<Tokenizer>).detokenize = this.detokenize;
         (this.tokenize as Tokenizer).isSpecialToken = this.isSpecialToken;
+        (this.tokenize as Tokenizer).isEogToken = this.isEogToken;
 
         Object.freeze(this.tokenize);
         this.tokenizer = this.tokenize as Tokenizer;
