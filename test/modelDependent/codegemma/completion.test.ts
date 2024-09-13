@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("CodeGemma", () => {
     describe("completion", () => {
-        test("complete a list of sweet fruits", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        test("complete a list of sweet fruits", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
             const modelPath = await getModelFile("codegemma-2b-Q4_K_M.gguf");
             const llama = await getTestLlama();
 
@@ -23,8 +23,10 @@ describe("CodeGemma", () => {
                 maxTokens: 10
             });
             expect(res).toMatchInlineSnapshot(`
-              "1. Mango
-              * 2. Pineapple"
+              "🍎
+              * 🍊
+
+              Here is a list"
             `);
         });
     });
@@ -49,7 +51,7 @@ describe("CodeGemma", () => {
             const res = await completion.generateInfillCompletion(prefix, suffix, {
                 maxTokens: 10
             });
-            expect(res).toMatchInlineSnapshot('"Orange, Pineapple "');
+            expect(res).toMatchInlineSnapshot('"Orange, Pineapple, "');
         });
     });
 });

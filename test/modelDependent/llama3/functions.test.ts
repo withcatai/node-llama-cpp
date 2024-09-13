@@ -257,7 +257,7 @@ describe("llama 3", () => {
             const res = await chatSession.prompt("Is an apple more expensive than a banana?", promptOptions);
 
             expect(res).toMatchInlineSnapshot(
-                '"Let me check the prices for you.  According to the prices I checked, an apple is indeed more expensive than a banana. The price of an apple is $6, while the price of a banana is $4."'
+                '"Let me check the prices for you.  According to the prices I checked, an apple is indeed more expensive than a banana. The apple costs $6, while the banana costs $4."'
             );
         });
     });

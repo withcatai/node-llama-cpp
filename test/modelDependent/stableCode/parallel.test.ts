@@ -149,8 +149,7 @@ describe("stableCode", () => {
             });
             const context = await model.createContext({
                 contextSize: 4096,
-                sequences: 2,
-                seed: 0
+                sequences: 2
             });
             const completion = new LlamaCompletion({
                 contextSequence: context.getSequence()
@@ -159,10 +158,10 @@ describe("stableCode", () => {
                 contextSequence: context.getSequence()
             });
 
-            const resPromise = completion.generateCompletion("const arrayFromOneToHundred = [1, 2, 3", {
+            const resPromise = completion.generateCompletion("const singleLineArrayFromOneToHundred = [1, 2, 3", {
                 maxTokens: 40
             });
-            const resPromise2 = completion2.generateCompletion("const arrayFromOneHundredToOne = [100, 99, 98, 97, 96,", {
+            const resPromise2 = completion2.generateCompletion("const singleLineArrayFromOneToHundred = [100, 99, 98, 97, 96,", {
                 maxTokens: 40
             });
 
