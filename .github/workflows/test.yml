@@ -35,5 +35,11 @@ jobs:
           node-version: "20"
       - name: Install modules
         run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Download latest llama.cpp release
+        env:
+          CI: true
+        run: node ./dist/cli/cli.js source download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Compile docs
         run: npm run docs:build

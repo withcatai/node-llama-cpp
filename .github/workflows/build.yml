@@ -615,7 +615,7 @@ jobs:
     if: |
       always() &&
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta') &&
       needs.build.result == 'success' &&
       needs.resolve-next-release.result == 'success' &&
       needs.resolve-next-release.outputs.next-version != '' && (
@@ -674,15 +674,15 @@ jobs:
           echo "Package version: $DOCS_PACKAGE_VERSION"
           
           npm run docs:build
-      - name: Upload docs to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          name: pages-docs
-          path: docs-site
-      - name: Deploy docs to GitHub Pages
-        uses: actions/deploy-pages@v4
-        with:
-          artifact_name: pages-docs
-      - name: Update feed
-        run: |
-          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"
+#      - name: Upload docs to GitHub Pages
+#        uses: actions/upload-pages-artifact@v3
+#        with:
+#          name: pages-docs
+#          path: docs-site
+#      - name: Deploy docs to GitHub Pages
+#        uses: actions/deploy-pages@v4
+#        with:
+#          artifact_name: pages-docs
+#      - name: Update feed
+#        run: |
+#          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"
