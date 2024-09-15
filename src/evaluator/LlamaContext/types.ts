@@ -127,6 +127,13 @@ export type LlamaContextOptions = {
     },
 
     /**
+     * Track the inference performance of the context, so using `.printTimings()` will work.
+     *
+     * Defaults to `false`.
+     */
+    performanceTracking?: boolean,
+
+    /**
      * embedding mode only
      * @internal
      */

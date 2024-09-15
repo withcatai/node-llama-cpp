@@ -8,6 +8,7 @@ import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.j
 import {TokenMeter} from "../TokenMeter.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
+import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
@@ -34,6 +35,7 @@ export class LlamaContext {
     /** @internal */ private readonly _contextSize: number;
     /** @internal */ private readonly _batchSize: number;
     /** @internal */ private readonly _flashAttention: boolean;
+    /** @internal */ private readonly _performanceTracking: boolean;
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
@@ -66,6 +68,7 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
+        performanceTracking = false,
         _embeddings
     }: LlamaContextOptions & {
         sequences: number,
@@ -84,6 +87,7 @@ export class LlamaContext {
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
+        this._performanceTracking = !!performanceTracking;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
@@ -92,7 +96,8 @@ export class LlamaContext {
             threads: threads == null
                 ? undefined
                 : Math.max(0, Math.floor(threads)),
-            embeddings: _embeddings
+            embeddings: _embeddings,
+            performanceTracking: this._performanceTracking
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
@@ -447,11 +452,17 @@ export class LlamaContext {
 
     /**
      * Print the timings of token evaluation since that last print for this context.
+     *
+     * Requires the `performanceTracking` option to be enabled.
+     *
      * > **Note:** it prints on the `LlamaLogLevel.info` level, so if you set the level of your `Llama` instance higher than that,
      * it won't print anything.
      */
     public async printTimings() {
         this._ensureNotDisposed();
+
+        if (!this._performanceTracking)
+            throw new UnsupportedError("Performance tracking is not enabled");
 
         this._ctx.printTimings();
         await new Promise((accept) => setTimeout(accept, 0)); // wait for the logs to finish printing

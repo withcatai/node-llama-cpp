@@ -404,7 +404,8 @@ async function RunChat({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
                 threads: threads === null ? undefined : threads,
-                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
+                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null,
+                performanceTracking: printTimings
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {

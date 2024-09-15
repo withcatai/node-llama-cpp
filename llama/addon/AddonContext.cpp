@@ -283,6 +283,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.n_ctx = 4096;
     context_params.n_threads = std::max(cpu_get_num_math(), 1);
     context_params.n_threads_batch = context_params.n_threads;
+    context_params.no_perf = true;
 
     if (info.Length() > 1 && info[1].IsObject()) {
         Napi::Object options = info[1].As<Napi::Object>();
@@ -314,6 +315,10 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
 
             context_params.n_threads = resolved_n_threads;
             context_params.n_threads_batch = resolved_n_threads;
+        }
+
+        if (options.Has("performanceTracking")) {
+            context_params.no_perf = !(options.Get("performanceTracking").As<Napi::Boolean>().Value());
         }
     }
 }
@@ -563,8 +568,8 @@ Napi::Value AddonContext::GetThreads(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value AddonContext::PrintTimings(const Napi::CallbackInfo& info) {
-    llama_perf_print(ctx, LLAMA_PERF_TYPE_CONTEXT);
-    llama_perf_reset(ctx, LLAMA_PERF_TYPE_CONTEXT);
+    llama_perf_context_print(ctx);
+    llama_perf_context_reset(ctx);
     return info.Env().Undefined();
 }
 

@@ -86,7 +86,6 @@ void AddonSampler::freeChain() {
     while (llama_sampler_chain_n(chain) > 0) {
         llama_sampler_chain_remove(chain, 0);
     }
-    // ((llama_sampler_chain*)chain->ctx)->samplers.clear();
 
     llama_sampler_free(chain);
     chain = nullptr;
