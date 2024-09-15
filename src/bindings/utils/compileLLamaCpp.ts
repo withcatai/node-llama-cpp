@@ -382,12 +382,45 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildO
         }
     }
 
-    if (buildOptions.platform === "win" && buildOptions.arch === "x64" && buildOptions.gpu === "cuda")
-        // @ts-ignore
-        return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-cuda"));
-    else if (buildOptions.platform === "linux" && buildOptions.arch === "x64" && buildOptions.gpu === "cuda")
-        // @ts-ignore
-        return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-cuda"));
+    if (buildOptions.platform === "mac") {
+        if (buildOptions.arch === "arm64" && buildOptions.gpu === "metal")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/mac-arm64-metal"));
+        else if (buildOptions.arch === "x64" && buildOptions.gpu === false)
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/mac-x64"));
+    } else if (buildOptions.platform === "linux") {
+        if (buildOptions.arch === "x64") {
+            if (buildOptions.gpu === "cuda")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-cuda"));
+            else if (buildOptions.gpu === "vulkan")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-vulkan"));
+            else if (buildOptions.gpu === false)
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64"));
+        } else if (buildOptions.arch === "arm64")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-arm64"));
+        else if (buildOptions.arch === "arm")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-armv7l"));
+    } else if (buildOptions.platform === "win") {
+        if (buildOptions.arch === "x64") {
+            if (buildOptions.gpu === "cuda")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-cuda"));
+            else if (buildOptions.gpu === "vulkan")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-vulkan"));
+            else if (buildOptions.gpu === false)
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64"));
+        } else if (buildOptions.arch === "arm64")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/win-arm64"));
+    }
 
     return null;
 }
