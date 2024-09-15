@@ -1,5 +1,5 @@
 # Tips and Tricks
-## Flash Attention
+## Flash Attention {#flash-attention}
 ::: warning Experimental Feature
 The support for flash attention is currently experimental and may not always work as expected
 :::
@@ -59,7 +59,7 @@ All the CLI commands related to using model files have a flag to enable flash at
 or provide additional information regarding flash attention when used.
 :::
 
-## OpenMP
+## OpenMP {#openmp}
 > OpenMP is an API for parallel programming in shared-memory systems
 
 OpenMP can help improve inference performance on Linux and Windows, but requires additional installation and setup.

@@ -33,6 +33,7 @@ you need to build all the binaries you want to ship to users before packaging yo
 You also need to call [`getLlama`](../api/functions/getLlama.md) with the CMake build options you used to build the binaries,
 so that `node-llama-cpp` can find them.
 
+## Cross Compilation
 Cross packaging from one platform to another is not supported, since binaries for other platforms are not downloaded to you machine when your run `npm install`.
 
 Packaging an `arm64` app on an `x64` machine is supported, but packaging an `x64` app on an `arm64` machine is not.

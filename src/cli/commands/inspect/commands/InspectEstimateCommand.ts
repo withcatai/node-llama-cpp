@@ -158,72 +158,12 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             : contextSizeArg;
 
         async function resolveCompatibilityScore(flashAttention: boolean) {
-            const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
+            return await ggufInsights.configurationResolver.resolveAndScoreConfig({
                 flashAttention,
-                contextSize,
+                targetContextSize: contextSize,
+                targetGpuLayers: gpuLayers,
                 embeddingContext: embedding
             });
-
-            if (contextSize != null || gpuLayers != null) {
-                const vramState = await llama._vramOrchestrator.getMemoryState();
-                const resolvedGpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(
-                    gpuLayers == null
-                        ? {
-                            fitContext: {
-                                contextSize: contextSize,
-                                embeddingContext: embedding
-                            }
-                        }
-                        : gpuLayers,
-                    {
-                        getVramState: async () => vramState,
-                        defaultContextFlashAttention: flashAttention,
-                        ignoreMemorySafetyChecks: gpuLayers != null
-                    }
-                );
-                const estimatedModelResourceUsage = ggufInsights.estimateModelResourceRequirements({
-                    gpuLayers: resolvedGpuLayers
-                });
-
-                const resolvedContextSize = await ggufInsights.configurationResolver.resolveContextContextSize(contextSize ?? "auto", {
-                    getVramState: async () => ({
-                        total: vramState.total,
-                        free: Math.max(0, vramState.free - estimatedModelResourceUsage.gpuVram)
-                    }),
-                    isEmbeddingContext: embedding,
-                    modelGpuLayers: resolvedGpuLayers,
-                    modelTrainContextSize: ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes,
-                    flashAttention,
-                    ignoreMemorySafetyChecks: contextSize != null
-                });
-                const estimatedContextResourceUsage = ggufInsights.estimateContextResourceRequirements({
-                    contextSize: resolvedContextSize,
-                    isEmbeddingContext: embedding,
-                    modelGpuLayers: resolvedGpuLayers,
-                    flashAttention
-                });
-
-                compatibilityScore.resolvedValues = {
-                    gpuLayers: resolvedGpuLayers,
-                    contextSize: resolvedContextSize,
-
-                    modelRamUsage: estimatedModelResourceUsage.cpuRam,
-                    contextRamUsage: estimatedContextResourceUsage.cpuRam,
-                    totalRamUsage: estimatedModelResourceUsage.cpuRam + estimatedContextResourceUsage.cpuRam,
-
-                    modelVramUsage: estimatedModelResourceUsage.gpuVram,
-                    contextVramUsage: estimatedContextResourceUsage.gpuVram,
-                    totalVramUsage: estimatedModelResourceUsage.gpuVram + estimatedContextResourceUsage.gpuVram
-                };
-
-                if (compatibilityScore.resolvedValues.totalVramUsage > vramState.total) {
-                    compatibilityScore.compatibilityScore = 0;
-                    compatibilityScore.bonusScore = 0;
-                    compatibilityScore.totalScore = 0;
-                }
-            }
-
-            return compatibilityScore;
         }
 
         const [
