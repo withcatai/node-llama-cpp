@@ -2,11 +2,12 @@ import {CSSProperties} from "react";
 import classNames from "classnames";
 import {LoadFileIconSVG} from "../../../icons/LoadFileIconSVG.tsx";
 import {DeleteIconSVG} from "../../../icons/DeleteIconSVG.tsx";
+import {UpdateBadge} from "./components/UpdateBadge.js";
 
 import "./Header.css";
 
 
-export function Header({modelName, onLoadClick, loadPercentage, onResetChatClick}: HeaderProps) {
+export function Header({appVersion, canShowCurrentVersion, modelName, onLoadClick, loadPercentage, onResetChatClick}: HeaderProps) {
     return <div className="appHeader">
         <div className="panel model">
             <div
@@ -37,10 +38,16 @@ export function Header({modelName, onLoadClick, loadPercentage, onResetChatClick
             </button>
         </div>
         <div className="spacer"/>
+        <UpdateBadge
+            appVersion={appVersion}
+            canShowCurrentVersion={canShowCurrentVersion}
+        />
     </div>;
 }
 
 type HeaderProps = {
+    appVersion?: string,
+    canShowCurrentVersion?: boolean,
     modelName?: string,
     onLoadClick?(): void,
     loadPercentage?: number,

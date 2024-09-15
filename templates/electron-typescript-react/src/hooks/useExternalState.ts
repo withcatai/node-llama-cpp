@@ -17,7 +17,7 @@ export function useExternalState<const StateType>(state: State<StateType>, selec
                     ? newState
                     : selector(newState)
             );
-        }).dispose;
+        }, true).dispose;
     }, [state]);
 
     return currentState;

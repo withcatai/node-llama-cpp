@@ -3,8 +3,10 @@ import {
     getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel
 } from "node-llama-cpp";
 import {withLock, State} from "lifecycle-utils";
+import packageJson from "../../package.json";
 
 export const llmState = new State<LlmState>({
+    appVersion: packageJson.version,
     llama: {
         loaded: false
     },
@@ -29,6 +31,7 @@ export const llmState = new State<LlmState>({
 });
 
 export type LlmState = {
+    appVersion?: string,
     llama: {
         loaded: boolean,
         error?: string
