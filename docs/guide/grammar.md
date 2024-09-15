@@ -69,14 +69,14 @@ console.log(JSON.parse(a2));
 The [`llama.createGrammarForJsonSchema(...)`](../api/classes/Llama.md#creategrammarforjsonschema) creates a [`LlamaJsonSchemaGrammar`](../api/classes/LlamaJsonSchemaGrammar)
 from a GBNF grammar generated a based on the [JSON schema](https://json-schema.org/learn/getting-started-step-by-step) you provide.
 
-It only supports [a small subset of the JSON schema spec](/api/type-aliases/GbnfJsonSchema),
+It only supports [a small subset of the JSON schema spec](../api/type-aliases/GbnfJsonSchema.md),
 but it's enough to generate useful JSON objects using a text generation model.
 
 Many features of [JSON schema spec](https://json-schema.org/learn/getting-started-step-by-step) are not supported here on purpose,
 as those features don't align well with the way models generate text and are prone to [hallucinations](https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence)).
 Workarounds for the missing features that you can implement with the supported set of features often lead to improved generation quality.
 
-To see what subset of the JSON schema spec is supported, see the [`GbnfJsonSchema` type](/api/type-aliases/GbnfJsonSchema) and follow its sub-types.
+To see what subset of the JSON schema spec is supported, see the [`GbnfJsonSchema` type](../api/type-aliases/GbnfJsonSchema.md) and follow its sub-types.
 
 ```typescript
 import {fileURLToPath} from "url";

@@ -71,7 +71,7 @@ const cudaCmakeOptionsTable = data.cudaCmakeOptionsTable;
 
 > Source: <a :href="cmakeOptionsFileUrl">`CMakeLists`</a> (filtered for only CUDA-related options)
 > 
-> You can see all the available `llama.cpp` CMake build options [here](/guide/building-from-source#customize-build)
+> You can see all the available `llama.cpp` CMake build options [here](../guide/building-from-source.md#customize-build)
 
 :::
 

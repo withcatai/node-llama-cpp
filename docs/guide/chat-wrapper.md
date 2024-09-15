@@ -41,14 +41,14 @@ To learn more about tokens, see the [tokens guide](./tokens.md)
 :::
 
 ## Chat Wrappers
-The [`LlamaChatSession`](/api/classes/LlamaChatSession) class allows you to chat with a model without having to worry about any parsing or formatting.
+The [`LlamaChatSession`](../api/classes/LlamaChatSession.md) class allows you to chat with a model without having to worry about any parsing or formatting.
 
 To do that, it uses a chat wrapper to handle the unique chat format of the model you use.
 
 It automatically selects and configures a chat wrapper that it thinks is best for the model you use (via [`resolveChatWrapper(...)`](../api/functions/resolveChatWrapper.md)).
 
 You can also specify a specific chat wrapper to only use it, or to customize its settings.
-For example, to chat with a LLama 3 Instruct model, you can use [Llama3ChatWrapper](/api/classes/Llama3ChatWrapper):
+For example, to chat with a LLama 3 Instruct model, you can use [Llama3ChatWrapper](../api/classes/Llama3ChatWrapper.md):
 
 ```typescript
 import {fileURLToPath} from "url";

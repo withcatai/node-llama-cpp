@@ -69,15 +69,14 @@ To run a chat session with a debugger, configure your IDE to run the following c
 npx vite-node ./src/cli/cli.ts chat <path-to-a-model-file-on-your-computer>
 ```
 
-#### Crash Stack Trace on Native Code (macOS)
-To get a stack trace of a crash stemming in `llama.cpp` or the binding code,
-you can run your code this way to get a stack trace:
+#### Finding Process Crash Stack Trace for Native Code (macOS) {#native-crash-stack-trace-macos}
+To get the stack trace of a crash stemming in `llama.cpp` or the bindings, run `node` with `lldb`:
 ```shell
 lldb node -- ./node_modules/.bin/vite-node ./src/cli/cli.ts chat <path-to-a-model-file-on-your-computer>
 ```
 
-After it finishes loading, type `run` (or `process launch` if `run` fails) and press Enter for the execution of the code to start.
-When the code crashes, you'll get a stack trace in the terminal.
+After it finishes loading, type `run` (or `process launch` if `run` fails) and press Enter for the execution of `node` to start.
+When the process crashes, you'll get a stack trace in the terminal.
 
 ### Updating the Documentation
 All the documentation is written in Markdown files in the `docs` directory.

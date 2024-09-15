@@ -1,7 +1,7 @@
 # Using `LlamaChatSession`
-To chat with a text generation model, you can use the [`LlamaChatSession`](/api/classes/LlamaChatSession) class.
+To chat with a text generation model, you can use the [`LlamaChatSession`](../api/classes/LlamaChatSession.md) class.
 
-Here are usage examples of [`LlamaChatSession`](/api/classes/LlamaChatSession):
+Here are usage examples of [`LlamaChatSession`](../api/classes/LlamaChatSession.md):
 
 ## Simple Chatbot {#simple-chatbot}
 ```typescript
@@ -70,7 +70,7 @@ console.log("AI: " + a2);
 ```
 
 ## Response Streaming {#response-streaming}
-You can see all the possible parameters of the `prompt` function [here](../api/classes/LlamaChatSession.md#prompt).
+You can see all the possible options of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
@@ -101,7 +101,7 @@ const a1 = await session.prompt(q1, {
 ```
 
 ## Repeat Penalty Customization {#repeat-penalty}
-You can see all the possible parameters of the `prompt` function [here](/api/classes/LlamaChatSession#prompt).
+You can see all the possible options of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
@@ -145,7 +145,14 @@ console.log("AI: " + a1);
 ```
 
 ## Custom Temperature {#temperature}
-You can see the description of the parameters of the `prompt` function [here](/api/classes/LlamaChatSession#prompt).
+Setting the [`temperature`](../api/type-aliases/LLamaChatPromptOptions#temperature) option is useful for controlling the randomness of the model's responses.
+
+A temperature of `0` (the default) will ensure the model response is always deterministic for a given prompt.
+
+The randomness of the temperature can be controlled by the [`seed`](../api/type-aliases/LLamaChatPromptOptions.md#seed) parameter.
+Setting a specific [`seed`](../api/type-aliases/LLamaChatPromptOptions.md#seed) and a specific [`temperature`](../api/type-aliases/LLamaChatPromptOptions#temperature) will yield the same response every time for the same input.
+
+You can see the description of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function options [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";

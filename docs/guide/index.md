@@ -130,7 +130,7 @@ To force a model to generate output according to a JSON schema, use [`llama.crea
 
 It'll force the model to generate output according to the JSON schema you provide, and it'll do it on the text generation level.
 
-It only supports [a small subset of the JSON schema spec](/api/type-aliases/GbnfJsonSchema), but it's enough to generate useful JSON objects using a text generation model.
+It only supports [a small subset of the JSON schema spec](../api/type-aliases/GbnfJsonSchema.md), but it's enough to generate useful JSON objects using a text generation model.
 
 ::: tip NOTE
 

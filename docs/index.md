@@ -76,7 +76,7 @@ npx -y node-llama-cpp inspect gpu
 * [Metal support](./guide/Metal.md)
 * [Vulkan support](./guide/Vulkan.md)
 * [Adapts to your hardware](./guide/index.md#gpu-support)
-* [Model downloader](./cli/pull.md)
+* [Model downloader](./guide/downloading-models.md)
 * [Prebuilt binaries](./guide/building-from-source.md)
 * [Electron support](./guide/electron.md)
 * [Prompt preloading](./guide/chat-session.md#preload-prompt)
