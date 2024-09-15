@@ -91,7 +91,7 @@ const modelMetadata = await readGgufFileInfo("<model url>");
 > If the URL is of a model with multiple parts (either separate files or binary-split files),
 > pass the URL of the first file and it'll automatically inspect the rest of the files and combine the metadata.
 
-### Detecting Compatibility of Remote Models
+### Detecting the Compatibility of Remote Models
 It's handy to check the compatibility of a remote model with your current machine hardware before downloading it,
 so you won't waste time downloading a model that won't work on your machine.
 
