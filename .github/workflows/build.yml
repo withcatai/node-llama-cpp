@@ -289,7 +289,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pages: read
-      id-token: read
+      id-token: write
       contents: read
       issues: read
       pull-requests: read
