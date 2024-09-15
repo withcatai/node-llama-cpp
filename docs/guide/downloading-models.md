@@ -101,7 +101,7 @@ npx --no node-llama-cpp inspect estimate <model-url>
 ```
 
 Running this command will attempt to find the best balance of parameters for the model to run on your machine,
-and it'll output the estimated compatibility of the model with your machine with [flash attention](./guide/tips-and-tricks.md#flash-attention) either turned off (the default) or on.
+and it'll output the estimated compatibility of the model with your machine with [flash attention](./tips-and-tricks.md#flash-attention) either turned off (the default) or on.
 
 > **Note:** don't specify any of these configurations when loading the model.
 > 
