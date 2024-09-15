@@ -492,6 +492,26 @@ export default defineConfig({
             await fs.writeFile(jpgPath, jpgBuffer, "binary");
         }
 
+        async function convertPngToPreviewAvif(pngPath: string, avifPath: string, quality: number = 24, maxSize: number = 640) {
+            console.info(`Converting "${pngPath}" to "${avifPath}" with quality ${quality}`);
+
+            const pngBuffer = await fs.readFile(pngPath);
+            const avifBuffer = await sharp(pngBuffer)
+                .resize({
+                    width: maxSize,
+                    height: maxSize,
+                    fit: "outside",
+                    withoutEnlargement: true
+                })
+                .avif({
+                    quality,
+                    effort: 9
+                })
+                .toBuffer();
+
+            await fs.writeFile(avifPath, avifBuffer, "binary");
+        }
+
         async function addOgImages() {
             const svgImages = await innerSvgImages;
 
@@ -661,6 +681,11 @@ export default defineConfig({
             path.join(siteConfig.outDir, "social.poster.png"),
             path.join(siteConfig.outDir, "social.poster.jpg"),
             75
+        );
+        await convertPngToPreviewAvif(
+            path.join(__dirname, "..", "assets", "logo.v3.png"),
+            path.join(siteConfig.outDir, "logo.preview.avif"),
+            24
         );
     }
 });

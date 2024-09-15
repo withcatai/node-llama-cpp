@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {provide, nextTick, onBeforeMount} from "vue";
+import {provide, nextTick, onBeforeMount, watch} from "vue";
 import {useData, useRoute} from "vitepress";
 
 const {isDark} = useData();
@@ -15,10 +15,20 @@ const themeTransitionEnabled = typeof document === "undefined"
 if (typeof document !== "undefined")
     document?.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
 
+function updateIsBlogPage() {
+    document?.documentElement.classList.toggle(
+        "blog-page",
+        route.path !== "/blog/" && route.path.startsWith("/blog/")
+    );
+}
+
+watch(() => route.path, updateIsBlogPage);
+
 onBeforeMount(() => {
     if (typeof document === "undefined")
         return;
 
+    updateIsBlogPage();
     document.documentElement.classList.add("start-animation");
 
     // ensure homepage starting style animations are played on production builds

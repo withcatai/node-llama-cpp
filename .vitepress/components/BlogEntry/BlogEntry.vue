@@ -29,22 +29,24 @@ const dateText = new Date(props.date).toLocaleDateString("en-US", {
             <a class="title" :href="withBase(props.link)">
                 <h2>{{ props.title }}</h2>
             </a>
-            <img
-                class="image"
-                v-if="props.image?.url != null"
-                :src="props.image.url"
-                :width="props.image.width"
-                :height="props.image.height"
-                :alt="props.image.alt"
-                :style="{
-                    'background-image': props.image.lowResUrl
-                        ? `url(${JSON.stringify(props.image.lowResUrl)})`
-                        : undefined,
-                    '--aspect-ratio': (props.image.width && props.image.height)
-                        ? (props.image.width / props.image.height)
-                        : undefined
-                }"
-            />
+            <a class="image" :href="withBase(props.link)">
+                <img
+                    class="image"
+                    v-if="props.image?.url != null"
+                    :src="props.image.url"
+                    :width="props.image.width"
+                    :height="props.image.height"
+                    :alt="props.image.alt"
+                    :style="{
+                        'background-image': props.image.lowResUrl
+                            ? `url(${JSON.stringify(props.image.lowResUrl)})`
+                            : undefined,
+                        '--aspect-ratio': (props.image.width && props.image.height)
+                            ? (props.image.width / props.image.height)
+                            : undefined
+                    }"
+                />
+            </a>
             <p class="description">{{ props.description }}</p>
             <a class="readMore" :href="withBase(props.link)">
                 Read more
@@ -98,20 +100,22 @@ const dateText = new Date(props.date).toLocaleDateString("en-US", {
         }
 
         > .image {
-            display: block;
-            font-style: italic;
-            border-radius: 24px;
-            box-shadow: 0px 8px 32px 0px rgb(0 0 0 / 32%);
-            background-color: var(--vp-c-bg-soft);
-            margin-bottom: 24px;
-            object-fit: contain;
-            object-position: left;
-            width: 100%;
-            max-width: calc(var(--aspect-ratio) * var(--max-height));
-            align-self: start;
-            background-repeat: no-repeat;
-            background-size: cover;
-            --max-height: 256px;
+            > .image {
+                display: block;
+                font-style: italic;
+                border-radius: 24px;
+                box-shadow: 0px 8px 32px 0px rgb(0 0 0 / 32%);
+                background-color: var(--vp-c-bg-soft);
+                margin-bottom: 24px;
+                object-fit: contain;
+                object-position: left;
+                width: 100%;
+                max-width: calc(var(--aspect-ratio) * var(--max-height));
+                align-self: start;
+                background-repeat: no-repeat;
+                background-size: cover;
+                --max-height: 256px;
+            }
         }
 
         > .description {

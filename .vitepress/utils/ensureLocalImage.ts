@@ -59,9 +59,16 @@ export async function ensureLocalImage(url: string, name: string, {
         if (resolvedImages.has(cacheKey))
             return resolvedImages.get(cacheKey)!;
 
-        const fetchRes = await fetch(url);
+        let fetchRes: Response;
+        try {
+            fetchRes = await fetchWithRetry(url);
+        } catch (err) {
+            console.error(`Failed to fetch image: ${url}`, err);
+            throw err;
+        }
+
         if (!fetchRes.ok)
-            throw new Error(`Failed to fetch image: ${url}`);
+            throw new Error(`Failed to fetch image: ${url}. status: ${fetchRes.status}`);
 
         const fileBuffer = Buffer.from(await fetchRes.arrayBuffer());
         async function getDestFileBuffer(): Promise<[buffer: Buffer, fileExtension: string, width?: number, height?: number]> {
@@ -173,4 +180,21 @@ function getFileExtension(format: keyof FormatEnum | undefined) {
         return "jpg";
 
     return format;
+}
+
+async function fetchWithRetry(url: string, retires: number = 5, waitTime: number = 1000 * 2) {
+    for (let i = retires; i >= 0; i--) {
+        try {
+            return await fetch(url);
+        } catch (err) {
+            if (i === 0) {
+                console.error(`Failed to fetch image: ${url}`, err);
+                throw err;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+    }
+
+    throw new Error(`Failed to fetch image: ${url}`);
 }
