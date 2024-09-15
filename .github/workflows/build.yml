@@ -84,6 +84,9 @@ jobs:
           name: llama.cpp
           path: llama
 
+      - name: DEBUG
+        run: ls -la llama
+
       - name: Install dependencies on Windows
         if: startsWith(matrix.config.os, 'windows')
         run: |
