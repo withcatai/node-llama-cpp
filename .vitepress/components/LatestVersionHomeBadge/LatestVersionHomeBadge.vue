@@ -88,8 +88,8 @@ const resolvedLink = props.link != null
 }
 
 :global(html.start-animation) {
-    .latestVersionBadge.forDesktop {
-        @media (width >= 960px) {
+    @media (width >= 960px) {
+        .latestVersionBadge.forDesktop {
             transition: color 0.25s, border-color 0.25s, background-color 0.25s, opacity 1s, transform 1s, display 1s ease-in-out;
             transition-behavior: allow-discrete;
             transform: translateY(0px);

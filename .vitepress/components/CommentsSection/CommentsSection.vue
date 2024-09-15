@@ -157,12 +157,12 @@ onUnmounted(() => {
         position: absolute;
     }
 
-    > :global(iframe) {
+    &:global(>iframe) {
         margin-top: 24px;
         width: 100%;
     }
 
-    &.isBlog > :global(iframe) {
+    &.isBlog:global(>iframe) {
         margin-top: 24px;
     }
 }

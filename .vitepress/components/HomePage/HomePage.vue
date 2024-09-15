@@ -206,7 +206,7 @@ getElectronExampleAppDownloadLink()
             --fade-offset: 48px;
         }
 
-        > :global(>ul) {
+        &:global(>ul) {
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
@@ -217,7 +217,7 @@ getElectronExampleAppDownloadLink()
             mask: linear-gradient(to right, transparent calc(var(--mask-size) - var(--fade-offset)), black calc(var(--mask-size) + var(--fade-size)), black calc(100% - var(--mask-size) - var(--fade-size)), transparent calc(100% - var(--mask-size) + var(--fade-offset)));
             margin-bottom: calc(-1lh - (12px * 2) - 6px); /* line height + top padding + bottom padding + half row gap */
 
-            > :global(>li) {
+            &:global(>li) {
                 display: block;
                 padding: 12px 16px;
                 border-radius: 12px;
@@ -225,7 +225,7 @@ getElectronExampleAppDownloadLink()
                 margin: 0px;
                 white-space: pre;
 
-                > :global(>a) {
+                &:global(>a) {
                     margin: -13px -17px;
                     padding: 12px 16px;
                     border-radius: 12px;
@@ -283,7 +283,7 @@ getElectronExampleAppDownloadLink()
     }
 
     :global(.VPHome .VPHero .container .main) {
-        > :global(.name) {
+        &:global(>.name) {
             transition: font-weight 0.5s ease-in-out;
 
             @starting-style {
@@ -292,7 +292,7 @@ getElectronExampleAppDownloadLink()
             }
         }
 
-        > :global(.text) {
+        &:global(> .text) {
             transition: font-weight 0.5s ease-in-out;
 
             @starting-style {
@@ -301,7 +301,7 @@ getElectronExampleAppDownloadLink()
             }
         }
 
-        > :global(.tagline) {
+        &:global(> .tagline) {
             transition: transform 0.5s ease-in-out;
 
             @starting-style {

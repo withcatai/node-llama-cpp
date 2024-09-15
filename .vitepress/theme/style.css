@@ -49,29 +49,36 @@
     --navbar-bg: color-mix(in srgb, var(--vp-c-bg) 60%, transparent);
 
     --og-vp-c-bg-alt: #f6f6f7;
-    --vp-c-bg-alt: rgb(0 0 40 / 0.036);
     --vp-sidebar-bg-color: var(--og-vp-c-bg-alt);
-
     --og-vp-c-divider: #e2e2e3;
+}
+.VPNav,
+.VPNavBar,
+.VPLocalNav {
+    --vp-c-bg-alt: rgb(0 0 40 / 0.036);
     --vp-c-divider: rgb(0 0 10 / 0.115);
 }
+
 .dark {
     --navbar-bg: color-mix(in srgb, var(--vp-c-bg) 80%, transparent);
 
     --og-vp-c-bg-alt: #161618;
-    --vp-c-bg-alt: rgb(0 0 2 / 0.2);
     --vp-sidebar-bg-color: var(--og-vp-c-bg-alt);
-
     --og-vp-c-divider: #2e2e32;
+}
+.dark .VPNav,
+.dark .VPNavBar,
+.dark .VPLocalNav {
+    --vp-c-bg-alt: rgb(0 0 2 / 0.2);
     --vp-c-divider: rgb(240 240 255 / 0.087);
-
     --vp-c-neutral-inverse: rgb(0 0 0 / 60%);
 }
+
 .VPNavBar:before {
     display: block;
     position: absolute;
-    left: 0px;
-    right: 0px;
+    inset-inline-start: 0px;
+    inset-inline-end: 0px;
     height: calc(100% + 32px);
     mask: linear-gradient(to bottom, black 0%, black calc(100% - 32px), transparent calc(100% - 32px + (32px * 0.7)));
     background: var(--navbar-bg);
@@ -84,12 +91,12 @@
     z-index: -1;
 }
 .VPNavBar.has-sidebar:before {
-    left: var(--vp-sidebar-width);
+    inset-inline-start: var(--vp-sidebar-width);
 }
 
 @media (min-width: 1440px) {
     .VPNavBar.has-sidebar:before {
-        left: calc((100% - (var(--vp-layout-max-width) - 64px)) / 2 + var(--vp-sidebar-width) - 32px);
+        inset-inline-start: calc((100% - (var(--vp-layout-max-width) - 64px)) / 2 + var(--vp-sidebar-width) - 32px);
     }
 }
 
@@ -116,14 +123,18 @@ html:not(.blog-page) .VPNavBar:not(.home):before {
 
 .VPLocalNav[class] {
     border-bottom: none;
+    background-color: transparent;
 }
-.VPLocalNav[class]:after {
+.VPLocalNav[class]:before {
     display: block;
     position: absolute;
     inset-inline-start: 0px;
     inset-inline-end: 0px;
-    height: 32px;
-    background: linear-gradient(var(--vp-c-bg), transparent 70%);
+    height: calc(100% + 32px);
+    mask: linear-gradient(to bottom, black 0%, black calc(100% - 32px), transparent calc(100% - 32px + (32px * 0.7)));
+    background: var(--navbar-bg);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     content: "";
     transition: opacity 0.5s;
     pointer-events: none;
@@ -514,8 +525,8 @@ html.blog-page #VPContent:before {
     content: "";
     pointer-events: none;
     top: 0px;
-    left: 0px;
-    right: 0px;
+    inset-inline-start: 0px;
+    inset-inline-end: 0px;
     height: 100%;
     max-height: 380px;
 
