@@ -3,12 +3,14 @@ import path from "path";
 import {htmlEscape} from "../utils/htmlEscape.js";
 import {getMarkdownRenderer} from "../utils/getMarkdownRenderer.js";
 import {renderHtmlTag} from "../utils/renderHtmlTag.js";
+import {ensureLocalImage, resolveImageBuffers, relativeToAbsoluteImageUrls} from "../utils/ensureLocalImage.js";
 
 export function BlogPageInfoPlugin({
     include
 }: {
     include(id: string): boolean,
 }): Plugin {
+    const refIdToUrlPath = new Map<string, string>();
     let root = "";
 
     return {
@@ -16,6 +18,44 @@ export function BlogPageInfoPlugin({
         enforce: "pre",
         configResolved(config) {
             root = config.root ?? "";
+        },
+        async load(id, options) {
+            if (relativeToAbsoluteImageUrls.has(id))
+                return `export default ${JSON.stringify(relativeToAbsoluteImageUrls.get(id))};`;
+
+            return undefined;
+        },
+        resolveId(id) {
+            if (relativeToAbsoluteImageUrls.has(id))
+                return id;
+
+            return undefined;
+        },
+        async buildEnd() {
+            for (const imageBuffer of resolveImageBuffers.values()) {
+                refIdToUrlPath.set(
+                    this.emitFile({
+                        type: "asset",
+                        fileName: imageBuffer.mainImage.path.relative,
+                        source: imageBuffer.mainImage.buffer
+                    }),
+                    imageBuffer.mainImage.path.relative
+                );
+                refIdToUrlPath.set(
+                    this.emitFile({
+                        type: "asset",
+                        fileName: imageBuffer.previewImage.path.relative,
+                        source: imageBuffer.previewImage.buffer
+                    }),
+                    imageBuffer.previewImage.path.relative
+                );
+            }
+        },
+        resolveFileUrl({referenceId, fileName}) {
+            if (refIdToUrlPath.has(referenceId))
+                return refIdToUrlPath.get(referenceId);
+
+            return undefined;
         },
         async transform(code, id) {
             if (!id.endsWith(".md"))
@@ -25,8 +65,8 @@ export function BlogPageInfoPlugin({
 
             const markdownRenderer = await getMarkdownRenderer();
             const mdEnv: MarkdownEnv = {
-                path: path.join(root, id),
-                relativePath: id,
+                path: path.resolve(root, id),
+                relativePath: path.relative(root, id),
                 cleanUrls: true
             };
             markdownRenderer.render(code, mdEnv);
@@ -56,23 +96,40 @@ export function BlogPageInfoPlugin({
             );
 
             if (frontmatter.image != null) {
-                if (typeof frontmatter.image === "string")
-                    newCode += renderHtmlTag("img", {
-                        "class": "blog-coverImage",
-                        src: frontmatter.image,
-                        alt: frontmatter.title
+                let imageDir = path.relative(root, id);
+                if (imageDir.toLowerCase().endsWith(".md"))
+                    imageDir = imageDir.slice(0, -".md".length);
+
+                if (typeof frontmatter.image === "string") {
+                    const {
+                        urlPath, previewUrlPath, width, height
+                    } = await ensureLocalImage(frontmatter.image, "cover", {
+                        baseDestLocation: imageDir.split(path.sep)
                     });
-                else if (typeof (frontmatter.image as any).url === "string")
                     newCode += renderHtmlTag("img", {
                         "class": "blog-coverImage",
-                        src: (frontmatter.image as any).url,
+                        src: urlPath.relative,
+                        alt: frontmatter.title,
+                        width: width,
+                        height: height,
+                        style: 'background-image: url(' + JSON.stringify(previewUrlPath.absolute) + ');'
+                    });
+                }
+                else if (typeof (frontmatter.image as any).url === "string") {
+                    const {
+                        urlPath, previewUrlPath, width, height
+                    } = await ensureLocalImage((frontmatter.image as any).url, "cover", {
+                        baseDestLocation: imageDir.split(path.sep)
+                    });
+                    newCode += renderHtmlTag("img", {
+                        "class": "blog-coverImage",
+                        src: urlPath.relative,
                         alt: (frontmatter.image as any).alt ?? frontmatter.title,
-                        width: (frontmatter.image as any).width,
-                        height: (frontmatter.image as any).height,
-                        style: (frontmatter.image as any).lowResUrl != null
-                            ? 'background-image: url(' + JSON.stringify((frontmatter.image as any).lowResUrl) + ');'
-                            : undefined
+                        width: width ?? (frontmatter.image as any).width,
+                        height: height ?? (frontmatter.image as any).height,
+                        style: 'background-image: url(' + JSON.stringify(previewUrlPath.absolute) + ');'
                     });
+                }
             }
 
             newCode += "\n\n";

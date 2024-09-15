@@ -16,6 +16,7 @@ import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-ima
 import {Resvg, initWasm as initResvgWasm, ResvgRenderOptions} from "@resvg/resvg-wasm";
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
 import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
+import {ensureLocalImage} from "./utils/ensureLocalImage.js";
 
 import type {Node as UnistNode} from "unist";
 import type {ShikiTransformer} from "shiki";
@@ -40,7 +41,18 @@ const socialPosterLink = hostname + "social.poster.jpg";
 const defaultPageTitle = "node-llama-cpp - node.js bindings for llama.cpp";
 const defaultPageDescription = "Run AI models locally on your machine with node.js bindings for llama.cpp";
 
-function resolveHref(href: string) {
+function resolveHref(href: string, withDomain: boolean = false): string {
+    if (withDomain) {
+        const resolvedHref = resolveHref(href, false);
+
+        if (hostname.endsWith("/") && resolvedHref.startsWith("/"))
+            return hostname + resolvedHref.slice("/".length);
+        else if (!hostname.endsWith("/") && !resolvedHref.startsWith("/"))
+            return hostname + "/" + resolvedHref;
+
+        return hostname + resolvedHref;
+    }
+
     if (urlBase == null)
         return href;
 
@@ -95,7 +107,7 @@ export default defineConfig({
     head: [
         ["link", {rel: "icon", type: "image/svg+xml", href: resolveHref("/favicon.svg")}],
         ["link", {rel: "icon", type: "image/png", href: resolveHref("/favicon.png")}],
-        ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom")}],
+        ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom", true)}],
         ["meta", {name: "theme-color", content: "#cd8156"}],
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
         ["meta", {name: "og:type", content: "website"}],
@@ -110,7 +122,7 @@ export default defineConfig({
         ],
         ["style", {}],
     ],
-    transformHead({pageData, head}) {
+    async transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
             head.push(["meta", {name: "google-site-verification", content: googleSiteVerificationCode}]);
             head.push(...defaultImageMetaTags);
@@ -126,17 +138,39 @@ export default defineConfig({
         const description = pageData.description || defaultPageDescription;
 
         if (pageData.filePath.startsWith("blog/") && pageData.frontmatter.image != null) {
-            if (typeof pageData.frontmatter.image === "string")
-                head.push(["meta", {name: "og:image", content: resolveHref(pageData.frontmatter.image)}]);
-            else if (typeof pageData.frontmatter.image === "object") {
+            let imageDir = pageData.filePath;
+            if (imageDir.toLowerCase().endsWith(".md"))
+                imageDir = imageDir.slice(0, -".md".length);
+
+            if (typeof pageData.frontmatter.image === "string") {
+                const coverImage = await ensureLocalImage(pageData.frontmatter.image, "cover", {
+                    baseDestLocation: imageDir.split("/")
+                });
+                head.push(["meta", {name: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
+            } else if (typeof pageData.frontmatter.image === "object") {
+                const coverImage = typeof pageData.frontmatter.image.url === "string"
+                    ? await ensureLocalImage(pageData.frontmatter.image.url, "cover", {
+                        baseDestLocation: imageDir.split("/")
+                    })
+                    : undefined;
+
                 if (typeof pageData.frontmatter.image.url === "string")
-                    head.push(["meta", {name: "og:image", content: resolveHref(pageData.frontmatter.image.url)}]);
+                    head.push(["meta", {
+                        name: "og:image",
+                        content: resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true)
+                    }]);
 
                 if (pageData.frontmatter.image.width != null)
-                    head.push(["meta", {name: "og:image:width", content: String(pageData.frontmatter.image.width)}]);
+                    head.push(["meta", {
+                        name: "og:image:width",
+                        content: String(coverImage?.width ?? pageData.frontmatter.image.width)
+                    }]);
 
                 if (pageData.frontmatter.image.height != null)
-                    head.push(["meta", {name: "og:image:height", content: String(pageData.frontmatter.image.height)}]);
+                    head.push(["meta", {
+                        name: "og:image:height",
+                        content: String(coverImage?.height ?? pageData.frontmatter.image.height)
+                    }]);
             }
         }
 
@@ -167,6 +201,7 @@ export default defineConfig({
         if (pageData.filePath.startsWith("blog/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.aside = false;
+            pageData.frontmatter.outline = false
             pageData.frontmatter.nolebase = {
                 gitChangelog: false
             };
@@ -460,7 +495,7 @@ export default defineConfig({
         async function addOgImages() {
             const svgImages = await innerSvgImages;
 
-            let baseUrl = resolveHref("");
+            let baseUrl = resolveHref("", true);
             if (baseUrl.endsWith("/"))
                 baseUrl = baseUrl.slice(0, -"/".length);
 
@@ -520,10 +555,10 @@ export default defineConfig({
                 link: hostname,
                 language: "en",
                 image: socialPosterLink,
-                favicon: resolveHref("/favicon.ico"),
+                favicon: resolveHref("/favicon.ico", true),
                 copyright: "node-llama-cpp",
                 generator: "node-llama-cpp",
-                feed: resolveHref("/blog/feed.atom"),
+                feed: resolveHref("/blog/feed.atom", true),
                 author: {
                     name: typeof packageJson.author === "string"
                         ? packageJson.author
@@ -558,8 +593,8 @@ export default defineConfig({
 
                 feed.addItem({
                     title: frontmatter.title,
-                    id: resolveHref(url),
-                    link: resolveHref(url),
+                    id: resolveHref(url, true),
+                    link: resolveHref(url, true),
                     description: excerpt || frontmatter.description || undefined,
                     content: html,
                     author: [{
