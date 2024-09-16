@@ -25,8 +25,8 @@ describe("CodeGemma", () => {
             expect(res).toMatchInlineSnapshot(`
               "🍎
               * 🍊
-
-              Here is a list"
+              * 🍋
+              "
             `);
         });
     });
