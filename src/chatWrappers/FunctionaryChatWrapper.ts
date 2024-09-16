@@ -238,7 +238,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                     if (isLastItem && (res.length === 0 || typeof item.response[item.response.length - 1] !== "string"))
                         res.push(
                             hasFunctions
-                                ? LlamaText(new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n>>>"))
+                                ? LlamaText(new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
                                 : LlamaText(new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n>>>all\n"))
                         );
 
@@ -252,7 +252,12 @@ export class FunctionaryChatWrapper extends ChatWrapper {
 
         const lastItem = historyWithFunctions.at(-1);
 
-        if (!hasFunctions || (lastItem?.type === "model" && lastItem.response.length > 0 && lastItem.response.at(-1) !== "")) {
+        if (!hasFunctions || (
+            lastItem?.type === "model" &&
+            lastItem.response.length > 0 &&
+            typeof lastItem.response.at(-1) === "string" &&
+            lastItem.response.at(-1) !== ""
+        )) {
             return {
                 contextText,
                 stopGenerationTriggers: [
@@ -267,8 +272,8 @@ export class FunctionaryChatWrapper extends ChatWrapper {
         }
 
         const textResponseStart = [
-            LlamaText(new SpecialTokensText("all\n")),
-            LlamaText("all\n")
+            LlamaText(new SpecialTokensText(">>>all\n")),
+            LlamaText(">>>all\n")
         ];
 
         return {
