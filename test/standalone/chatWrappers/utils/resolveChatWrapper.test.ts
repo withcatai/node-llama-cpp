@@ -1,17 +1,8 @@
-import path from "path";
-import {fileURLToPath} from "url";
 import {describe, expect, test} from "vitest";
-import fs from "fs-extra";
 import {
     AlpacaChatWrapper, ChatMLChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper, GeneralChatWrapper,
     Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, resolveChatWrapper
 } from "../../../../src/index.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const jinjaModulePackageJsonPath = path.join(__dirname, "..", "..", "..", "..", "node_modules", "@huggingface", "jinja", "package.json");
-const jinjaModuleVersion = JSON.parse(fs.readFileSync(jinjaModulePackageJsonPath, "utf8")).version;
-
-const skipTestWithUnsupportedJinjaFeatures = jinjaModuleVersion === "0.3.0";
 
 
 const alpacaJinjaTemplate = `
@@ -461,10 +452,7 @@ describe("resolveChatWrapper", () => {
         expect(chatWrapper).to.be.instanceof(Llama3_1ChatWrapper);
     });
 
-    test("should resolve to specialized Llama3_1ChatWrapper 2", {
-        timeout: 1000 * 60 * 60 * 2,
-        skip: skipTestWithUnsupportedJinjaFeatures
-    }, async () => {
+    test("should resolve to specialized Llama3_1ChatWrapper 2", {timeout: 1000 * 60 * 60 * 2}, async () => {
         const chatWrapper = resolveChatWrapper({
             customWrapperSettings: {
                 jinjaTemplate: {
@@ -477,10 +465,7 @@ describe("resolveChatWrapper", () => {
         expect(chatWrapper).to.be.instanceof(Llama3_1ChatWrapper);
     });
 
-    test("should resolve to specialized MistralChatWrapper", {
-        timeout: 1000 * 60 * 60 * 2,
-        skip: skipTestWithUnsupportedJinjaFeatures
-    }, async () => {
+    test("should resolve to specialized MistralChatWrapper", {timeout: 1000 * 60 * 60 * 2}, async () => {
         const chatWrapper = resolveChatWrapper({
             customWrapperSettings: {
                 jinjaTemplate: {
