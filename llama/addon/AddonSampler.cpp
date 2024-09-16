@@ -1,3 +1,4 @@
+#include <cmath>
 #include "common/common.h"
 #include "llama-grammar.h"
 #include "llama.h"
