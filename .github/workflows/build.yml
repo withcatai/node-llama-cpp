@@ -27,16 +27,19 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "build"
           path: "dist"
       - name: Upload packed templates artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "build-templates"
           path: "templates/packed"
       - name: Upload llama.cpp artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "llama.cpp"
           path: |
             llama/binariesGithubRelease.json
@@ -83,9 +86,6 @@ jobs:
         with:
           name: llama.cpp
           path: llama
-
-      - name: DEBUG
-        run: ls -la llama
 
       - name: Install dependencies on Windows
         if: startsWith(matrix.config.os, 'windows')
@@ -283,6 +283,7 @@ jobs:
       - name: Publish artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "bins-${{ matrix.config.artifact }}"
           path: "bins/*"
 
@@ -320,6 +321,7 @@ jobs:
       - name: Upload resolved release artifact
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "resolved-next-release"
           path: "./semanticReleaseDryRunReleaseResult.json"
 
@@ -595,6 +597,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: "electron-app-example-${{ matrix.config.name }}"
           path: "./electron-app-example/release"
 
