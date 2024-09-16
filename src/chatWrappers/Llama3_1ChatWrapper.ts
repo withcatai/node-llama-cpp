@@ -1,4 +1,4 @@
-import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatSystemMessage, ChatWrapperCheckModelCompatibilityParams,
     ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings
@@ -275,13 +275,6 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public prependPreambleToChatHistory(chatHistory: readonly ChatHistoryItem[]): readonly ChatHistoryItem[] {
         const res = chatHistory.slice();
 
-        function formatDate(date: Date, timezone?: "UTC") {
-            const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: timezone});
-            const month = date.toLocaleDateString("en-US", {month: "short", timeZone: timezone});
-            const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: timezone});
-            return `${day} ${month} ${year}`;
-        }
-
         const formatMonthDate = (date: Date, timezone?: "UTC") => {
             const today = this.todayDate instanceof Function
                 ? this.todayDate()
@@ -352,21 +345,35 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             [{noToolInstructions: true}, {}],
             [{todayDate: null, cuttingKnowledgeDate: null}, {}],
             [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
-            [{todayDate: new Date("2023-07-26T00:00:00"), cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
-            [{
-                todayDate: new Date("2024-07-26T00:00:00"),
-                cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
-                noToolInstructions: true
-            }, {}],
-            [{
-                todayDate: new Date("2024-07-26T00:00:00"),
-                cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
-                noToolInstructions: true,
-                _specialTokensTextForPreamble: true
-            }, {}]
-        ] satisfies Array<
-            Partial<ConstructorParameters<typeof this>[0]> |
-            [Partial<ConstructorParameters<typeof this>[0]>, Partial<ConstructorParameters<typeof this>[0]>]
-        >;
+            [{todayDate: new Date("2024-07-26T00:00:00"), cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
+
+            [
+                {
+                    todayDate: new Date("2024-07-26T00:00:00"),
+                    cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
+                    noToolInstructions: true
+                },
+                {cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z")},
+                {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)}
+            ],
+
+            [
+                {
+                    todayDate: new Date("2024-07-26T00:00:00"),
+                    cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z"),
+                    noToolInstructions: true,
+                    _specialTokensTextForPreamble: true
+                },
+                {cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z")},
+                {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)}
+            ]
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
+}
+
+function formatDate(date: Date, timezone?: "UTC") {
+    const day = date.toLocaleDateString("en-US", {day: "numeric", timeZone: timezone});
+    const month = date.toLocaleDateString("en-US", {month: "short", timeZone: timezone});
+    const year = date.toLocaleDateString("en-US", {year: "numeric", timeZone: timezone});
+    return `${day} ${month} ${year}`;
 }

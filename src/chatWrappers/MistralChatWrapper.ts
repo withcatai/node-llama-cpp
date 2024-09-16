@@ -1,4 +1,4 @@
-import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatSystemMessage, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
     ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
@@ -216,10 +216,9 @@ export class MistralChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{
-            addSpaceBeforeEos: false
-        }, {
-            addSpaceBeforeEos: true
-        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
+        return [
+            {addSpaceBeforeEos: false},
+            {addSpaceBeforeEos: true}
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 }

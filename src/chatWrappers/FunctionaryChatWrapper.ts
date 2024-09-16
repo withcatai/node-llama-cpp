@@ -1,4 +1,4 @@
-import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings,
     isChatModelResponseFunctionCall
@@ -723,6 +723,6 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             {variation: "v3"},
             {variation: "v2.llama3"},
             {variation: "v2"}
-        ] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 }

@@ -56,7 +56,12 @@ export type JinjaTemplateChatWrapperOptions = {
      *
      * Defaults to `true`.
      */
-    trimLeadingWhitespaceInResponses?: boolean
+    trimLeadingWhitespaceInResponses?: boolean,
+
+    /**
+     * Additional parameters to use for rendering the Jinja template.
+     */
+    additionalRenderParameters?: Record<string, any>
 };
 
 export type JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
@@ -104,6 +109,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptionsConvertMessageFormat;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
     public readonly trimLeadingWhitespaceInResponses: boolean;
+    public readonly additionalRenderParameters?: Record<string, any>;
 
     /** @internal */ private readonly _jinjaTemplate: Template;
 
@@ -118,7 +124,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         convertUnsupportedSystemMessagesToUserMessages = defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
         functionCallMessageTemplate,
         joinAdjacentMessagesOfTheSameType = true,
-        trimLeadingWhitespaceInResponses = true
+        trimLeadingWhitespaceInResponses = true,
+        additionalRenderParameters
     }: JinjaTemplateChatWrapperOptions) {
         super();
 
@@ -133,6 +140,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             resolveConvertUnsupportedSystemMessagesToUserMessagesOption(convertUnsupportedSystemMessagesToUserMessages);
         this.joinAdjacentMessagesOfTheSameType = joinAdjacentMessagesOfTheSameType;
         this.trimLeadingWhitespaceInResponses = trimLeadingWhitespaceInResponses;
+        this.additionalRenderParameters = additionalRenderParameters;
 
         this.settings = {
             ...ChatWrapper.defaultSettings,
@@ -309,12 +317,22 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const renderJinjaText = () => {
             return tryOptions([
                 () => this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId
                 }),
                 () => this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,

@@ -1,4 +1,4 @@
-import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState} from "../types.js";
 import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 
@@ -151,8 +151,9 @@ export class FalconChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{}, {
-            allowSpecialTokensInTitles: true
-        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
+        return [
+            {},
+            {allowSpecialTokensInTitles: true}
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 }

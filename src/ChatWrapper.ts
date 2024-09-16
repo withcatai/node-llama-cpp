@@ -227,7 +227,7 @@ export abstract class ChatWrapper {
     public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): (
         Array<Record<string | symbol, any> | [testConfig: Record<string | symbol, any>, applyConfig: Record<string | symbol, any>]>
     ) {
-        return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
+        return [{}] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 
     /** @internal */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -237,3 +237,16 @@ export abstract class ChatWrapper {
 }
 
 type FirstItemOfTupleOrFallback<T extends any[], Fallback> = T extends [infer U, ...any[]] ? U : Fallback;
+
+export type ChatWrapperJinjaMatchConfiguration<T extends typeof ChatWrapper> = Array<
+    FirstItemOfTupleOrFallback<ConstructorParameters<T>, object> |
+    [
+        testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>
+    ] |
+    [
+        testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        testJinjaParameters: Record<string, any>
+    ]
+>;

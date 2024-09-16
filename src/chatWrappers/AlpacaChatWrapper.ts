@@ -1,3 +1,4 @@
+import {ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
 
 export class AlpacaChatWrapper extends GeneralChatWrapper {
@@ -31,8 +32,9 @@ export class AlpacaChatWrapper extends GeneralChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{}, {
-            allowSpecialTokensInTitles: true
-        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
+        return [
+            {},
+            {allowSpecialTokensInTitles: true}
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 }
