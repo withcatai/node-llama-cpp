@@ -53,7 +53,7 @@ export type LlamaOptions = {
 
     /**
      * Set the minimum log level for llama.cpp.
-     * Defaults to `"warn"`.
+     * Defaults to `"info"`.
      */
     logLevel?: LlamaLogLevel,
 
@@ -135,7 +135,7 @@ export type LlamaOptions = {
 export type LastBuildOptions = {
     /**
      * Set the minimum log level for llama.cpp.
-     * Defaults to "debug".
+     * Defaults to "info".
      */
     logLevel?: LlamaLogLevel,
 

@@ -148,7 +148,7 @@ export async function InitCommandHandler({name, template, gpu}: InitCommand) {
     console.info(chalk.greenBright("npm") + " install");
     console.info(chalk.greenBright("npm") + " start");
     console.info();
-    console.info(chalk.grey("Note: running \"npm install\" may take a little while since it also downloads the model you selected"));
+    console.info(chalk.gray("Note: running \"npm install\" may take a little while since it also downloads the model you selected"));
     process.exit(0);
 }
 

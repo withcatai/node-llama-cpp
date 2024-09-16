@@ -68,6 +68,7 @@ export enum LlamaLogLevel {
     error = "error",
     warn = "warn",
     info = "info",
+    log = "log",
     debug = "debug"
 }
 export const LlamaLogLevelValues = Object.freeze([
@@ -76,6 +77,7 @@ export const LlamaLogLevelValues = Object.freeze([
     LlamaLogLevel.error,
     LlamaLogLevel.warn,
     LlamaLogLevel.info,
+    LlamaLogLevel.log,
     LlamaLogLevel.debug
 ] as const);
 

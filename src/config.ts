@@ -65,7 +65,7 @@ export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
         )
 );
 export const defaultLlamaCppLogLevel = env.get("NODE_LLAMA_CPP_LOG_LEVEL")
-    .default(LlamaLogLevel.warn)
+    .default(LlamaLogLevel.info)
     .asEnum(LlamaLogLevelValues);
 export const defaultLlamaCppDebugMode = env.get("NODE_LLAMA_CPP_DEBUG")
     .default("false")

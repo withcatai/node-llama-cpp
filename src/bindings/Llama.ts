@@ -16,7 +16,8 @@ const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map
     [LlamaLogLevel.error, 2],
     [LlamaLogLevel.warn, 3],
     [LlamaLogLevel.info, 4],
-    [LlamaLogLevel.debug, 5]
+    [LlamaLogLevel.log, 5],
+    [LlamaLogLevel.debug, 6]
 ]);
 const addonLogLevelToLlamaLogLevel: ReadonlyMap<number, LlamaLogLevel> = new Map(
     [...LlamaLogLevelToAddonLogLevel.entries()].map(([key, value]) => [value, key])
@@ -416,6 +417,9 @@ export class Llama {
             case LlamaLogLevel.info:
                 console.info(prefixAndColorMessage(message, getColorForLogLevel(level)));
                 break;
+            case LlamaLogLevel.log:
+                console.info(prefixAndColorMessage(message, getColorForLogLevel(level)));
+                break;
             case LlamaLogLevel.debug:
                 console.debug(prefixAndColorMessage(message, getColorForLogLevel(level)));
                 break;
@@ -435,7 +439,8 @@ function getColorForLogLevel(level: LlamaLogLevel) {
         case LlamaLogLevel.error: return chalk.red;
         case LlamaLogLevel.warn: return chalk.yellow;
         case LlamaLogLevel.info: return chalk.whiteBright;
-        case LlamaLogLevel.debug: return chalk.white;
+        case LlamaLogLevel.log: return chalk.white;
+        case LlamaLogLevel.debug: return chalk.gray;
         default:
             void (level satisfies never);
             return chalk.whiteBright;

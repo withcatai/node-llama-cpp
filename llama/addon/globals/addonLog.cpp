@@ -11,7 +11,8 @@ static int addonGetGgmlLogLevelNumber(ggml_log_level level) {
         case GGML_LOG_LEVEL_ERROR: return 2;
         case GGML_LOG_LEVEL_WARN: return 3;
         case GGML_LOG_LEVEL_INFO: return 4;
-        case GGML_LOG_LEVEL_DEBUG: return 5;
+        case GGML_LOG_LEVEL_NONE: return 5;
+        case GGML_LOG_LEVEL_DEBUG: return 6;
     }
 
     return 1;
