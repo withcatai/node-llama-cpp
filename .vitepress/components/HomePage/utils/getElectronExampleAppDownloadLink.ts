@@ -23,6 +23,9 @@ async function getReleaseAssets(release: Release) {
 }
 
 export async function getElectronExampleAppDownloadLink() {
+    if (typeof navigator === "undefined")
+        return defaultDownloadElectronExampleAppLink;
+
     const platformInfo: null | {
         architecture?: "arm" | "x86",
         bitness?: string,
