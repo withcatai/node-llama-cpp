@@ -52,7 +52,6 @@ jobs:
     needs:
       - build
     runs-on: ${{ matrix.config.os }}
-    timeout-minutes: 140
     strategy:
       fail-fast: false
       matrix:
@@ -149,7 +148,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 80
+        timeout-minutes: 160
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
