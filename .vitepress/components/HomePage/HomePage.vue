@@ -206,7 +206,7 @@ getElectronExampleAppDownloadLink()
             --fade-offset: 48px;
         }
 
-        &:global(>ul) {
+        &:deep(>ul) {
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
@@ -235,7 +235,7 @@ getElectronExampleAppDownloadLink()
                     border: solid 1px transparent;
                     transition: border-color 0.25s;
 
-                    &:global(&:hover) {
+                    &:hover {
                         border-color: var(--vp-c-brand-1);
                     }
                 }
@@ -262,7 +262,7 @@ getElectronExampleAppDownloadLink()
     :global(#app>.Layout) {
         transition: background-color 0.5s, transform 0.5s ease-in-out, opacity 0.5s ease-in-out, display 1s ease-in-out;
         transition-behavior: allow-discrete;
-        transform: translateY(0px);
+        //transform: translateY(0px);
         opacity: 1;
 
         @starting-style {
