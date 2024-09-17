@@ -636,7 +636,7 @@ jobs:
     concurrency: update-documentation-website-${{ github.ref }}
     environment:
       name: Documentation website
-      url: "https://node-llama-cpp.withcat.ai"
+#      url: "https://node-llama-cpp.withcat.ai"
     needs:
       - build
       - resolve-next-release
@@ -681,6 +681,13 @@ jobs:
           echo "Package version: $DOCS_PACKAGE_VERSION"
           
           npm run docs:build
+      - name: Upload docs
+        uses: actions/upload-artifact@v4
+        with:
+          include-hidden-files: true
+          retention-days: 2
+          name: "docs-site"
+          path: docs-site
 #      - name: Upload docs to GitHub Pages
 #        uses: actions/upload-pages-artifact@v3
 #        with:
