@@ -291,6 +291,8 @@ jobs:
     name: Resolve next release
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta')
     runs-on: ubuntu-latest
+    needs:
+      - build
     permissions:
       pages: read
       id-token: write
