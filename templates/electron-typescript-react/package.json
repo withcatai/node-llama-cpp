@@ -52,7 +52,7 @@
     "vite": "^5.4.5",
     "vite-plugin-electron": "^0.28.7",
     "vite-plugin-electron-renderer": "^0.14.5",
-    "zx": "^8.1.6"
+    "zx": "^8.1.7"
   },
   "overrides": {
     "electron-builder": {
