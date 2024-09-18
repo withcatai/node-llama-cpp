@@ -24,8 +24,6 @@ const res = await semanticRelease({
     cwd: path.join(__dirname, "..")
 });
 
-console.log("Result:", res);
-
 if (saveReleaseToFile != null) {
     const resolvedPath = path.resolve(process.cwd(), saveReleaseToFile);
 
