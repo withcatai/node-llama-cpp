@@ -305,6 +305,16 @@ jobs:
           node-version: "20"
       - name: Install modules
         run: npm ci
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+      - name: Download llama.cpp artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: llama.cpp
+          path: llama
       - name: Resolve next release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -364,7 +374,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-14
+    runs-on: macos-13
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
