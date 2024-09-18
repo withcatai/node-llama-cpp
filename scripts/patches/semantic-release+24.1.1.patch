@@ -1,0 +1,14 @@
+diff --git a/node_modules/semantic-release/index.js b/node_modules/semantic-release/index.js
+index 19c9f70..559665c 100644
+--- a/node_modules/semantic-release/index.js
++++ b/node_modules/semantic-release/index.js
+@@ -94,7 +94,8 @@ async function run(context, plugins) {
+         return false;
+       }
+ 
+-      throw error;
++      if (!options.dryRun)
++        throw error;
+     }
+   } catch (error) {
+     logger.error(`The command "${error.command}" failed with the error message ${error.stderr}.`);
