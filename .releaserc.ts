@@ -1,5 +1,4 @@
 import {createRequire} from "module";
-import fs from "fs-extra";
 import {getBinariesGithubRelease} from "./dist/bindings/utils/binariesGithubRelease.js";
 import {cliBinName, defaultLlamaCppGitHubRepo} from "./dist/config.js";
 
@@ -7,8 +6,19 @@ import type {GlobalConfig, Result as SemanticReleaseDryRunResult} from "semantic
 
 const require = createRequire(import.meta.url);
 
-const defaultFooterTemplatePath = require.resolve("conventional-changelog-writer/templates/footer.hbs");
-const defaultFooterTemplate = await fs.readFile(defaultFooterTemplatePath, "utf8");
+// source: conventional-changelog-writer/templates/footer.hbs
+const defaultFooterTemplate = `
+{{#if noteGroups}}
+{{#each noteGroups}}
+
+### {{title}}
+
+{{#each notes}}
+* {{text}}
+{{/each}}
+{{/each}}
+{{/if}}
+`.slice(1, -1);
 const binariesSourceRelease = await getBinariesGithubRelease();
 const homepageUrl = require("./package.json").homepage;
 const homepageUrlWithoutTrailingSlash = homepageUrl.endsWith("/")
