@@ -93,7 +93,7 @@ Example usage:
 import {TemplateChatWrapper} from "node-llama-cpp";
 
 const chatWrapper = new TemplateChatWrapper({
-    template: "{{systemPrompt}}\n{{history}}model:{{completion}}\nuser:",
+    template: "{{systemPrompt}}\n{{history}}model: {{completion}}\nuser: ",
     historyTemplate: {
         system: "system: {{message}}\n",
         user: "user: {{message}}\n",
