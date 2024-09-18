@@ -243,7 +243,12 @@ export default defineConfig({
             BlogPageInfoPlugin({
                 include: (id) => id.includes(path.sep + "blog" + path.sep) && !id.endsWith(path.sep + "blog" + path.sep + "index.md")
             })
-        ]
+        ],
+        build: {
+            rollupOptions: {
+                external: ["/logo.preview.avif"]
+            }
+        }
     },
     markdown: {
         codeTransformers: [
