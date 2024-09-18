@@ -8,14 +8,23 @@ import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.j
 import {TokenMeter} from "../TokenMeter.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
+import {UnsupportedError} from "../../utils/UnsupportedError.js";
+import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
+import {LlamaSampler} from "./LlamaSampler.js";
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
+const shrinkRetriesMinContextSize = 4096;
+const defaultMaxPunishTokens = 64;
+const defaultFailedCreationRemedy = {
+    retries: 6,
+    autoContextSizeShrink: 0.16
+} as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
@@ -27,6 +36,9 @@ export class LlamaContext {
     /** @internal */ private readonly _contextSize: number;
     /** @internal */ private readonly _batchSize: number;
     /** @internal */ private readonly _flashAttention: boolean;
+    /** @internal */ private readonly _idealThreads: number;
+    /** @internal */ private readonly _minThreads: number;
+    /** @internal */ private readonly _performanceTracking: boolean;
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
@@ -39,6 +51,8 @@ export class LlamaContext {
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
+    /** @internal */ private _threadSplitterConsumer?: ThreadsSplitterConsumer;
+    /** @internal */ private _freeReservedThreadsTimeout?: ReturnType<typeof setTimeout>;
     /** @internal */ private _currentDispatchBatchHandle: object = {};
     /** @internal */ private _allocatedContextSize?: number;
     /** @internal */ private _disposed: boolean = false;
@@ -51,17 +65,16 @@ export class LlamaContext {
         _model: LlamaModel
     }, {
         sequences,
-        seed = null,
         contextSize,
         batchSize,
         flashAttention = _model.defaultContextFlashAttention,
-        threads = 6,
+        threads,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextTick",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
-        _embeddings,
-        _noSeed
+        performanceTracking = false,
+        _embeddings
     }: LlamaContextOptions & {
         sequences: number,
         contextSize: number,
@@ -79,15 +92,21 @@ export class LlamaContext {
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
+        this._idealThreads = typeof threads === "number"
+            ? this._llama._threadsSplitter.normalizeThreadsValue(threads)
+            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.ideal ?? this._llama.maxThreads);
+        this._minThreads = typeof threads === "number"
+            ? 1
+            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1);
+        this._performanceTracking = !!performanceTracking;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
-            seed: seed != null ? Math.max(-1, Math.floor(seed)) : undefined,
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
-            threads: Math.max(0, Math.floor(threads)),
+            threads: this._idealThreads,
             embeddings: _embeddings,
-            noSeed: _noSeed
+            performanceTracking: this._performanceTracking
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
@@ -97,6 +116,7 @@ export class LlamaContext {
         this._gcRegistry.register(this, this._loraAdapters);
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
+        this._freeReservedThreads = this._freeReservedThreads.bind(this);
 
         this._disposeAggregator.add(() => {
             this._disposed = true;
@@ -166,6 +186,22 @@ export class LlamaContext {
         this._ensureNotDisposed();
 
         return this._ctx.getStateSize();
+    }
+
+    /** The number of threads currently used to evaluate tokens */
+    public get currentThreads() {
+        this._ensureNotDisposed();
+
+        return this._ctx.getThreads();
+    }
+
+    /**
+     * The number of threads that are preferred to be used to evaluate tokens.
+     *
+     * The actual number of threads used may be lower when other evaluations are running in parallel.
+     */
+    public get idealThreads() {
+        return this._idealThreads;
     }
 
     public getAllocatedContextSize(): number {
@@ -372,7 +408,7 @@ export class LlamaContext {
                 }
 
                 for (let i = 0; i < this._queuedDecodes.length; i++) {
-                    const queuedDecode = this._queuedDecodes[i];
+                    const queuedDecode = this._queuedDecodes[i]!;
                     if (queuedDecodesToDelete.has(queuedDecode)) {
                         this._queuedDecodes.splice(i, 1);
                         this._queuedDecodeSequenceIds.delete(queuedDecode.sequenceId);
@@ -380,12 +416,19 @@ export class LlamaContext {
                     }
                 }
 
-                try {
-                    if (currentBatchSize !== 0)
+                if (currentBatchSize !== 0) {
+                    const [threadsToUse, consumerHandle] = await this._threadSplitterConsumer?.getAllocationToConsume() ?? [];
+                    try {
+                        if (threadsToUse != null)
+                            this._ctx.setThreads(threadsToUse);
+
                         await this._ctx.decodeBatch();
-                } catch (err) {
-                    this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
-                    return;
+                        consumerHandle?.dispose();
+                    } catch (err) {
+                        consumerHandle?.dispose();
+                        this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                        return;
+                    }
                 }
 
                 for (const action of afterDecodeActions) {
@@ -405,41 +448,52 @@ export class LlamaContext {
             const prioritizationStrategy = resolvePrioritizationStrategy();
             if (prioritizationStrategy == null) return; // all queued items are rejected and dequeued when we get here
 
-            while (shouldHaveAnotherLoop) {
-                const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizationStrategy);
-                if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
+            this._reserveThreads();
+            try {
+                while (shouldHaveAnotherLoop) {
+                    const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizationStrategy);
+                    if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
 
-                const {
-                    currentBatchItems,
-                    currentBatchSize
-                } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
+                    const {
+                        currentBatchItems,
+                        currentBatchSize
+                    } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
 
-                let preventDisposalHandle: DisposalPreventionHandle;
-                try {
-                    preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
-                } catch (err) {
-                    this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                    return;
+                    let preventDisposalHandle: DisposalPreventionHandle;
+                    try {
+                        preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
+                    } catch (err) {
+                        this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
+                        return;
+                    }
+
+                    try {
+                        await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
+
+                        shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
+                    } finally {
+                        preventDisposalHandle.dispose();
+                    }
                 }
-
-                try {
-                    await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
-
-                    shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
-                } finally {
-                    preventDisposalHandle.dispose();
-                }
+            } finally {
+                this._scheduleToFreeReservedThreads();
             }
         });
     }
 
     /**
      * Print the timings of token evaluation since that last print for this context.
+     *
+     * Requires the `performanceTracking` option to be enabled.
+     *
      * > **Note:** it prints on the `LlamaLogLevel.info` level, so if you set the level of your `Llama` instance higher than that,
      * it won't print anything.
      */
     public async printTimings() {
         this._ensureNotDisposed();
+
+        if (!this._performanceTracking)
+            throw new UnsupportedError("Performance tracking is not enabled");
 
         this._ctx.printTimings();
         await new Promise((accept) => setTimeout(accept, 0)); // wait for the logs to finish printing
@@ -482,16 +536,6 @@ export class LlamaContext {
             this._unusedSequenceIds.push(sequenceId);
             this._onReclaimUnusedSequenceId.dispatchEvent();
         });
-    }
-
-    /** @internal */
-    public _acceptTokenOnGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
-        this._ctx.acceptGrammarEvaluationStateToken(grammarEvaluationState._state, token);
-    }
-
-    /** @internal */
-    public _canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: LlamaGrammarEvaluationState, token: Token) {
-        return this._ctx.canBeNextTokenForGrammarEvaluationState(grammarEvaluationState._state, token);
     }
 
     /** @internal */
@@ -543,7 +587,7 @@ export class LlamaContext {
         }
 
         for (let i = 0; i < this._queuedDecodes.length; i++) {
-            const item = this._queuedDecodes[i];
+            const item = this._queuedDecodes[i]!;
             if (queuedDecodes.has(item)) {
                 this._queuedDecodes.splice(i, 1);
                 this._queuedDecodeSequenceIds.delete(item.sequenceId);
@@ -574,6 +618,38 @@ export class LlamaContext {
     }
 
     /** @internal */
+    private _reserveThreads() {
+        clearTimeout(this._freeReservedThreadsTimeout);
+        delete this._freeReservedThreadsTimeout;
+
+        if (this._threadSplitterConsumer != null)
+            return;
+
+        this._threadSplitterConsumer = this._llama._threadsSplitter.createConsumer(this._idealThreads, this._minThreads);
+    }
+
+    /** @internal */
+    private _freeReservedThreads() {
+        clearTimeout(this._freeReservedThreadsTimeout);
+        delete this._freeReservedThreadsTimeout;
+
+        if (this._threadSplitterConsumer == null)
+            return;
+
+        this._threadSplitterConsumer.dispose();
+        delete this._threadSplitterConsumer;
+    }
+
+    /** @internal */
+    private _scheduleToFreeReservedThreads() {
+        if (this._threadSplitterConsumer == null)
+            return;
+
+        clearTimeout(this._freeReservedThreadsTimeout);
+        this._freeReservedThreadsTimeout = setTimeout(this._freeReservedThreads, 0);
+    }
+
+    /** @internal */
     public static async _create(options: LlamaContextOptions, {_model}: {
         _model: LlamaModel
     }): Promise<LlamaContext> {
@@ -581,11 +657,17 @@ export class LlamaContext {
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
-        const loraOptions: LlamaContextOptions["lora"] = typeof options.lora === "string"
-            ? {adapters: [{filePath: options.lora}]}
-            : options.lora;
+        const loraOptions = typeof options.lora === "string"
+            ? {adapters: [{filePath: options.lora}]} satisfies LlamaContextOptions["lora"]
+            : options.lora satisfies LlamaContextOptions["lora"];
+        let failedCreationRetries = options.failedCreationRemedy === false
+            ? 0
+            : Math.max(0, options.failedCreationRemedy?.retries ?? defaultFailedCreationRemedy.retries);
+        const failedCreationAutoContextSizeShrink = options.failedCreationRemedy === false
+            ? 0
+            : options.failedCreationRemedy?.autoContextSizeShrink ?? defaultFailedCreationRemedy.autoContextSizeShrink;
 
-        const contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
+        let contextSize = await _model.fileInsights.configurationResolver.resolveContextContextSize(options.contextSize, {
             batchSize: options.batchSize,
             sequences: sequences,
             modelGpuLayers: _model.gpuLayers,
@@ -596,73 +678,113 @@ export class LlamaContext {
             ignoreMemorySafetyChecks: options.ignoreMemorySafetyChecks,
             isEmbeddingContext: options._embeddings
         });
-        const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
-        const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
-            contextSize,
-            sequences,
-            isEmbeddingContext: options._embeddings,
-            modelGpuLayers: _model.gpuLayers,
-            batchSize,
-            flashAttention
-        }).gpuVram;
-
-        const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
+        const minContextSize = options.contextSize === "auto"
+            ? shrinkRetriesMinContextSize
+            : (typeof options.contextSize === "object" && typeof options.contextSize.min === "number")
+                ? options.contextSize.min
+                : typeof options.contextSize === "number"
+                    ? options.contextSize
+                    : shrinkRetriesMinContextSize;
         const {createSignal} = options;
-        const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
-            ? null
-            : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-        try {
-            const contextLoaded = await context._ctx.init();
+        async function createContext(contextSize: number) {
+            const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
+            const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
+                contextSize,
+                sequences,
+                isEmbeddingContext: options._embeddings,
+                modelGpuLayers: _model.gpuLayers,
+                batchSize,
+                flashAttention
+            }).gpuVram;
 
-            if (createSignal?.aborted) {
-                if (contextLoaded)
-                    await context._ctx.dispose();
+            const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
+            const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
+                ? null
+                : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
 
-                throw createSignal.reason;
-            } else if (!contextLoaded)
-                throw new Error("Failed to create context");
+            try {
+                if (createSignal?.aborted)
+                    throw createSignal.reason;
 
-            contextCreationMemoryReservation?.dispose?.();
+                const contextLoaded = await context._ctx.init();
 
-            if (loraOptions != null && loraOptions.adapters.length > 0) {
-                let loadedAdapters = 0;
+                if (createSignal?.aborted) {
+                    if (contextLoaded)
+                        await context._ctx.dispose();
 
-                for (const adapter of loraOptions.adapters) {
-                    try {
-                        await context._setLora({
-                            filePath: adapter.filePath,
-                            scale: adapter.scale
-                        });
-                        loadedAdapters++;
+                    throw createSignal.reason;
+                } else if (!contextLoaded)
+                    throw new Error("Failed to create context");
 
+                contextCreationMemoryReservation?.dispose?.();
+
+                if (loraOptions != null && loraOptions.adapters.length > 0) {
+                    let loadedAdapters = 0;
+
+                    for (const adapter of loraOptions.adapters) {
                         try {
-                            loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                            await context._setLora({
+                                filePath: adapter.filePath,
+                                scale: adapter.scale
+                            });
+                            loadedAdapters++;
+
+                            try {
+                                loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
+                            } catch (err) {
+                                console.error(err);
+                            }
                         } catch (err) {
-                            console.error(err);
+                            await context.dispose();
+                            throw err;
                         }
+
+                        if (createSignal?.aborted) {
+                            await context.dispose();
+                            throw createSignal.reason;
+                        }
+                    }
+                } else if (loraOptions?.onLoadProgress != null) {
+                    try {
+                        loraOptions.onLoadProgress(1);
                     } catch (err) {
-                        await context.dispose();
-                        throw err;
+                        console.error(err);
                     }
+                }
 
-                    if (createSignal?.aborted) {
-                        await context.dispose();
-                        throw createSignal.reason;
-                    }
-                }
-            } else if (loraOptions?.onLoadProgress != null) {
-                try {
-                    loraOptions.onLoadProgress(1);
-                } catch (err) {
-                    console.error(err);
-                }
+                return context;
+            } finally {
+                contextCreationMemoryReservation?.dispose?.();
             }
-
-            return context;
-        } finally {
-            contextCreationMemoryReservation?.dispose?.();
         }
+
+        while (failedCreationRetries >= 0) {
+            try {
+                return await createContext(contextSize);
+            } catch (err) {
+                if (failedCreationRetries === 0 || (createSignal?.aborted && err === createSignal.reason))
+                    throw err;
+
+                failedCreationRetries--;
+                let newContextSize = typeof failedCreationAutoContextSizeShrink === "number"
+                    ? Math.floor(contextSize * (1 - failedCreationAutoContextSizeShrink))
+                    : Math.floor(failedCreationAutoContextSizeShrink(contextSize));
+
+                if (!Number.isFinite(newContextSize))
+                    throw err;
+
+                if (newContextSize < minContextSize)
+                    newContextSize = minContextSize;
+
+                if (newContextSize >= contextSize)
+                    throw err;
+
+                contextSize = newContextSize;
+            }
+        }
+
+        throw new Error("Failed to create context");
     }
 }
 
@@ -818,7 +940,7 @@ export class LlamaContextSequence {
                     if (ranges.length === 0)
                         return [range];
 
-                    const lastRange = ranges[ranges.length - 1];
+                    const lastRange = ranges[ranges.length - 1]!;
                     if (lastRange.end >= range.start) {
                         lastRange.end = Math.max(lastRange.end, range.end);
                         return ranges;
@@ -860,6 +982,17 @@ export class LlamaContextSequence {
 
     public evaluate(tokens: Token[], options: {
         temperature?: number, minP?: number, topK?: number, topP?: number,
+
+        /**
+         * Used to control the randomness of the generated text.
+         *
+         * Change the seed to get different results.
+         *
+         * Defaults to the current epoch time.
+         *
+         * Only relevant when using `temperature`.
+         */
+        seed?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
@@ -899,6 +1032,7 @@ export class LlamaContextSequence {
             minP = 0,
             topK = 40,
             topP = 0.95,
+            seed,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -917,6 +1051,7 @@ export class LlamaContextSequence {
             minP,
             topK,
             topP,
+            seed,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -978,6 +1113,7 @@ export class LlamaContextSequence {
         minP = 0,
         topK = 40,
         topP = 0.95,
+        seed,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias,
@@ -988,7 +1124,7 @@ export class LlamaContextSequence {
 
         _noSampling = false
     }: {
-        temperature?: number, minP?: number, topK?: number, topP?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
@@ -1002,65 +1138,92 @@ export class LlamaContextSequence {
         if (evalTokens.length === 0)
             return;
 
-        while (true) {
-            this._ensureNotDisposed();
+        const sampler = new LlamaSampler(this.model);
+        try {
+            while (true) {
+                this._ensureNotDisposed();
 
-            // Evaluate to get the next token.
-            const nextToken: Token | null = await this._decodeTokens(
-                evalTokens,
-                generateNewTokens,
-                evaluationPriority,
-                this._tokenMeter,
-                contextShiftOptions,
-                (batchLogitIndex) => {
-                    if (_noSampling)
-                        return null;
+                // Evaluate to get the next token.
+                const nextToken: Token | null = await this._decodeTokens(
+                    evalTokens,
+                    generateNewTokens,
+                    evaluationPriority,
+                    this._tokenMeter,
+                    contextShiftOptions,
+                    (batchLogitIndex) => {
+                        if (_noSampling)
+                            return null;
 
-                    const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
-                        ? repeatPenalty.punishTokens()
-                        : repeatPenalty?.punishTokens;
+                        const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
+                            ? repeatPenalty.punishTokens()
+                            : repeatPenalty?.punishTokens;
 
-                    const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
-                        ? grammarEvaluationState()
-                        : grammarEvaluationState;
+                        const maxPunishTokens = Math.max(
+                            repeatPenalty?.maxPunishTokens ?? defaultMaxPunishTokens,
+                            repeatPenaltyTokens?.length ?? 0
+                        );
 
-                    if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
-                        throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+                        const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+                            ? grammarEvaluationState()
+                            : grammarEvaluationState;
 
-                    const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
+                        if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
+                            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
 
-                    return this._context._ctx.sampleToken(batchLogitIndex, removeNullFields({
-                        temperature,
-                        minP,
-                        topK,
-                        topP,
-                        repeatPenalty: repeatPenalty?.penalty,
-                        repeatPenaltyTokens: repeatPenaltyTokens != null
-                            ? Uint32Array.from(repeatPenaltyTokens)
-                            : undefined,
-                        repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
-                        repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
-                        tokenBiasKeys,
-                        tokenBiasValues,
-                        grammarEvaluationState: resolvedGrammarEvaluationState?._state
-                    }));
-                }
-            );
+                        const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
 
-            if (nextToken == null)
-                return;
+                        sampler.applyConfig(removeNullFields({
+                            temperature,
+                            minP,
+                            topK,
+                            topP,
+                            seed: Math.max(
+                                0,
+                                Number.isFinite(seed)
+                                    ? Math.floor(seed ?? (Date.now() / 1000))
+                                    : Math.floor(Date.now() / 1000)
+                            ),
+                            repeatPenalty: repeatPenalty?.penalty,
+                            repeatPenaltyMaxTokens: maxPunishTokens,
+                            repeatPenaltyTokens: repeatPenaltyTokens != null
+                                ? Uint32Array.from(repeatPenaltyTokens)
+                                : undefined,
+                            repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
+                            repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+                            tokenBiasKeys,
+                            tokenBiasValues,
+                            grammarEvaluationState: resolvedGrammarEvaluationState?._state
+                        }));
 
-            // the model finished generating text
-            if (!yieldEogToken && this._context.model.isEogToken(nextToken))
-                break;
+                        return withLock(sampler, "sample", async () => {
+                            if (sampler.disposed)
+                                return null;
 
-            const replacementToken = (yield nextToken) as undefined | Token;
+                            return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                        });
+                    }
+                );
 
-            // set the tokens for the next evaluation
-            if (replacementToken != null)
-                evalTokens = [replacementToken];
-            else
-                evalTokens = [nextToken];
+                if (nextToken === -1)
+                    throw new Error("Failed to sample next token");
+
+                if (nextToken == null)
+                    return;
+
+                // the model finished generating text
+                if (!yieldEogToken && this._context.model.isEogToken(nextToken))
+                    break;
+
+                const replacementToken = (yield nextToken) as undefined | Token;
+
+                // set the tokens for the next evaluation
+                if (replacementToken != null)
+                    evalTokens = [replacementToken];
+                else
+                    evalTokens = [nextToken];
+            }
+        } finally {
+            void withLock(sampler, "sample", sampler.asyncDispose);
         }
     }
 
@@ -1214,7 +1377,7 @@ function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenB
     if (tokenBias instanceof Function)
         tokenBias = tokenBias();
 
-    if (tokenBias._model !== currentModel)
+    if (tokenBias._tokenizer !== currentModel.tokenizer)
         throw new Error(
             "This TokenBias instance was created with a different model than the one used by this context. " +
             "Make sure you use the model instance of the context sequence for the TokenBias you use it with."

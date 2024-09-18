@@ -2,7 +2,7 @@ export function scoreLevels(num: number, levels: { start: number, end?: number, 
     let res = 0;
 
     for (let i = 0; i < levels.length; i++) {
-        const level = levels[i];
+        const level = levels[i]!;
         const start = level.start;
         const end = level.end ?? levels[i + 1]?.start ?? Math.max(start, num);
 

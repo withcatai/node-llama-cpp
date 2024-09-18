@@ -1,4 +1,4 @@
-import {useCallback, useLayoutEffect} from "react";
+import {useCallback, useLayoutEffect, useRef} from "react";
 import {llmState} from "../state/llmState.ts";
 import {electronLlmRpc} from "../rpc/llmRpc.ts";
 import {useExternalState} from "../hooks/useExternalState.ts";
@@ -15,25 +15,26 @@ import "./App.css";
 export function App() {
     const state = useExternalState(llmState);
     const {generatingResult} = state.chatSession;
+    const isScrollAnchoredRef = useRef(false);
+
+    const isScrolledToTheBottom = useCallback(() => {
+        return document.documentElement.scrollHeight - document.documentElement.scrollTop === document.documentElement.clientHeight;
+    }, []);
+
+    const scrollToBottom = useCallback(() => {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        isScrollAnchoredRef.current = isScrolledToTheBottom();
+    }, []);
 
     useLayoutEffect(() => {
         // anchor scroll to bottom
 
-        let isAnchored = false;
-        function isAtTheBottom() {
-            return document.documentElement.scrollHeight - document.documentElement.scrollTop === document.documentElement.clientHeight;
-        }
-
-        function scrollToBottom() {
-            document.documentElement.scrollTop = document.documentElement.scrollHeight;
-        }
-
         function onScroll() {
-            isAnchored = isAtTheBottom();
+            isScrollAnchoredRef.current = isScrolledToTheBottom();
         }
 
         const observer = new ResizeObserver(() => {
-            if (isAnchored && !isAtTheBottom())
+            if (isScrollAnchoredRef.current && !isScrolledToTheBottom())
                 scrollToBottom();
         });
 
@@ -42,7 +43,6 @@ export function App() {
             box: "border-box"
         });
         scrollToBottom();
-        isAnchored = isAtTheBottom();
 
         return () => {
             observer.disconnect();
@@ -67,8 +67,9 @@ export function App() {
         if (generatingResult)
             return;
 
+        scrollToBottom();
         void electronLlmRpc.prompt(prompt);
-    }, [generatingResult]);
+    }, [generatingResult, scrollToBottom]);
 
     const onPromptInput = useCallback((currentText: string) => {
         void electronLlmRpc.setDraftPrompt(currentText);
@@ -82,6 +83,8 @@ export function App() {
 
     return <div className="app">
         <Header
+            appVersion={state.appVersion}
+            canShowCurrentVersion={state.selectedModelFilePath == null}
             modelName={state.model.name}
             loadPercentage={state.model.loadProgress}
             onLoadClick={openSelectModelFileDialog}
@@ -118,16 +121,20 @@ export function App() {
                                 </div>
                             </a>
                             <div className="links">
-                                <a target="_blank"
-                                    href="https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf">
+                                <a
+                                    target="_blank"
+                                    href="https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
+                                >
                                     <DownloadIconSVG className="downloadIcon"/>
                                     <div className="text">Get Llama 3.1 8B model</div>
                                 </a>
                                 <div className="separator"/>
-                                <a target="_blank"
-                                    href="https://huggingface.co/ggml-org/gemma-1.1-2b-it-Q4_K_M-GGUF/resolve/main/gemma-1.1-2b-it.Q4_K_M.gguf">
+                                <a
+                                    target="_blank"
+                                    href="https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf"
+                                >
                                     <DownloadIconSVG className="downloadIcon"/>
-                                    <div className="text">Get Gemma 1.1 2B model</div>
+                                    <div className="text">Get Gemma 2 2B model</div>
                                 </a>
                             </div>
                             <a className="browseLink" target="_blank" href="https://huggingface.co/mradermacher">

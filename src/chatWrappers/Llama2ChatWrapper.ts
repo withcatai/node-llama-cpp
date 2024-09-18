@@ -1,4 +1,4 @@
-import {ChatWrapper} from "../ChatWrapper.js";
+import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState} from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 
@@ -116,10 +116,9 @@ export class Llama2ChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
-        return [{
-            addSpaceBeforeEos: false
-        }, {
-            addSpaceBeforeEos: true
-        }] satisfies Partial<ConstructorParameters<typeof this>[0]>[];
+        return [
+            {addSpaceBeforeEos: false},
+            {addSpaceBeforeEos: true}
+        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 }

@@ -28,7 +28,7 @@ async function unshallowAndSquashCurrentRepoWithoutSubmodulesAndSaveItAsReleaseB
     await simpleGit(llamaCppDirectory).fetch(["--unshallow"]);
 
     const lastCommit = await simpleGit(llamaCppDirectory).log(["-1"]);
-    const lastCommitMessage: string | null = lastCommit?.all?.[0]?.message;
+    const lastCommitMessage: string | undefined = lastCommit?.all?.[0]?.message;
     const newCommitMessage = "## SQUASHED ##\n\n" + (lastCommitMessage ?? "");
 
     const newCommitSha = await simpleGit(llamaCppDirectory).raw(["commit-tree", "HEAD^{tree}", "-m", newCommitMessage]);
@@ -70,7 +70,7 @@ async function unshallowAndSquashCurrentRepoWithSubmodulesAndSaveItAsReleaseBund
     const currentBranch = await getCurrentTagOrBranch();
 
     const lastCommit = await simpleGit(llamaCppDirectory).log(["-1"]);
-    const lastCommitMessage: string | null = lastCommit?.all?.[0]?.message;
+    const lastCommitMessage: string | undefined = lastCommit?.all?.[0]?.message;
     const newCommitMessage = "## SQUASHED ##\n\n" + (lastCommitMessage ?? "");
     const currentRemoteUrl = (await simpleGit(llamaCppDirectory).listRemote(["--get-url", "origin"])).trim();
 

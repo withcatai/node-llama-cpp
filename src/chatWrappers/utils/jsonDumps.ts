@@ -4,8 +4,8 @@
  * We need to format results this way since this is what many models use in their training data,
  * so this is what many models expect to have in their context state.
  */
-export function jsonDumps(result: any) {
-    return JSON.stringify(result, null, 1)
+export function jsonDumps(value: any) {
+    return JSON.stringify(value, null, 1)
         .split("\n")
         .map((line) => {
             line = line.trim();

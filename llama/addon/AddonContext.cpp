@@ -1,6 +1,7 @@
 #include <thread>
 #include <algorithm>
-#include "common.h"
+#include "common/common.h"
+#include "llama-grammar.h"
 #include "llama.h"
 
 #include "addonGlobals.h"
@@ -188,21 +189,10 @@ class AddonContextUnloadContextWorker : public Napi::AsyncWorker {
 class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
     public:
         AddonContext* ctx;
-        AddonGrammarEvaluationState* grammar_evaluation_state;
+        AddonSampler* sampler;
         int32_t batchLogitIndex;
-        bool use_grammar = false;
         llama_token result;
-        float temperature = 0.0f;
-        float min_p = 0;
-        int32_t top_k = 40;
-        float top_p = 0.95f;
-        float repeat_penalty = 1.10f;  // 1.0 = disabled
-        float repeat_penalty_presence_penalty = 0.00f;  // 0.0 = disabled
-        float repeat_penalty_frequency_penalty = 0.00f;  // 0.0 = disabled
-        std::vector<llama_token> repeat_penalty_tokens;
-        std::unordered_map<llama_token, float> tokenBiases;
-        bool useTokenBiases = false;
-        bool use_repeat_penalty = false;
+        bool no_output = false;
 
         AddonContextSampleTokenWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
             : Napi::AsyncWorker(info.Env(), "AddonContextSampleTokenWorker"),
@@ -211,77 +201,12 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             ctx->Ref();
 
             batchLogitIndex = info[0].As<Napi::Number>().Int32Value();
-
-            if (info.Length() > 1 && info[1].IsObject()) {
-                Napi::Object options = info[1].As<Napi::Object>();
-
-                if (options.Has("temperature")) {
-                    temperature = options.Get("temperature").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("minP")) {
-                    min_p = options.Get("minP").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("topK")) {
-                    top_k = options.Get("topK").As<Napi::Number>().Int32Value();
-                }
-
-                if (options.Has("topP")) {
-                    top_p = options.Get("topP").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("repeatPenalty")) {
-                    repeat_penalty = options.Get("repeatPenalty").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("repeatPenaltyTokens")) {
-                    Napi::Uint32Array repeat_penalty_tokens_uint32_array = options.Get("repeatPenaltyTokens").As<Napi::Uint32Array>();
-
-                    repeat_penalty_tokens.reserve(repeat_penalty_tokens_uint32_array.ElementLength());
-                    for (size_t i = 0; i < repeat_penalty_tokens_uint32_array.ElementLength(); i++) {
-                        repeat_penalty_tokens.push_back(static_cast<llama_token>(repeat_penalty_tokens_uint32_array[i]));
-                    }
-
-                    use_repeat_penalty = true;
-                }
-
-                if (options.Has("tokenBiasKeys") && options.Has("tokenBiasValues")) {
-                    Napi::Uint32Array tokenBiasKeys = options.Get("tokenBiasKeys").As<Napi::Uint32Array>();
-                    Napi::Float32Array tokenBiasValues = options.Get("tokenBiasValues").As<Napi::Float32Array>();
-
-                    if (tokenBiasKeys.ElementLength() == tokenBiasValues.ElementLength()) {
-                        for (size_t i = 0; i < tokenBiasKeys.ElementLength(); i++) {
-                            tokenBiases[static_cast<llama_token>(tokenBiasKeys[i])] = tokenBiasValues[i];
-                        }
-
-                        useTokenBiases = true;
-                    }
-                }
-
-                if (options.Has("repeatPenaltyPresencePenalty")) {
-                    repeat_penalty_presence_penalty = options.Get("repeatPenaltyPresencePenalty").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("repeatPenaltyFrequencyPenalty")) {
-                    repeat_penalty_frequency_penalty = options.Get("repeatPenaltyFrequencyPenalty").As<Napi::Number>().FloatValue();
-                }
-
-                if (options.Has("grammarEvaluationState")) {
-                    grammar_evaluation_state =
-                        Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(options.Get("grammarEvaluationState").As<Napi::Object>());
-                    grammar_evaluation_state->Ref();
-                    use_grammar = true;
-                }
-            }
+            sampler = Napi::ObjectWrap<AddonSampler>::Unwrap(info[1].As<Napi::Object>());
+            sampler->Ref();
         }
         ~AddonContextSampleTokenWorker() {
             ctx->Unref();
-
-            if (use_grammar) {
-                grammar_evaluation_state->Unref();
-                use_grammar = false;
-            }
+            sampler->Unref();
         }
 
         Napi::Promise GetPromise() {
@@ -302,93 +227,46 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         }
 
         void SampleToken() {
-            llama_token new_token_id = 0;
-
-            // Select the best prediction.
             if (llama_get_logits(ctx->ctx) == nullptr) {
                 SetError("This model does not support token generation");
                 return;
             }
 
-            auto logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
-            auto n_vocab = llama_n_vocab(ctx->model->model);
+            sampler->rebuildChainIfNeeded();
 
-            std::vector<llama_token_data> candidates;
-            candidates.reserve(n_vocab);
+            const auto * logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
+            const int n_vocab = llama_n_vocab(ctx->model->model);
 
+            auto & candidates = sampler->tokenCandidates;
             for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                auto logit = logits[token_id];
-
-                if (useTokenBiases) {
-                    bool hasTokenBias = tokenBiases.find(token_id) != tokenBiases.end();
-                    if (hasTokenBias) {
-                        auto logitBias = tokenBiases.at(token_id);
-                        if (logitBias == -INFINITY || logitBias < -INFINITY) {
-                            if (!llama_token_is_eog(ctx->model->model, token_id)) {
-                                logit = -INFINITY;
-                            }
-                        } else {
-                            logit += logitBias;
-                        }
-                    }
-                }
-
-                candidates.emplace_back(llama_token_data { token_id, logit, 0.0f });
+                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};;
             }
 
-            llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
+            llama_token_data_array cur_p = {
+                /* .data       = */ candidates.data(),
+                /* .size       = */ candidates.size(),
+                /* .selected   = */ -1,
+                /* .sorted     = */ false,
+            };
 
-            if (use_repeat_penalty && !repeat_penalty_tokens.empty()) {
-                llama_sample_repetition_penalties(
-                    ctx->ctx,
-                    &candidates_p,
-                    repeat_penalty_tokens.data(),
-                    repeat_penalty_tokens.size(),
-                    repeat_penalty,
-                    repeat_penalty_frequency_penalty,
-                    repeat_penalty_presence_penalty
-                );
+            llama_sampler_apply(sampler->chain, &cur_p);
+
+            if (!(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
+                no_output = true;
+                return;
             }
 
-            if (use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-                llama_grammar_sample((grammar_evaluation_state)->grammar, ctx->ctx, &candidates_p);
-
-                if ((candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) && useTokenBiases) {
-                    // logit biases caused grammar sampling to fail, so sampling again without logit biases
-                    useTokenBiases = false;
-                    SampleToken();
-                    return;
-                }
-            }
-
-            if (temperature <= 0) {
-                new_token_id = llama_sample_token_greedy(ctx->ctx, &candidates_p);
-            } else {
-                const int32_t resolved_top_k =
-                    top_k <= 0 ? llama_n_vocab(ctx->model->model) : std::min(top_k, llama_n_vocab(ctx->model->model));
-                const int32_t n_probs = 0;  // Number of probabilities to keep - 0 = disabled
-                const float tfs_z = 1.00f;  // Tail free sampling - 1.0 = disabled
-                const float typical_p = 1.00f;  // Typical probability - 1.0 = disabled
-                const float resolved_top_p = top_p;  // Top p sampling - 1.0 = disabled
-
-                // Temperature sampling
-                size_t min_keep = std::max(1, n_probs);
-                llama_sample_top_k(ctx->ctx, &candidates_p, resolved_top_k, min_keep);
-                llama_sample_tail_free(ctx->ctx, &candidates_p, tfs_z, min_keep);
-                llama_sample_typical(ctx->ctx, &candidates_p, typical_p, min_keep);
-                llama_sample_top_p(ctx->ctx, &candidates_p, resolved_top_p, min_keep);
-                llama_sample_min_p(ctx->ctx, &candidates_p, min_p, min_keep);
-                llama_sample_temp(ctx->ctx, &candidates_p, temperature);
-                new_token_id = llama_sample_token(ctx->ctx, &candidates_p);
-            }
-
-            if (!llama_token_is_eog(ctx->model->model, new_token_id) && use_grammar && (grammar_evaluation_state)->grammar != nullptr) {
-                llama_grammar_accept_token((grammar_evaluation_state)->grammar, ctx->ctx, new_token_id);
-            }
-
+            auto new_token_id = cur_p.data[cur_p.selected].id;
+            sampler->acceptToken(new_token_id);
             result = new_token_id;
         }
         void OnOK() {
+            if (no_output) {
+                Napi::Number resultValue = Napi::Number::New(Env(), -1);
+                deferred.Resolve(resultValue);
+                return;
+            }
+
             Napi::Number resultValue = Napi::Number::New(Env(), static_cast<uint32_t>(result));
             deferred.Resolve(resultValue);
         }
@@ -402,19 +280,13 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     model->Ref();
 
     context_params = llama_context_default_params();
-    context_params.seed = -1;
     context_params.n_ctx = 4096;
-    context_params.n_threads = 6;
+    context_params.n_threads = std::max(cpu_get_num_math(), 1);
     context_params.n_threads_batch = context_params.n_threads;
+    context_params.no_perf = true;
 
     if (info.Length() > 1 && info[1].IsObject()) {
         Napi::Object options = info[1].As<Napi::Object>();
-
-        if (options.Has("noSeed")) {
-            context_params.seed = time(NULL);
-        } else if (options.Has("seed")) {
-            context_params.seed = options.Get("seed").As<Napi::Number>().Uint32Value();
-        }
 
         if (options.Has("contextSize")) {
             context_params.n_ctx = options.Get("contextSize").As<Napi::Number>().Uint32Value();
@@ -438,11 +310,15 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("threads")) {
-            const auto n_threads = options.Get("threads").As<Napi::Number>().Uint32Value();
-            const auto resolved_n_threads = n_threads == 0 ? std::thread::hardware_concurrency() : n_threads;
+            const auto n_threads = options.Get("threads").As<Napi::Number>().Int32Value();
+            const auto resolved_n_threads = n_threads == 0 ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads) : n_threads;
 
             context_params.n_threads = resolved_n_threads;
             context_params.n_threads_batch = resolved_n_threads;
+        }
+
+        if (options.Has("performanceTracking")) {
+            context_params.no_perf = !(options.Get("performanceTracking").As<Napi::Boolean>().Value());
         }
     }
 }
@@ -641,42 +517,6 @@ Napi::Value AddonContext::SampleToken(const Napi::CallbackInfo& info) {
     return worker->GetPromise();
 }
 
-Napi::Value AddonContext::AcceptGrammarEvaluationStateToken(const Napi::CallbackInfo& info) {
-    AddonGrammarEvaluationState* grammar_evaluation_state =
-        Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
-    llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
-
-    if ((grammar_evaluation_state)->grammar != nullptr) {
-        llama_grammar_accept_token((grammar_evaluation_state)->grammar, ctx, tokenId);
-    }
-
-    return info.Env().Undefined();
-}
-
-Napi::Value AddonContext::CanBeNextTokenForGrammarEvaluationState(const Napi::CallbackInfo& info) {
-    AddonGrammarEvaluationState* grammar_evaluation_state =
-        Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(info[0].As<Napi::Object>());
-    llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
-
-    if ((grammar_evaluation_state)->grammar != nullptr) {
-        std::vector<llama_token_data> candidates;
-        candidates.reserve(1);
-        candidates.emplace_back(llama_token_data { tokenId, 1, 0.0f });
-
-        llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
-
-        llama_grammar_sample((grammar_evaluation_state)->grammar, ctx, &candidates_p);
-
-        if (candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) {
-            return Napi::Boolean::New(info.Env(), false);
-        }
-
-        return Napi::Boolean::New(info.Env(), true);
-    }
-
-    return Napi::Boolean::New(info.Env(), false);
-}
-
 Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     if (disposed) {
         Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
@@ -718,9 +558,36 @@ Napi::Value AddonContext::GetStateSize(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), llama_state_get_size(ctx));
 }
 
+Napi::Value AddonContext::GetThreads(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    return Napi::Number::From(info.Env(), llama_n_threads(ctx));
+}
+
+Napi::Value AddonContext::SetThreads(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const auto threads = info[0].As<Napi::Number>().Int32Value();
+    const auto resolvedThreads = threads == 0
+        ? std::max((int32_t)std::thread::hardware_concurrency(), std::max(cpu_get_num_math(), 1))
+        : threads;
+
+    if (llama_n_threads(ctx) != resolvedThreads) {
+        llama_set_n_threads(ctx, resolvedThreads, resolvedThreads);
+    }
+
+    return info.Env().Undefined();
+}
+
 Napi::Value AddonContext::PrintTimings(const Napi::CallbackInfo& info) {
-    llama_print_timings(ctx);
-    llama_reset_timings(ctx);
+    llama_perf_context_print(ctx);
+    llama_perf_context_reset(ctx);
     return info.Env().Undefined();
 }
 
@@ -749,10 +616,10 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("shiftSequenceTokenCells", &AddonContext::ShiftSequenceTokenCells),
                 InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
-                InstanceMethod("acceptGrammarEvaluationStateToken", &AddonContext::AcceptGrammarEvaluationStateToken),
-                InstanceMethod("canBeNextTokenForGrammarEvaluationState", &AddonContext::CanBeNextTokenForGrammarEvaluationState),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                 InstanceMethod("getStateSize", &AddonContext::GetStateSize),
+                InstanceMethod("getThreads", &AddonContext::GetThreads),
+                InstanceMethod("setThreads", &AddonContext::SetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),
                 InstanceMethod("setLora", &AddonContext::SetLora),
                 InstanceMethod("dispose", &AddonContext::Dispose),

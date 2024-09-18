@@ -1,7 +1,8 @@
 #include <sstream>
 #include "addonGlobals.h"
 #include "globals/addonLog.h"
-#include "common.h"
+#include "globals/addonProgress.h"
+#include "common/common.h"
 #include "llama.h"
 #include "AddonModel.h"
 #include "AddonModelData.h"
@@ -538,7 +539,7 @@ Napi::Value AddonModel::PrefixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_prefix(model));
+    return getNapiToken(info, model, llama_token_prefix(model));
 }
 Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -546,7 +547,7 @@ Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_middle(model));
+    return getNapiToken(info, model, llama_token_middle(model));
 }
 Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -554,7 +555,7 @@ Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_suffix(model));
+    return getNapiToken(info, model, llama_token_suffix(model));
 }
 Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -562,7 +563,7 @@ Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_eot(model));
+    return getNapiToken(info, model, llama_token_eot(model));
 }
 Napi::Value AddonModel::GetTokenString(const Napi::CallbackInfo& info) {
     if (disposed) {

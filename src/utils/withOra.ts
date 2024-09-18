@@ -36,7 +36,7 @@ export default async function withOra<T>(
 
         if (typeof message !== "string") {
             if (message.noSuccessLiveStatus)
-                spinner.clear();
+                spinner.stop();
             else
                 spinner.succeed(message.success);
         } else

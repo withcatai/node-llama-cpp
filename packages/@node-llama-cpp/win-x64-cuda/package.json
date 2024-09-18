@@ -40,7 +40,7 @@
   "bugs": {
     "url": "https://github.com/withcatai/node-llama-cpp/issues"
   },
-  "homepage": "https://withcatai.github.io/node-llama-cpp/",
+  "homepage": "https://node-llama-cpp.withcat.ai",
   "devDependencies": {
     "typescript": "^5.2.2"
   }

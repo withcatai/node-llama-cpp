@@ -96,10 +96,11 @@ describe("TemplateChatWrapper", () => {
     test("with system prompt", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "SYS: {{systemPrompt}}\n{{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system"
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
@@ -256,10 +257,11 @@ describe("TemplateChatWrapper", () => {
     test("without system prompt", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "BEGIN {{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system"
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
@@ -290,10 +292,11 @@ describe("TemplateChatWrapper", () => {
     test("without beginning text", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "{{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system"
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
@@ -324,10 +327,11 @@ describe("TemplateChatWrapper", () => {
     test("functions", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "{{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system"
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
         });
         const {contextText} = chatWrapper.generateContextState({
             chatHistory: conversationHistory,
@@ -391,10 +395,11 @@ describe("TemplateChatWrapper", () => {
     test("functions template", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "{{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system",
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            },
             functionCallMessageTemplate: {
                 call: "[[call: {{functionName}}({{functionParams}})]]",
                 result: " [[result: {{functionCallResult}}]]"
@@ -460,10 +465,11 @@ describe("TemplateChatWrapper", () => {
     test("functions template 2", () => {
         const chatWrapper = new TemplateChatWrapper({
             template: "{{history}}model:{{completion}}\nuser:",
-            historyTemplate: "{{roleName}}: {{message}}\n",
-            modelRoleName: "model",
-            userRoleName: "user",
-            systemRoleName: "system",
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            },
             functionCallMessageTemplate: {
                 call: "\nCall function: {{functionName}} with params {{functionParams}}.",
                 result: "\nFunction result: {{functionCallResult}}\n"

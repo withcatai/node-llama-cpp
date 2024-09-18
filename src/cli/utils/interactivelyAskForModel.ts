@@ -21,6 +21,7 @@ import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsol
 import {splitAnsiToLines} from "./splitAnsiToLines.js";
 import {consolePromptQuestion} from "./consolePromptQuestion.js";
 import {renderInfoLine} from "./printInfoLine.js";
+import {renderModelCompatibilityPercentageWithColors} from "./renderModelCompatibilityPercentageWithColors.js";
 
 type ModelOption = {
     type: "localModel",
@@ -464,7 +465,7 @@ function renderModelCompatibility(
 
     if (compatibilityScore != null)
         info.push(
-            renderCompatibilityPercentageWithColors(compatibilityScore * 100) + chalk.whiteBright(" compatibility")
+            renderModelCompatibilityPercentageWithColors(compatibilityScore * 100) + chalk.whiteBright(" compatibility")
             + (
                 compatibilityContextSize == null
                     ? ""
@@ -513,7 +514,7 @@ function renderRecommendedModelTechnicalInfo(
             maxWidth,
             info: [{
                 title: "",
-                value: renderCompatibilityPercentageWithColors(compatibilityScore.compatibilityScore * 100) + " compatibility"
+                value: renderModelCompatibilityPercentageWithColors(compatibilityScore.compatibilityScore * 100) + " compatibility"
             }, {
                 show: ggufInsights.trainContextSize != null,
                 title: "Context size",
@@ -532,31 +533,6 @@ function renderRecommendedModelTechnicalInfo(
             }]
         })
     ].join("\n");
-}
-
-function renderCompatibilityPercentageWithColors(percentage: number, {
-    greenBright = 100,
-    green = 95,
-    yellow = 85,
-    yellowBright = 75
-}: {
-    greenBright?: number,
-    green?: number,
-    yellow?: number,
-    yellowBright?: number
-} = {}): string {
-    const percentageText = String(Math.floor(percentage)) + "%";
-
-    if (percentage >= greenBright)
-        return chalk.greenBright(percentageText);
-    else if (percentage >= green)
-        return chalk.green(percentageText);
-    else if (percentage >= yellow)
-        return chalk.yellow(percentageText);
-    else if (percentage >= yellowBright)
-        return chalk.yellowBright(percentageText);
-
-    return chalk.red(percentageText);
 }
 
 async function selectFileForModelRecommendation({

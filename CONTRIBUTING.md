@@ -1,1 +1,1 @@
-# Moved [here](https://withcatai.github.io/node-llama-cpp/guide/contributing)
+# Moved [here](https://node-llama-cpp.withcat.ai/guide/contributing)

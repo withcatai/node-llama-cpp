@@ -10,6 +10,8 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true,
         "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "moduleDetection": "force",
 
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,

@@ -42,6 +42,10 @@ export function truncateLlamaTextAndRoundToWords(llamaText: LlamaText, truncateS
 
     for (let i = 0; i < llamaText.values.length; i++) {
         const value = llamaText.values[i];
+
+        if (value == null)
+            continue;
+
         if (typeof value === "string") {
             if (value.length > truncateStartIndex) {
                 return LlamaText([

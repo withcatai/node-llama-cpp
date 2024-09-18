@@ -13,6 +13,7 @@ import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
+import withOra from "../../../../utils/withOra.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -96,10 +97,23 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
         }
 
-        const parsedMetadata = await readGgufFileInfo(ggufPath, {
-            fetchHeaders: isPathUrl ? headers : undefined,
-            spliceSplitFiles: !noSplice
-        });
+        const parsedMetadata = plainJson
+            ? await readGgufFileInfo(ggufPath, {
+                fetchHeaders: isPathUrl ? headers : undefined,
+                spliceSplitFiles: !noSplice
+            })
+            : await withOra({
+                loading: chalk.blue("Reading model metadata"),
+                success: chalk.blue("Read model metadata"),
+                fail: chalk.blue("Failed to read model metadata"),
+                noSuccessLiveStatus: true
+            }, async () => {
+                return await readGgufFileInfo(ggufPath, {
+                    fetchHeaders: isPathUrl ? headers : undefined,
+                    spliceSplitFiles: !noSplice
+                });
+            });
+
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {

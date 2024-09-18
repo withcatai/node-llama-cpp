@@ -16,7 +16,7 @@ import {LlamaContextOptions} from "../LlamaContext/types.js";
 import {LlamaContext} from "../LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbeddingContext.js";
 import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataTypes.js";
-import {DeepPartialObject} from "../../utils/DeepPartialObject.js";
+import {OverridesObject} from "../../utils/OverridesObject.js";
 import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
@@ -53,11 +53,18 @@ export type LlamaModelOptions = {
         }
     },
 
-    /** only load the vocabulary, no weights */
+    /**
+     * Only load the vocabulary, not weight tensors.
+     *
+     * Useful when you only want to use the model to use its tokenizer but not for evaluation.
+     *
+     * Defaults to `false`.
+     */
     vocabOnly?: boolean,
 
     /**
      * Use mmap if possible.
+     *
      * Defaults to `true`.
      */
     useMmap?: boolean,
@@ -71,6 +78,7 @@ export type LlamaModelOptions = {
     /**
      * Check for tensor validity before actually loading the model.
      * Using it increases the time it takes to load the model.
+     *
      * Defaults to `false`.
      */
     checkTensors?: boolean,
@@ -120,7 +128,7 @@ export type LlamaModelOptions = {
      * > Only use this for metadata values that are explicitly documented to be supported by `llama.cpp` to be overridden,
      * > and only in cases when this is crucial, as this is not guaranteed to always work as expected.
      */
-    metadataOverrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
+    metadataOverrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 };
 
 const defaultUseMmap = true;
@@ -135,6 +143,7 @@ export class LlamaModel {
     /** @internal */ private readonly _fileInfo: GgufFileInfo;
     /** @internal */ private readonly _fileInsights: GgufInsights;
     /** @internal */ private readonly _gpuLayers: number;
+    /** @internal */ private readonly _vocabOnly: boolean;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -152,7 +161,7 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number
     }, {
@@ -175,6 +184,7 @@ export class LlamaModel {
         this._modelPath = path.resolve(process.cwd(), modelPath);
         this._fileInsights = _fileInsights;
         this._gpuLayers = gpuLayers;
+        this._vocabOnly = vocabOnly ?? false;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
         this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
@@ -184,7 +194,7 @@ export class LlamaModel {
         this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
             addonExports: this._llama._bindings,
             gpuLayers,
-            vocabOnly,
+            vocabOnly: this._vocabOnly,
             useMmap,
             useMlock: _llama.supportsMlock
                 ? useMlock
@@ -229,9 +239,13 @@ export class LlamaModel {
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
         this.isSpecialToken = this.isSpecialToken.bind(this);
+        this.isEogToken = this.isEogToken.bind(this);
 
         (this.tokenize as Tokenizer as Writable<Tokenizer>).detokenize = this.detokenize;
         (this.tokenize as Tokenizer).isSpecialToken = this.isSpecialToken;
+        (this.tokenize as Tokenizer).isEogToken = this.isEogToken;
+
+        Object.freeze(this.tokenize);
         this.tokenizer = this.tokenize as Tokenizer;
     }
 
@@ -319,7 +333,7 @@ export class LlamaModel {
                 case "BOS": return this.tokens.bos == null ? [] : [this.tokens.bos];
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
-                case "EOT": return this.tokens.infill.eot == null ? [] : [this.tokens.infill.eot];
+                case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
             }
 
             void (builtinToken satisfies never);
@@ -343,8 +357,8 @@ export class LlamaModel {
                         ? [this.tokens.eos, this.tokens.eosString]
                         : (this.tokens.nl != null && this.tokens.nlString != null)
                             ? [this.tokens.nl, this.tokens.nlString]
-                            : (this.tokens.infill.eot != null && this.tokens.infill.eotString != null)
-                                ? [this.tokens.infill.eot, this.tokens.infill.eotString]
+                            : (this.tokens.eot != null && this.tokens.eotString != null)
+                                ? [this.tokens.eot, this.tokens.eotString]
                                 : [null, null];
 
                 if (workaroundToken != null && workaroundTokenString != null) {
@@ -405,7 +419,12 @@ export class LlamaModel {
      * Transform tokens into text
      * @param tokens - the tokens to detokenize.
      * @param [specialTokens] - if set to `true`, special tokens will be detokenized to their corresponding token text representation.
+     *
      * Recommended for debugging purposes only.
+     *
+     * > **Note:** there may be additional spaces around special tokens that were not present in the original text - this is not a bug,
+     * this is [how the tokenizer is supposed to work](https://github.com/ggerganov/llama.cpp/pull/7697#issuecomment-2144003246).
+     *
      * Defaults to `false`.
      * @param [lastTokens] - the last few tokens that preceded the tokens to detokenize.
      * If provided, the last few tokens will be used to determine whether a space has to be added before the current tokens or not,
@@ -435,6 +454,9 @@ export class LlamaModel {
     }
 
     public getTokenAttributes(token: Token): TokenAttributes {
+        if (token == null)
+            throw new Error("Token cannot be null");
+
         if (this.vocabularyType === LlamaVocabularyType.none)
             return TokenAttributes._create(token, TokenAttribute.undefined);
 
@@ -457,15 +479,30 @@ export class LlamaModel {
         return false;
     }
 
+    public *iterateAllTokens() {
+        if (this.vocabularyType === LlamaVocabularyType.none)
+            return;
+
+        const totalTokens = this.fileInfo.metadata?.tokenizer?.ggml?.tokens?.length;
+        if (typeof totalTokens !== "number")
+            return;
+
+        for (let i = 0; i < totalTokens; i++)
+            yield i as Token;
+    }
+
     /** Check whether the given token is an EOG (End Of Generation) token, like EOS or EOT. */
     public isEogToken(token: Token | undefined): boolean {
         if (token == null)
             return false;
 
-        return token === this.tokens.eos || token === this.tokens.infill.eot || this._model.isEogToken(token);
+        return token === this.tokens.eos || token === this.tokens.eot || this._model.isEogToken(token);
     }
 
     public async createContext(options: LlamaContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
@@ -477,6 +514,9 @@ export class LlamaModel {
     }
 
     public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
         return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
@@ -499,29 +539,15 @@ export class LlamaModel {
         const modelFilePathText = `("${getReadablePath(this._modelPath)}")`;
 
         try {
-            const specialTokenString = this.tokens.bosString || this.tokens.eosString || this.tokens.infill.eotString;
-            if (specialTokenString != null && specialTokenString !== "") {
-                const beforeTextNoSpecialTokens = "some test text here";
-                const afterTextNoSpecialTokens = this.detokenize(this.tokenize(beforeTextNoSpecialTokens, false, "trimLeadingSpace"));
+            const beforeTextNoSpecialTokens = "some test text here";
+            const afterTextNoSpecialTokens = this.detokenize(this.tokenize(beforeTextNoSpecialTokens, false, "trimLeadingSpace"), false);
 
-                if (beforeTextNoSpecialTokens !== afterTextNoSpecialTokens)
-                    warnings.push(
-                        `Using this model ${modelFilePathText} to tokenize text and then detokenize it resulted in a different text. ` +
-                        "There might be an issue with the model or the tokenizer implementation. " +
-                        "Using this model may not work as intended"
-                    );
-
-                const beforeTextWithSpecialTokens = specialTokenString + beforeTextNoSpecialTokens;
-                const afterTextWithSpecialTokens = this.detokenize(this.tokenize(beforeTextWithSpecialTokens, true, "trimLeadingSpace"), true);
-
-                if (beforeTextWithSpecialTokens !== afterTextWithSpecialTokens)
-                    warnings.push(
-                        `Using this model ${modelFilePathText} to tokenize text with special tokens and then ` +
-                        "detokenize it resulted in a different text. " +
-                        "There might be an issue with the model or the tokenizer implementation. " +
-                        "Using this model may not work as intended"
-                    );
-            }
+            if (beforeTextNoSpecialTokens !== afterTextNoSpecialTokens)
+                warnings.push(
+                    `Using this model ${modelFilePathText} to tokenize text and then detokenize it resulted in a different text. ` +
+                    "There might be an issue with the model or the tokenizer implementation. " +
+                    "Using this model may not work as intended"
+                );
         } catch (err) {
             // do nothing
         }
@@ -726,9 +752,11 @@ export class LlamaModelTokens {
     /** @internal */ private _infillTokens?: LlamaModelInfillTokens;
     /** @internal */ private _bosToken?: Token;
     /** @internal */ private _eosToken?: Token;
+    /** @internal */ private _eotToken?: Token;
     /** @internal */ private _nlToken?: Token;
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
+    /** @internal */ private _eotString?: string;
     /** @internal */ private _nlString?: string;
     /** @internal */ private _shouldPrependBosToken?: boolean;
 
@@ -780,6 +808,21 @@ export class LlamaModelTokens {
     }
 
     /**
+     * @returns The EOT (End Of Turn) token.
+     */
+    public get eot(): Token | null {
+        this._ensureNotDisposed();
+
+        if (this._eotToken == null)
+            this._eotToken = this._model.eotToken();
+
+        if (this._eotToken === -1)
+            return null;
+
+        return this._eotToken;
+    }
+
+    /**
      * @returns The NL (New Line) token.
      */
     public get nl(): Token | null {
@@ -795,7 +838,7 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The BOS (Beginning Of Sequence) token as a string.
+     * @returns The BOS (Beginning Of Sequence) token text representation.
      */
     public get bosString(): string | null {
         this._ensureNotDisposed();
@@ -812,7 +855,7 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The EOS (End Of Sequence) token as a string.
+     * @returns The EOS (End Of Sequence) token text representation.
      */
     public get eosString(): string | null {
         this._ensureNotDisposed();
@@ -829,7 +872,24 @@ export class LlamaModelTokens {
     }
 
     /**
-     * @returns The NL (New Line) token as a string.
+     * @returns The EOT (End Of Turn) token text representation.
+     */
+    public get eotString(): string | null {
+        this._ensureNotDisposed();
+
+        const eotToken = this.eot;
+
+        if (eotToken == null)
+            return null;
+
+        if (this._eotString == null)
+            this._eotString = this._model.getTokenString(eotToken);
+
+        return this._eotString;
+    }
+
+    /**
+     * @returns The NL (New Line) token text representation.
      */
     public get nlString(): string | null {
         this._ensureNotDisposed();
@@ -875,11 +935,9 @@ export class LlamaModelInfillTokens {
     /** @internal */ private _prefixToken?: Token;
     /** @internal */ private _middleToken?: Token;
     /** @internal */ private _suffixToken?: Token;
-    /** @internal */ private _eotToken?: Token;
     /** @internal */ private _prefixString?: string;
     /** @internal */ private _middleString?: string;
     /** @internal */ private _suffixString?: string;
-    /** @internal */ private _eotString?: string;
 
     private constructor(model: AddonModel, disposedState: DisposedState) {
         this._model = model;
@@ -929,21 +987,6 @@ export class LlamaModelInfillTokens {
             return null;
 
         return this._suffixToken;
-    }
-
-    /**
-     * @returns End of infill middle token (End Of Text).
-     */
-    public get eot(): Token | null {
-        this._ensureNotDisposed();
-
-        if (this._eotToken == null)
-            this._eotToken = this._model.eotToken();
-
-        if (this._eotToken === -1)
-            return null;
-
-        return this._eotToken;
     }
 
     /**
@@ -997,23 +1040,6 @@ export class LlamaModelInfillTokens {
         return this._suffixString;
     }
 
-    /**
-     * @returns End of infill middle token (End Of Text) as a string.
-     */
-    public get eotString(): string | null {
-        this._ensureNotDisposed();
-
-        const eotToken = this.eot;
-
-        if (eotToken == null)
-            return null;
-
-        if (this._eotString == null)
-            this._eotString = this._model.getTokenString(eotToken);
-
-        return this._eotString;
-    }
-
     /** @internal */
     private _ensureNotDisposed() {
         if (this._disposedState.disposed)
@@ -1044,7 +1070,7 @@ export class LlamaModelInfillTokens {
 
 function applyGgufMetadataOverrides(
     ggufFileInfo: GgufFileInfo,
-    overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>
+    overrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 ) {
     function applyOverride(object: object, override?: object) {
         if (override == null || object == null)
@@ -1067,7 +1093,7 @@ function applyGgufMetadataOverrides(
     applyOverride(ggufFileInfo.metadata, overrides);
 }
 
-function ggufMetadataOverridesToList(overrides?: DeepPartialObject<GgufMetadata, number | bigint | boolean | string>) {
+function ggufMetadataOverridesToList(overrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>) {
     const maxStringLength = 127;
     const maxKeyLength = 127;
 

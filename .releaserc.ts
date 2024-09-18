@@ -3,6 +3,8 @@ import fs from "fs-extra";
 import {getBinariesGithubRelease} from "./dist/bindings/utils/binariesGithubRelease.js";
 import {cliBinName, defaultLlamaCppGitHubRepo} from "./dist/config.js";
 
+import type {GlobalConfig, Result as SemanticReleaseDryRunResult} from "semantic-release";
+
 const require = createRequire(import.meta.url);
 
 const defaultFooterTemplatePath = require.resolve("conventional-changelog-writer/templates/footer.hbs");
@@ -15,39 +17,63 @@ const homepageUrlWithoutTrailingSlash = homepageUrl.endsWith("/")
 
 const newFooterTemplate = defaultFooterTemplate + "\n---\n\n" +
     `Shipped with \`llama.cpp\` release [\`${binariesSourceRelease.split("`").join("")}\`](https://github.com/${defaultLlamaCppGitHubRepo}/releases/tag/${encodeURIComponent(binariesSourceRelease)})\n\n` +
-    `> To use the latest \`llama.cpp\` release available, run \`npx --no ${cliBinName} download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#downloading-a-newer-release))\n`;
+    `> To use the latest \`llama.cpp\` release available, run \`npx -n ${cliBinName} source download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#download-new-release))\n`;
 
-/**
- * @type {import("semantic-release").GlobalConfig}
- */
-export default {
-    "branches": [
+const githubPluginConfig = {
+    discussionCategoryName: "Releases" as string | boolean
+};
+
+const config: Omit<GlobalConfig, "repositoryUrl" | "tagFormat"> = {
+    branches: [
         "master",
-        {"name": "beta", "prerelease": true}
+        {name: "beta", prerelease: true}
     ],
-    "ci": true,
-    "plugins": [
+    ci: true,
+    plugins: [
         ["@semantic-release/commit-analyzer", {
-            "preset": "angular",
-            "releaseRules": [
-                {"type": "feat", "scope": "minor", "release": "patch"},
-                {"type": "docs", "scope": "README", "release": "patch"}
+            preset: "angular",
+            releaseRules: [
+                {type: "feat", scope: "minor", release: "patch"},
+                {type: "docs", scope: "README", release: "patch"}
             ]
         }],
         ["@semantic-release/release-notes-generator", {
-            "writerOpts": {
-                "footerPartial": newFooterTemplate
+            writerOpts: {
+                footerPartial: newFooterTemplate
             }
         }],
         ["@semantic-release/exec", {
-            "publishCmd": "npx --no vite-node ./scripts/publishStandalonePrebuiltBinaryModules.ts --packageVersion \"${nextRelease.version}\""
+            publishCmd: "npx --no vite-node ./scripts/publishStandalonePrebuiltBinaryModules.ts --packageVersion \"${nextRelease.version}\""
         }],
         "@semantic-release/npm",
-        ["@semantic-release/github", {
-            "discussionCategoryName": "Releases"
-        }],
+        ["@semantic-release/github", githubPluginConfig],
         ["@semantic-release/exec", {
-            "publishCmd": "echo \"${nextRelease.version}\" > .semanticRelease.npmPackage.deployedVersion.txt"
+            publishCmd: "echo \"${nextRelease.version}\" > .semanticRelease.npmPackage.deployedVersion.txt"
         }]
     ]
 };
+
+function getDryRunResult() {
+    try {
+        const dryRunResultEnvVarValue = process.env.DRY_RUN_RESULT;
+        if (dryRunResultEnvVarValue == null)
+            return null;
+
+        const res: SemanticReleaseDryRunResult = JSON.parse(dryRunResultEnvVarValue);
+        if (res === false)
+            return null;
+
+        console.log("Dry run result:", res);
+        return res;
+    } catch (err) {
+        // do nothing
+    }
+
+    return null;
+}
+
+const dryRunResult = getDryRunResult();
+if (dryRunResult == null || !(dryRunResult.nextRelease.type === "major" || dryRunResult.nextRelease.type === "minor"))
+    githubPluginConfig.discussionCategoryName = false;
+
+export default config;

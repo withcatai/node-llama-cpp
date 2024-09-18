@@ -2,26 +2,31 @@ import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {defaultExtraAllocationSize, ggufDefaultFetchRetryOptions} from "../consts.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "../../utils/modelFileAccesTokens.js";
 import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFetchFileReaderOptions = {
     url: string,
     retryOptions?: retry.Options,
     headers?: Record<string, string>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    tokens?: ModelFileAccessTokens
 };
 
 export class GgufNetworkFetchFileReader extends GgufFileReader {
     public readonly url: string;
     public readonly retryOptions: retry.Options;
     public readonly headers: Record<string, string>;
+    public readonly tokens?: ModelFileAccessTokens;
     private readonly _signal?: AbortSignal;
+    private _tryHeaders: Record<string, string>[] | undefined = undefined;
 
-    public constructor({url, retryOptions = ggufDefaultFetchRetryOptions, headers, signal}: GgufFetchFileReaderOptions) {
+    public constructor({url, retryOptions = ggufDefaultFetchRetryOptions, headers, tokens, signal}: GgufFetchFileReaderOptions) {
         super();
         this.url = url;
         this.retryOptions = retryOptions;
         this.headers = headers ?? {};
+        this.tokens = tokens;
         this._signal = signal;
     }
 
@@ -81,20 +86,34 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
         });
     }
 
-    private async _fetchByteRange(start: number, length: number) {
-        const response = await fetch(this.url, {
-            headers: {
-                ...this.headers,
-                Range: `bytes=${start}-${start + length}`,
-                accept: "*/*"
-            },
-            signal: this._signal
-        });
+    private async _fetchByteRange(start: number, length: number): Promise<Buffer> {
+        if (this._tryHeaders == null)
+            this._tryHeaders = await resolveModelFileAccessTokensTryHeaders(this.url, this.tokens, this.headers);
 
-        if (!response.ok)
-            throw new Error(`Failed to fetch byte range: ${response.status} ${response.statusText}`);
+        const headersToTry = [this.headers, ...this._tryHeaders];
 
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
+        while (headersToTry.length > 0) {
+            const headers = headersToTry.shift();
+
+            const response = await fetch(this.url, {
+                headers: {
+                    ...headers,
+                    Range: `bytes=${start}-${start + length}`,
+                    accept: "*/*"
+                },
+                signal: this._signal
+            });
+
+            if ((response.status >= 500 || response.status === 429) && headersToTry.length > 0)
+                continue;
+
+            if (!response.ok)
+                throw new Error(`Failed to fetch byte range: ${response.status} ${response.statusText}`);
+
+            const arrayBuffer = await response.arrayBuffer();
+            return Buffer.from(arrayBuffer);
+        }
+
+        throw new Error("Failed to fetch byte range: no more headers to try");
     }
 }

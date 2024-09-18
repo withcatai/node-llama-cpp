@@ -36,7 +36,11 @@ export type LlamaChatSessionOptions = {
      */
     forceAddSystemPrompt?: boolean,
 
-    /** Automatically dispose the sequence when the session is disposed */
+    /**
+     * Automatically dispose the sequence when the session is disposed.
+     *
+     * Defaults to `false`.
+     */
     autoDisposeSequence?: boolean,
 
     contextShift?: LlamaChatSessionContextShiftOptions
@@ -86,9 +90,12 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     /**
      * Temperature is a hyperparameter that controls the randomness of the generated text.
      * It affects the probability distribution of the model's output tokens.
+     *
      * A higher temperature (e.g., 1.5) makes the output more random and creative,
      * while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative.
+     *
      * The suggested temperature is 0.8, which provides a balance between randomness and determinism.
+     *
      * At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run.
      *
      * Set to `0` to disable.
@@ -125,6 +132,15 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      * Only relevant when `temperature` is set to a value greater than `0`.
      */
     topP?: number,
+
+    /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
 
     /**
      * Trim whitespace from the end of the generated text
@@ -197,6 +213,7 @@ export type LLamaChatCompletePromptOptions = {
     minP?: LLamaChatPromptOptions["minP"],
     topK?: LLamaChatPromptOptions["topK"],
     topP?: LLamaChatPromptOptions["topP"],
+    seed?: LLamaChatPromptOptions["seed"],
     trimWhitespaceSuffix?: LLamaChatPromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatPromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatPromptOptions["repeatPenalty"],
@@ -281,17 +298,16 @@ export class LlamaChatSession {
 
     public readonly onDispose = new EventRelay<void>();
 
-    /**
-     * @param options
-     */
-    public constructor({
-        contextSequence,
-        chatWrapper = "auto",
-        systemPrompt,
-        forceAddSystemPrompt = false,
-        autoDisposeSequence = true,
-        contextShift
-    }: LlamaChatSessionOptions) {
+    public constructor(options: LlamaChatSessionOptions) {
+        const {
+            contextSequence,
+            chatWrapper = "auto",
+            systemPrompt,
+            forceAddSystemPrompt = false,
+            autoDisposeSequence = false,
+            contextShift
+        } = options;
+
         if (contextSequence == null)
             throw new Error("contextSequence cannot be null");
 
@@ -363,36 +379,38 @@ export class LlamaChatSession {
         return this.sequence.model;
     }
 
-    /**
-     * @param prompt
-     * @param [options]
-     */
-    public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
-        functions,
-        documentFunctionParams,
-        maxParallelFunctionCalls,
-        onTextChunk,
-        onToken,
-        signal,
-        stopOnAbortSignal = false,
-        maxTokens,
-        temperature,
-        minP,
-        topK,
-        topP,
-        grammar,
-        trimWhitespaceSuffix = false,
-        repeatPenalty,
-        tokenBias,
-        customStopTriggers
-    }: LLamaChatPromptOptions<Functions> = {}) {
+    public async prompt<const Functions extends ChatSessionModelFunctions | undefined = undefined>(
+        prompt: string,
+        options: LLamaChatPromptOptions<Functions> = {}
+    ) {
+        const {
+            functions,
+            documentFunctionParams,
+            maxParallelFunctionCalls,
+            onTextChunk,
+            onToken,
+            signal,
+            stopOnAbortSignal = false,
+            maxTokens,
+            temperature,
+            minP,
+            topK,
+            topP,
+            seed,
+            grammar,
+            trimWhitespaceSuffix = false,
+            repeatPenalty,
+            tokenBias,
+            customStopTriggers
+        } = options;
+
         const {responseText} = await this.promptWithMeta<Functions>(prompt, {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
-            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, grammar, trimWhitespaceSuffix,
+            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar, trimWhitespaceSuffix,
             repeatPenalty, tokenBias, customStopTriggers
         });
 
@@ -416,6 +434,7 @@ export class LlamaChatSession {
         minP,
         topK,
         topP,
+        seed,
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
@@ -482,6 +501,7 @@ export class LlamaChatSession {
                     minP,
                     topK,
                     topP,
+                    seed,
                     tokenBias,
                     customStopTriggers,
                     maxTokens,
@@ -692,6 +712,7 @@ export class LlamaChatSession {
         minP,
         topK,
         topP,
+        seed,
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
@@ -701,8 +722,12 @@ export class LlamaChatSession {
     }: LLamaChatCompletePromptOptions = {}) {
         this._ensureNotDisposed();
 
-        if (grammar != null && grammar._llama !== this.model._llama)
-            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+        if (grammar != null) {
+            if (grammar._llama == null)
+                throw new Error("The grammar passed to this function is not a LlamaGrammar instance.");
+            else if (grammar._llama !== this.model._llama)
+                throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+        }
 
         const abortController = wrapAbortSignal(signal);
         this._preloadAndCompleteAbortControllers.add(abortController);
@@ -727,6 +752,7 @@ export class LlamaChatSession {
                     minP,
                     topK,
                     topP,
+                    seed,
                     tokenBias,
                     customStopTriggers,
                     maxTokens,
@@ -822,7 +848,7 @@ function addFunctionCallToChatHistory({
     startsNewChunk?: boolean
 }) {
     const newChatHistory = chatHistory.slice();
-    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1].type !== "model")
+    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1]!.type !== "model")
         newChatHistory.push({
             type: "model",
             response: []
@@ -853,7 +879,7 @@ function addFunctionCallToChatHistory({
 }
 
 function getLastModelResponseItem(chatHistory: ChatHistoryItem[]) {
-    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].type !== "model")
+    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1]!.type !== "model")
         throw new Error("Expected chat history to end with a model response");
 
     return chatHistory[chatHistory.length - 1] as ChatModelResponse;

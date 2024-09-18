@@ -1,57 +1,81 @@
-import {DefaultTheme, defineConfig} from "vitepress";
+import {createContentLoader, defineConfig, HeadConfig} from "vitepress";
 import path from "path";
+import {createRequire} from "node:module";
+import process from "process";
 import fs from "fs-extra";
 import {fileURLToPath} from "url";
 import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
-import typedocSidebar from "../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 import envVar from "env-var";
-import process from "process";
+import {Feed} from "feed";
+import {rehype} from "rehype";
+import {Element as HastElement, Parent} from "hast";
+import sharp from "sharp";
+import {GitChangelog, GitChangelogMarkdownSection} from "@nolebase/vitepress-plugin-git-changelog/vite";
+import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-image/vitepress";
+import {Resvg, initWasm as initResvgWasm, ResvgRenderOptions} from "@resvg/resvg-wasm";
+import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
+import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
+import {ensureLocalImage} from "./utils/ensureLocalImage.js";
+
+import type {Node as UnistNode} from "unist";
+import type {ShikiTransformer} from "shiki";
+
+
+const require = createRequire(import.meta.url);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson: typeof import("../package.json") = fs.readJsonSync(path.join(__dirname, "..", "package.json"));
 const env = envVar.from(process.env);
 
-const urlBase = env.get("DOCS_URL_BASE").asString();
-const packageVersion = env.get("DOCS_PACKAGE_VERSION").default(packageJson.version).asString();
+const urlBase = env.get("DOCS_URL_BASE")
+    .asString();
+const packageVersion = env.get("DOCS_PACKAGE_VERSION")
+    .default(packageJson.version)
+    .asString();
 const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
-const hostname = "https://withcatai.github.io/node-llama-cpp/";
+const hostname = "https://node-llama-cpp.withcat.ai/";
 
-const chatWrappersOrder = [
-    "GeneralChatWrapper",
-    "Llama3ChatWrapper",
-    "Llama2ChatWrapper",
-    "ChatMLChatWrapper",
-    "FalconChatWrapper"
-] as const;
+const socialPosterLink = hostname + "social.poster.jpg";
+const defaultPageTitle = "node-llama-cpp - node.js bindings for llama.cpp";
+const defaultPageDescription = "Run AI models locally on your machine with node.js bindings for llama.cpp";
 
-const categoryOrder = [
-    "Functions",
-    "Classes",
-    "Types",
-    "Enums"
-] as const;
+function resolveHref(href: string, withDomain: boolean = false): string {
+    if (withDomain) {
+        const resolvedHref = resolveHref(href, false);
 
-const functionsOrder = [
-    "getLlama",
-    "defineChatSessionFunction",
-    "LlamaText"
-] as const;
+        if (hostname.endsWith("/") && resolvedHref.startsWith("/"))
+            return hostname + resolvedHref.slice("/".length);
+        else if (!hostname.endsWith("/") && !resolvedHref.startsWith("/"))
+            return hostname + "/" + resolvedHref;
 
-function resolveHref(href: string) {
+        return hostname + resolvedHref;
+    }
+
     if (urlBase == null)
         return href;
 
     if (urlBase.endsWith("/") && href.startsWith("/"))
         return urlBase.slice(0, -1) + href;
 
+    if (href.startsWith("http://") || href.startsWith("https://"))
+        return href;
+
     return urlBase + href;
 }
 
+const defaultImageMetaTags: HeadConfig[] = [
+    ["meta", {name: "og:image", content: socialPosterLink}],
+    ["meta", {name: "og:image:width", content: "4096"}],
+    ["meta", {name: "og:image:height", content: "2048"}],
+    ["meta", {name: "twitter:image", content: socialPosterLink}],
+    ["meta", {name: "twitter:card", content: "summary_large_image"}]
+];
+
 export default defineConfig({
     title: "node-llama-cpp",
-    description: "Run AI models locally on your machine with node.js bindings for llama.cpp",
+    description: defaultPageDescription,
 
     srcDir: "./docs",
     outDir: "./docs-site",
@@ -60,16 +84,20 @@ export default defineConfig({
     cleanUrls: true,
     lastUpdated: true,
 
+    contentProps: {
+        packageVersion
+    },
+
     base: urlBase,
     sitemap: {
         hostname,
         transformItems(items) {
             return items.map((item) => {
-                if (item.url.includes("api/") || item.url.includes("guide/cli/")) {
+                if (item.url.includes("api/") || item.url.includes("cli/")) {
                     item = {
                         ...item,
-                        lastmod: undefined,
-                    }
+                        lastmod: undefined
+                    };
                 }
 
                 return item;
@@ -79,37 +107,104 @@ export default defineConfig({
     head: [
         ["link", {rel: "icon", type: "image/svg+xml", href: resolveHref("/favicon.svg")}],
         ["link", {rel: "icon", type: "image/png", href: resolveHref("/favicon.png")}],
+        ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom", true)}],
         ["meta", {name: "theme-color", content: "#cd8156"}],
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
         ["meta", {name: "og:type", content: "website"}],
         ["meta", {name: "og:locale", content: "en"}],
         ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
-        ["meta", {name: "og:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
-        ["meta", {name: "og:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}],
-        ["meta", {name: "og:image", content: hostname + "social.poster.jpg"}],
-        ["meta", {name: "og:image:width", content: "4096"}],
-        ["meta", {name: "og:image:height", content: "2048"}],
-        ["meta", {name: "twitter:image:src", content: hostname + "social.poster.jpg"}],
-        ["meta", {name: "twitter:card", content: "summary_large_image"}],
-        ["meta", {name: "twitter:title", content: "node-llama-cpp - node.js bindings for llama.cpp"}],
-        ["meta", {name: "twitter:description", content: "Run AI models locally on your machine with node.js bindings for llama.cpp"}]
+        ["script", {async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-Q2SWE5Z1ST"}],
+        [
+            "script",
+            {},
+            "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());" +
+            "gtag('config','G-Q2SWE5Z1ST');"
+        ],
+        ["style", {}],
     ],
-    transformHead({pageData, head}) {
+    async transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
             head.push(["meta", {name: "google-site-verification", content: googleSiteVerificationCode}]);
+            head.push(...defaultImageMetaTags);
+        } else if (pageData.relativePath === "404.md")
+            head.push(...defaultImageMetaTags);
+
+        const title = [
+            pageData.title,
+            pageData.titleTemplate
+        ]
+            .filter(Boolean)
+            .join(" - ") || defaultPageTitle;
+        const description = pageData.description || defaultPageDescription;
+
+        if (pageData.filePath.startsWith("blog/") && pageData.frontmatter.image != null) {
+            let imageDir = pageData.filePath;
+            if (imageDir.toLowerCase().endsWith(".md"))
+                imageDir = imageDir.slice(0, -".md".length);
+
+            if (typeof pageData.frontmatter.image === "string") {
+                const coverImage = await ensureLocalImage(pageData.frontmatter.image, "cover", {
+                    baseDestLocation: imageDir.split("/")
+                });
+                head.push(["meta", {name: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
+            } else if (typeof pageData.frontmatter.image === "object") {
+                const coverImage = typeof pageData.frontmatter.image.url === "string"
+                    ? await ensureLocalImage(pageData.frontmatter.image.url, "cover", {
+                        baseDestLocation: imageDir.split("/")
+                    })
+                    : undefined;
+
+                if (typeof pageData.frontmatter.image.url === "string")
+                    head.push(["meta", {
+                        name: "og:image",
+                        content: resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true)
+                    }]);
+
+                if (pageData.frontmatter.image.width != null)
+                    head.push(["meta", {
+                        name: "og:image:width",
+                        content: String(coverImage?.width ?? pageData.frontmatter.image.width)
+                    }]);
+
+                if (pageData.frontmatter.image.height != null)
+                    head.push(["meta", {
+                        name: "og:image:height",
+                        content: String(coverImage?.height ?? pageData.frontmatter.image.height)
+                    }]);
+            }
         }
+
+        head.push(["meta", {name: "og:title", content: title}]);
+        head.push(["meta", {name: "og:description", content: description}]);
+        head.push(["meta", {name: "twitter:title", content: title}]);
+        head.push(["meta", {name: "twitter:description", content: description}]);
     },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
-            pageData.frontmatter ||= {}
+            pageData.frontmatter ||= {};
             pageData.frontmatter.outline = [2, 3];
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
         }
 
-        if (pageData.filePath.startsWith("guide/cli/")) {
+        if (pageData.filePath.startsWith("cli/")) {
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
+        }
+
+        if (pageData.filePath.startsWith("blog/")) {
+            pageData.frontmatter.editLink = false;
+            pageData.frontmatter.aside = false;
+            pageData.frontmatter.outline = false
+            pageData.frontmatter.nolebase = {
+                gitChangelog: false
+            };
         }
 
         let canonicalUrl = hostname + pageData.relativePath;
@@ -125,13 +220,38 @@ export default defineConfig({
         pageData.frontmatter.head ??= [];
         pageData.frontmatter.head.push([
             "link",
-            {rel: "canonical", href: canonicalUrl}
-        ])
+            {rel: "canonical", href: canonicalUrl},
+            {rel: "giscus:backlink", href: canonicalUrl}
+        ]);
+    },
+    vite: {
+        plugins: [
+            GitChangelog({
+                repoURL: () => "https://github.com/withcatai/node-llama-cpp",
+                cwd: path.join(__dirname, "..", "docs")
+            }),
+            GitChangelogMarkdownSection({
+                exclude: (id) => (
+                    id.includes(path.sep + "api" + path.sep) ||
+                    id.includes(path.sep + "cli" + path.sep) ||
+                    id.includes(path.sep + "blog" + path.sep)
+                ),
+                sections: {
+                    disableContributors: true
+                }
+            }),
+            BlogPageInfoPlugin({
+                include: (id) => id.includes(path.sep + "blog" + path.sep) && !id.endsWith(path.sep + "blog" + path.sep + "index.md")
+            })
+        ]
     },
     markdown: {
         codeTransformers: [
             transformerTwoslash({
-                // explicitTrigger: false,
+                explicitTrigger: false,
+                filter(lang, code, options) {
+                    return options.lang?.toLowerCase() === "typescript";
+                },
                 twoslashOptions: {
                     compilerOptions: {
                         ...(await fs.readJSON(path.join(__dirname, "..", "tsconfig.json"))).compilerOptions,
@@ -140,6 +260,10 @@ export default defineConfig({
                             "node-llama-cpp": [
                                 path.resolve(__dirname, "..", "dist", "index.d.ts"),
                                 path.resolve(__dirname, "..", "src", "index.ts")
+                            ],
+                            "node-llama-cpp/commands": [
+                                path.resolve(__dirname, "..", "dist", "commands.d.ts"),
+                                path.resolve(__dirname, "..", "src", "commands.ts")
                             ]
                         },
                         typeRoots: [
@@ -147,11 +271,12 @@ export default defineConfig({
                             path.resolve(__dirname, "..", "node_modules", "@types")
                         ],
                         module: ts.ModuleKind.ES2022,
-                        target: ts.ScriptTarget.ES2022
+                        target: ts.ScriptTarget.ES2022,
+                        moduleDetection: ts.ModuleDetectionKind.Force
                     },
                     tsModule: ts
                 }
-            })
+            }) as ShikiTransformer
         ]
     },
     themeConfig: {
@@ -160,7 +285,9 @@ export default defineConfig({
         },
         nav: [
             {text: "Guide", link: "/guide/", activeMatch: "/guide/"},
+            {text: "CLI", link: "/cli/", activeMatch: "/cli/"},
             {text: "API Reference", link: "/api/functions/getLlama", activeMatch: "/api/"},
+            {text: "Blog", link: "/blog/", activeMatch: "/blog/"},
             {
                 text: packageVersion,
                 items: [{
@@ -172,6 +299,9 @@ export default defineConfig({
                 }, {
                     text: "npm",
                     link: "https://www.npmjs.com/package/node-llama-cpp"
+                }, {
+                    text: "GitHub Discussions",
+                    link: "https://github.com/withcatai/node-llama-cpp/discussions"
                 }, {
                     text: "Contribute",
                     link: "/guide/contributing"
@@ -187,47 +317,75 @@ export default defineConfig({
             }
         ],
         search: {
-            provider: "local"
+            provider: "local",
+            options: {
+                detailedView: true
+            }
         },
         sidebar: {
-            "/api/": orderApiReferenceSidebar(getApiReferenceSidebar()),
+            "/api/": getApiReferenceSidebar(),
 
             "/guide/": [{
                 text: "Guide",
                 base: "/guide",
                 items: [
-                    {text: "Getting started", link: "/"},
-                    {text: "Chat session", link: "/chat-session"},
-                    {text: "Chat prompt wrapper", link: "/chat-prompt-wrapper"},
-                    {text: "Using grammar", link: "/grammar"}
+                    {text: "Getting Started", link: "/"},
+                    {text: "Chat Session", link: "/chat-session"},
+                    {text: "Chat Wrapper", link: "/chat-wrapper"},
+                    {text: "Grammar", link: "/grammar"},
+                    {text: "Function Calling", link: "/function-calling"},
+                    {text: "Embedding", link: "/embedding"},
+                    {text: "Text Completion", link: "/text-completion"},
+                    {text: "Choosing a Model", link: "/choosing-a-model"},
+                    {text: "Downloading Models", link: "/downloading-models"}
                 ]
             }, {
                 text: "Advanced",
                 base: "/guide",
                 items: [
-                    {text: "Building from source", link: "/building-from-source"},
-                    {text: "Metal support", link: "/Metal"},
-                    {text: "CUDA support", link: "/CUDA"},
-                    {text: "Vulkan support", link: "/vulkan"},
-                    {text: "Troubleshooting", link: "/troubleshooting"}
+                    {text: "Building From Source", link: "/building-from-source"},
+                    {text: "Metal Support", link: "/Metal"},
+                    {text: "CUDA Support", link: "/CUDA"},
+                    {text: "Vulkan Support", link: "/Vulkan"},
+                    {text: "Electron Support", link: "/electron"},
+                    {text: "Using in Docker", link: "/docker"},
+                    {text: "Using Tokens", link: "/tokens"},
+                    {text: "LlamaText", link: "/llama-text"},
+                    {text: "External Chat State", link: "/external-chat-state"},
+                    {text: "Token Bias", link: "/token-bias"},
+                    {text: "Objects Lifecycle", link: "/objects-lifecycle"},
+                    {text: "Batching", link: "/batching"},
+                    {text: "Awesome List", link: "/awesome"},
+                    {text: "Troubleshooting", link: "/troubleshooting"},
+                    {text: "Tips and Tricks", link: "/tips-and-tricks"}
                 ]
             }, {
                 text: "Contributing",
                 base: "/guide",
                 items: [
-                    {text: "Setting up a dev environment", link: "/development"},
-                    {text: "Pull request guidelines", link: "/contributing"}
+                    {text: "Setting Up a Dev Environment", link: "/development"},
+                    {text: "Pull Request Guidelines", link: "/contributing"}
                 ]
-            }, {
+            }],
+
+            "/cli/": [{
                 text: "CLI",
-                base: "/guide/cli",
-                collapsed: true,
+                base: "/cli",
                 link: "/",
                 items: [
-                    {text: "Pull", link: "/pull"},
-                    {text: "Chat", link: "/chat"},
                     {text: "Init", link: "/init"},
-                    {text: "Download", link: "/download"},
+                    {text: "Chat", link: "/chat"},
+                    {text: "Pull", link: "/pull"},
+                    {
+                        text: "Source",
+                        link: "/source",
+                        collapsed: true,
+                        items: [
+                            {text: "Download", link: "/source/download"},
+                            {text: "Build", link: "/source/build"},
+                            {text: "Clear", link: "/source/clear"}
+                        ]
+                    },
                     {text: "Complete", link: "/complete"},
                     {text: "Infill", link: "/infill"},
                     {
@@ -238,10 +396,9 @@ export default defineConfig({
                             {text: "GPU", link: "/inspect/gpu"},
                             {text: "GGUF", link: "/inspect/gguf"},
                             {text: "Measure", link: "/inspect/measure"},
+                            {text: "Estimate", link: "/inspect/estimate"}
                         ]
-                    },
-                    {text: "Build", link: "/build"},
-                    {text: "Clear", link: "/clear"}
+                    }
                 ]
             }]
         },
@@ -249,323 +406,325 @@ export default defineConfig({
             {icon: "npm", link: "https://www.npmjs.com/package/node-llama-cpp"},
             {icon: "github", link: "https://github.com/withcatai/node-llama-cpp"}
         ]
+    },
+    async buildEnd(siteConfig) {
+        const blogPosts = await createContentLoader("blog/*.md", {
+            excerpt: true,
+            render: true
+        })
+            .load();
+
+        async function loadSvgFontBuffers() {
+            const interFontFilesDirectoryPath = path.join(require.resolve("@fontsource/inter"), "..", "files");
+            const interFontFilePaths = [
+                "inter-latin-400-normal.woff2",
+                "inter-latin-500-normal.woff2",
+                "inter-latin-600-normal.woff2",
+                "inter-latin-700-normal.woff2",
+                "inter-latin-ext-400-normal.woff2",
+                "inter-latin-ext-500-normal.woff2",
+                "inter-latin-ext-600-normal.woff2",
+                "inter-latin-ext-700-normal.woff2",
+            ];
+
+            return await Promise.all(
+                interFontFilePaths.map((filename) => (
+                    fs.readFile(path.join(interFontFilesDirectoryPath, filename))
+                ))
+            );
+        }
+
+        async function loadInnerSvgImages() {
+            const svgImages: Record<string, Buffer> = {
+                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.png":
+                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.v3.roundEdges.png")),
+                "https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.png":
+                    await fs.readFile(path.join(__dirname, "..", "assets", "logo.v3.png"))
+            };
+
+            return svgImages;
+        }
+
+        const svgFontBuffers = loadSvgFontBuffers();
+        const innerSvgImages = loadInnerSvgImages();
+
+        async function renderSvg(svgPath: string, destPngPath: string, options: ResvgRenderOptions) {
+            console.info(`Rendering "${svgPath}" to "${destPngPath}"`)
+
+            const svgContent = await fs.readFile(svgPath, "utf8");
+            const svgImages = await innerSvgImages;
+
+            const resvg = new Resvg(svgContent, {
+                ...(options ?? {}),
+                font: {
+                    ...(options.font ?? {}),
+                    fontBuffers: await svgFontBuffers,
+                    loadSystemFonts: false
+                }
+            });
+
+            for (const url of resvg.imagesToResolve()) {
+                if (svgImages[url] != null)
+                    resvg.resolveImage(url, svgImages[url]);
+                else {
+                    console.info(`Fetching image: "${url}" for SVG "${svgPath}"`);
+                    const fetchRes = await fetch(url);
+                    if (!fetchRes.ok)
+                        throw new Error(`Failed to fetch image: ${url}`);
+
+                    resvg.resolveImage(url, Buffer.from(await fetchRes.arrayBuffer()));
+                }
+            }
+
+            const res = resvg.render();
+
+            await fs.writeFile(destPngPath, res.asPng(), "binary");
+        }
+
+        async function convertPngToJpg(pngPath: string, jpgPath: string, quality: number = 75) {
+            console.info(`Converting "${pngPath}" to "${jpgPath}" with quality ${quality}`);
+
+            const pngBuffer = await fs.readFile(pngPath);
+            const jpgBuffer = await sharp(pngBuffer)
+                .jpeg({quality})
+                .toBuffer();
+
+            await fs.writeFile(jpgPath, jpgBuffer, "binary");
+        }
+
+        async function convertPngToPreviewAvif(pngPath: string, avifPath: string, quality: number = 24, maxSize: number = 640) {
+            console.info(`Converting "${pngPath}" to "${avifPath}" with quality ${quality}`);
+
+            const pngBuffer = await fs.readFile(pngPath);
+            const avifBuffer = await sharp(pngBuffer)
+                .resize({
+                    width: maxSize,
+                    height: maxSize,
+                    fit: "outside",
+                    withoutEnlargement: true
+                })
+                .avif({
+                    quality,
+                    effort: 9
+                })
+                .toBuffer();
+
+            await fs.writeFile(avifPath, avifBuffer, "binary");
+        }
+
+        async function addOgImages() {
+            const svgImages = await innerSvgImages;
+
+            let baseUrl = resolveHref("", true);
+            if (baseUrl.endsWith("/"))
+                baseUrl = baseUrl.slice(0, -"/".length);
+
+            await buildEndGenerateOpenGraphImages({
+                baseUrl,
+                category: {
+                    byCustomGetter(page) {
+                        if (page.link?.startsWith("/api/")) return "API";
+                        if (page.link?.startsWith("/guide/")) return "Guide";
+                        if (page.link?.startsWith("/cli/")) return "CLI";
+                        if (page.link === "/blog/") return " ";
+                        if (page.link?.startsWith("/blog/")) return "Blog";
+
+                        return " ";
+                    }
+                },
+                async svgImageUrlResolver(imageUrl: string) {
+                    if (svgImages[imageUrl] != null)
+                        return svgImages[imageUrl];
+
+                    throw new Error(`Unknown SVG image URL: ${imageUrl}`);
+                },
+                svgFontBuffers: await svgFontBuffers,
+                templateSvgPath: path.join(__dirname, "assets", "ogTemplate.svg"),
+                resultImageWidth: 1200,
+                maxCharactersPerLine: 20,
+                overrideExistingMetaTags: false
+            })({
+                ...siteConfig,
+                site: {
+                    ...siteConfig.site,
+                    themeConfig: {
+                        ...siteConfig.site.themeConfig,
+                        sidebar: {
+                            ...siteConfig.site.themeConfig.sidebar,
+                            "/_blog/": {
+                                text: "Blog",
+                                link: "/blog/",
+                                items: blogPosts.map((post) => ({
+                                    text: post.frontmatter.title,
+                                    link: post.url
+                                }))
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function addBlogRssFeed() {
+            const feedFilePath = path.join(siteConfig.outDir, "blog", "feed.atom");
+
+            const feed = new Feed({
+                title: "node-llama-cpp",
+                description: "Run AI models locally on your machine",
+                id: hostname,
+                link: hostname,
+                language: "en",
+                image: socialPosterLink,
+                favicon: resolveHref("/favicon.ico", true),
+                copyright: "node-llama-cpp",
+                generator: "node-llama-cpp",
+                feed: resolveHref("/blog/feed.atom", true),
+                author: {
+                    name: typeof packageJson.author === "string"
+                        ? packageJson.author
+                        : (packageJson.author as undefined | { name?: string })?.name
+                },
+                hub: "https://pubsubhubbub.appspot.com/"
+            });
+
+            blogPosts.sort((a, b) => {
+                const aDate = a.frontmatter.date
+                    ? new Date(a.frontmatter.date)
+                    : null;
+                const bDate = b.frontmatter.date
+                    ? new Date(b.frontmatter.date)
+                    : null;
+
+                if (aDate == null)
+                    return -1;
+                if (bDate == null)
+                    return 1;
+
+                return bDate.getTime() - aDate.getTime();
+            });
+
+            for (const {url, excerpt, frontmatter, html} of blogPosts) {
+                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:imag");
+                const date = new Date(frontmatter.date);
+                if (Number.isNaN(date.getTime()))
+                    throw new Error(`Invalid date for blog post: ${url}`);
+                else if (frontmatter.title == null || frontmatter.title === "")
+                    throw new Error(`Invalid title for blog post: ${url}`);
+
+                feed.addItem({
+                    title: frontmatter.title,
+                    id: resolveHref(url, true),
+                    link: resolveHref(url, true),
+                    description: excerpt || frontmatter.description || undefined,
+                    content: html,
+                    author: [{
+                        name: frontmatter.author?.name,
+                        link: frontmatter.author?.link != null
+                            ? frontmatter.author?.link
+                            : frontmatter.author?.github != null
+                                ? `https://github.com/${frontmatter.author.github}`
+                                : undefined,
+                        email: frontmatter.author?.github != null
+                            ? (
+                                frontmatter.author?.github +
+                                "@users.noreply.github.com" + (
+                                    frontmatter.author?.name != null
+                                        ? ` (${frontmatter.author.name})`
+                                        : ""
+                                )
+                            )
+                            : undefined
+                    }],
+                    published: date,
+                    date: date,
+                    image: ogImageElement?.properties?.content as string | undefined,
+                    category: typeof frontmatter.category === "string"
+                        ? [{term: frontmatter.category}]
+                        : frontmatter.category instanceof Array
+                            ? frontmatter.category.map((category: string) => ({term: category}))
+                            : frontmatter.categories instanceof Array
+                                ? frontmatter.categories.map((category: string) => ({term: category}))
+                                : undefined
+                });
+            }
+
+            await fs.writeFile(feedFilePath, feed.atom1());
+        }
+
+        await addOgImages();
+
+        const indexPageIndex = blogPosts.findIndex((post) => post.url === "/blog/");
+        if (indexPageIndex < 0)
+            throw new Error("Blog index page not found");
+
+        blogPosts.splice(indexPageIndex, 1);
+
+        await addBlogRssFeed();
+
+        try {
+            await initResvgWasm(await fs.readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
+        } catch (err) {
+            // do nothing if wasm is already loaded
+        }
+
+        await renderSvg(
+            path.join(__dirname, "assets", "social.poster.svg"),
+            path.join(siteConfig.outDir, "social.poster.png"),
+            {
+                fitTo: {
+                    mode: "height",
+                    value: 2048
+                }
+            }
+        );
+        await convertPngToJpg(
+            path.join(siteConfig.outDir, "social.poster.png"),
+            path.join(siteConfig.outDir, "social.poster.jpg"),
+            75
+        );
+        await convertPngToPreviewAvif(
+            path.join(__dirname, "..", "assets", "logo.v3.png"),
+            path.join(siteConfig.outDir, "logo.preview.avif"),
+            24
+        );
     }
 });
 
-function getApiReferenceSidebar(): typeof typedocSidebar {
-    return structuredClone(typedocSidebar)
-        .map((item) => {
-            switch (item.text) {
-                case "README":
-                case "API":
-                    return null;
-
-                case "Classes":
-                case "Type Aliases":
-                case "Functions":
-                    if (item.text === "Type Aliases")
-                        item.text = "Types";
-
-                    if (item.collapsed)
-                        item.collapsed = false;
-
-                    if (item.items instanceof Array)
-                        item.items = item.items.map((subItem) => {
-                            if ((subItem as {collapsed?: boolean}).collapsed)
-                                // @ts-ignore
-                                delete subItem.collapsed;
-
-                            return subItem;
-                        });
-
-                    return item;
-
-                case "Enumerations":
-                    item.text = "Enums";
-
-                    if (item.collapsed)
-                        item.collapsed = false;
-                    return item;
-
-                case "Variables":
-                    if (item.collapsed)
-                        item.collapsed = false;
-
-                    return item;
-            }
-
-            return item;
-        })
-        .filter((item) => item != null) as typeof typedocSidebar;
-}
-
-function orderApiReferenceSidebar(sidebar: typeof typedocSidebar): typeof typedocSidebar {
-    applyOverrides(sidebar);
-    orderClasses(sidebar);
-    orderTypes(sidebar);
-    orderFunctions(sidebar);
-
-    sortItemsInOrder(sidebar, categoryOrder);
-
-    return sidebar;
-}
-
-function applyOverrides(sidebar: typeof typedocSidebar) {
-    const functions = sidebar.find((item) => item.text === "Functions");
-
-    const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
-    if (llamaTextFunction != null) {
-        delete (llamaTextFunction as {link?: string}).link;
+function findElementInHtml(html: string | undefined, matcher: (element: HastElement) => boolean) {
+    function isElement(node: UnistNode): node is HastElement {
+        return node.type === "element";
     }
 
-    const classes = sidebar.find((item) => item.text === "Classes");
-    if (classes != null && classes.items instanceof Array && !classes.items.some((item) => item.text === "LlamaText")) {
-        classes.items.push({
-            text: "LlamaText",
-            link: "/api/classes/LlamaText.md"
-        });
-    }
-}
-
-function orderClasses(sidebar: typeof typedocSidebar) {
-    const baseChatWrapper = "ChatWrapper";
-    const chatWrapperItems: DefaultTheme.SidebarItem[] = [];
-
-    const classes = sidebar.find((item) => item.text === "Classes");
-
-    if (classes == null || !(classes.items instanceof Array))
-        return;
-
-    const chatWrappersGroup = {
-        text: "Chat wrappers",
-        collapsed: false,
-        items: chatWrapperItems
-    };
-    (classes.items as DefaultTheme.SidebarItem[]).unshift(chatWrappersGroup);
-
-    moveItem(
-        classes.items,
-        (item) => item.text === baseChatWrapper,
-        0
-    );
-
-    groupItems(
-        classes.items,
-        (item) => item === chatWrappersGroup,
-        (item) => item.text !== baseChatWrapper && item.text?.endsWith(baseChatWrapper),
-        {moveToEndIfGrouped: false, collapsed: false}
-    )
-
-    groupItems(
-        classes.items,
-        (item) => item.text === "LlamaModelTokens",
-        (item) => item.text != null && ["LlamaModelInfillTokens"].includes(item.text),
-        {moveToEndIfGrouped: false}
-    )
-    groupItems(
-        classes.items,
-        (item) => item.text === "LlamaModel",
-        (item) => item.text != null && ["LlamaModelTokens"].includes(item.text),
-        {moveToEndIfGrouped: false}
-    )
-
-    let LlamaTextGroup = classes.items.find((item) => item.text === "LlamaText") as {
-        text: string,
-        collapsed?: boolean,
-        items?: []
-    } | undefined;
-    if (LlamaTextGroup == null) {
-        LlamaTextGroup = {
-            text: "LlamaText",
-            collapsed: true,
-            items: []
-        };
-        (classes.items as DefaultTheme.SidebarItem[]).push(LlamaTextGroup);
+    function isParent(node: UnistNode): node is Parent {
+        return node.type === "element" || node.type === "root";
     }
 
-    if (LlamaTextGroup != null) {
-        LlamaTextGroup.collapsed = true;
+    if (html == null)
+        return undefined;
 
-        if (LlamaTextGroup.items == null)
-            LlamaTextGroup.items = [];
+    const parsedHtml = rehype()
+        .parse(html);
 
-        const LlamaTextGroupItemsOrder = ["SpecialTokensText", "SpecialToken"];
-
-        groupItems(
-            classes.items,
-            (item) => item === LlamaTextGroup,
-            (item) => item.text != null && LlamaTextGroupItemsOrder.includes(item.text),
-            {moveToEndIfGrouped: false}
-        )
-        sortItemsInOrder(LlamaTextGroup.items, LlamaTextGroupItemsOrder);
-    }
-
-    sortItemsInOrder(chatWrapperItems, chatWrappersOrder);
-}
-
-function orderTypes(sidebar: typeof typedocSidebar) {
-    const types = sidebar.find((item) => item.text === "Types");
-
-    if (types == null || !(types.items instanceof Array))
-        return;
-
-    groupItems(
-        types.items,
-        (item) => item.text === "BatchingOptions",
-        (item) => (
-            item.text === "BatchItem" ||
-            item.text === "CustomBatchingDispatchSchedule" ||
-            item.text === "CustomBatchingPrioritizationStrategy" ||
-            item.text === "PrioritizedBatchItem"
-        ),
-        {collapsed: false}
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaContextOptions",
-        (item) => item.text === "BatchingOptions"
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "GbnfJsonSchema",
-        (item) => item.text?.startsWith("GbnfJson")
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaChatSessionOptions",
-        (item) => item.text != null && ["LlamaChatSessionContextShiftOptions"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LLamaChatPromptOptions",
-        (item) => item.text != null && ["LlamaChatSessionRepeatPenalty", "ChatSessionModelFunctions"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "ChatModelResponse",
-        (item) => item.text === "ChatModelFunctionCall"
-    );
-    groupItems(
-        types.items,
-        (item) => item.text === "ChatHistoryItem",
-        (item) => item.text != null && ["ChatSystemMessage", "ChatUserMessage", "ChatModelResponse"].includes(item.text)
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaChatResponse",
-        (item) => item.text === "LlamaChatResponseFunctionCall"
-    );
-
-    groupItems(
-        types.items,
-        (item) => item.text === "LlamaText",
-        (item) => item.text?.startsWith("LlamaText")
-    );
-
-    moveCollapseItemsToTheEnd(types.items);
-}
-
-function orderFunctions(sidebar: typeof typedocSidebar) {
-    const functions = sidebar.find((item) => item.text === "Functions");
-
-    if (functions == null || !(functions.items instanceof Array))
-        return;
-
-    groupItems(
-        functions.items,
-        (item) => item.text === "LlamaText",
-        (item) => item.text != null && ["isLlamaText", "tokenizeText"].includes(item.text)
-    );
-
-    sortItemsInOrder(functions.items, functionsOrder);
-
-    moveCollapseItemsToTheEnd(functions.items);
-}
-
-
-function groupItems(
-    items: DefaultTheme.SidebarItem[] | undefined,
-    findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
-) {
-    const children: DefaultTheme.SidebarItem[] = [];
-
-    if (items == null || !(items instanceof Array))
-        return;
-
-    const parent = items.find(findParent) as DefaultTheme.SidebarItem | null;
-
-    if (parent == null)
-        return;
-
-    for (const item of items.slice()) {
-        if (item === parent || !findChildren(item))
+    const queue: Parent[] = [parsedHtml];
+    while (queue.length > 0) {
+        const item = queue.shift();
+        if (item == null)
             continue;
 
-        items.splice(items.indexOf(item), 1);
-        children.push(item);
-    }
+        if (isElement(item) && matcher(item))
+            return item;
 
-    if (children.length > 0) {
-        parent.collapsed = collapsed;
-        parent.items = children;
+        if (item.children == null)
+            continue;
 
-        if (moveToEndIfGrouped) {
-            items.splice(items.indexOf(parent as typeof items[number]), 1);
-            items.push(parent as typeof items[number]);
+        for (let i = 0; i < item.children.length; i++) {
+            const child = item.children[i]!;
+
+            if (isParent(child))
+                queue.push(child);
         }
     }
+
+    return undefined;
 }
 
-function moveItem(
-    items: DefaultTheme.SidebarItem[] | undefined,
-    findItem: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    newIndex: number
-) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    const item = items.find(findItem);
-    if (item != null) {
-        items.splice(items.indexOf(item), 1);
-        items.splice(newIndex, 0, item);
-    }
-}
-
-function moveCollapseItemsToTheEnd(items: DefaultTheme.SidebarItem[] | undefined) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    items.sort((a, b) => {
-        if (a.collapsed && !b.collapsed)
-            return 1;
-        if (!a.collapsed && b.collapsed)
-            return -1;
-
-        return 0;
-    });
-}
-
-function sortItemsInOrder(items: DefaultTheme.SidebarItem[] | undefined, order: readonly string[]) {
-    if (items == null || !(items instanceof Array))
-        return;
-
-    items.sort((a, b) => {
-        const aIndex = order.indexOf(a.text as typeof order[number]);
-        const bIndex = order.indexOf(b.text as typeof order[number]);
-
-        if (aIndex < 0 && bIndex < 0)
-            return 0;
-        if (aIndex < 0)
-            return 1;
-        if (bIndex < 0)
-            return -1;
-
-        return aIndex - bIndex;
-    });
-}

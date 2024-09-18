@@ -27,5 +27,18 @@ async function moveBinariesFolderToStandaloneModule(folderNameFilter: (folderNam
     }
 }
 
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("mac-arm64-metal"), "@node-llama-cpp/mac-arm64-metal");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("mac-x64"), "@node-llama-cpp/mac-x64");
+
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64-cuda"), "@node-llama-cpp/linux-x64-cuda");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64-vulkan"), "@node-llama-cpp/linux-x64-vulkan");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64"), "@node-llama-cpp/linux-x64");
+
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-arm64"), "@node-llama-cpp/linux-arm64");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-armv7l"), "@node-llama-cpp/linux-armv7l");
+
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("win-x64-cuda"), "@node-llama-cpp/win-x64-cuda");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("win-x64-vulkan"), "@node-llama-cpp/win-x64-vulkan");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("win-x64"), "@node-llama-cpp/win-x64");
+
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("win-arm64"), "@node-llama-cpp/win-arm64");

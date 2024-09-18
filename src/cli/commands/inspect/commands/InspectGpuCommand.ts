@@ -30,10 +30,16 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         const availableComputeLayers = await detectAvailableComputeLayers({platform});
         const gpusToLogVramUsageOf: BuildGpu[] = [];
         const gpuToLlama = new Map<BuildGpu, Llama | undefined>();
+        let lastLlama: Llama | undefined;
 
         async function loadLlamaForGpu(gpu: BuildGpu) {
-            if (!gpuToLlama.has(gpu))
-                gpuToLlama.set(gpu, await getLlamaForGpu(gpu));
+            if (!gpuToLlama.has(gpu)) {
+                const loadedLlama = await getLlamaForGpu(gpu);
+                gpuToLlama.set(gpu, loadedLlama);
+
+                if (loadedLlama != null)
+                    lastLlama = loadedLlama;
+            }
 
             return gpuToLlama.get(gpu);
         }
@@ -76,23 +82,36 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         console.info();
 
         if (platform === "mac" && arch === "arm64") {
-            console.info(`${chalk.yellow("Metal:")} ${chalk.green("available")}`);
-            gpusToLogVramUsageOf.push("metal");
-            await loadLlamaForGpu("metal");
+            const llama = await loadLlamaForGpu("metal");
+
+            if (llama == null) {
+                console.info(`${chalk.yellow("Metal:")} ${chalk.red("Metal is detected, but using it failed")}`);
+            } else {
+                console.info(`${chalk.yellow("Metal:")} ${chalk.green("available")}`);
+                gpusToLogVramUsageOf.push("metal");
+            }
         } else if (platform === "mac") {
             console.info(`${chalk.yellow("Metal:")} ${chalk.red("not supported by llama.cpp on Intel Macs")}`);
+
+            const llama = await loadLlamaForGpu(false);
+            if (llama == null) {
+                console.info(`${chalk.yellow("CPU:")} ${chalk.red("Loading a binding with only CPU support failed")}`);
+            }
         }
 
         if (availableComputeLayers.cuda.hasNvidiaDriver && !availableComputeLayers.cuda.hasCudaRuntime) {
             console.info(`${chalk.yellow("CUDA:")} ${chalk.red("NVIDIA driver is installed, but CUDA runtime is not")}`);
+            console.info(chalk.yellow("To resolve errors related to CUDA, see the CUDA guide: ") + documentationPageUrls.CUDA);
         } else if (availableComputeLayers.cuda.hasCudaRuntime && !availableComputeLayers.cuda.hasNvidiaDriver) {
             console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA runtime is installed, but NVIDIA driver is not")}`);
+            console.info(chalk.yellow("To resolve errors related to CUDA, see the CUDA guide: ") + documentationPageUrls.CUDA);
         } else if (availableComputeLayers.cuda.hasCudaRuntime && availableComputeLayers.cuda.hasNvidiaDriver) {
             const llama = await loadLlamaForGpu("cuda");
 
-            if (llama == null)
+            if (llama == null) {
                 console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA is detected, but using it failed")}`);
-            else {
+                console.info(chalk.yellow("To resolve errors related to CUDA, see the CUDA guide: ") + documentationPageUrls.CUDA);
+            } else {
                 console.info(`${chalk.yellow("CUDA:")} ${chalk.green("available")}`);
                 gpusToLogVramUsageOf.push("cuda");
             }
@@ -101,9 +120,10 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         if (availableComputeLayers.vulkan) {
             const llama = await loadLlamaForGpu("vulkan");
 
-            if (llama == null)
+            if (llama == null) {
                 console.info(`${chalk.yellow("Vulkan:")} ${chalk.red("Vulkan is detected, but using it failed")}`);
-            else {
+                console.info(chalk.yellow("To resolve errors related to Vulkan, see the Vulkan guide: ") + documentationPageUrls.Vulkan);
+            } else {
                 console.info(`${chalk.yellow("Vulkan:")} ${chalk.green("available")}`);
                 gpusToLogVramUsageOf.push("vulkan");
             }
@@ -119,7 +139,7 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         }
 
         console.info();
-        await logRamUsage();
+        await logRamUsage(lastLlama?.cpuMathCores);
     }
 };
 
@@ -153,7 +173,7 @@ async function logGpuVramUsage(gpu: BuildGpu, llama: Llama) {
     } catch (err) {}
 }
 
-async function logRamUsage() {
+async function logRamUsage(cpuMathCores?: number) {
     const totalMemory = os.totalmem();
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;
@@ -167,6 +187,9 @@ async function logRamUsage() {
 
     if (cpuDeviceNames.length > 0)
         console.info(`${chalk.yellow("CPU model" + (cpuDeviceNames.length > 1 ? "s" : "") + ":")} ${cpuDeviceNames.join(", ")}`);
+
+    if (cpuMathCores != null)
+        console.info(`${chalk.yellow("Math cores:")} ${cpuMathCores}`);
 
     console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
     console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);

@@ -192,11 +192,11 @@ export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progres
             fail: chalk.blue("Failed to fetch llama.cpp info"),
             disableLogs: !progressLogs
         }, async () => {
-            releaseTag = await resolveGithubRelease(githubOwner, githubRepo, releaseTag);
+            releaseTag = await resolveGithubRelease(githubOwner!, githubRepo!, releaseTag);
         });
     }
 
-    await cloneLlamaCppRepo(githubOwner, githubRepo, releaseTag, true, progressLogs);
+    await cloneLlamaCppRepo(githubOwner!, githubRepo!, releaseTag, true, progressLogs);
 }
 
 async function updateClonedLlamaCppRepoTagFile(githubOwner: string, githubRepo: string, tag: string) {

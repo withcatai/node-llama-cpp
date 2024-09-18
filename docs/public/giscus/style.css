@@ -1,0 +1,133 @@
+body, #__next {
+    .rounded-t {
+        border-start-end-radius: 8px;
+        border-start-start-radius: 8px;
+    }
+
+    .gsc-comment-box:not(.gsc-comment-box-is-reply) {
+        border-radius: 12px;
+    }
+
+    .rounded-md {
+        border-radius: 8px;
+    }
+
+    .gsc-comment-box-textarea {
+        border-radius: 8px 8px 0 0;
+    }
+
+    .gsc-comment-box-textarea-extras {
+        border-end-end-radius: 8px;
+        border-end-start-radius: 8px;
+    }
+
+    .gsc-comment-box-tabs {
+        border-start-end-radius: 12px;
+        border-start-start-radius: 12px;
+    }
+
+    .gsc-comment .gsc-comment-box-tabs {
+        border-start-end-radius: 0;
+        border-start-start-radius: 0;
+    }
+
+    .gsc-reactions-popover {
+        border-radius: 12px;
+
+        > p:first-child {
+            margin: 12px;
+        }
+
+        &.open.bottom:after {
+            top: -14px;
+        }
+
+        &.open.top:after {
+            bottom: -14px;
+        }
+    }
+
+    .gsc-reply-box {
+        padding: 8px;
+        border-end-end-radius: 12px;
+        border-end-start-radius: 12px;
+
+        > button {
+            border-radius: 8px;
+        }
+    }
+
+    .gsc-comment > div {
+        border-radius: 12px;
+    }
+
+    .gsc-comment-box-bottom {
+        > .link-secondary {
+            padding-inline-start: 7px;
+        }
+    }
+
+    .gsc-comment-box-write {
+        border-radius: 8px;
+    }
+
+    .gsc-reactions:after {
+        content: "";
+        display: block;
+        height: 1px;
+        background: var(--vp-c-divider);
+        margin-top: 24px;
+    }
+
+    .gsc-reactions-count {
+        display: none;
+
+        + div {
+            margin-top: 0px;
+        }
+    }
+
+    .gsc-main {
+        gap: 64px;
+    }
+}
+
+html {
+    color-scheme: light dark;
+}
+
+main {
+    --color-canvas-default: var(--g-comment-bg-alt);
+    --color-canvas-subtle: var(--g-comment-bg);
+    --color-canvas-inset: transparent;
+
+    --color-border-default: var(--vp-c-divider);
+    --color-segmented-control-button-selected-border: var(--vp-c-divider);
+
+    --color-segmented-control-button-bg: var(--vp-c-bg);
+    --color-btn-selected-bg: var(--vp-c-bg);
+    --color-btn-bg: var(--vp-c-bg);
+    --color-btn-hover-bg: var(--vp-c-bg);
+    --color-btn-hover-border: var(--vp-c-brand-1);
+    --color-btn-active-bg: var(--vp-c-bg);
+    --color-btn-active-border: var(--vp-c-brand-1);
+
+    --color-fg-default: var(--vp-c-text-1);
+
+    --color-accent-fg: var(--vp-c-brand-1);
+    --color-accent-emphasis: var(--vp-c-brand-2);
+    --color-accent-muted: color-mix(in srgb, var(--vp-c-brand-3) 40%, transparent);
+    --color-accent-subtle: color-mix(in srgb, var(--vp-c-brand-1) 10%, transparent);
+
+    --color-btn-primary-bg: var(--vp-c-brand-3);
+    --color-btn-primary-border: transparent;
+    --color-btn-primary-hover-bg: var(--vp-c-brand-2);
+    --color-btn-primary-hover-border: transparent;
+    --color-btn-primary-selected-bg: var(--vp-c-brand-3);
+    --color-btn-primary-border: transparent;
+    --color-btn-primary-disabled-border: transparent;
+
+    --color-canvas-overlay: var(--vp-c-bg-elv);
+    --color-social-reaction-bg-hover: var(--vp-c-bg-elv);
+    --color-social-reaction-bg-reacted-hover: color-mix(in srgb, var(--vp-c-brand-1) 20%, transparent);
+}

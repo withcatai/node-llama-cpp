@@ -56,7 +56,12 @@ export type JinjaTemplateChatWrapperOptions = {
      *
      * Defaults to `true`.
      */
-    trimLeadingWhitespaceInResponses?: boolean
+    trimLeadingWhitespaceInResponses?: boolean,
+
+    /**
+     * Additional parameters to use for rendering the Jinja template.
+     */
+    additionalRenderParameters?: Record<string, any>
 };
 
 export type JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
@@ -76,6 +81,22 @@ const defaultConvertUnsupportedSystemMessagesToUserMessagesFormat: JinjaTemplate
  * from the `ChatWrapper` class and implement a custom chat wrapper of your own in TypeScript.
  *
  * For a simpler way to create a chat wrapper, see the `TemplateChatWrapper` class.
+ * @example
+ * <span v-pre>
+ *
+ * ```ts
+ * import {JinjaTemplateChatWrapper} from "node-llama-cpp";
+ *
+ * const chatWrapper = new JinjaTemplateChatWrapper({
+ *     template: "<Jinja template here>",
+ *     // functionCallMessageTemplate: { // optional
+ *     //     call: "[[call: {{functionName}}({{functionParams}})]]",
+ *     //     result: " [[result: {{functionCallResult}}]]"
+ *     // }
+ * });
+ * ```
+ *
+ * </span>
  */
 export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly wrapperName = "JinjaTemplate";
@@ -88,9 +109,13 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptionsConvertMessageFormat;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
     public readonly trimLeadingWhitespaceInResponses: boolean;
+    public readonly additionalRenderParameters?: Record<string, any>;
 
     /** @internal */ private readonly _jinjaTemplate: Template;
 
+    /**
+     * @param options
+     */
     public constructor({
         template,
         modelRoleName = "assistant",
@@ -99,7 +124,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         convertUnsupportedSystemMessagesToUserMessages = defaultConvertUnsupportedSystemMessagesToUserMessagesFormat,
         functionCallMessageTemplate,
         joinAdjacentMessagesOfTheSameType = true,
-        trimLeadingWhitespaceInResponses = true
+        trimLeadingWhitespaceInResponses = true,
+        additionalRenderParameters
     }: JinjaTemplateChatWrapperOptions) {
         super();
 
@@ -114,6 +140,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             resolveConvertUnsupportedSystemMessagesToUserMessagesOption(convertUnsupportedSystemMessagesToUserMessages);
         this.joinAdjacentMessagesOfTheSameType = joinAdjacentMessagesOfTheSameType;
         this.trimLeadingWhitespaceInResponses = trimLeadingWhitespaceInResponses;
+        this.additionalRenderParameters = additionalRenderParameters;
 
         this.settings = {
             ...ChatWrapper.defaultSettings,
@@ -272,23 +299,47 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         idToContent.set(eosTokenId, new SpecialToken("EOS"));
         idToContent.set(eotTokenId, new SpecialToken("EOT"));
 
+        function tryOptions<const T extends (() => any)[]>(options: T): ReturnType<T[number]> {
+            for (let i = 0; i < options.length; i++) {
+                if (i === options.length - 1)
+                    return options[i]!();
+
+                try {
+                    return options[i]!();
+                } catch (err) {
+                    // do nothing
+                }
+            }
+
+            throw new Error("All options failed");
+        }
+
         const renderJinjaText = () => {
-            try {
-                return this._jinjaTemplate.render({
+            return tryOptions([
+                () => this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId
-                });
-            } catch (err) {
-                return this._jinjaTemplate.render({
+                }),
+                () => this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
                     messages: jinjaItems,
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId,
                     "add_generation_prompt": true
-                });
-            }
+                })
+            ]);
         };
 
         const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string[]>>) => {
@@ -314,7 +365,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 for (let i = splitJinjaParts.length - 1; i >= 0; i--) {
                     const part = splitJinjaParts[i];
 
-                    if (typeof part === "string")
+                    if (part == null || typeof part === "string")
                         continue;
 
                     if (modelMessageIds.has(part.separator)) {
@@ -421,7 +472,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
             return {supportsSystemMessages};
         } catch (err) {
-            throw new Error("The provided Jinja template failed that sanity test: " + String(err));
+            throw new Error("The provided Jinja template failed the sanity test: " + String(err) + ". Inspect the Jinja template to find out what went wrong");
         }
     }
 }

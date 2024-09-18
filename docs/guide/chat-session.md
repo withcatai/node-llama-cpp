@@ -1,22 +1,24 @@
 # Using `LlamaChatSession`
-To chat with a text generation model, you can use the [`LlamaChatSession`](/api/classes/LlamaChatSession) class.
+To chat with a text generation model, you can use the [`LlamaChatSession`](../api/classes/LlamaChatSession.md) class.
 
-Here are some examples usage of [`LlamaChatSession`](/api/classes/LlamaChatSession):
+Here are usage examples of [`LlamaChatSession`](../api/classes/LlamaChatSession.md):
 
-## Simple chatbot
-> To use a custom chat prompt wrapper, see the [chat prompt wrapper guide](./chat-prompt-wrapper.md).
+## Simple Chatbot {#simple-chatbot}
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -33,23 +35,24 @@ const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
 
-## Different chat prompt wrapper
-To learn more about chat prompt wrappers, see the [chat prompt wrapper guide](./chat-prompt-wrapper.md).
+## Specific Chat Wrapper {#specific-chat-wrapper}
+To learn more about chat wrappers, see the [chat wrapper guide](./chat-wrapper).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {
-    LlamaModel, LlamaContext, LlamaChatSession, Llama3ChatWrapper
-} from "node-llama-cpp";
+import {getLlama, LlamaChatSession, GeneralChatWrapper} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf"),
-    chatWrapper: new Llama3ChatWrapper()
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    chatWrapper: new GeneralChatWrapper()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -66,22 +69,23 @@ const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
 
-## Response streaming
-You can see all the possible parameters of the `prompt` function [here](/api/classes/LlamaChatSession#prompt).
+## Response Streaming {#response-streaming}
+You can see all the possible options of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {
-    LlamaModel, LlamaContext, LlamaChatSession, Token
-} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -89,29 +93,29 @@ console.log("User: " + q1);
 
 process.stdout.write("AI: ");
 const a1 = await session.prompt(q1, {
-    onToken(chunk: Token[]) {
-        process.stdout.write(context.decode(chunk));
+    onTextChunk(chunk: string) {
+        process.stdout.write(chunk);
     }
 });
+
 ```
 
-## Repeat penalty customization
-You can see all the possible parameters of the `prompt` function [here](/api/classes/LlamaChatSession#prompt).
+## Repeat Penalty Customization {#repeat-penalty}
+You can see all the possible options of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {
-    LlamaModel, LlamaContext, LlamaChatSession, Token
-} from "node-llama-cpp";
+import {getLlama, LlamaChatSession, Token} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
+const context = await model.createContext();
 const session = new LlamaChatSession({
-    context
+    contextSequence: context.getSequence()
 });
 
 
@@ -126,35 +130,44 @@ const a1 = await session.prompt(q1, {
         frequencyPenalty: 0.02,
         presencePenalty: 0.02,
         punishTokensFilter(tokens: Token[]) {
-            // allow the model to repeat the tokens that make up
-            // the words "Better" and "better"
-            const BetterTokens = Array.from(context.encode("Better"));
-            const betterTokens = Array.from(context.encode("better"));
-            const allowedTokens = new Set([
-                ...BetterTokens, ...betterTokens
-            ]);
+            return tokens.filter(token => {
+                const text = model.detokenize([token]);
 
-            return tokens.filter(token => !allowedTokens.has(token));
+                // allow the model to repeat tokens
+                // that contain the word "better"
+                return !text.toLowerCase().includes("better");
+            });
         }
     }
 });
 console.log("AI: " + a1);
+
 ```
 
-## Custom temperature
-You can see the description of the parameters of the `prompt` function [here](/api/classes/LlamaChatSession#prompt).
+## Custom Temperature {#temperature}
+Setting the [`temperature`](../api/type-aliases/LLamaChatPromptOptions#temperature) option is useful for controlling the randomness of the model's responses.
+
+A temperature of `0` (the default) will ensure the model response is always deterministic for a given prompt.
+
+The randomness of the temperature can be controlled by the [`seed`](../api/type-aliases/LLamaChatPromptOptions.md#seed) parameter.
+Setting a specific [`seed`](../api/type-aliases/LLamaChatPromptOptions.md#seed) and a specific [`temperature`](../api/type-aliases/LLamaChatPromptOptions#temperature) will yield the same response every time for the same input.
+
+You can see the description of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function options [here](../api/type-aliases/LLamaChatPromptOptions.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
 
 
 const q1 = "Hi there, how are you?";
@@ -163,30 +176,30 @@ console.log("User: " + q1);
 const a1 = await session.prompt(q1, {
     temperature: 0.8,
     topK: 40,
-    topP: 0.02
+    topP: 0.02,
+    seed: 2462
 });
 console.log("AI: " + a1);
 ```
 
-## JSON response
+## JSON Response {#json-response}
 To learn more about grammars, see the [grammar guide](./grammar.md).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {
-    LlamaModel, LlamaGrammar, LlamaContext, LlamaChatSession
-} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
-})
-const grammar = await LlamaGrammar.getFor("json");
-const context = new LlamaContext({
-    model
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
 });
-const session = new LlamaChatSession({context});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+const grammar = await llama.getGrammarFor("json");
 
 
 const q1 = 'Create a JSON that contains a message saying "hi there"';
@@ -194,7 +207,7 @@ console.log("User: " + q1);
 
 const a1 = await session.prompt(q1, {
     grammar,
-    maxTokens: context.getContextSize()
+    maxTokens: context.contextSize
 });
 console.log("AI: " + a1);
 console.log(JSON.parse(a1));
@@ -206,53 +219,431 @@ console.log("User: " + q2);
 
 const a2 = await session.prompt(q2, {
     grammar,
-    maxTokens: context.getContextSize()
+    maxTokens: context.contextSize
 });
 console.log("AI: " + a2);
 console.log(JSON.parse(a2));
 ```
 
-## JSON response with schema
+## JSON Response With a Schema {#response-json-schema}
 To learn more about the JSON schema grammar, see the [grammar guide](./grammar.md#using-a-json-schema-grammar).
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {
-    LlamaModel, LlamaJsonSchemaGrammar, LlamaContext, LlamaChatSession
-} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(
+    fileURLToPath(import.meta.url)
+);
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+const grammar = await llama.createGrammarForJsonSchema({
+    type: "object",
+    properties: {
+        positiveWordsInUserMessage: {
+            type: "array",
+            items: {
+                type: "string"
+            }
+        },
+        userMessagePositivityScoreFromOneToTen: {
+            enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        },
+        nameOfUser: {
+            oneOf: [{
+                type: "null"
+            }, {
+                type: "string"
+            }]
+        }
+    }
+});
+
+const prompt = "Hi there! I'm John. Nice to meet you!";
+
+const res = await session.prompt(prompt, {grammar});
+const parsedRes = grammar.parse(res);
+
+console.log("User name:", parsedRes.nameOfUser);
+console.log(
+    "Positive words in user message:",
+    parsedRes.positiveWordsInUserMessage
+);
+console.log(
+    "User message positivity score:",
+    parsedRes.userMessagePositivityScoreFromOneToTen
+);
+```
+
+
+## Function Calling {#function-calling}
+To learn more about using function calling, read the [function calling guide](./function-calling.md).
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession, defineChatSessionFunction} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const model = new LlamaModel({
-    modelPath: path.join(__dirname, "models", "codellama-13b.Q3_K_M.gguf")
-})
-const grammar = new LlamaJsonSchemaGrammar({
-    "type": "object",
-    "properties": {
-        "responseMessage": {
-            "type": "string"
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+const fruitPrices: Record<string, string> = {
+    "apple": "$6",
+    "banana": "$4"
+};
+const functions = {
+    getFruitPrice: defineChatSessionFunction({
+        description: "Get the price of a fruit",
+        params: {
+            type: "object",
+            properties: {
+                name: {
+                    type: "string"
+                }
+            }
         },
-        "requestPositivityScoreFromOneToTen": {
-            "type": "number"
+        async handler(params) {
+            const name = params.name.toLowerCase();
+            if (Object.keys(fruitPrices).includes(name))
+                return {
+                    name: name,
+                    price: fruitPrices[name]
+                };
+
+            return `Unrecognized fruit "${params.name}"`;
         }
-    }
-} as const);
-const context = new LlamaContext({model});
-const session = new LlamaChatSession({context});
+    })
+};
 
 
-const q1 = 'How are you doing?';
+const q1 = "Is an apple more expensive than a banana?";
 console.log("User: " + q1);
 
+const a1 = await session.prompt(q1, {functions});
+console.log("AI: " + a1);
+```
+
+## Customizing the System Prompt {#system-prompt}
+::: info What is a system prompt?
+A system prompt is a text that guides the model towards the kind of responses we want it to generate.
+
+It's recommended to explain to the model how to behave in certain situations you care about,
+and to tell it to not make up information if it doesn't know something.
+:::
+
+Here is an example of how to customize the system prompt:
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    systemPrompt: "You are a helpful, respectful and honest botanist. " +
+        "Always answer as helpfully as possible.\n" +
+        
+        "If a question does not make any sense or is not factually coherent," +
+        "explain why instead of answering something incorrectly.\n" +
+        
+        "Attempt to include nature facts that you know in your answers.\n" + 
+        
+        "If you don't know the answer to a question, " +
+        "don't share false information."
+});
+
+
+const q1 = "What is the tallest tree in the world?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+```
+
+## Saving and Restoring a Chat Session {#save-and-restore}
+::: code-group
+```typescript [Save chat history]
+import {fileURLToPath} from "url";
+import path from "path";
+import fs from "fs/promises";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+
+const chatHistory = session.getChatHistory();// [!code highlight]
+await fs.writeFile("chatHistory.json", JSON.stringify(chatHistory), "utf8");// [!code highlight]
+```
+:::
+
+::: code-group
+```typescript [Restore chat history]
+import {fileURLToPath} from "url";
+import path from "path";
+import fs from "fs/promises";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// ---cut---
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+const chatHistory = JSON.parse(await fs.readFile("chatHistory.json", "utf8"));// [!code highlight]
+session.setChatHistory(chatHistory);// [!code highlight]
+
+const q2 = "Summarize what you said";
+console.log("User: " + q2);
+
+const a2 = await session.prompt(q2);
+console.log("AI: " + a2);
+```
+:::
+
+## Prompt Without Updating Chat History {#prompt-without-updating-chat-history}
+Prompt without saving the prompt to the chat history.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import fs from "fs/promises";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+// Save the initial chat history
+const initialChatHistory = session.getChatHistory();// [!code highlight]
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+
+// Reset the chat history
+session.setChatHistory(initialChatHistory);// [!code highlight]
+
+const q2 = "Summarize what you said";
+console.log("User: " + q2);
+
+// This response will not be aware of the previous interaction
+const a2 = await session.prompt(q2);
+console.log("AI: " + a2);
+```
+
+
+## Preload User Prompt {#preload-prompt}
+You can preload a user prompt onto the context sequence state
+to make the response start being generated sooner when the final prompt is given.
+
+This won't speed up inference if you call the [`.prompt()`](../api/classes/LlamaChatSession.md#prompt) function immediately after preloading the prompt,
+but can greatly improve initial response times if you preload a prompt before the user gives it.
+
+You can call this function with an empty string
+to only preload the existing chat history onto the context sequence state.
+
+::: tip NOTE
+Preloading a long prompt can cause context shifts,
+so it's recommended to limit the maximum length of the prompt you preload.
+:::
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+const prompt = "Hi there, how are you?";
+
+console.log("Preloading prompt");
+await session.preloadPrompt(prompt);
+
+console.log("Prompt preloaded. Waiting 10 seconds");
+await new Promise(resolve => setTimeout(resolve, 1000 * 10));
+
+console.log("Generating response...");
+process.stdout.write("AI: ");
+const res = await session.prompt(prompt, {
+    onTextChunk(text) {
+        process.stdout.write(text);
+    }
+});
+
+console.log("AI: " + res);
+```
+
+## Complete User Prompt {#complete-prompt}
+You can generate a completion to a given incomplete user prompt and let the model complete it.
+
+The advantage of doing that on the chat session is that it will use the chat history as context for the completion,
+and also use the existing context sequence state, so you don't have to create another context sequence for this.
+
+::: tip NOTE
+Generating a completion to a user prompt can incur context shifts,
+so it's recommended to limit the maximum number of tokens that are used for the prompt + completion.
+:::
+::: info
+Prompting the model while a prompt completion is in progress will automatically abort the prompt completion.
+:::
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+
+const q1 = "Give me a recipe for a cheesecake";
+console.log("User: " + q1);
+
+process.stdout.write("AI: ");
 const a1 = await session.prompt(q1, {
-    grammar,
-    maxTokens: context.getContextSize()
+    onTextChunk(text) {
+        process.stdout.write(text);
+    }
 });
 console.log("AI: " + a1);
 
-const parsedA1 = grammar.parse(a1);
-console.log(
-    parsedA1.responseMessage,
-    parsedA1.requestPositivityScoreFromOneToTen
-);
+const maxTokens = 100;
+const partialPrompt = "Can I replace the cream cheese with ";
+
+const maxCompletionTokens = maxTokens - model.tokenize(partialPrompt).length;
+console.log("Partial prompt: " + partialPrompt);
+process.stdout.write("Completion: ");
+const promptCompletion = await session.completePrompt(partialPrompt, {
+    maxTokens: maxCompletionTokens,
+    onTextChunk(text) {
+        process.stdout.write(text);
+    }
+});
+console.log("\nPrompt completion: " + promptCompletion);
+```
+
+## Prompt Completion Engine {#prompt-completion-engine}
+If you want to complete a user prompt as the user types it in an input field,
+you need a more robust prompt completion engine
+that can work well with partial prompts that their completion is frequently cancelled and restarted.
+
+The prompt completion created with [`.createPromptCompletionEngine()`](../api/classes/LlamaChatSession.md#createpromptcompletionengine)
+allows you to trigger the completion of a prompt,
+while utilizing existing cache to avoid redundant inference and provide fast completions.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+// ensure the model is fully loaded before continuing this demo
+await session.preloadPrompt("");
+
+const completionEngine = session.createPromptCompletionEngine({
+    // 15 is used for demonstration only,
+    // it's best to omit this option
+    maxPreloadTokens: 15,
+    // temperature: 0.8, // you can set custom generation options
+    onGeneration(prompt, completion) {
+        console.log(`Prompt: ${prompt} | Completion:${completion}`);
+        // you should add a custom code here that checks whether
+        // the existing input text equals to `prompt`, and if it does,
+        // use `completion` as the completion of the input text.
+        // this callback will be called multiple times
+        // as the completion is being generated.
+    }
+});
+
+completionEngine.complete("Hi the");
+
+await new Promise(resolve => setTimeout(resolve, 1500));
+
+completionEngine.complete("Hi there");
+await new Promise(resolve => setTimeout(resolve, 1500));
+
+completionEngine.complete("Hi there! How");
+await new Promise(resolve => setTimeout(resolve, 1500));
+
+// get an existing completion from the cache
+// and begin/continue generating a completion for it
+const cachedCompletion = completionEngine.complete("Hi there! How");
+console.log("Cached completion:", cachedCompletion);
 ```

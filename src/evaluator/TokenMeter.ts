@@ -1,10 +1,9 @@
 /**
- * Tracks the evaluation usage of tokens.
+ * Tracks the usage of tokens.
  */
 export class TokenMeter {
     private _inputTokens: number = 0;
     private _outputTokens: number = 0;
-    private _restoreStateTokens: number = 0;
 
     /**
      * The number of input tokens used
@@ -21,28 +20,19 @@ export class TokenMeter {
     }
 
     /**
-     * The number of tokens used as input to restore a context sequence state to continue previous evaluation.
-     * This may be consumed by virtual context sequences.
-     */
-    public get usedRestoreStateTokens() {
-        return this._restoreStateTokens;
-    }
-
-    /**
      * Get the current state of the token meter
      */
     public getState(): TokenMeterState {
         return {
             usedInputTokens: this.usedInputTokens,
-            usedOutputTokens: this.usedOutputTokens,
-            usedRestoreStateTokens: this.usedRestoreStateTokens
+            usedOutputTokens: this.usedOutputTokens
         };
     }
 
     /**
      * Log the usage of tokens
      */
-    public useTokens(tokens: number, type: "input" | "output" | "restoreState") {
+    public useTokens(tokens: number, type: "input" | "output") {
         if (tokens < 0)
             throw new RangeError("Tokens cannot be negative");
         else if (tokens === 0)
@@ -52,8 +42,6 @@ export class TokenMeter {
             this._inputTokens += tokens;
         else if (type === "output")
             this._outputTokens += tokens;
-        else if (type === "restoreState")
-            this._restoreStateTokens += tokens;
         else {
             void (type satisfies never);
             throw new TypeError(`Unknown token type: ${type}`);
@@ -73,7 +61,7 @@ export class TokenMeter {
     public static useTokens(
         meters: null | undefined | TokenMeter | readonly TokenMeter[] | ReadonlySet<TokenMeter>,
         tokens: number,
-        type: "input" | "output" | "restoreState"
+        type: "input" | "output"
     ) {
         if (meters == null)
             return;
@@ -95,14 +83,12 @@ export class TokenMeter {
     ) {
         return {
             usedInputTokens: meter1.usedInputTokens - meter2.usedInputTokens,
-            usedOutputTokens: meter1.usedOutputTokens - meter2.usedOutputTokens,
-            usedRestoreStateTokens: meter1.usedRestoreStateTokens - meter2.usedRestoreStateTokens
+            usedOutputTokens: meter1.usedOutputTokens - meter2.usedOutputTokens
         };
     }
 }
 
 export type TokenMeterState = {
     usedInputTokens: number,
-    usedOutputTokens: number,
-    usedRestoreStateTokens: number
+    usedOutputTokens: number
 };

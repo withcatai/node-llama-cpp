@@ -1,10 +1,10 @@
 import {Argv, CommandModule, Options} from "yargs";
-import {createMarkdownRenderer} from "vitepress";
 import {htmlEscape} from "./htmlEscape.js";
 import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 import {htmlEscapeWithCodeMarkdown} from "./htmlEscapeWithCodeMarkdown.js";
 import {getInlineCodeBlockHtml} from "./getInlineCodeBlockHtml.js";
+import {getMarkdownRenderer} from "./getMarkdownRenderer.js";
 import {cliBinName, npxRunPrefix} from "../../src/config.js";
 import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
@@ -22,7 +22,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     const title = cliName + " " + (resolvedParentCommandCliCommand ?? "<command>").replace("<command>", currentCommandCliCommand ?? "");
     const description = command.describe ?? "";
     const {subCommands, optionGroups} = await parseCommandDefinition(command);
-    const markdownRenderer = await createMarkdownRenderer(process.cwd());
+    const markdownRenderer = await getMarkdownRenderer();
 
     let res = "";
 
@@ -70,7 +70,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
         res += buildHtmlHeading("h2", htmlEscape("Options"), "options");
 
         if (optionGroups.length === 1) {
-            res += renderOptionsGroupOptionsTable(optionGroups[0].options) + "\n";
+            res += renderOptionsGroupOptionsTable(optionGroups[0]!.options) + "\n";
         } else {
             for (const group of optionGroups) {
                 let groupName = group.name;
@@ -85,7 +85,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
 
     return {
         title,
-        description: withoutCliCommandDescriptionDocsUrl(description),
+        description: htmlEscapeWithCodeMarkdown(withoutCliCommandDescriptionDocsUrl(description)),
         usage: npxRunPrefix + title,
         usageHtml: markdownRenderer.render("```shell\n" + npxRunPrefix + title + "\n```"),
         options: res

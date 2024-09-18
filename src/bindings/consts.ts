@@ -6,7 +6,10 @@ const prettyBuildGpuNames: Record<Exclude<BuildGpu, false>, string> = {
     vulkan: "Vulkan"
 };
 
-export function getPrettyBuildGpuName(gpu: BuildGpu) {
+export function getPrettyBuildGpuName(gpu: BuildGpu | undefined) {
+    if (gpu == null)
+        return "unknown GPU";
+
     if (gpu == false)
         return "no GPU";
 

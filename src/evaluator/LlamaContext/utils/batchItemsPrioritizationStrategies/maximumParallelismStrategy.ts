@@ -25,7 +25,7 @@ export function maximumParallelismStrategy({items, size}: { items: readonly Batc
         const minIncreaseAmount = Math.ceil(leftFreeTokens / clippedItems.length);
 
         for (let i = 0; i < clippedItems.length && leftFreeTokens > 0; i++) {
-            const prioritizeItem = clippedItems[i];
+            const prioritizeItem = clippedItems[i]!;
             const unprocessedAmount = prioritizeItem.item.tokens.length - prioritizeItem.processAmount;
             const increaseAmount = Math.min(unprocessedAmount, leftFreeTokens, minIncreaseAmount);
             prioritizeItem.processAmount += increaseAmount;
@@ -40,7 +40,7 @@ export function maximumParallelismStrategy({items, size}: { items: readonly Batc
     clippedItems.sort((a, b) => b.item.evaluationPriority - a.item.evaluationPriority);
 
     for (let i = 0; i < clippedItems.length && leftFreeTokens > 0; i++) {
-        const prioritizeItem = clippedItems[i];
+        const prioritizeItem = clippedItems[i]!;
         const unprocessedAmount = prioritizeItem.item.tokens.length - prioritizeItem.processAmount;
         const increaseAmount = Math.min(unprocessedAmount, leftFreeTokens);
         prioritizeItem.processAmount += increaseAmount;

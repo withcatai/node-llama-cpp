@@ -6,10 +6,11 @@ import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate
 
 export type TemplateChatWrapperOptions = {
     template: `${"" | `${string}{{systemPrompt}}`}${string}{{history}}${string}{{completion}}${string}`,
-    historyTemplate: `${string}{{roleName}}${string}{{message}}${string}`,
-    modelRoleName: string,
-    userRoleName: string,
-    systemRoleName?: string,
+    historyTemplate: {
+        system: `${string}{{message}}${string}`,
+        user: `${string}{{message}}${string}`,
+        model: `${string}{{message}}${string}`
+    },
     functionCallMessageTemplate?: ChatHistoryFunctionCallMessageTemplate,
     joinAdjacentMessagesOfTheSameType?: boolean
 };
@@ -17,13 +18,18 @@ export type TemplateChatWrapperOptions = {
 /**
  * A chat wrapper based on a simple template.
  * @example
- * ```typescript
+ * <span v-pre>
+ *
+ * ```ts
+ * import {TemplateChatWrapper} from "node-llama-cpp";
+ *
  * const chatWrapper = new TemplateChatWrapper({
  *     template: "{{systemPrompt}}\n{{history}}model:{{completion}}\nuser:",
- *     historyTemplate: "{{roleName}}: {{message}}\n",
- *     modelRoleName: "model",
- *     userRoleName: "user",
- *     systemRoleName: "system", // optional
+ *     historyTemplate: {
+ *         system: "system: {{message}}\n",
+ *         user: "user: {{message}}\n",
+ *         model: "model: {{message}}\n"
+ *     },
  *     // functionCallMessageTemplate: { // optional
  *     //     call: "[[call: {{functionName}}({{functionParams}})]]",
  *     //     result: " [[result: {{functionCallResult}}]]"
@@ -31,11 +37,14 @@ export type TemplateChatWrapperOptions = {
  * });
  * ```
  *
+ * </span>
+ *
  * **<span v-pre>`{{systemPrompt}}`</span>** is optional and is replaced with the first system message
  * (when is does, that system message is not included in the history).
  *
  * **<span v-pre>`{{history}}`</span>** is replaced with the chat history.
- * Each message in the chat history is converted using template passed to `historyTemplate`, and all messages are joined together.
+ * Each message in the chat history is converted using the template passed to `historyTemplate` for the message role,
+ * and all messages are joined together.
  *
  * **<span v-pre>`{{completion}}`</span>** is where the model's response is generated.
  * The text that comes after <span v-pre>`{{completion}}`</span> is used to determine when the model has finished generating the response,
@@ -49,38 +58,40 @@ export class TemplateChatWrapper extends ChatWrapper {
     public override readonly settings: ChatWrapperSettings;
 
     public readonly template: TemplateChatWrapperOptions["template"];
-    public readonly historyTemplate: TemplateChatWrapperOptions["historyTemplate"];
-    public readonly modelRoleName: string;
-    public readonly userRoleName: string;
-    public readonly systemRoleName: string;
+    public readonly historyTemplate: Readonly<TemplateChatWrapperOptions["historyTemplate"]>;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
 
     /** @internal */ private readonly _parsedChatTemplate: ReturnType<typeof parseChatTemplate>;
-    /** @internal */ private readonly _parsedChatHistoryTemplate: ReturnType<typeof parseChatHistoryTemplate>;
+    /** @internal */ private readonly _parsedChatHistoryTemplate: {
+        system: ReturnType<typeof parseChatHistoryTemplate>,
+        user: ReturnType<typeof parseChatHistoryTemplate>,
+        model: ReturnType<typeof parseChatHistoryTemplate>
+    };
 
     public constructor({
         template,
         historyTemplate,
-        modelRoleName,
-        userRoleName,
-        systemRoleName = "System",
         functionCallMessageTemplate,
         joinAdjacentMessagesOfTheSameType = true
     }: TemplateChatWrapperOptions) {
         super();
 
-        if (template == null || historyTemplate == null || modelRoleName == null || userRoleName == null)
-            throw new Error("Template chat wrapper settings must have a template, historyTemplate, modelRoleName, and userRoleName.");
+        if (template == null || historyTemplate == null)
+            throw new Error("Template chat wrapper settings must have a template and historyTemplate.");
+
+        if (historyTemplate.system == null || historyTemplate.user == null || historyTemplate.model == null)
+            throw new Error("Template chat wrapper historyTemplate must have system, user, and model templates.");
 
         this.template = template;
         this.historyTemplate = historyTemplate;
-        this.modelRoleName = modelRoleName;
-        this.userRoleName = userRoleName;
-        this.systemRoleName = systemRoleName;
         this.joinAdjacentMessagesOfTheSameType = joinAdjacentMessagesOfTheSameType;
 
         this._parsedChatTemplate = parseChatTemplate(template);
-        this._parsedChatHistoryTemplate = parseChatHistoryTemplate(historyTemplate);
+        this._parsedChatHistoryTemplate = {
+            system: parseChatHistoryTemplate(historyTemplate.system),
+            user: parseChatHistoryTemplate(historyTemplate.user),
+            model: parseChatHistoryTemplate(historyTemplate.model)
+        };
 
         this.settings = {
             ...ChatWrapper.defaultSettings,
@@ -145,9 +156,9 @@ export class TemplateChatWrapper extends ChatWrapper {
         flush();
 
         const getHistoryItem = (role: "system" | "user" | "model", text: LlamaText, prefix?: string | null) => {
-            const {roleNamePrefix, messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate;
+            const {messagePrefix, messageSuffix} = this._parsedChatHistoryTemplate[role];
             return LlamaText([
-                new SpecialTokensText((prefix ?? "") + roleNamePrefix + role + messagePrefix),
+                new SpecialTokensText((prefix ?? "") + messagePrefix),
                 text,
                 new SpecialTokensText(messageSuffix)
             ]);
@@ -249,21 +260,16 @@ function parseChatTemplate(template: TemplateChatWrapperOptions["template"]): {
     };
 }
 
-function parseChatHistoryTemplate(template: TemplateChatWrapperOptions["historyTemplate"]): {
-    roleNamePrefix: string,
+function parseChatHistoryTemplate(template: `${string}{{message}}${string}`): {
     messagePrefix: string,
     messageSuffix: string
 } {
     const parsedTemplate = parseTextTemplate(template, [{
-        text: "{{roleName}}",
-        key: "roleName"
-    }, {
         text: "{{message}}",
         key: "message"
     }]);
 
     return {
-        roleNamePrefix: parsedTemplate.roleName.prefix,
         messagePrefix: parsedTemplate.message.prefix,
         messageSuffix: parsedTemplate.message.suffix
     };

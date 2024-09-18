@@ -78,6 +78,7 @@
             align-self: center;
             flex-basis: 400px;
             padding: 12px 24px;
+            word-break: break-word;
 
             margin-inline-end: 48px;
         }

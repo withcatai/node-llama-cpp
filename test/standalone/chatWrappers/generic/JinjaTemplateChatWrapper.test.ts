@@ -469,7 +469,7 @@ describe("JinjaTemplateChatWrapper", () => {
             template: template2,
             joinAdjacentMessagesOfTheSameType: false
         });
-        const {contextText} = chatWrapper.generateContextState({chatHistory: [conversationHistory[0], ...conversationHistory]});
+        const {contextText} = chatWrapper.generateContextState({chatHistory: [conversationHistory[0]!, ...conversationHistory]});
 
         expect(contextText.values).toMatchInlineSnapshot(`
           [
@@ -756,7 +756,7 @@ describe("JinjaTemplateChatWrapper", () => {
             });
             expect.unreachable("Should have thrown an error");
         } catch (err) {
-            expect(String(err)).toMatchInlineSnapshot('"Error: The provided Jinja template failed that sanity test: Error: Some input messages are not present in the generated Jinja template output"');
+            expect(String(err)).toMatchInlineSnapshot('"Error: The provided Jinja template failed the sanity test: Error: Some input messages are not present in the generated Jinja template output. Inspect the Jinja template to find out what went wrong"');
         }
     });
 
@@ -768,7 +768,7 @@ describe("JinjaTemplateChatWrapper", () => {
             });
             expect.unreachable("Should have thrown an error");
         } catch (err) {
-            expect(String(err)).toMatchInlineSnapshot('"Error: The provided Jinja template failed that sanity test: Error: Some input messages are not present in the generated Jinja template output"');
+            expect(String(err)).toMatchInlineSnapshot('"Error: The provided Jinja template failed the sanity test: Error: Some input messages are not present in the generated Jinja template output. Inspect the Jinja template to find out what went wrong"');
         }
     });
 });

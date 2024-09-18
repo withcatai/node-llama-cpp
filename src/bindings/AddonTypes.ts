@@ -20,29 +20,35 @@ export type BindingModule = {
     },
     AddonContext: {
         new (model: AddonModel, params: {
-            seed?: number,
             contextSize?: number,
             batchSize?: number,
             sequences?: number,
             flashAttention?: boolean,
             logitsAll?: boolean,
             embeddings?: boolean,
-            threads?: number
+            threads?: number,
+            performanceTracking?: boolean
         }): AddonContext
     },
     AddonGrammar: {
         new (grammarPath: string, params?: {
             addonExports?: BindingModule,
-            debugPrintGrammar?: boolean
+            rootRuleName?: string
         }): AddonGrammar
     },
     AddonGrammarEvaluationState: {
-        new (grammar: AddonGrammar): AddonGrammarEvaluationState
+        new (model: AddonModel, grammar: AddonGrammar): AddonGrammarEvaluationState
+    },
+    AddonSampler: {
+        new (model: AddonModel): AddonSampler,
+        acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
+        canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean
     },
     systemInfo(): string,
     getSupportsGpuOffloading(): boolean,
     getSupportsMmap(): boolean,
     getSupportsMlock(): boolean,
+    getMathCores(): number,
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
     getTypeSizeForGgmlType(ggmlType: number): number | undefined,
     getConsts(): {
@@ -50,7 +56,6 @@ export type BindingModule = {
         ggmlTypeF16Size: number,
         ggmlTypeF32Size: number,
         ggmlTensorOverhead: number,
-        llamaMaxRngState: number,
         llamaPosSize: number,
         llamaSeqIdSize: number
     },
@@ -107,19 +112,7 @@ export type AddonContext = {
         generateLogitAtTheEnd: boolean
     ): BatchLogitIndex | undefined, // returns batchLogitIndex if `generateLogitAtTheEnd` is true
     decodeBatch(): Promise<void>,
-    sampleToken(batchLogitIndex: BatchLogitIndex, options?: {
-        temperature?: number,
-        minP?: number,
-        topK?: number,
-        topP?: number,
-        repeatPenalty?: number,
-        repeatPenaltyTokens?: Uint32Array,
-        repeatPenaltyPresencePenalty?: number, // alpha_presence
-        repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
-        grammarEvaluationState?: AddonGrammarEvaluationState,
-        tokenBiasKeys?: Uint32Array,
-        tokenBiasValues?: Float32Array
-    }): Promise<Token>,
+    sampleToken(batchLogitIndex: BatchLogitIndex, sampler: AddonSampler): Promise<Token>,
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive
@@ -128,10 +121,10 @@ export type AddonContext = {
     // startPos in inclusive, endPos is exclusive
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
-    acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
-    canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean,
     getEmbedding(inputTokensLength: number): Float64Array,
     getStateSize(): number,
+    getThreads(): number,
+    setThreads(threads: number): void,
     printTimings(): void,
     setLora(lora: AddonModelLora, scale: number): void
 };
@@ -146,6 +139,25 @@ export type AddonGrammar = "AddonGrammar" & {
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {
     __brand: never
+};
+
+export type AddonSampler = {
+    dispose(): void,
+    applyConfig(config: {
+        temperature?: number,
+        minP?: number,
+        topK?: number,
+        topP?: number,
+        seed?: number,
+        repeatPenalty?: number,
+        repeatPenaltyMaxTokens?: number,
+        repeatPenaltyTokens?: Uint32Array,
+        repeatPenaltyPresencePenalty?: number, // alpha_presence
+        repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
+        grammarEvaluationState?: AddonGrammarEvaluationState,
+        tokenBiasKeys?: Uint32Array,
+        tokenBiasValues?: Float32Array
+    }): void
 };
 
 export type AddonModelLora = {

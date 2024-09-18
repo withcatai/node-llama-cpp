@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4096 2048" style="background-color: black">
+    <style>
+        /* latin-ext */
+        @font-face {
+            font-family: "Inter";
+            font-style: oblique 0deg 10deg;
+            font-weight: 100 900;
+            font-display: swap;
+            src: url(https://fonts.gstatic.com/s/inter/v13/UcCo3FwrK3iLTcvsYwYZ8UA3J58.woff2) format("woff2");
+            unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+        }
+        /* latin */
+        @font-face {
+            font-family: "Inter";
+            font-style: oblique 0deg 10deg;
+            font-weight: 100 900;
+            font-display: swap;
+            src: url(https://fonts.gstatic.com/s/inter/v13/UcCo3FwrK3iLTcviYwYZ8UA3.woff2) format("woff2");
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+    </style>
+    <defs>
+        <linearGradient
+            id="ThemeGradient"
+            gradientTransform="rotate(18)"
+            gradientUnits="userSpaceOnUse"
+        >
+            <stop offset="0" stop-color="#faad5e"/>
+            <stop offset="1" stop-color="#bd44c5"/>
+        </linearGradient>
+        <linearGradient
+            id="BgGradient"
+            gradientUnits="userSpaceOnUse"
+        >
+            <stop offset="0" stop-color="black" stop-opacity="0.3"/>
+            <stop offset="0.6" stop-color="black" stop-opacity="0.25"/>
+            <stop offset="1" stop-color="black" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="LogoGlowGradient">
+            <stop offset="0" stop-opacity="0.12" stop-color="white"/>
+            <stop offset="0.6" stop-opacity="0.04" stop-color="white"/>
+            <stop offset="1" stop-opacity="0" stop-color="white"/>
+        </radialGradient>
+        <filter id="backgroundBlur" filterUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="16"/>
+        </filter>
+    </defs>
+    <rect id="background" x="0" y="0" width="4096" height="2048" fill="#1b1b1f"/>
+    <image id="backgroundTheme" href="themeBackground.png" x="-64" y="-64" width="4224" height="2176" filter="url(#backgroundBlur)"/>
+
+    <rect id="bgGradient" x="0" y="0" width="4096" height="2048" fill="url(#BgGradient)"/>
+
+    <mask id="LogoMask">
+        <rect fill="white" x="3072" y="1024" width="768" height="768" rx="128"/>
+    </mask>
+    <circle id="logo-glow" fill="url(#LogoGlowGradient)" cx="3456" cy="1408" r="1472" />
+    <image id="logo" href="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.png" x="3072" y="1024" width="768" height="768" mask="url(#LogoMask)"/>
+
+    <text id="logo-text" x="256" y="1792" font-size="90" font-weight="700" fill="url(#ThemeGradient)" alignment-baseline="baseline" font-family="Inter, sans-serif">node-llama-cpp</text>
+
+    <text id="category" x="256" y="448" opacity=".42" font-size="108" fill="#FFFFF5" alignment-baseline="baseline" font-family="Inter, sans-serif">{{category}}</text>
+    <text id="text" x="256" y="520" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line1}}</text>
+    <text id="text" x="256" y="780" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line2}}</text>
+    <text id="text" x="256" y="1039" opacity=".86" font-size="216" fill="#FFFFF5" alignment-baseline="before-edge" font-family="Inter, sans-serif">{{line3}}</text>
+
+    <rect id="view-guard-top" x="0" y="-100" width="4096" height="100" fill="black"/>
+    <rect id="view-guard-bottom" x="0" y="2048" width="4096" height="100" fill="black"/>
+    <rect id="view-guard-right" x="4096" y="0" width="100" height="2048" fill="black"/>
+    <rect id="view-guard-left" x="-100" y="0" width="100" height="2048" fill="black"/>
+</svg>

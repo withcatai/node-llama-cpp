@@ -11,12 +11,10 @@ import {withCliCommandDescriptionDocsUrl} from "./utils/withCliCommandDescriptio
 import {PullCommand} from "./commands/PullCommand.js";
 import {ChatCommand} from "./commands/ChatCommand.js";
 import {InitCommand} from "./commands/InitCommand.js";
-import {DownloadCommand} from "./commands/DownloadCommand.js";
+import {SourceCommand} from "./commands/source/SourceCommand.js";
 import {CompleteCommand} from "./commands/CompleteCommand.js";
 import {InfillCommand} from "./commands/InfillCommand.js";
 import {InspectCommand} from "./commands/inspect/InspectCommand.js";
-import {BuildCommand} from "./commands/BuildCommand.js";
-import {ClearCommand} from "./commands/ClearCommand.js";
 import {OnPostInstallCommand} from "./commands/OnPostInstallCommand.js";
 import {DebugCommand} from "./commands/DebugCommand.js";
 
@@ -34,12 +32,10 @@ yarg
     .command(PullCommand)
     .command(ChatCommand)
     .command(InitCommand)
-    .command(DownloadCommand)
+    .command(SourceCommand)
     .command(CompleteCommand)
     .command(InfillCommand)
     .command(InspectCommand)
-    .command(BuildCommand)
-    .command(ClearCommand)
     .command(OnPostInstallCommand)
     .command(DebugCommand)
     .recommendCommands()

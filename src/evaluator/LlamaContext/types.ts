@@ -10,12 +10,10 @@ export type LlamaContextOptions = {
      * This is beneficial for performance, as multiple sequences can be evaluated in parallel (on the same batch).
      *
      * Each sequence increases the memory usage of the context.
+     *
      * Defaults to `1`.
      */
     sequences?: number,
-
-    /** If null, a random seed will be used */
-    seed?: number | null,
 
     /**
      * The number of tokens the model can see at once.
@@ -36,6 +34,7 @@ export type LlamaContextOptions = {
 
     /**
      * The number of tokens that can be processed at once by the GPU.
+     *
      * Defaults to `512` or `contextSize` if `contextSize` is less than `512`.
      */
     batchSize?: number,
@@ -59,9 +58,30 @@ export type LlamaContextOptions = {
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware.
      *
-     * Defaults to `6`.
+     * This value is considered as a hint, and the actual number of threads used may be lower when other evaluations are running.
+     * To ensure the minimum number of threads you want to use are always used,
+     * set this to an object with a `min` property (see the `min` property description for more details).
+     *
+     * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
      */
-    threads?: number,
+    threads?: number | {
+        /**
+         * The ideal number of threads to use for evaluations.
+         *
+         * If other evaluations are running, the actual number of threads may be lower than this value.
+         *
+         * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
+         */
+        ideal?: number,
+
+        /**
+         * Ensure evaluations always use at least this number of threads.
+         *
+         * Use with caution, since setting this value too high can lead to the context waiting too much time
+         * to reserve this number of threads before the evaluation can start.
+         */
+        min?: number
+    },
 
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions,
@@ -78,7 +98,7 @@ export type LlamaContextOptions = {
             filePath: string,
 
             /**
-             * @default `1`
+             * Defaults to `1`
              */
             scale?: number
         }>,
@@ -102,37 +122,78 @@ export type LlamaContextOptions = {
     ignoreMemorySafetyChecks?: boolean,
 
     /**
+     * On failed context creation, retry the creation with a smaller context size.
+     *
+     * Only works if `contextSize` is set to `"auto"`, left as default or set to an object with `min` and/or `max` properties.
+     *
+     * Set `retries` to `false` to disable.
+     */
+    failedCreationRemedy?: false | {
+        /**
+         * Retries to attempt to create the context.
+         *
+         * Defaults to `6`.
+         */
+        retries?: number,
+
+        /**
+         * The percentage to decrease the context size by on each retry.
+         * Should be a number between `0` and `1`.
+         *
+         * If a function is provided, it will be called with the current context size and should return the new context size.
+         *
+         * Defaults to `0.16`.
+         */
+        autoContextSizeShrink?: number | ((contextSize: number) => number)
+    },
+
+    /**
+     * Track the inference performance of the context, so using `.printTimings()` will work.
+     *
+     * Defaults to `false`.
+     */
+    performanceTracking?: boolean,
+
+    /**
      * embedding mode only
      * @internal
      */
-    _embeddings?: boolean,
-
-    /**
-     * disable the seed generation
-     * @internal
-     */
-    _noSeed?: boolean
+    _embeddings?: boolean
 };
 export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */
     punishTokens: Token[] | (() => Token[]),
 
     /**
-     * The relative amount to lower the probability of the tokens in `punishTokens` by
+     * The maximum number of tokens that will be provided in the `punishTokens` array.
+     *
+     * This is used as a hint for a performance optimization for avoiding frequent memory deallocation and reallocation.
+     *
+     * Don't set this value too high, as it can allocate too much memory.
+     *
+     * Defaults to `64`.
+     */
+    maxPunishTokens?: number,
+
+    /**
+     * The relative amount to lower the probability of the tokens in `punishTokens` by.
+     *
      * Defaults to `1.1`.
      * Set to `1` to disable.
      */
     penalty?: number,
 
     /**
-     * For n time a token is in the `punishTokens` array, lower its probability by `n * frequencyPenalty`
+     * For n time a token is in the `punishTokens` array, lower its probability by `n * frequencyPenalty`.
+     *
      * Disabled by default (`0`).
      * Set to a value between `0` and `1` to enable.
      */
     frequencyPenalty?: number,
 
     /**
-     * Lower the probability of all the tokens in the `punishTokens` array by `presencePenalty`
+     * Lower the probability of all the tokens in the `punishTokens` array by `presencePenalty`.
+     *
      * Disabled by default (`0`).
      * Set to a value between `0` and `1` to enable.
      */

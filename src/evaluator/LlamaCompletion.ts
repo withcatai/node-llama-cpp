@@ -10,16 +10,22 @@ import {UNKNOWN_UNICODE_CHAR} from "../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeStopTrigger.js";
 import {safeEventCallback} from "../utils/safeEventCallback.js";
 import {pushAll} from "../utils/pushAll.js";
+import {GgufArchitectureType} from "../gguf/types/GgufMetadataTypes.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
 import {LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 import {TokenBias} from "./TokenBias.js";
+import {LlamaModel} from "./LlamaModel/LlamaModel.js";
 
 export type LlamaCompletionOptions = {
     contextSequence: LlamaContextSequence,
 
-    /** Automatically dispose the sequence when the object is disposed */
+    /**
+     * Automatically dispose the sequence when the object is disposed.
+     *
+     * Defaults to `false`.
+     */
     autoDisposeSequence?: boolean
 };
 
@@ -44,9 +50,12 @@ export type LlamaCompletionGenerationOptions = {
     /**
      * Temperature is a hyperparameter that controls the randomness of the generated text.
      * It affects the probability distribution of the model's output tokens.
+     *
      * A higher temperature (e.g., 1.5) makes the output more random and creative,
      * while a lower temperature (e.g., 0.5) makes the output more focused, deterministic, and conservative.
+     *
      * The suggested temperature is 0.8, which provides a balance between randomness and determinism.
+     *
      * At the extreme, a temperature of 0 will always pick the most likely next token, leading to identical outputs in each run.
      *
      * Set to `0` to disable.
@@ -83,6 +92,15 @@ export type LlamaCompletionGenerationOptions = {
      * Only relevant when `temperature` is set to a value greater than `0`.
      */
     topP?: number,
+
+    /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
 
     /**
      * Trim whitespace from the end of the generated text
@@ -164,7 +182,7 @@ export class LlamaCompletion {
 
     public constructor({
         contextSequence,
-        autoDisposeSequence = true
+        autoDisposeSequence = false
     }: LlamaCompletionOptions) {
         this._sequence = contextSequence;
         this._autoDisposeSequence = autoDisposeSequence;
@@ -203,8 +221,7 @@ export class LlamaCompletion {
             throw new DisposedError();
 
         return this._sequence.model.tokens.infill.prefix != null &&
-            this._sequence.model.tokens.infill.suffix != null &&
-            this._sequence.model.tokens.infill.middle != null;
+            this._sequence.model.tokens.infill.suffix != null;
     }
 
     /**
@@ -231,6 +248,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -312,6 +330,7 @@ export class LlamaCompletion {
                 minP,
                 topK,
                 topP,
+                seed,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -366,6 +385,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -386,23 +406,23 @@ export class LlamaCompletion {
         const bosToken = this._sequence.model.tokens.bos;
         const shouldPrependBosToken = this._sequence.model.tokens.shouldPrependBosToken;
 
-        if (prefixToken == null || suffixToken == null || middleToken == null)
+        if (prefixToken == null || suffixToken == null)
             throw new UnsupportedError("Infill completions are not supported by this model");
+
+        const extraEosTokens = getExtraInfillEosTokens(this._sequence.model);
 
         async function fitInputIntoContext({
             maxTokens, prefixTokens, suffixTokens, sequence
         }: {
             maxTokens: number, prefixTokens: Token[], suffixTokens: Token[], sequence: LlamaContextSequence
         }): Promise<Token[]> {
-            if (prefixToken == null || suffixToken == null || middleToken == null)
+            if (prefixToken == null || suffixToken == null)
                 throw new UnsupportedError("Infill completions are not supported by this model");
 
-            // 3 - InfillPrefix token, InfillSuffix token, InfillMiddle token
-            const specialTokensInContext = 3 + (
-                (shouldPrependBosToken && bosToken != null)
-                    ? 1
-                    : 0
-            );
+            // 2 - InfillPrefix token, InfillSuffix token
+            const specialTokensInContext = 2 +
+                (middleToken != null ? 1 : 0) +
+                ((shouldPrependBosToken && bosToken != null) ? 1 : 0);
             const resolvedMaxTokens = maxTokens - specialTokensInContext;
             let sizeLeftToFill = resolvedMaxTokens;
 
@@ -444,13 +464,21 @@ export class LlamaCompletion {
             if (shouldPrependBosToken && bosToken != null)
                 newContextState.push(bosToken);
 
-            newContextState.push(prefixToken);
-            pushAll(newContextState, resolvedPrefixTokens);
+            if (middleToken != null) {
+                newContextState.push(prefixToken);
+                pushAll(newContextState, resolvedPrefixTokens);
 
-            newContextState.push(suffixToken);
-            pushAll(newContextState, resolvedSuffixTokens);
+                newContextState.push(suffixToken);
+                pushAll(newContextState, resolvedSuffixTokens);
 
-            newContextState.push(middleToken);
+                newContextState.push(middleToken);
+            } else {
+                newContextState.push(suffixToken);
+                pushAll(newContextState, resolvedSuffixTokens);
+
+                newContextState.push(prefixToken);
+                pushAll(newContextState, resolvedPrefixTokens);
+            }
 
             return newContextState;
         }
@@ -497,6 +525,7 @@ export class LlamaCompletion {
                 minP,
                 topK,
                 topP,
+                seed,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -516,7 +545,8 @@ export class LlamaCompletion {
                             sequence
                         })
                     };
-                }
+                },
+                extraEosTokens
             });
         });
     }
@@ -533,6 +563,7 @@ export class LlamaCompletion {
             minP,
             topK,
             topP,
+            seed,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -542,14 +573,16 @@ export class LlamaCompletion {
             customStopTriggers
         }: LlamaCompletionGenerationOptions,
         {
-            contextShift
+            contextShift,
+            extraEosTokens = new Set()
         }: {
             contextShift(state: {
                 shiftSize: number,
                 res: Token[],
                 pendingTokens: Token[],
                 sequence: LlamaContextSequence
-            }): Promise<{newContextState: Token[]}>
+            }): Promise<{newContextState: Token[]}>,
+            extraEosTokens?: Set<Token>
         }
     ): Promise<LlamaCompletionResponse> {
         if (this._sequence == null)
@@ -562,7 +595,7 @@ export class LlamaCompletion {
         const res: Token[] = [];
         const pendingTokens: Token[] = [];
         const grammarEvaluationState = grammar != null
-            ? new LlamaGrammarEvaluationState({grammar})
+            ? new LlamaGrammarEvaluationState({model, grammar})
             : undefined;
         const {
             lastTokens: repeatPenaltyLastTokens = 64,
@@ -641,10 +674,11 @@ export class LlamaCompletion {
             }
 
             const evaluationIterator = sequence.evaluate(inputTokens, removeNullFields({
-                temperature, minP, topK, topP,
+                temperature, minP, topK, topP, seed,
                 grammarEvaluationState,
                 repeatPenalty: !repeatPenaltyEnabled ? undefined : {
                     punishTokens: getPenaltyTokens,
+                    maxPunishTokens: repeatPenaltyLastTokens,
                     penalty,
                     frequencyPenalty,
                     presencePenalty
@@ -676,10 +710,13 @@ export class LlamaCompletion {
                 stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
                 customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
 
+                if (model.isEogToken(token) || extraEosTokens.has(token))
+                    queuedTokenRelease.createTokenIndexLock(0);
+
                 pushAll(pendingTokens, streamRegulator.popFreeChunkTokens());
 
                 if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
-                    model.isEogToken(token)
+                    model.isEogToken(token) || extraEosTokens.has(token)
                 ) {
                     const triggeredStops  = stopGenerationDetector.hasTriggeredStops
                         ? stopGenerationDetector.getTriggeredStops()
@@ -708,7 +745,7 @@ export class LlamaCompletion {
                     if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
                         modelResponse = modelResponse.trimEnd();
 
-                    const isEogToken = model.isEogToken(token);
+                    const isEogToken = model.isEogToken(token) || extraEosTokens.has(token);
 
                     if (isEogToken || stopGenerationDetector.hasTriggeredStops)
                         return {
@@ -726,7 +763,7 @@ export class LlamaCompletion {
                         metadata: {
                             remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
                             stopReason: "customStopTrigger",
-                            customStopTrigger: triggeredStops[0].stopTrigger
+                            customStopTrigger: triggeredStops[0]!.stopTrigger
                         }
                     };
                 }
@@ -801,4 +838,22 @@ async function resolveContextShiftSize(
         );
 
     return defaultContextShiftSize(sequence);
+}
+
+function getExtraInfillEosTokens(model: LlamaModel) {
+    const extraEosTokens = new Set<Token>();
+
+    if (model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma ||
+        model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2
+    ) {
+        for (const token of model.iterateAllTokens()) {
+            const tokenText = model.detokenize([token], true);
+            if (tokenText === "<|file_separator|>") {
+                extraEosTokens.add(token);
+                break;
+            }
+        }
+    }
+
+    return extraEosTokens;
 }

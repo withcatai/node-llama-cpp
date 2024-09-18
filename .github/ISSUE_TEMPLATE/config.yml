@@ -1,3 +1,4 @@
+blank_issues_enabled: false
 contact_links:
   - name: 🤔 Questions, General Support, and Help
     url: https://github.com/withcatai/node-llama-cpp/discussions

@@ -14,7 +14,8 @@ export type Tokenizer = {
     tokenize(text: BuiltinSpecialTokenValue, specialTokens: "builtin"): Token[]
 }["tokenize"] & {
     readonly detokenize: Detokenizer,
-    isSpecialToken(token: Token): boolean
+    isSpecialToken(token: Token): boolean,
+    isEogToken(token: Token): boolean
 };
 
 

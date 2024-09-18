@@ -56,9 +56,9 @@ async function getFolderNamePartForRelease(repo: string, release: string) {
     if (repo !== builtinLlamaCppGitHubRepo) {
         const [owner, name] = repo.split("/");
 
-        if (containsUnsafeCharacters(owner) || containsUnsafeCharacters(name)) {
+        if (containsUnsafeCharacters(String(owner)) || containsUnsafeCharacters(String(name))) {
             shouldHash = true;
-            resParts.push(encodeURIComponent(owner) + " " + encodeURIComponent(name));
+            resParts.push(encodeURIComponent(String(owner)) + " " + encodeURIComponent(String(name)));
         } else
             resParts.push(owner + " " + name);
     }

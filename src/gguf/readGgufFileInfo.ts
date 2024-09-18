@@ -1,5 +1,6 @@
 import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
+import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -12,6 +13,8 @@ import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
 /**
  * Read a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`).
  * Only the parts of the file required for the metadata and tensor info are read.
+ * @param pathOrUrl
+ * @param options
  */
 export async function readGgufFileInfo(pathOrUrl: string, {
     readTensorInfo = true,
@@ -21,11 +24,13 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     fetchRetryOptions = ggufDefaultFetchRetryOptions,
     fetchHeaders = {},
     spliceSplitFiles = true,
-    signal
+    signal,
+    tokens
 }: {
     /**
-     * Whether to read the tensor info from the file's header
-     * Enabled by default.
+     * Whether to read the tensor info from the file's header.
+     *
+     * Defaults to `true`.
      */
     readTensorInfo?: boolean,
 
@@ -41,7 +46,11 @@ export async function readGgufFileInfo(pathOrUrl: string, {
      */
     ignoreKeys?: string[],
 
-    /** Whether to log warnings */
+    /**
+     * Whether to log warnings
+     *
+     * Defaults to `true`.
+     */
     logWarnings?: boolean,
 
     /** Relevant only when fetching from a network */
@@ -50,10 +59,16 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     /** Relevant only when fetching from a network */
     fetchHeaders?: Record<string, string>,
 
-    /** When split files are detected, read the metadata of the first file and splice the tensor info from all the parts */
+    /**
+     * When split files are detected, read the metadata of the first file and splice the tensor info from all the parts.
+     *
+     * Defaults to `true`.
+     */
     spliceSplitFiles?: boolean,
 
-    signal?: AbortSignal
+    signal?: AbortSignal,
+
+    tokens?: ModelFileAccessTokens
 } = {}) {
     const useNetworkReader = sourceType === "network" || (sourceType == null && isUrl(pathOrUrl));
 
@@ -63,7 +78,8 @@ export async function readGgufFileInfo(pathOrUrl: string, {
                 url: normalizeGgufDownloadUrl(pathOrUrl),
                 retryOptions: fetchRetryOptions,
                 headers: fetchHeaders,
-                signal
+                signal,
+                tokens
             });
         } else if (sourceType === "filesystem" || sourceType == null) {
             return new GgufFsFileReader({
@@ -92,11 +108,14 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     const allSplitPartPaths = resolveSplitGgufParts(pathOrUrl);
 
     if (allSplitPartPaths.length === 1)
-        return await readSingleFile(allSplitPartPaths[0]);
+        return await readSingleFile(allSplitPartPaths[0]!);
 
     const [first, ...rest] = await Promise.all(
         allSplitPartPaths.map((partPath) => readSingleFile(partPath))
     );
+
+    if (first == null)
+        throw new Error("First part of the split GGUF file is missing");
 
     return {
         version: first.version,

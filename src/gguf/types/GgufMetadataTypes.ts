@@ -24,6 +24,7 @@ export const enum GgufArchitectureType {
     orion = "orion",
     internlm2 = "internlm2",
     minicpm = "minicpm",
+    minicpm3 = "minicpm3",
     gemma = "gemma",
     gemma2 = "gemma2",
     starcoder2 = "starcoder2",
@@ -32,12 +33,18 @@ export const enum GgufArchitectureType {
     commandR = "command-r",
     dbrx = "dbrx",
     olmo = "olmo",
+    olmoe = "olmoe",
     openelm = "openelm",
     arctic = "arctic",
     deepseek2 = "deepseek2",
+    chatglm = "chatglm",
     bitnet = "bitnet",
     t5 = "t5",
+    t5encoder = "t5encoder",
     jais = "jais",
+    nemotron = "nemotron",
+    exaone = "exaone",
+    rwkv6 = "rwkv6",
     unknown = "(unknown)"
 }
 
@@ -101,7 +108,14 @@ export enum GgufFileType {
     MOSTLY_IQ3_M = 27,
     MOSTLY_IQ2_S = 28,
     MOSTLY_IQ2_M = 29,
-    MOSTLY_IQ4_XS = 30
+    MOSTLY_IQ4_XS = 30,
+    MOSTLY_IQ1_M = 31,
+    MOSTLY_BF16 = 32,
+    MOSTLY_Q4_0_4_4 = 33,
+    MOSTLY_Q4_0_4_8 = 34,
+    MOSTLY_Q4_0_8_8 = 35,
+    LLAMA_FTYPE_MOSTLY_TQ1_0 = 36,
+    LLAMA_FTYPE_MOSTLY_TQ2_0 = 37
 }
 
 
@@ -133,6 +147,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      */
     readonly name?: string,
     readonly basename?: string,
+    readonly size_label?: string,
     readonly author?: string,
 
     /**
@@ -237,7 +252,8 @@ export const enum GgufMetadataArchitecturePoolingType {
     unspecified = -1,
     none = 0,
     mean = 1,
-    max = 2,
+    cls = 2,
+    last = 3
 }
 
 export type GgufMetadataDefaultArchitectureType = {

@@ -24,6 +24,7 @@ export type LLamaChatPromptCompletionEngineOptions = {
     minP?: LLamaChatCompletePromptOptions["minP"],
     topK?: LLamaChatCompletePromptOptions["topK"],
     topP?: LLamaChatCompletePromptOptions["topP"],
+    seed?: LLamaChatCompletePromptOptions["seed"],
     trimWhitespaceSuffix?: LLamaChatCompletePromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatCompletePromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatCompletePromptOptions["repeatPenalty"],
@@ -200,7 +201,7 @@ class CompletionCache {
                 return null;
 
             const [next, completion]: InputNode = node;
-            const char = input[i];
+            const char = input[i]!;
 
             if (!next.has(char)) {
                 if (completion != null && completion.startsWith(input.slice(i))) {
@@ -230,7 +231,7 @@ class CompletionCache {
         let node = this._rootNode;
         for (let i = 0; i < input.length; i++) {
             const [next] = node;
-            const char = input[i];
+            const char = input[i]!;
 
             if (!next.has(char))
                 next.set(char, [new Map()]);
@@ -249,12 +250,12 @@ class CompletionCache {
     /** @internal */
     private _deleteInput(input: string) {
         let lastNodeWithMultipleChildren: InputNode = this._rootNode;
-        let lastNodeWithMultipleChildrenDeleteChar: string = input[0];
+        let lastNodeWithMultipleChildrenDeleteChar: string = input[0]!;
 
         let node = this._rootNode;
         for (let i = 0; i < input.length; i++) {
             const [next] = node;
-            const char = input[i];
+            const char = input[i]!;
 
             if (next.size > 1) {
                 lastNodeWithMultipleChildren = node;

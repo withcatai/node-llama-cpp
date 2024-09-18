@@ -11,13 +11,14 @@ import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../gene
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
+import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llama3.1", "llama3", "llama2Chat", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -33,11 +34,12 @@ export const resolvableChatWrapperTypeNames = Object.freeze([
 ] as const);
 export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNames)[number];
 
-const chatWrappers = {
+export const chatWrappers = Object.freeze({
     "general": GeneralChatWrapper,
     "llama3.1": Llama3_1ChatWrapper,
     "llama3": Llama3ChatWrapper,
     "llama2Chat": Llama2ChatWrapper,
+    "mistral": MistralChatWrapper,
     "alpacaChat": AlpacaChatWrapper,
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
@@ -45,13 +47,15 @@ const chatWrappers = {
     "gemma": GemmaChatWrapper,
     "template": TemplateChatWrapper,
     "jinjaTemplate": JinjaTemplateChatWrapper
-} as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>;
+} as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>);
 const chatWrapperToConfigType = new Map(
     Object.entries(chatWrappers)
         .map(([configType, Wrapper]) => (
             [Wrapper, configType as keyof typeof chatWrappers]
         ))
 );
+
+export type BuiltInChatWrapperType = InstanceType<typeof chatWrappers[keyof typeof chatWrappers]>;
 
 export type ResolveChatWrapperOptions = {
     /**
@@ -69,11 +73,21 @@ export type ResolveChatWrapperOptions = {
     customWrapperSettings?: {
         [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     },
+
+    /**
+     * Defaults to `true`.
+     */
     warningLogs?: boolean,
+
+    /**
+     * Defaults to `true`.
+     */
     fallbackToOtherWrappersOnJinjaError?: boolean,
 
     /**
      * Don't resolve to a Jinja chat wrapper unless `type` is set to a Jinja chat wrapper type.
+     *
+     * Defaults to `false`.
      */
     noJinja?: boolean
 };
@@ -90,22 +104,38 @@ export type ResolveChatWrapperOptions = {
  * When loading a Jinja chat template from either `fileInfo` or `customWrapperSettings.jinjaTemplate.template`,
  * if the chat template format is invalid, it fallbacks to resolve other chat wrappers,
  * unless `fallbackToOtherWrappersOnJinjaError` is set to `false` (in which case, it will throw an error).
+ * @example
+ *```typescript
+ * import {getLlama, resolveChatWrapper, GeneralChatWrapper} from "node-llama-cpp";
+ *
+ * const llama = await getLlama();
+ * const model = await llama.loadModel({modelPath: "path/to/model.gguf"});
+ *
+ * const chatWrapper = resolveChatWrapper({
+ *     bosString: model.tokens.bosString,
+ *     filename: model.filename,
+ *     fileInfo: model.fileInfo,
+ *     tokenizer: model.tokenizer
+ * }) ?? new GeneralChatWrapper()
+ * ```
  */
-export function resolveChatWrapper({
-    type = "auto",
-    bosString,
-    filename,
-    fileInfo,
-    tokenizer,
-    customWrapperSettings,
-    warningLogs = true,
-    fallbackToOtherWrappersOnJinjaError = true,
-    noJinja = false
-}: ResolveChatWrapperOptions) {
+export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInChatWrapperType | null {
+    const {
+        type = "auto",
+        bosString,
+        filename,
+        fileInfo,
+        tokenizer,
+        customWrapperSettings,
+        warningLogs = true,
+        fallbackToOtherWrappersOnJinjaError = true,
+        noJinja = false
+    } = options;
+
     function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
         specializedChatWrapper: T,
         defaultSettings: ConstructorParameters<T>[0] = {}
-    ) {
+    ): InstanceType<T> {
         const chatWrapperConfigType = chatWrapperToConfigType.get(specializedChatWrapper) as SpecializedChatWrapperTypeName;
         const chatWrapperSettings = customWrapperSettings?.[chatWrapperConfigType];
 
@@ -144,10 +174,11 @@ export function resolveChatWrapper({
             if (isClassReference(Wrapper, TemplateChatWrapper)) {
                 const wrapperSettings = customWrapperSettings?.template;
                 if (wrapperSettings == null || wrapperSettings?.template == null || wrapperSettings?.historyTemplate == null ||
-                    wrapperSettings?.modelRoleName == null || wrapperSettings?.userRoleName == null
+                    wrapperSettings.historyTemplate.system == null || wrapperSettings.historyTemplate.user == null ||
+                    wrapperSettings.historyTemplate.model == null
                 ) {
                     if (warningLogs)
-                        console.warn(getConsoleLogPrefix() + "Template chat wrapper settings must have a template, historyTemplate, modelRoleName, and userRoleName. Falling back to resolve other chat wrapper types.");
+                        console.warn(getConsoleLogPrefix() + "Template chat wrapper settings must have a template, historyTemplate, historyTemplate.system, historyTemplate.user, and historyTemplate.model. Falling back to resolve other chat wrapper types.");
                 } else
                     return new TemplateChatWrapper(wrapperSettings);
             } else if (isClassReference(Wrapper, JinjaTemplateChatWrapper)) {
@@ -208,15 +239,45 @@ export function resolveChatWrapper({
             if (testOptionConfigurations.length === 0)
                 testOptionConfigurations.push({} as any);
 
-            for (const testConfiguration of testOptionConfigurations) {
+            for (const testConfigurationOrPair of testOptionConfigurations) {
+                const testConfig = testConfigurationOrPair instanceof Array
+                    ? (testConfigurationOrPair[0]! ?? {})
+                    : testConfigurationOrPair;
+                const applyConfig = testConfigurationOrPair instanceof Array
+                    ? (testConfigurationOrPair[1]! ?? {})
+                    : testConfigurationOrPair;
+                const additionalJinjaParameters = testConfigurationOrPair instanceof Array
+                    ? testConfigurationOrPair[2]!
+                    : undefined;
+
                 const testChatWrapperSettings = {
                     ...(wrapperSettings ?? {}),
-                    ...(testConfiguration ?? {})
+                    ...(testConfig ?? {})
+                };
+                const applyChatWrapperSettings = {
+                    ...(wrapperSettings ?? {}),
+                    ...(applyConfig ?? {})
                 };
                 const chatWrapper = new (Wrapper as any)(testChatWrapperSettings);
 
-                if (isJinjaTemplateEquivalentToSpecializedChatWrapper(jinjaTemplateChatWrapperOptions, chatWrapper, tokenizer))
-                    return new (Wrapper as any)(testChatWrapperSettings);
+                const jinjaTemplateChatWrapperOptionsWithAdditionalParameters: JinjaTemplateChatWrapperOptions = {
+                    ...jinjaTemplateChatWrapperOptions,
+                    additionalRenderParameters: additionalJinjaParameters == null
+                        ? jinjaTemplateChatWrapperOptions.additionalRenderParameters
+                        : {
+                            ...(jinjaTemplateChatWrapperOptions.additionalRenderParameters ?? {}),
+                            ...additionalJinjaParameters
+                        }
+                };
+
+                if (
+                    isJinjaTemplateEquivalentToSpecializedChatWrapper(
+                        jinjaTemplateChatWrapperOptionsWithAdditionalParameters,
+                        chatWrapper,
+                        tokenizer
+                    )
+                )
+                    return new (Wrapper as any)(applyChatWrapperSettings);
             }
         }
 
@@ -230,6 +291,17 @@ export function resolveChatWrapper({
                 console.error(getConsoleLogPrefix() + "Error creating Jinja template chat wrapper. Falling back to resolve other chat wrappers. Error:", err);
             }
         }
+    }
+
+    for (const modelNames of getModelLinageNames()) {
+        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+            return createSpecializedChatWrapper(Llama3_1ChatWrapper);
+        else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
+            return createSpecializedChatWrapper(Llama3ChatWrapper);
+        else if (includesText(modelNames, ["Mistral", "Mistral Large", "Mistral Large Instruct", "Mistral-Large", "Codestral"]))
+            return createSpecializedChatWrapper(MistralChatWrapper);
+        else if (includesText(modelNames, ["Gemma", "Gemma 2"]))
+            return createSpecializedChatWrapper(GemmaChatWrapper);
     }
 
     // try to find a pattern in the Jinja template to resolve to a specialized chat wrapper,
@@ -249,14 +321,6 @@ export function resolveChatWrapper({
         } else if (modelJinjaTemplate.includes("<start_of_turn>"))
             return createSpecializedChatWrapper(GemmaChatWrapper);
     }
-
-    for (const modelNames of getModelLinageNames()) {
-        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
-            return createSpecializedChatWrapper(Llama3_1ChatWrapper);
-        else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
-            return createSpecializedChatWrapper(Llama3ChatWrapper);
-    }
-
 
     if (filename != null) {
         const {name, subType, fileType, otherInfo} = parseModelFileName(filename);
@@ -299,6 +363,14 @@ export function resolveChatWrapper({
         }
     }
 
+    if (bosString !== "" && bosString != null) {
+        if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
+            return createSpecializedChatWrapper(Llama2ChatWrapper);
+        } else if ("<|im_start|>system\n".startsWith(bosString)) {
+            return createSpecializedChatWrapper(ChatMLChatWrapper);
+        }
+    }
+
     if (fileInfo != null) {
         const arch = fileInfo.metadata.general?.architecture;
 
@@ -306,15 +378,8 @@ export function resolveChatWrapper({
             return createSpecializedChatWrapper(GeneralChatWrapper);
         else if (arch === "falcon")
             return createSpecializedChatWrapper(FalconChatWrapper);
-    }
-
-    if (bosString === "" || bosString == null)
-        return null;
-
-    if ("<s>[INST] <<SYS>>\n".startsWith(bosString)) {
-        return createSpecializedChatWrapper(Llama2ChatWrapper);
-    } else if ("<|im_start|>system\n".startsWith(bosString)) {
-        return createSpecializedChatWrapper(ChatMLChatWrapper);
+        else if (arch === "gemma" || arch === "gemma2")
+            return createSpecializedChatWrapper(GemmaChatWrapper);
     }
 
     return null;

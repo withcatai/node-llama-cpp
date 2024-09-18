@@ -18,7 +18,7 @@ export class TokenStreamRegulator {
     public popFreeChunkTokens() {
         const res: Token[] = [];
 
-        while (this._queue.length > 0 && this._queue[0].isFree) {
+        while (this._queue.length > 0 && this._queue[0]!.isFree) {
             const tokens = this._queue.shift()!.tokens;
             pushAll(res, tokens);
             pushAll(this._LastTokens, tokens);
@@ -31,8 +31,8 @@ export class TokenStreamRegulator {
     }
 
     public getPartiallyFreeChunk(tokenizer: Tokenizer) {
-        if (this._queue.length > 0 && this._queue[0].isPartiallyFree) {
-            const queuedRelease = this._queue[0];
+        if (this._queue.length > 0 && this._queue[0]!.isPartiallyFree) {
+            const queuedRelease = this._queue[0]!;
 
             if (queuedRelease.hasTextLocks && !queuedRelease.hasTokenLocks)
                 return {
@@ -105,9 +105,9 @@ export class TokenStreamRegulator {
         const res: Token[] = [];
 
         for (let i = this._queue.length - 1; i >= 0 && res.length < maxTokens; i--) {
-            const tokens = this._queue[i].tokens;
+            const tokens = this._queue[i]!.tokens;
             for (let j = tokens.length - 1; j >= 0 && res.length < maxTokens; j--)
-                res.unshift(tokens[j]);
+                res.unshift(tokens[j]!);
         }
 
         return this._queue.flatMap((queuedRelease) => queuedRelease.tokens);

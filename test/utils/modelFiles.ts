@@ -14,7 +14,9 @@ const supportedModels = {
     "stable-code-3b-Q5_K_M.gguf": "https://huggingface.co/stabilityai/stable-code-3b/resolve/main/stable-code-3b-Q5_K_M.gguf?download=true",
     "bge-small-en-v1.5-q8_0.gguf": "https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf?download=true",
     "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf": "https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf?download=true",
-    "lora-Llama-3-Instruct-abliteration-LoRA-8B-f16.gguf": "https://huggingface.co/ngxson/test_gguf_lora_adapter/resolve/main/lora-Llama-3-Instruct-abliteration-LoRA-8B-f16.gguf?download=true"
+    "lora-Llama-3-Instruct-abliteration-LoRA-8B-f16.gguf": "https://huggingface.co/ngxson/test_gguf_lora_adapter/resolve/main/lora-Llama-3-Instruct-abliteration-LoRA-8B-f16.gguf?download=true",
+    "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf": "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf?download=true",
+    "codegemma-2b-Q4_K_M.gguf": "https://huggingface.co/bartowski/codegemma-2b-GGUF/resolve/main/codegemma-2b-Q4_K_M.gguf?download=true"
 } as const;
 
 export async function getModelFile(modelName: keyof typeof supportedModels) {

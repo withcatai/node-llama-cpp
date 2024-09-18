@@ -26,7 +26,7 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
         {
             (
                 simplifiedChat.length > 0 &&
-                simplifiedChat[simplifiedChat.length - 1].type !== "model" &&
+                simplifiedChat[simplifiedChat.length - 1]!.type !== "model" &&
                 generatingResult
             ) &&
             <div className="message model active"/>

@@ -12,7 +12,8 @@ import {LlamaJsonSchemaGrammar} from "./evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaJsonSchemaValidationError} from "./utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from "./evaluator/LlamaGrammarEvaluationState.js";
 import {LlamaContext, LlamaContextSequence} from "./evaluator/LlamaContext/LlamaContext.js";
-import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions, type LlamaEmbedding} from "./evaluator/LlamaEmbeddingContext.js";
+import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions} from "./evaluator/LlamaEmbeddingContext.js";
+import {LlamaEmbedding, type LlamaEmbeddingOptions, type LlamaEmbeddingJSON} from "./evaluator/LlamaEmbedding.js";
 import {
     type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
@@ -43,6 +44,7 @@ import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {Llama3_1ChatWrapper} from "./chatWrappers/Llama3_1ChatWrapper.js";
 import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
 import {Llama2ChatWrapper} from "./chatWrappers/Llama2ChatWrapper.js";
+import {MistralChatWrapper} from "./chatWrappers/MistralChatWrapper.js";
 import {GeneralChatWrapper} from "./chatWrappers/GeneralChatWrapper.js";
 import {ChatMLChatWrapper} from "./chatWrappers/ChatMLChatWrapper.js";
 import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
@@ -57,7 +59,7 @@ import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/uti
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
-    type ResolveChatWrapperOptions
+    type ResolveChatWrapperOptions, type BuiltInChatWrapperType, chatWrappers
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
@@ -70,7 +72,10 @@ import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
 import {GgufInsightsConfigurationResolver} from "./gguf/insights/GgufInsightsConfigurationResolver.js";
-import {createModelDownloader, ModelDownloader, type ModelDownloaderOptions} from "./utils/createModelDownloader.js";
+import {
+    createModelDownloader, ModelDownloader, type ModelDownloaderOptions, combineModelDownloaders, CombinedModelDownloader,
+    type CombinedModelDownloaderOptions
+} from "./utils/createModelDownloader.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 
 import {
@@ -92,6 +97,8 @@ import {
     type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, isGgufMetadataOfArchitectureType
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
+import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
+import {type OverridesObject} from "./utils/OverridesObject.js";
 
 
 export {
@@ -128,7 +135,9 @@ export {
     TokenBias,
     LlamaEmbeddingContext,
     type LlamaEmbeddingContextOptions,
-    type LlamaEmbedding,
+    LlamaEmbedding,
+    type LlamaEmbeddingOptions,
+    type LlamaEmbeddingJSON,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,
@@ -167,6 +176,7 @@ export {
     Llama3_1ChatWrapper,
     Llama3ChatWrapper,
     Llama2ChatWrapper,
+    MistralChatWrapper,
     GeneralChatWrapper,
     ChatMLChatWrapper,
     FalconChatWrapper,
@@ -180,6 +190,7 @@ export {
     type JinjaTemplateChatWrapperOptionsConvertMessageFormat,
     type ChatHistoryFunctionCallMessageTemplate,
     resolveChatWrapper,
+    type BuiltInChatWrapperType,
     type ResolveChatWrapperOptions,
     resolvableChatWrapperTypeNames,
     type ResolvableChatWrapperTypeName,
@@ -187,6 +198,7 @@ export {
     type SpecializedChatWrapperTypeName,
     templateChatWrapperTypeNames,
     type TemplateChatWrapperTypeName,
+    chatWrappers,
     ChatModelFunctionsDocumentationGenerator,
     LlamaText,
     SpecialTokensText,
@@ -254,5 +266,10 @@ export {
     createModelDownloader,
     ModelDownloader,
     type ModelDownloaderOptions,
-    jsonDumps
+    type ModelFileAccessTokens,
+    combineModelDownloaders,
+    CombinedModelDownloader,
+    type CombinedModelDownloaderOptions,
+    jsonDumps,
+    type OverridesObject
 };

@@ -19,7 +19,7 @@ export class GbnfOr extends GbnfTerminal {
         if (mappedValues.length === 0)
             return grammarNoValue;
         else if (mappedValues.length === 1)
-            return mappedValues[0];
+            return mappedValues[0]!;
 
         return "( " + mappedValues.join(" | ") + " )";
     }
@@ -32,7 +32,7 @@ export class GbnfOr extends GbnfTerminal {
         if (mappedValues.length === 0)
             return grammarNoValue;
         else if (mappedValues.length === 1)
-            return mappedValues[0];
+            return mappedValues[0]!;
 
         return super.resolve(grammarGenerator);
     }

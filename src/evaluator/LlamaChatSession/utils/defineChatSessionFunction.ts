@@ -2,6 +2,9 @@ import {GbnfJsonSchema, GbnfJsonSchemaToType} from "../../../utils/gbnfJson/type
 import {ChatSessionModelFunction} from "../../../types.js";
 
 /**
+ * Define a function that can be used by the model in a chat session, and return it.
+ *
+ * This is a helper function to facilitate defining functions with full TypeScript type information.
  * @param functionDefinition
  */
 export function defineChatSessionFunction<const Params extends GbnfJsonSchema | undefined>({

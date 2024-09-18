@@ -232,7 +232,7 @@ export const recommendedModels: ModelRecommendation[] = [{
             file: "functionary-medium-v2.4.Q4_0.gguf"
         }
     }]
-}, */ {
+}, */ /* {
     name: "Functionary Small v2.5",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
@@ -258,42 +258,143 @@ export const recommendedModels: ModelRecommendation[] = [{
             file: "functionary-small-v2.5.Q4_0.gguf"
         }
     }]
-}, {
-    name: "Gemma 1.1 7B",
+}, */ {
+    name: "Gemma 2 9B",
     abilities: ["chat", "complete"],
-    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
-        "This is the 7 billion parameters version of the model.",
+    description: "Gemma models were created by Google and are optimized suited for variety of text generation tasks, " +
+        "including question answering, summarization, and reasoning, with a focus on responsible responses.\n" +
+        "This is the 9 billion parameters version of the model.",
 
     fileOptions: [{
         huggingFace: {
-            model: "ggml-org/gemma-1.1-7b-it-Q8_0-GGUF",
+            model: "bartowski/gemma-2-9b-it-GGUF",
             branch: "main",
-            file: "gemma-1.1-7b-it.Q8_0.gguf"
+            file: "gemma-2-9b-it-Q6_K_L.gguf"
         }
     }, {
         huggingFace: {
-            model: "ggml-org/gemma-1.1-7b-it-Q4_K_M-GGUF",
+            model: "bartowski/gemma-2-9b-it-GGUF",
             branch: "main",
-            file: "gemma-1.1-7b-it.Q4_K_M.gguf"
+            file: "gemma-2-9b-it-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-9b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-9b-it-Q5_K_L.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-9b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-9b-it-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-9b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-9b-it-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-9b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-9b-it-Q4_K_L.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-9b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-9b-it-Q4_K_M.gguf"
         }
     }]
 }, {
-    name: "Gemma 1.1 2B",
+    name: "Gemma 2 2B",
     abilities: ["chat", "complete"],
-    description: "Gemma models were created by Google and are optimized to provide responsible responses.\n" +
-        "This is the 2 billion parameters version of the model and is significantly less powerful than the 7B version.",
+    description: "Gemma models were created by Google and are optimized suited for variety of text generation tasks, " +
+        "including question answering, summarization, and reasoning, with a focus on responsible responses.\n" +
+        "This is the 2 billion parameters version of the model and is significantly less powerful than the 9B version.",
 
     fileOptions: [{
         huggingFace: {
-            model: "ggml-org/gemma-1.1-2b-it-Q8_0-GGUF",
+            model: "bartowski/gemma-2-2b-it-GGUF",
             branch: "main",
-            file: "gemma-1.1-2b-it.Q8_0.gguf"
+            file: "gemma-2-2b-it-Q6_K_L.gguf"
         }
     }, {
         huggingFace: {
-            model: "ggml-org/gemma-1.1-2b-it-Q4_K_M-GGUF",
+            model: "bartowski/gemma-2-2b-it-GGUF",
             branch: "main",
-            file: "gemma-1.1-2b-it.Q4_K_M.gguf"
+            file: "gemma-2-2b-it-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-2b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-2b-it-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-2b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-2b-it-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-2b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-2b-it-Q4_K_M.gguf"
+        }
+    }]
+}, {
+    name: "Gemma 2 27B",
+    abilities: ["chat", "complete"],
+    description: "Gemma models were created by Google and are optimized suited for varoety of text generation tasks, " +
+        "including question answering, summarization, and reasoning, with a focus on responsible responses.\n" +
+        "This is the 27 billion parameters version of the model.\n" +
+        "Since the model is relatively big, it may not run well on your machine",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q6_K_L.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q5_K_L.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q4_K_L.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/gemma-2-27b-it-GGUF",
+            branch: "main",
+            file: "gemma-2-27b-it-Q4_K_M.gguf"
         }
     }]
 }, {
@@ -374,9 +475,79 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
+    name: "CodeGemma 2B",
+    abilities: ["code", "complete", "infill"],
+    description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
+        "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This is the 2 billion parameters version of the model.\n",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-2b-GGUF",
+            branch: "main",
+            file: "codegemma-2b-Q4_K_M.gguf"
+        }
+    }]
+}, {
+    name: "CodeGemma 7B",
+    abilities: ["code", "complete", "infill"],
+    description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
+        "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This is the 7 billion parameters version of the model.\n",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "bartowski/codegemma-1.1-7b-it-GGUF",
+            branch: "main",
+            file: "codegemma-1.1-7b-it-Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-1.1-7b-it-GGUF",
+            branch: "main",
+            file: "codegemma-1.1-7b-it-Q5_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-1.1-7b-it-GGUF",
+            branch: "main",
+            file: "codegemma-1.1-7b-it-Q5_K_S.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "bartowski/codegemma-1.1-7b-it-GGUF",
+            branch: "main",
+            file: "codegemma-1.1-7b-it-Q4_K_M.gguf"
+        }
+    }]
+}, {
     name: "Stable Code Instruct 3B",
     abilities: ["chat", "complete", "infill"],
-    description: "Stable Code model were created by Stability AI and are optimized for code completion.",
+    description: "Stable Code models were created by Stability AI and are optimized for code completion.",
 
     fileOptions: [{
         huggingFace: {

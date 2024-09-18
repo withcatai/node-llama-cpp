@@ -27,6 +27,7 @@ describe("functionary", () => {
 
             const chatHistory = chatSession.getChatHistory();
 
+            chatSession.sequence.dispose();
             chatSession.dispose();
             const chatSession2 = new LlamaChatSession({
                 contextSequence: context.getSequence()
@@ -64,7 +65,6 @@ describe("functionary", () => {
               {
                 "usedInputTokens": 81,
                 "usedOutputTokens": 9,
-                "usedRestoreStateTokens": 0,
               }
             `);
 
@@ -83,7 +83,6 @@ describe("functionary", () => {
               {
                 "usedInputTokens": 82,
                 "usedOutputTokens": 14,
-                "usedRestoreStateTokens": 0,
               }
             `);
             expect(tokenMeterState2.usedInputTokens).to.be.greaterThanOrEqual(tokenMeterState.usedInputTokens);
@@ -116,7 +115,6 @@ describe("functionary", () => {
               {
                 "usedInputTokens": 81,
                 "usedOutputTokens": 9,
-                "usedRestoreStateTokens": 0,
               }
             `);
 
@@ -132,7 +130,6 @@ describe("functionary", () => {
               {
                 "usedInputTokens": 7,
                 "usedOutputTokens": 11,
-                "usedRestoreStateTokens": 0,
               }
             `);
             expect(tokenMeterStateDiff.usedInputTokens).to.be.lessThan(tokenMeterState.usedInputTokens);

@@ -8,6 +8,8 @@ import {resolveContextContextSizeOption} from "./utils/resolveContextContextSize
 import {scoreLevels} from "./utils/scoreLevels.js";
 import type {GgufInsights} from "./GgufInsights.js";
 
+export const defaultTrainContextSizeForEstimationPurposes = 4096;
+
 
 export class GgufInsightsConfigurationResolver {
     /** @internal */ private readonly _ggufInsights: GgufInsights;
@@ -18,6 +20,117 @@ export class GgufInsightsConfigurationResolver {
 
     public get ggufInsights() {
         return this._ggufInsights;
+    }
+
+    /**
+     * Resolve the best configuration for loading a model and creating a context using the current hardware.
+     *
+     * Specifying a `targetGpuLayers` and/or `targetContextSize` will ensure the resolved configuration matches those values,
+     * but note it can lower the compatibility score if the hardware doesn't support it.
+     *
+     * Overriding hardware values it possible by configuring `hardwareOverrides`.
+     * @param options
+     * @param hardwareOverrides
+     */
+    public async resolveAndScoreConfig({
+        targetGpuLayers,
+        targetContextSize,
+        embeddingContext = false,
+        flashAttention = false
+    }: {
+        targetGpuLayers?: number | "max",
+        targetContextSize?: number,
+        embeddingContext?: boolean,
+        flashAttention?: boolean
+    } = {}, {
+        getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
+        getRamState = (async () => ({total: os.totalmem(), free: os.freemem()})),
+        llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize,
+        llamaGpu = this._ggufInsights._llama.gpu,
+        llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading
+    }: {
+        getVramState?(): Promise<{total: number, free: number}>,
+        getRamState?(): Promise<{total: number, free: number}>,
+        llamaVramPaddingSize?: number,
+        llamaGpu?: BuildGpu,
+        llamaSupportsGpuOffloading?: boolean
+    } = {}) {
+        const compatibilityScore = await this.scoreModelConfigurationCompatibility({
+            flashAttention,
+            contextSize: targetContextSize,
+            embeddingContext
+        }, {
+            getVramState,
+            getRamState,
+            llamaVramPaddingSize,
+            llamaGpu,
+            llamaSupportsGpuOffloading
+        });
+
+        if (targetContextSize != null || targetGpuLayers != null) {
+            const vramState = await getVramState();
+            const resolvedGpuLayers = await this.resolveModelGpuLayers(
+                targetGpuLayers == null
+                    ? {
+                        fitContext: {
+                            contextSize: targetContextSize,
+                            embeddingContext
+                        }
+                    }
+                    : targetGpuLayers,
+                {
+                    getVramState: async () => vramState,
+                    defaultContextFlashAttention: flashAttention,
+                    ignoreMemorySafetyChecks: targetGpuLayers != null,
+                    llamaGpu,
+                    llamaSupportsGpuOffloading,
+                    llamaVramPaddingSize
+                }
+            );
+            const estimatedModelResourceUsage = this._ggufInsights.estimateModelResourceRequirements({
+                gpuLayers: resolvedGpuLayers
+            });
+
+            const resolvedContextSize = await this._ggufInsights.configurationResolver.resolveContextContextSize(targetContextSize ?? "auto", {
+                getVramState: async () => ({
+                    total: vramState.total,
+                    free: Math.max(0, vramState.free - estimatedModelResourceUsage.gpuVram)
+                }),
+                isEmbeddingContext: embeddingContext,
+                modelGpuLayers: resolvedGpuLayers,
+                modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes,
+                flashAttention,
+                ignoreMemorySafetyChecks: targetContextSize != null,
+                llamaGpu
+            });
+            const estimatedContextResourceUsage = this._ggufInsights.estimateContextResourceRequirements({
+                contextSize: resolvedContextSize,
+                isEmbeddingContext: embeddingContext,
+                modelGpuLayers: resolvedGpuLayers,
+                flashAttention
+            });
+
+            compatibilityScore.resolvedValues = {
+                gpuLayers: resolvedGpuLayers,
+                contextSize: resolvedContextSize,
+
+                modelRamUsage: estimatedModelResourceUsage.cpuRam,
+                contextRamUsage: estimatedContextResourceUsage.cpuRam,
+                totalRamUsage: estimatedModelResourceUsage.cpuRam + estimatedContextResourceUsage.cpuRam,
+
+                modelVramUsage: estimatedModelResourceUsage.gpuVram,
+                contextVramUsage: estimatedContextResourceUsage.gpuVram,
+                totalVramUsage: estimatedModelResourceUsage.gpuVram + estimatedContextResourceUsage.gpuVram
+            };
+
+            if (compatibilityScore.resolvedValues.totalVramUsage > vramState.total) {
+                compatibilityScore.compatibilityScore = 0;
+                compatibilityScore.bonusScore = 0;
+                compatibilityScore.totalScore = 0;
+            }
+        }
+
+        return compatibilityScore;
     }
 
     /**
@@ -86,8 +199,6 @@ export class GgufInsightsConfigurationResolver {
             totalVramUsage: number
         }
     }> {
-        const defaultTrainContextSize = 4096;
-
         const [
             vramState,
             ramState
@@ -95,12 +206,18 @@ export class GgufInsightsConfigurationResolver {
             getVramState(),
             getRamState()
         ]);
-        const resolvedGpuLayers = await this.resolveModelGpuLayers("auto", {
-            getVramState: async () => vramState,
-            llamaVramPaddingSize,
-            llamaGpu,
-            llamaSupportsGpuOffloading
-        });
+        const resolvedGpuLayers = await this.resolveModelGpuLayers(
+            embeddingContext
+                ? {fitContext: {embeddingContext: true}}
+                : "auto",
+            {
+                getVramState: async () => vramState,
+                llamaVramPaddingSize,
+                llamaGpu,
+                llamaSupportsGpuOffloading,
+                defaultContextFlashAttention: flashAttention
+            }
+        );
         const canUseGpu = llamaSupportsGpuOffloading && llamaGpu !== false;
         const estimatedModelResourceUsage = this._ggufInsights.estimateModelResourceRequirements({
             gpuLayers: resolvedGpuLayers
@@ -114,7 +231,8 @@ export class GgufInsightsConfigurationResolver {
             llamaGpu,
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers,
-            modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSize
+            modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes,
+            flashAttention
         });
         const estimatedContextResourceUsage = this._ggufInsights.estimateContextResourceRequirements({
             contextSize: resolvedContextSize,
@@ -183,7 +301,7 @@ export class GgufInsightsConfigurationResolver {
         };
     }
 
-    public async resolveModelGpuLayers(gpuLayers: LlamaModelOptions["gpuLayers"], {
+    public async resolveModelGpuLayers(gpuLayers?: LlamaModelOptions["gpuLayers"], {
         ignoreMemorySafetyChecks = false,
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize, llamaGpu = this._ggufInsights._llama.gpu,

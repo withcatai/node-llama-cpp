@@ -53,7 +53,7 @@ export class StopGenerationDetector<T extends string = string> {
             return;
 
         for (let i = 0; i < text.length && (!triggerMustStartWithGeneration || i === 0); i++) {
-            const char = text[i];
+            const char = text[i]!;
             const currentPart = this._stopTriggers.get(char);
 
             if (currentPart == null)
@@ -69,7 +69,7 @@ export class StopGenerationDetector<T extends string = string> {
         }
 
         for (let i = 0; i < tokens.length && (!triggerMustStartWithGeneration || i === 0); i++) {
-            const token = tokens[i];
+            const token = tokens[i]!;
             const currentPart = this._stopTriggers.get(token);
 
             if (currentPart == null)
@@ -99,7 +99,7 @@ export class StopGenerationDetector<T extends string = string> {
         let currentMap = this._stopTriggers;
 
         for (let i = 0; i < triggerValues.length; i++) {
-            const value = triggerValues[i];
+            const value = triggerValues[i]!;
             const isLast = i === triggerValues.length - 1;
 
             if (!currentMap.has(value)) {
@@ -195,10 +195,10 @@ export class StopGenerationDetector<T extends string = string> {
 
         if (startNewChecks) {
             const disregardedTextPossibilities = text.length > 0
-                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(text[0]), text.slice(1))
+                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(text[0]!), text.slice(1))
                 : null;
             const disregardedTokenPossibilities = tokens.length > 0
-                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(tokens[0]), tokens.slice(1))
+                ? this._getCountOfPossibleTriggersToBeDisregarded(this._stopTriggers.get(tokens[0]!), tokens.slice(1))
                 : null;
 
             if (disregardedTextPossibilities != null && disregardedTokenPossibilities != null)
@@ -242,7 +242,7 @@ export class StopGenerationDetector<T extends string = string> {
         let res = 0;
 
         for (let i = 0; i < value.length && part != null; i++) {
-            const item = value[i];
+            const item = value[i]!;
 
             if (part.next == null)
                 return res + 1;
@@ -270,7 +270,7 @@ export class StopGenerationDetector<T extends string = string> {
         let part: TriggerPart<T> | undefined = check.currentPart;
 
         for (let i = 0; i < value.length && part != null; i++) {
-            const item = value[i];
+            const item = value[i]!;
 
             if (part.next == null) {
                 this._addFoundStop(part, value.slice(i), check.queuedTokenReleaseLock?.duplicate?.());

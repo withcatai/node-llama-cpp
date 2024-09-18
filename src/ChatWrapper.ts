@@ -71,8 +71,8 @@ export abstract class ChatWrapper {
 
         if (this.settings.functions.parallelism == null) {
             for (let i = 0; i < calls.length; i++) {
-                res.push(calls[i]);
-                res.push(results[i]);
+                res.push(calls[i]!);
+                res.push(results[i]!);
             }
 
             return LlamaText(res);
@@ -83,7 +83,7 @@ export abstract class ChatWrapper {
             if (i > 0)
                 res.push(LlamaText(this.settings.functions.parallelism.call.betweenCalls ?? ""));
 
-            res.push(calls[i]);
+            res.push(calls[i]!);
         }
         res.push(LlamaText(this.settings.functions.parallelism.call.sectionSuffix ?? ""));
 
@@ -92,7 +92,7 @@ export abstract class ChatWrapper {
             if (i > 0)
                 res.push(LlamaText(this.settings.functions.parallelism.result?.betweenResults ?? ""));
 
-            res.push(results[i]);
+            res.push(results[i]!);
         }
         res.push(LlamaText(this.settings.functions.parallelism.result?.sectionSuffix ?? ""));
 
@@ -216,7 +216,7 @@ export abstract class ChatWrapper {
 
     public generateInitialChatHistory({
         systemPrompt = defaultChatSystemPrompt
-    }: ChatWrapperGenerateInitialHistoryOptions): ChatHistoryItem[] {
+    }: ChatWrapperGenerateInitialHistoryOptions = {}): ChatHistoryItem[] {
         return [{
             type: "system",
             text: LlamaText(systemPrompt ?? defaultChatSystemPrompt).toJSON()
@@ -224,8 +224,10 @@ export abstract class ChatWrapper {
     }
 
     /** @internal */
-    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): Record<string | symbol, any>[] {
-        return [{}] satisfies Partial<FirstItemOfTupleOrFallback<ConstructorParameters<typeof this>, object>>[];
+    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): (
+        Array<Record<string | symbol, any> | [testConfig: Record<string | symbol, any>, applyConfig: Record<string | symbol, any>]>
+    ) {
+        return [{}] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 
     /** @internal */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -235,3 +237,16 @@ export abstract class ChatWrapper {
 }
 
 type FirstItemOfTupleOrFallback<T extends any[], Fallback> = T extends [infer U, ...any[]] ? U : Fallback;
+
+export type ChatWrapperJinjaMatchConfiguration<T extends typeof ChatWrapper> = Array<
+    FirstItemOfTupleOrFallback<ConstructorParameters<T>, object> |
+    [
+        testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>
+    ] |
+    [
+        testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
+        testJinjaParameters: Record<string, any>
+    ]
+>;

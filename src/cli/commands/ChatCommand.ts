@@ -27,6 +27,7 @@ import {resolveCommandGgufPath} from "../utils/resolveCommandGgufPath.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -45,11 +46,12 @@ type ChatCommand = {
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
-    threads: number,
+    threads?: number,
     temperature: number,
     minP: number,
     topK: number,
     topP: number,
+    seed?: number,
     gpuLayers?: number,
     repeatPenalty: number,
     lastTokensRepeatPenalty: number,
@@ -67,7 +69,7 @@ type ChatCommand = {
 export const ChatCommand: CommandModule<object, ChatCommand> = {
     command: "chat [modelPath]",
     describe: withCliCommandDescriptionDocsUrl(
-        "Chat with a Llama model",
+        "Chat with a model",
         documentationPageUrls.CLI.Chat
     ),
     builder(yargs) {
@@ -77,7 +79,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("modelPath", {
                 alias: ["m", "model", "path", "url"],
                 type: "string",
-                description: "Llama model file to use for the chat. Can be a path to a local file or a URL of a model file to download"
+                description: "Model file to use for the chat. Can be a path to a local file or a URL of a model file to download. Leave empty to choose from a list of recommended models"
             })
             .option("header", {
                 alias: ["H"],
@@ -110,7 +112,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "string",
                 description:
                     "System prompt to use against the model" +
-                    (isInDocumentationMode ? "" : (". [default value: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
+                    (isInDocumentationMode ? "" : (". [the default value is determined by the chat wrapper, but is usually: " + defaultChatSystemPrompt.split("\n").join(" ") + "]"))
             })
             .option("systemPromptFile", {
                 type: "string",
@@ -174,7 +176,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             })
             .option("threads", {
                 type: "number",
-                default: 6,
+                defaultDescription: "Number of cores that are useful for math on the current machine",
                 description: "Number of threads to use for the evaluation of tokens"
             })
             .option("temperature", {
@@ -200,6 +202,11 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "number",
                 default: 0.95,
                 description: "Dynamically selects the smallest set of tokens whose cumulative probability exceeds the threshold P, and samples the next token only from this set. A float number between `0` and `1`. Set to `1` to disable. Only relevant when `temperature` is set to a value greater than `0`."
+            })
+            .option("seed", {
+                type: "number",
+                description: "Used to control the randomness of the generated text. Only relevant when using `temperature`.",
+                defaultDescription: "The current epoch time"
             })
             .option("gpuLayers", {
                 alias: "gl",
@@ -276,14 +283,14 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
-        topP, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
         environmentFunctions, debug, meter, printTimings
     }) {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP,
+                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
             });
@@ -299,7 +306,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
     contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
-    threads, temperature, minP, topK, topP, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
+    threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
@@ -396,8 +403,9 @@ async function RunChat({
             return await model.createContext({
                 contextSize: contextSize != null ? contextSize : undefined,
                 batchSize: batchSize != null ? batchSize : undefined,
-                threads,
-                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null
+                threads: threads === null ? undefined : threads,
+                ignoreMemorySafetyChecks: gpuLayers != null || contextSize != null,
+                performanceTracking: printTimings
             });
         } finally {
             if (llama.logLevel === LlamaLogLevel.debug) {
@@ -505,8 +513,9 @@ async function RunChat({
         return res;
     }
 
-    void session.preloadPrompt("")
-        .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
+    if (!printTimings && !meter)
+        void session.preloadPrompt("")
+            .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -529,54 +538,77 @@ async function RunChat({
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
 
-        process.stdout.write(startColor);
-        await session.prompt(input, {
-            grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
-            temperature,
-            minP,
-            topK,
-            topP,
-            repeatPenalty: {
-                penalty: repeatPenalty,
-                frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
-                presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
-                penalizeNewLine: penalizeRepeatingNewLine,
-                lastTokens: lastTokensRepeatPenalty
-            },
-            maxTokens: maxTokens === -1
-                ? context.contextSize
-                : maxTokens <= 0
-                    ? undefined
-                    : maxTokens,
-            onTextChunk(chunk) {
-                let text = nextPrintLeftovers + chunk;
-                nextPrintLeftovers = "";
-
-                if (trimWhitespace) {
-                    if (!hadNoWhitespaceTextInThisIteration) {
-                        text = text.trimStart();
-
-                        if (text.length > 0)
-                            hadNoWhitespaceTextInThisIteration = true;
-                    }
-
-                    const textWithTrimmedEnd = text.trimEnd();
-
-                    if (textWithTrimmedEnd.length < text.length) {
-                        nextPrintLeftovers = text.slice(textWithTrimmedEnd.length);
-                        text = textWithTrimmedEnd;
-                    }
-                }
-
-                process.stdout.write(text);
-            },
-            functions: (grammar == null && environmentFunctions)
-                ? defaultEnvironmentFunctions
-                : undefined,
-            trimWhitespaceSuffix: trimWhitespace
+        const abortController = new AbortController();
+        const consoleInteraction = new ConsoleInteraction();
+        consoleInteraction.onKey(ConsoleInteractionKey.ctrlC, async () => {
+            abortController.abort();
+            consoleInteraction.stop();
         });
-        process.stdout.write(endColor);
-        console.log();
+
+        try {
+            process.stdout.write(startColor!);
+            consoleInteraction.start();
+            await session.prompt(input, {
+                grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                temperature,
+                minP,
+                topK,
+                topP,
+                seed: seed ?? undefined,
+                signal: abortController.signal,
+                stopOnAbortSignal: true,
+                repeatPenalty: {
+                    penalty: repeatPenalty,
+                    frequencyPenalty: repeatFrequencyPenalty != null ? repeatFrequencyPenalty : undefined,
+                    presencePenalty: repeatPresencePenalty != null ? repeatPresencePenalty : undefined,
+                    penalizeNewLine: penalizeRepeatingNewLine,
+                    lastTokens: lastTokensRepeatPenalty
+                },
+                maxTokens: maxTokens === -1
+                    ? context.contextSize
+                    : maxTokens <= 0
+                        ? undefined
+                        : maxTokens,
+                onTextChunk(chunk) {
+                    let text = nextPrintLeftovers + chunk;
+                    nextPrintLeftovers = "";
+
+                    if (trimWhitespace) {
+                        if (!hadNoWhitespaceTextInThisIteration) {
+                            text = text.trimStart();
+
+                            if (text.length > 0)
+                                hadNoWhitespaceTextInThisIteration = true;
+                        }
+
+                        const textWithTrimmedEnd = text.trimEnd();
+
+                        if (textWithTrimmedEnd.length < text.length) {
+                            nextPrintLeftovers = text.slice(textWithTrimmedEnd.length);
+                            text = textWithTrimmedEnd;
+                        }
+                    }
+
+                    process.stdout.write(text);
+                },
+                functions: (grammar == null && environmentFunctions)
+                    ? defaultEnvironmentFunctions
+                    : undefined,
+                trimWhitespaceSuffix: trimWhitespace
+            });
+        } catch (err) {
+            if (!(abortController.signal.aborted && err === abortController.signal.reason))
+                throw err;
+        } finally {
+            consoleInteraction.stop();
+
+            if (abortController.signal.aborted)
+                process.stdout.write(endColor! + chalk.yellow("[generation aborted by user]"));
+            else
+                process.stdout.write(endColor!);
+
+            console.log();
+        }
 
         if (printTimings) {
             if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))

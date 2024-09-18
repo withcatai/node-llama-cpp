@@ -3,6 +3,7 @@
 #include "AddonModelLora.h"
 #include "AddonGrammar.h"
 #include "AddonGrammarEvaluationState.h"
+#include "AddonSampler.h"
 #include "AddonContext.h"
 #include "globals/addonLog.h"
 #include "globals/addonProgress.h"
@@ -25,6 +26,10 @@ Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
 
 Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(info.Env(), llama_supports_mlock());
+}
+
+Napi::Value addonGetMathCores(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), cpu_get_num_math());
 }
 
 Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
@@ -189,6 +194,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
         Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
         Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
+        Napi::PropertyDescriptor::Function("getMathCores", addonGetMathCores),
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
@@ -205,6 +211,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
+    AddonSampler::init(exports);
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);
 

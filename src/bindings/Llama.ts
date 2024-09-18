@@ -6,6 +6,7 @@ import {DisposeGuard} from "../utils/DisposeGuard.js";
 import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
 import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
+import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
 import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
@@ -16,12 +17,14 @@ const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map
     [LlamaLogLevel.error, 2],
     [LlamaLogLevel.warn, 3],
     [LlamaLogLevel.info, 4],
-    [LlamaLogLevel.debug, 5]
+    [LlamaLogLevel.log, 5],
+    [LlamaLogLevel.debug, 6]
 ]);
 const addonLogLevelToLlamaLogLevel: ReadonlyMap<number, LlamaLogLevel> = new Map(
     [...LlamaLogLevelToAddonLogLevel.entries()].map(([key, value]) => [value, key])
 );
 const defaultLogLevel = 5;
+const defaultMinThreadSplitterThreads = 4;
 
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
@@ -31,12 +34,14 @@ export class Llama {
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _vramPadding: MemoryReservation;
     /** @internal */ public readonly _debug: boolean;
+    /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
     /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
     /** @internal */ private readonly _supportsMmap: boolean;
     /** @internal */ private readonly _supportsMlock: boolean;
+    /** @internal */ private readonly _mathCores: number;
     /** @internal */ private readonly _llamaCppRelease: {
         readonly repo: string,
         readonly release: string
@@ -54,7 +59,7 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, vramOrchestrator, vramPadding
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, maxThreads, vramOrchestrator, vramPadding
     }: {
         bindings: BindingModule,
         logLevel: LlamaLogLevel,
@@ -67,6 +72,7 @@ export class Llama {
         },
         debug: boolean,
         gpu: BuildGpu,
+        maxThreads?: number,
         vramOrchestrator: MemoryOrchestrator,
         vramPadding: MemoryReservation
     }) {
@@ -75,10 +81,12 @@ export class Llama {
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
+        this._mathCores = bindings.getMathCores();
         this._consts = bindings.getConsts();
         this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
+        this._threadsSplitter = new ThreadsSplitter(maxThreads ?? Math.max(defaultMinThreadSplitterThreads, this._mathCores));
 
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
@@ -137,6 +145,24 @@ export class Llama {
 
     public get supportsMlock() {
         return this._supportsMlock;
+    }
+
+    /** The number of CPU cores that are useful for math */
+    public get cpuMathCores() {
+        return this._mathCores;
+    }
+
+    /**
+     * The maximum number of threads that can be used by the Llama instance.
+     *
+     * Default to `cpuMathCores`.
+     */
+    public get maxThreads() {
+        return this._threadsSplitter.maxThreads;
+    }
+
+    public set maxThreads(value: number) {
+        this._threadsSplitter.maxThreads = Math.floor(Math.max(1, value));
     }
 
     public get logLevel() {
@@ -340,13 +366,14 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, skipLlamaInit = false, debug
+        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, maxThreads, skipLlamaInit = false, debug
     }: {
         bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
+        maxThreads?: number,
         vramPadding: number | ((totalVram: number) => number),
         skipLlamaInit?: boolean,
         debug: boolean
@@ -382,6 +409,7 @@ export class Llama {
             debug,
             gpu,
             vramOrchestrator,
+            maxThreads,
             vramPadding: resolvedVramPadding
         });
 
@@ -409,6 +437,9 @@ export class Llama {
             case LlamaLogLevel.info:
                 console.info(prefixAndColorMessage(message, getColorForLogLevel(level)));
                 break;
+            case LlamaLogLevel.log:
+                console.info(prefixAndColorMessage(message, getColorForLogLevel(level)));
+                break;
             case LlamaLogLevel.debug:
                 console.debug(prefixAndColorMessage(message, getColorForLogLevel(level)));
                 break;
@@ -428,7 +459,8 @@ function getColorForLogLevel(level: LlamaLogLevel) {
         case LlamaLogLevel.error: return chalk.red;
         case LlamaLogLevel.warn: return chalk.yellow;
         case LlamaLogLevel.info: return chalk.whiteBright;
-        case LlamaLogLevel.debug: return chalk.white;
+        case LlamaLogLevel.log: return chalk.white;
+        case LlamaLogLevel.debug: return chalk.gray;
         default:
             void (level satisfies never);
             return chalk.whiteBright;

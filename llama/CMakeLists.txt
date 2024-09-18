@@ -29,6 +29,10 @@ include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
+unset(GPU_INFO_HEADERS)
+unset(GPU_INFO_SOURCES)
+unset(GPU_INFO_EXTRA_LIBS)
+
 if (GGML_CUDA)
     cmake_minimum_required(VERSION 3.17)
 
@@ -38,18 +42,18 @@ if (GGML_CUDA)
 
         enable_language(CUDA)
 
-        set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS} gpuInfo/cuda-gpu-info.h)
-        set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/cuda-gpu-info.cu)
+        list(APPEND GPU_INFO_HEADERS gpuInfo/cuda-gpu-info.h)
+        list(APPEND GPU_INFO_SOURCES gpuInfo/cuda-gpu-info.cu)
 
         add_compile_definitions(GPU_INFO_USE_CUDA)
 
         if (GGML_STATIC)
-            set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart_static)
+            list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cudart_static)
         else()
-            set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cudart)
+            list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cudart)
         endif()
 
-        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} CUDA::cuda_driver)
+        list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cuda_driver)
 
         if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
             # copied from llama.cpp/CMakLists.txt under "if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)"
@@ -73,12 +77,12 @@ if (GGML_VULKAN OR GGML_KOMPUTE)
             message(STATUS "Using Vulkan for GPU info because Kompute is enabled")
         endif()
 
-        set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS} gpuInfo/vulkan-gpu-info.h)
-        set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/vulkan-gpu-info.cpp)
+        list(APPEND GPU_INFO_HEADERS gpuInfo/vulkan-gpu-info.h)
+        list(APPEND GPU_INFO_SOURCES gpuInfo/vulkan-gpu-info.cpp)
 
         add_compile_definitions(GPU_INFO_USE_VULKAN)
 
-        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} Vulkan::Vulkan)
+        list(APPEND GPU_INFO_EXTRA_LIBS Vulkan::Vulkan)
     else()
         message(FATAL_ERROR "Vulkan was not found")
     endif()
@@ -105,7 +109,7 @@ if (GGML_HIPBLAS)
         set_source_files_properties(gpuInfo/cuda-gpu-info.cu PROPERTIES LANGUAGE CXX)
         target_link_libraries(gpu-info-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
 
-        set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS} gpu-info-rocm)
+        list(APPEND GPU_INFO_EXTRA_LIBS gpu-info-rocm)
     else()
         message(FATAL_ERROR "hipBLAS or HIP was not found. Try setting CMAKE_PREFIX_PATH=/opt/rocm")
     endif()
@@ -117,17 +121,21 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK MetalKit   REQUIRED)
 
     message(STATUS "Using Metal for GPU info")
-    set(GPU_INFO_HEADERS ${GPU_INFO_HEADERS}  gpuInfo/metal-gpu-info.h)
-    set(GPU_INFO_SOURCES ${GPU_INFO_SOURCES} gpuInfo/metal-gpu-info.mm)
+    list(APPEND GPU_INFO_HEADERS gpuInfo/metal-gpu-info.h)
+    list(APPEND GPU_INFO_SOURCES gpuInfo/metal-gpu-info.mm)
 
     add_compile_definitions(GPU_INFO_USE_METAL)
 
-    set(GPU_INFO_EXTRA_LIBS ${GPU_INFO_EXTRA_LIBS}
+    list(APPEND GPU_INFO_EXTRA_LIBS
         ${FOUNDATION_LIBRARY}
         ${METAL_FRAMEWORK}
         ${METALKIT_FRAMEWORK}
         )
 endif()
+
+list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
+list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
+list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
 
 file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
 
