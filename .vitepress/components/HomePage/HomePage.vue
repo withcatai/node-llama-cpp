@@ -262,7 +262,7 @@ getElectronExampleAppDownloadLink()
     :global(#app>.Layout) {
         transition: background-color 0.5s, transform 0.5s ease-in-out, opacity 0.5s ease-in-out, display 1s ease-in-out;
         transition-behavior: allow-discrete;
-        //transform: translateY(0px);
+        /* transform: translateY(0px); */
         opacity: 1;
 
         @starting-style {
