@@ -15,7 +15,7 @@ const releaseRes = await fetch("https://api.github.com/repos/withcatai/node-llam
 const release: Release = await releaseRes.json();
 
 let latestReleaseVersion = release.tag_name;
-if (latestReleaseVersion.startsWith("v"))
+if (latestReleaseVersion.toLowerCase().startsWith("v"))
     latestReleaseVersion = latestReleaseVersion.slice("v".length);
 
 if (latestReleaseVersion === "")

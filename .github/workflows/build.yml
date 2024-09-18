@@ -148,7 +148,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 160
+        timeout-minutes: 200
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
@@ -326,13 +326,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx --no vite-node ./scripts/resolveNextReleaseVersion.ts --saveReleaseToFile ./semanticReleaseDryRunReleaseResult.json --saveVersionToFile ./resolvedNextVersion.txt
       - name: Save next version output
-        run: echo "next-version=$(cat ./resolvedNextVersion.txt)" >> $GITHUB_ENV
+        run: echo "next-version=$(cat ./resolvedNextVersion.txt)" >> "$GITHUB_OUTPUT"
       - name: Update job summary
         run: |
           if [ "$(cat ./resolvedNextVersion.txt)" == "false" ]; then
-            echo "Next release version: `N/A`" >> $GITHUB_STEP_SUMMARY
+            echo "Next release version: \`N/A\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "Next release version: `$(cat ./resolvedNextVersion.txt)`" >> $GITHUB_STEP_SUMMARY
+            echo "Next release version: \`$(cat ./resolvedNextVersion.txt)\`" >> $GITHUB_STEP_SUMMARY
           fi
       - name: Upload resolved release artifact
         uses: actions/upload-artifact@v4
