@@ -300,6 +300,8 @@ jobs:
       issues: read
       pull-requests: read
       discussions: read
+    outputs:
+      next-version: ${{ steps.save-next-version.outputs.next-version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -326,7 +328,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx --no vite-node ./scripts/resolveNextReleaseVersion.ts --saveReleaseToFile ./semanticReleaseDryRunReleaseResult.json --saveVersionToFile ./resolvedNextVersion.txt
       - name: Save next version output
-        run: echo "next-version=$(cat ./resolvedNextVersion.txt)" >> "$GITHUB_OUTPUT"
+        id: save-next-version
+        run: echo "next-version=$(cat ./resolvedNextVersion.txt)" >> $GITHUB_OUTPUT
       - name: Update job summary
         run: |
           if [ "$(cat ./resolvedNextVersion.txt)" == "false" ]; then
