@@ -317,6 +317,8 @@ jobs:
         with:
           name: llama.cpp
           path: llama
+      - name: Apply fix patch on semantic-release, to not check for push permission on dry run
+        run: git apply --ignore-whitespace ./scripts/patches/semantic-release+24.1.1.patch
       - name: Resolve next release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
