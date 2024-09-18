@@ -58,9 +58,30 @@ export type LlamaContextOptions = {
      * number of threads to use to evaluate tokens.
      * set to 0 to use the maximum threads supported by the current machine hardware.
      *
-     * Defaults to the number of CPU cores that are useful for math on the current machine (`llama.cpuMathCores`).
+     * This value is considered as a hint, and the actual number of threads used may be lower when other evaluations are running.
+     * To ensure the minimum number of threads you want to use are always used,
+     * set this to an object with a `min` property (see the `min` property description for more details).
+     *
+     * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
      */
-    threads?: number,
+    threads?: number | {
+        /**
+         * The ideal number of threads to use for evaluations.
+         *
+         * If other evaluations are running, the actual number of threads may be lower than this value.
+         *
+         * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
+         */
+        ideal?: number,
+
+        /**
+         * Ensure evaluations always use at least this number of threads.
+         *
+         * Use with caution, since setting this value too high can lead to the context waiting too much time
+         * to reserve this number of threads before the evaluation can start.
+         */
+        min?: number
+    },
 
     /** control the parallel sequences processing behavior */
     batching?: BatchingOptions,

@@ -9,6 +9,7 @@ import {TokenMeter} from "../TokenMeter.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {UnsupportedError} from "../../utils/UnsupportedError.js";
+import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
     LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
@@ -35,6 +36,8 @@ export class LlamaContext {
     /** @internal */ private readonly _contextSize: number;
     /** @internal */ private readonly _batchSize: number;
     /** @internal */ private readonly _flashAttention: boolean;
+    /** @internal */ private readonly _idealThreads: number;
+    /** @internal */ private readonly _minThreads: number;
     /** @internal */ private readonly _performanceTracking: boolean;
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
@@ -48,6 +51,8 @@ export class LlamaContext {
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
+    /** @internal */ private _threadSplitterConsumer?: ThreadsSplitterConsumer;
+    /** @internal */ private _freeReservedThreadsTimeout?: ReturnType<typeof setTimeout>;
     /** @internal */ private _currentDispatchBatchHandle: object = {};
     /** @internal */ private _allocatedContextSize?: number;
     /** @internal */ private _disposed: boolean = false;
@@ -87,15 +92,19 @@ export class LlamaContext {
         this._contextSize = Math.max(2, contextSize);
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
+        this._idealThreads = typeof threads === "number"
+            ? this._llama._threadsSplitter.normalizeThreadsValue(threads)
+            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.ideal ?? this._llama.maxThreads);
+        this._minThreads = typeof threads === "number"
+            ? 1
+            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1);
         this._performanceTracking = !!performanceTracking;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize,
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
-            threads: threads == null
-                ? undefined
-                : Math.max(0, Math.floor(threads)),
+            threads: this._idealThreads,
             embeddings: _embeddings,
             performanceTracking: this._performanceTracking
         }));
@@ -107,6 +116,7 @@ export class LlamaContext {
         this._gcRegistry.register(this, this._loraAdapters);
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
+        this._freeReservedThreads = this._freeReservedThreads.bind(this);
 
         this._disposeAggregator.add(() => {
             this._disposed = true;
@@ -178,11 +188,20 @@ export class LlamaContext {
         return this._ctx.getStateSize();
     }
 
-    /** The number of threads used to evaluate tokens */
-    public get threads() {
+    /** The number of threads currently used to evaluate tokens */
+    public get currentThreads() {
         this._ensureNotDisposed();
 
         return this._ctx.getThreads();
+    }
+
+    /**
+     * The number of threads that are preferred to be used to evaluate tokens.
+     *
+     * The actual number of threads used may be lower when other evaluations are running in parallel.
+     */
+    public get idealThreads() {
+        return this._idealThreads;
     }
 
     public getAllocatedContextSize(): number {
@@ -397,12 +416,19 @@ export class LlamaContext {
                     }
                 }
 
-                try {
-                    if (currentBatchSize !== 0)
+                if (currentBatchSize !== 0) {
+                    const [threadsToUse, consumerHandle] = await this._threadSplitterConsumer?.getAllocationToConsume() ?? [];
+                    try {
+                        if (threadsToUse != null)
+                            this._ctx.setThreads(threadsToUse);
+
                         await this._ctx.decodeBatch();
-                } catch (err) {
-                    this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
-                    return;
+                        consumerHandle?.dispose();
+                    } catch (err) {
+                        consumerHandle?.dispose();
+                        this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
+                        return;
+                    }
                 }
 
                 for (const action of afterDecodeActions) {
@@ -422,30 +448,35 @@ export class LlamaContext {
             const prioritizationStrategy = resolvePrioritizationStrategy();
             if (prioritizationStrategy == null) return; // all queued items are rejected and dequeued when we get here
 
-            while (shouldHaveAnotherLoop) {
-                const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizationStrategy);
-                if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
+            this._reserveThreads();
+            try {
+                while (shouldHaveAnotherLoop) {
+                    const orderedQueuedDecodes = getOrderedQueuedDecodes(prioritizationStrategy);
+                    if (orderedQueuedDecodes == null) return; // all queued items are rejected and dequeued when we get here
 
-                const {
-                    currentBatchItems,
-                    currentBatchSize
-                } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
+                    const {
+                        currentBatchItems,
+                        currentBatchSize
+                    } = fitQueuedDecodesToABatch(orderedQueuedDecodes, this._batchSize);
 
-                let preventDisposalHandle: DisposalPreventionHandle;
-                try {
-                    preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
-                } catch (err) {
-                    this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
-                    return;
+                    let preventDisposalHandle: DisposalPreventionHandle;
+                    try {
+                        preventDisposalHandle = this._backendContextDisposeGuard.createPreventDisposalHandle();
+                    } catch (err) {
+                        this._dispatchErrorForQueuedDecodesAndDequeue(new Set(this._queuedDecodes), err);
+                        return;
+                    }
+
+                    try {
+                        await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
+
+                        shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
+                    } finally {
+                        preventDisposalHandle.dispose();
+                    }
                 }
-
-                try {
-                    await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
-
-                    shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
-                } finally {
-                    preventDisposalHandle.dispose();
-                }
+            } finally {
+                this._scheduleToFreeReservedThreads();
             }
         });
     }
@@ -584,6 +615,38 @@ export class LlamaContext {
             this._loraAdapters.add(lora);
             lora.usages++;
         }
+    }
+
+    /** @internal */
+    private _reserveThreads() {
+        clearTimeout(this._freeReservedThreadsTimeout);
+        delete this._freeReservedThreadsTimeout;
+
+        if (this._threadSplitterConsumer != null)
+            return;
+
+        this._threadSplitterConsumer = this._llama._threadsSplitter.createConsumer(this._idealThreads, this._minThreads);
+    }
+
+    /** @internal */
+    private _freeReservedThreads() {
+        clearTimeout(this._freeReservedThreadsTimeout);
+        delete this._freeReservedThreadsTimeout;
+
+        if (this._threadSplitterConsumer == null)
+            return;
+
+        this._threadSplitterConsumer.dispose();
+        delete this._threadSplitterConsumer;
+    }
+
+    /** @internal */
+    private _scheduleToFreeReservedThreads() {
+        if (this._threadSplitterConsumer == null)
+            return;
+
+        clearTimeout(this._freeReservedThreadsTimeout);
+        this._freeReservedThreadsTimeout = setTimeout(this._freeReservedThreads, 0);
     }
 
     /** @internal */

@@ -124,6 +124,7 @@ export type AddonContext = {
     getEmbedding(inputTokensLength: number): Float64Array,
     getStateSize(): number,
     getThreads(): number,
+    setThreads(threads: number): void,
     printTimings(): void,
     setLora(lora: AddonModelLora, scale: number): void
 };

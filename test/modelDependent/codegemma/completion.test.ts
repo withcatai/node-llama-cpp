@@ -46,12 +46,12 @@ describe("CodeGemma", () => {
                 contextSequence: context.getSequence()
             });
 
-            const prefix = "4 sweet fruits: Apple,";
+            const prefix = "4 sweet fruits, listed alphabetically: Apple,";
             const suffix = "and Grape.\n\n";
             const res = await completion.generateInfillCompletion(prefix, suffix, {
                 maxTokens: 10
             });
-            expect(res).toMatchInlineSnapshot('"Orange, Pineapple, "');
+            expect(res).toMatchInlineSnapshot('"Banana, Kiwi, "');
         });
     });
 });

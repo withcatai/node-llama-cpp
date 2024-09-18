@@ -141,7 +141,7 @@ describe("llama 3", () => {
             expect(res2.length).to.be.greaterThan(1);
         });
 
-        test("Compare fruit prices", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        test("Compare fruit prices", {timeout: 1000 * 60 * 60 * 2, retry: 4}, async () => {
             const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();
 

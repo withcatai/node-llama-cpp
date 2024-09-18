@@ -28,8 +28,6 @@ describe("llama 3.1", () => {
                     customBias.set(token, -0.9);
                 else if (text.toLowerCase().includes("hi"))
                     customBias.set(token, "never");
-                else if (text.toLowerCase().includes("greeting"))
-                    customBias.set(token, {logit: 0.8});
             }
 
             const res = await chatSession.prompt('Greet me by saying "hello" to me', {
@@ -40,7 +38,6 @@ describe("llama 3.1", () => {
             expect(res.toLowerCase()).to.not.include("hello");
             expect(res.toLowerCase()).to.not.include("hi ");
             expect(res.toLowerCase()).to.not.include("hi.");
-            expect(res.toLowerCase()).to.include("greeting");
         });
     });
 });

@@ -53,7 +53,7 @@ export type LlamaOptions = {
 
     /**
      * Set the minimum log level for llama.cpp.
-     * Defaults to `"info"`.
+     * Defaults to `"warn"`.
      */
     logLevel?: LlamaLogLevel,
 
@@ -112,6 +112,13 @@ export type LlamaOptions = {
     skipDownload?: boolean,
 
     /**
+     * The maximum number of threads to use for the Llama instance.
+     *
+     * Defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     */
+    maxThreads?: number,
+
+    /**
      * Pad the available VRAM for the memory size calculations, as these calculations are not always accurate.
      * Recommended to ensure stability.
      * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
@@ -135,7 +142,7 @@ export type LlamaOptions = {
 export type LastBuildOptions = {
     /**
      * Set the minimum log level for llama.cpp.
-     * Defaults to "info".
+     * Defaults to "warn".
      */
     logLevel?: LlamaLogLevel,
 
@@ -163,6 +170,13 @@ export type LastBuildOptions = {
      * Disabled by default.
      */
     skipDownload?: boolean,
+
+    /**
+     * The maximum number of threads to use for the Llama instance.
+     *
+     * Defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     */
+    maxThreads?: number,
 
     /**
      * Pad the available VRAM for the memory size calculations, as these calculations are not always accurate.
@@ -227,6 +241,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             usePrebuiltBinaries: lastBuildOptions?.usePrebuiltBinaries ?? true,
             progressLogs: lastBuildOptions?.progressLogs ?? true,
             skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload,
+            maxThreads: lastBuildOptions?.maxThreads,
             vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
             debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
         };
@@ -249,6 +264,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     buildMetadata,
                     logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
                     logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppLogLevel,
+                    maxThreads: lastBuildOptions?.maxThreads,
                     vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
                     debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
                 });
@@ -274,6 +290,7 @@ export async function getLlamaForOptions({
     usePrebuiltBinaries = true,
     progressLogs = true,
     skipDownload = defaultSkipDownload,
+    maxThreads,
     vramPadding = defaultLlamaVramPadding,
     debug = defaultLlamaCppDebugMode
 }: LlamaOptions, {
@@ -349,6 +366,7 @@ export async function getLlamaForOptions({
                 platform,
                 platformInfo,
                 skipLlamaInit,
+                maxThreads,
                 vramPadding,
                 fallbackMessage: !isLastItem
                     ? `falling back to using ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}`
@@ -409,6 +427,7 @@ export async function getLlamaForOptions({
                 logLevel,
                 logger,
                 updateLastBuildInfoOnCompile,
+                maxThreads,
                 vramPadding,
                 skipLlamaInit,
                 debug
@@ -444,6 +463,7 @@ async function loadExistingLlamaBinary({
     platform,
     platformInfo,
     skipLlamaInit,
+    maxThreads,
     vramPadding,
     fallbackMessage,
     debug
@@ -457,6 +477,7 @@ async function loadExistingLlamaBinary({
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     skipLlamaInit: boolean,
+    maxThreads: number | undefined,
     vramPadding: Required<LlamaOptions>["vramPadding"],
     fallbackMessage: string | null,
     debug: boolean
@@ -489,6 +510,7 @@ async function loadExistingLlamaBinary({
                     buildMetadata,
                     logLevel,
                     logger,
+                    maxThreads,
                     vramPadding,
                     skipLlamaInit,
                     debug
@@ -544,6 +566,7 @@ async function loadExistingLlamaBinary({
                         buildMetadata,
                         logLevel,
                         logger,
+                        maxThreads,
                         vramPadding,
                         skipLlamaInit,
                         debug
@@ -597,6 +620,7 @@ async function buildAndLoadLlamaBinary({
     logLevel,
     logger,
     updateLastBuildInfoOnCompile,
+    maxThreads,
     vramPadding,
     skipLlamaInit,
     debug
@@ -606,6 +630,7 @@ async function buildAndLoadLlamaBinary({
     logLevel: Required<LlamaOptions>["logLevel"],
     logger: Required<LlamaOptions>["logger"],
     updateLastBuildInfoOnCompile: boolean,
+    maxThreads: number | undefined,
     vramPadding: Required<LlamaOptions>["vramPadding"],
     skipLlamaInit: boolean,
     debug: boolean
@@ -636,6 +661,7 @@ async function buildAndLoadLlamaBinary({
         buildMetadata,
         logLevel,
         logger,
+        maxThreads,
         vramPadding,
         skipLlamaInit,
         debug

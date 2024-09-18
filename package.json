@@ -182,7 +182,7 @@
     "ignore": "^5.3.2",
     "ipull": "^3.6.2",
     "is-unicode-supported": "^2.1.0",
-    "lifecycle-utils": "^1.6.0",
+    "lifecycle-utils": "^1.7.0",
     "log-symbols": "^7.0.0",
     "nanoid": "^5.0.7",
     "node-addon-api": "^8.1.0",
