@@ -94,10 +94,17 @@ export class LlamaContext {
         this._flashAttention = flashAttention;
         this._idealThreads = typeof threads === "number"
             ? this._llama._threadsSplitter.normalizeThreadsValue(threads)
-            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.ideal ?? this._llama.maxThreads);
-        this._minThreads = typeof threads === "number"
-            ? 1
-            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1);
+            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.ideal ?? (
+                this._llama.maxThreads === 0
+                    ? this._llama.cpuMathCores
+                    : this._llama.maxThreads
+            ));
+        this._minThreads = Math.max(
+            1,
+            typeof threads === "number"
+                ? 1
+                : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1)
+        );
         this._performanceTracking = !!performanceTracking;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
@@ -417,7 +424,11 @@ export class LlamaContext {
                 }
 
                 if (currentBatchSize !== 0) {
-                    const [threadsToUse, consumerHandle] = await this._threadSplitterConsumer?.getAllocationToConsume() ?? [];
+                    const allocationResult = this._threadSplitterConsumer?.getAllocationToConsume();
+                    const [threadsToUse, consumerHandle] = allocationResult instanceof Promise
+                        ? await allocationResult ?? []
+                        : allocationResult ?? [];
+
                     try {
                         if (threadsToUse != null)
                             this._ctx.setThreads(threadsToUse);
