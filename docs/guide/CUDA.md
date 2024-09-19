@@ -15,6 +15,8 @@ npx --no node-llama-cpp download --cuda
 > If you see the message `cuBLAS not found` during the build process,
 > it means that CUDA Toolkit is not installed on your machine or that it is not detected by the build process.
 
+> **Please note:** This will run slow as it's only running on a single core. [See related GitHub Issue](https://github.com/withcatai/node-llama-cpp/issues/311)
+
 ### Custom `llama.cpp` cmake options
 `llama.cpp` has some options you can use to customize your CUDA build, you can find these [here](https://github.com/ggerganov/llama.cpp/tree/master#cublas).
 
