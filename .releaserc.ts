@@ -83,6 +83,7 @@ function getDryRunResult() {
 }
 
 const dryRunResult = getDryRunResult();
+console.info("Next release type", dryRunResult?.nextRelease?.type);
 if (dryRunResult == null || !(dryRunResult.nextRelease.type === "major" || dryRunResult.nextRelease.type === "minor"))
     githubPluginConfig.discussionCategoryName = false;
 
