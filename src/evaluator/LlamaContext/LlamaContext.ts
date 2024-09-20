@@ -94,11 +94,13 @@ export class LlamaContext {
         this._flashAttention = flashAttention;
         this._idealThreads = typeof threads === "number"
             ? this._llama._threadsSplitter.normalizeThreadsValue(threads)
-            : this._llama._threadsSplitter.normalizeThreadsValue(threads?.ideal ?? (
-                this._llama.maxThreads === 0
-                    ? this._llama.cpuMathCores
-                    : this._llama.maxThreads
-            ));
+            : this._llama._threadsSplitter.normalizeThreadsValue(
+                threads?.ideal ?? (
+                    this._llama.maxThreads === 0
+                        ? this._llama.cpuMathCores
+                        : this._llama.maxThreads
+                )
+            );
         this._minThreads = Math.max(
             1,
             typeof threads === "number"

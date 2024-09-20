@@ -86,11 +86,13 @@ export class Llama {
         this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
-        this._threadsSplitter = new ThreadsSplitter(maxThreads ?? (
-            this._gpu === false
-                ? Math.max(defaultCPUMinThreadSplitterThreads, this._mathCores)
-                : 0
-        ));
+        this._threadsSplitter = new ThreadsSplitter(
+            maxThreads ?? (
+                this._gpu === false
+                    ? Math.max(defaultCPUMinThreadSplitterThreads, this._mathCores)
+                    : 0
+            )
+        );
 
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
