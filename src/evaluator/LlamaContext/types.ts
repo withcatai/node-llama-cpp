@@ -62,7 +62,10 @@ export type LlamaContextOptions = {
      * To ensure the minimum number of threads you want to use are always used,
      * set this to an object with a `min` property (see the `min` property description for more details).
      *
-     * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
+     * If `maxThreads` from the Llama instance is set to `0`, this value will always be the actual number of threads used.
+     *
+     * If `maxThreads` from the Llama instance is set to `0`, defaults to the `.cpuMathCores` value from the Llama instance,
+     * otherwise defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
      */
     threads?: number | {
         /**
@@ -70,7 +73,10 @@ export type LlamaContextOptions = {
          *
          * If other evaluations are running, the actual number of threads may be lower than this value.
          *
-         * Defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
+         * If `maxThreads` from the Llama instance is set to `0`, this value will always be the actual number of threads used.
+         *
+         * If `maxThreads` from the Llama instance is set to `0`, defaults to the `.cpuMathCores` value from the Llama instance,
+         * otherwise defaults to `maxThreads` from the Llama instance (see the `maxThreads` option of `getLlama` method for more details).
          */
         ideal?: number,
 

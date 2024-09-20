@@ -1,4 +1,5 @@
 import {DisposedError, DisposableHandle} from "lifecycle-utils";
+import type {Promisable} from "./transformPromisable.js";
 
 export class ThreadsSplitter {
     private readonly _threadDemands = new MaxNumberCollection();
@@ -7,22 +8,32 @@ export class ThreadsSplitter {
     private _totalWantedThreads: number = 0;
     public maxThreads: number;
 
+    /**
+     * Set to `0` to disable the limit
+     * @param maxThreads
+     */
     public constructor(maxThreads: number) {
-        this.maxThreads = Math.floor(Math.max(1, maxThreads));
+        this.maxThreads = Math.floor(Math.max(0, maxThreads));
 
         this._removeWantedThreads = this._removeWantedThreads.bind(this);
         this._removeThreadDemand = this._removeThreadDemand.bind(this);
     }
 
     public createConsumer(wantedThreads: number, minThreads: number = 1) {
-        if (minThreads > wantedThreads)
+        if (wantedThreads !== 0 && minThreads > wantedThreads)
             minThreads = wantedThreads;
+
+        if (this.maxThreads !== 0 && wantedThreads === 0)
+            wantedThreads = this.maxThreads;
 
         return new ThreadsSplitterConsumer(this, wantedThreads, minThreads);
     }
 
     public normalizeThreadsValue(threads: number) {
-        return Math.floor(Math.max(1, Math.min(this.maxThreads, threads)));
+        if (this.maxThreads === 0)
+            return Math.floor(Math.max(0, threads));
+
+        return Math.floor(Math.max(0, Math.min(this.maxThreads, threads)));
     }
 
     /** @internal */
@@ -152,10 +163,17 @@ export class ThreadsSplitterConsumer {
         this._demandedThreadsGcRegistry.unregister(this);
     }
 
-    public async getAllocationToConsume(): Promise<[threadsToUse: number, usageHandle: DisposableHandle]> {
+    public getAllocationToConsume(): Promisable<[threadsToUse: number, usageHandle: DisposableHandle]> {
         if (this._disposed)
             throw new DisposedError();
 
+        if (this._threadsSplitter.maxThreads === 0)
+            return [this._wantedThreads, new DisposableHandle(() => {})];
+
+        return this._getAsyncAllocationToConsume();
+    }
+
+    private async _getAsyncAllocationToConsume(): Promise<[threadsToUse: number, usageHandle: DisposableHandle]> {
         do {
             this._usedThreads = this._threadsSplitter._getUpdatedActiveThreads(
                 this._usedThreads, this._wantedThreads, this._demandedThreads

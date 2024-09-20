@@ -16,7 +16,7 @@ describe("utils", () => {
             const consumer2 = threadSplitter.createConsumer(8, 1);
             const allocationPromise = consumer2.getAllocationToConsume();
             let allocationPromiseResolved = false;
-            allocationPromise.then(() => {
+            Promise.resolve(allocationPromise).then(() => {
                 allocationPromiseResolved = true;
             });
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -61,7 +61,7 @@ describe("utils", () => {
             const consumer3 = threadSplitter.createConsumer(8, 5);
             const allocationPromise = consumer3.getAllocationToConsume();
             let allocationPromiseResolved = false;
-            allocationPromise.then(() => {
+            Promise.resolve(allocationPromise).then(() => {
                 allocationPromiseResolved = true;
             });
             await new Promise(resolve => setTimeout(resolve, 0));

@@ -114,7 +114,11 @@ export type LlamaOptions = {
     /**
      * The maximum number of threads to use for the Llama instance.
      *
-     * Defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     * Set to `0` to have no thread limit.
+     *
+     * When not using a GPU, defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     *
+     * When using a GPU, there's no limit by default.
      */
     maxThreads?: number,
 
@@ -174,7 +178,11 @@ export type LastBuildOptions = {
     /**
      * The maximum number of threads to use for the Llama instance.
      *
-     * Defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     * Set to `0` to have no thread limit.
+     *
+     * When not using a GPU, defaults to the number of CPU cores that are useful for math (`.cpuMathCores`), or `4`, whichever is higher.
+     *
+     * When using a GPU, there's no limit by default.
      */
     maxThreads?: number,
 

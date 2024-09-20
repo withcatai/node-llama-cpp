@@ -1,0 +1,12 @@
+diff --git a/node_modules/vitepress/dist/client/theme-default/components/VPLocalSearchBox.vue b/node_modules/vitepress/dist/client/theme-default/components/VPLocalSearchBox.vue
+index c8aded4..ccd5eff 100644
+--- a/node_modules/vitepress/dist/client/theme-default/components/VPLocalSearchBox.vue
++++ b/node_modules/vitepress/dist/client/theme-default/components/VPLocalSearchBox.vue
+@@ -443,6 +443,7 @@ function formMarkRegex(terms: Set<string>) {
+             :placeholder="buttonText"
+             id="localsearch-input"
+             aria-labelledby="localsearch-label"
++            autocomplete="off"
+             class="search-input"
+           />
+           <div class="search-actions">

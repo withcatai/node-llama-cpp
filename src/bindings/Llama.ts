@@ -24,7 +24,7 @@ const addonLogLevelToLlamaLogLevel: ReadonlyMap<number, LlamaLogLevel> = new Map
     [...LlamaLogLevelToAddonLogLevel.entries()].map(([key, value]) => [value, key])
 );
 const defaultLogLevel = 5;
-const defaultMinThreadSplitterThreads = 4;
+const defaultCPUMinThreadSplitterThreads = 4;
 
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
@@ -86,7 +86,13 @@ export class Llama {
         this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
-        this._threadsSplitter = new ThreadsSplitter(maxThreads ?? Math.max(defaultMinThreadSplitterThreads, this._mathCores));
+        this._threadsSplitter = new ThreadsSplitter(
+            maxThreads ?? (
+                this._gpu === false
+                    ? Math.max(defaultCPUMinThreadSplitterThreads, this._mathCores)
+                    : 0
+            )
+        );
 
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
@@ -155,14 +161,16 @@ export class Llama {
     /**
      * The maximum number of threads that can be used by the Llama instance.
      *
-     * Default to `cpuMathCores`.
+     * If set to `0`, the Llama instance will have no limit on the number of threads.
+     *
+     * See the `maxThreads` option of `getLlama` for more information.
      */
     public get maxThreads() {
         return this._threadsSplitter.maxThreads;
     }
 
     public set maxThreads(value: number) {
-        this._threadsSplitter.maxThreads = Math.floor(Math.max(1, value));
+        this._threadsSplitter.maxThreads = Math.floor(Math.max(0, value));
     }
 
     public get logLevel() {

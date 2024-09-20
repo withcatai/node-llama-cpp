@@ -72,7 +72,7 @@ export async function printCommonInfoLines({
             value: () => toOneLine(String(model.tokens.eosString))
         }, {
             title: "Train context size",
-            value: String(model.trainContextSize)
+            value: model.trainContextSize.toLocaleString("en-US")
         }]
     });
     printInfoLine({
@@ -80,14 +80,14 @@ export async function printCommonInfoLines({
         padTitle: padTitle,
         info: [{
             title: "Size",
-            value: String(context.contextSize)
+            value: context.contextSize.toLocaleString("en-US")
         }, {
             title: "Threads",
-            value: String(context.currentThreads)
+            value: context.currentThreads.toLocaleString("en-US")
         }, {
             show: logBatchSize,
             title: "Batch size",
-            value: bytes(context.batchSize)
+            value: context.batchSize.toLocaleString("en-US")
         }, {
             show: context.flashAttention,
             title: "Flash attention",
