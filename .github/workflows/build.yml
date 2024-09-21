@@ -725,7 +725,7 @@ jobs:
     if: |
       always() &&
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta') &&
       needs.build.result == 'success' &&
       needs.resolve-next-release.result == 'success' &&
       needs.resolve-next-release.outputs.next-version == 'false'
