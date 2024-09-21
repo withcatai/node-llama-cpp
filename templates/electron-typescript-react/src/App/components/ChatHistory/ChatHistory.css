@@ -17,6 +17,8 @@
             margin-inline-end: 12px;
             color: var(--user-message-text-color);
             word-break: break-word;
+            max-width: calc(100% - 48px - 12px);
+            box-sizing: border-box;
 
             &:not(:first-child) {
                 margin-top: 36px;
@@ -28,6 +30,12 @@
             margin-inline-end: 48px;
             padding-inline-start: 24px;
             word-break: break-word;
+            max-width: calc(100% - 48px);
+            box-sizing: border-box;
+
+            &:hover + .buttons {
+                opacity: 1;
+            }
 
             &.active {
                 &:empty:after,
@@ -56,6 +64,15 @@
 
         > :last-child {
             margin-bottom: 0px;
+        }
+
+        h2 {
+            margin: 16px 0px;
+            padding-top: 24px;
+        }
+
+        h3 {
+            margin: 32px 0px 0px 0px;
         }
 
         table {
@@ -92,6 +109,20 @@
                     padding: 8px 16px;
                 }
             }
+        }
+    }
+
+    > .buttons {
+        display: flex;
+        flex-direction: row;
+        padding: 8px 18px;
+        opacity: 0;
+
+        transition: opacity 0.1s ease-in-out;
+
+        &:hover,
+        &:focus-visible {
+            opacity: 1;
         }
     }
 }

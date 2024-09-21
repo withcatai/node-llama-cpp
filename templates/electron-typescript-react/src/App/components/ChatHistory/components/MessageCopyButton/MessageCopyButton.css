@@ -1,0 +1,42 @@
+.appChatHistory > .buttons {
+    > .copyButton {
+        display: grid;
+        grid-template-areas: "icon";
+        padding: 6px;
+        border: none;
+
+        transition: background-color 0.1s ease-in-out;
+
+        &:not(:hover, :focus-visible) {
+            background-color: transparent;
+        }
+
+        &.copied {
+            > .icon.copy {
+                opacity: 0;
+                transition-delay: 0s;
+            }
+
+            > .icon.check {
+                opacity: 1;
+                transition-delay: 0.1s;
+            }
+        }
+
+        > .icon {
+            grid-area: icon;
+            width: 18px;
+            height: 18px;
+
+            transition: opacity 0.3s ease-in-out;
+
+            &.copy {
+                opacity: 1;
+                transition-delay: 0.1s;
+            }
+            &.check {
+                opacity: 0;
+            }
+        }
+    }
+}
