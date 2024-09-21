@@ -1,6 +1,7 @@
 import classNames from "classnames";
 import {LlmState} from "../../../../electron/state/llmState.ts";
 import {MarkdownContent} from "../MarkdownContent/MarkdownContent.js";
+import {MessageCopyButton} from "./components/MessageCopyButton/MessageCopyButton.js";
 
 import "./ChatHistory.css";
 
@@ -11,9 +12,16 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
             simplifiedChat.map((item, index) => {
                 if (item.type === "model") {
                     const isActive = index === simplifiedChat.length - 1 && generatingResult;
-                    return <MarkdownContent key={index} className={classNames("message", "model", isActive && "active")}>
-                        {item.message}
-                    </MarkdownContent>;
+                    return <>
+                        <MarkdownContent key={index} className={classNames("message", "model", isActive && "active")}>
+                            {item.message}
+                        </MarkdownContent>
+                        {
+                            !isActive && <div className="buttons">
+                                <MessageCopyButton text={item.message} />
+                            </div>
+                        }
+                    </>;
 
                 } else if (item.type === "user")
                     return <MarkdownContent key={index} className="message user">

@@ -289,6 +289,8 @@ export class LlamaChatSession {
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;
     /** @internal */ private readonly _contextShift?: LlamaChatSessionContextShiftOptions;
+    /** @internal */ private readonly _forceAddSystemPrompt: boolean;
+    /** @internal */ private readonly _systemPrompt?: string;
     /** @internal */ private readonly _chatLock = {};
     /** @internal */ private _chatHistory: ChatHistoryItem[];
     /** @internal */ private _lastEvaluation?: LlamaChatResponse["lastEvaluation"];
@@ -315,6 +317,8 @@ export class LlamaChatSession {
             throw new DisposedError();
 
         this._contextShift = contextShift;
+        this._forceAddSystemPrompt = forceAddSystemPrompt;
+        this._systemPrompt = systemPrompt;
 
         this._chat = new LlamaChat({
             autoDisposeSequence,
@@ -323,8 +327,8 @@ export class LlamaChatSession {
         });
 
         const chatWrapperSupportsSystemMessages = this._chat.chatWrapper.settings.supportsSystemMessages;
-        if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || forceAddSystemPrompt)
-            this._chatHistory = this._chat.chatWrapper.generateInitialChatHistory({systemPrompt});
+        if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || this._forceAddSystemPrompt)
+            this._chatHistory = this._chat.chatWrapper.generateInitialChatHistory({systemPrompt: this._systemPrompt});
         else
             this._chatHistory = [];
 
@@ -813,6 +817,20 @@ export class LlamaChatSession {
         this._chatHistory = structuredClone(chatHistory);
         this._chatHistoryStateRef = {};
         this._lastEvaluation = undefined;
+    }
+
+    /** Clear the chat history and reset it to the initial state. */
+    public resetChatHistory() {
+        if (this._chat == null || this.disposed)
+            throw new DisposedError();
+
+        const chatWrapperSupportsSystemMessages = this._chat.chatWrapper.settings.supportsSystemMessages;
+        if (chatWrapperSupportsSystemMessages == null || chatWrapperSupportsSystemMessages || this._forceAddSystemPrompt)
+            this.setChatHistory(
+                this._chat.chatWrapper.generateInitialChatHistory({systemPrompt: this._systemPrompt})
+            );
+        else
+            this.setChatHistory([]);
     }
 
     /** @internal */
