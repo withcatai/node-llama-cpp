@@ -659,7 +659,11 @@ jobs:
       - build
       - resolve-next-release
       - release
-    steps: &update-documentation-website-steps
+
+    # All steps are copied to `update-documentation-website-no-release` job
+    # Can be replaced with YAML anchors when this will be supported by GitHub Actions:
+    # https://github.com/actions/runner/issues/1182#issuecomment-2317953582
+    steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
@@ -737,4 +741,67 @@ jobs:
     needs:
       - build
       - resolve-next-release
-    steps: *update-documentation-website-steps
+
+    # All steps are copied to `update-documentation-website` job
+    # Can be replaced with YAML anchors when this will be supported by GitHub Actions:
+    # https://github.com/actions/runner/issues/1182#issuecomment-2317953582
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Move artifacts
+        run: |
+          mv artifacts/build dist/
+          
+          cp -r artifacts/llama.cpp/llama.cpp llama/llama.cpp
+          
+          rm -f ./llama/binariesGithubRelease.json
+          mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
+          
+          rm -f ./llama/llama.cpp.info.json
+          mv artifacts/llama.cpp/llama.cpp.info.json ./llama/llama.cpp.info.json
+      - name: Resolve docs version
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.package-version || needs.resolve-next-release.outputs.next-version }}
+        run: |
+          if [ "$RELEASE_VERSION" == "false" ]; then
+            npx --no vite-node ./scripts/resolveLatestReleaseVersion.ts --saveVersionToFile ./docsVersion.txt
+          else
+            echo "$RELEASE_VERSION" > ./docsVersion.txt
+          fi
+      - name: Generate docs with updated version
+        env:
+          DOCS_URL_BASE: "/"
+        run: |
+          export DOCS_PACKAGE_VERSION="$(cat ./docsVersion.txt)"
+          echo "Package version: $DOCS_PACKAGE_VERSION"
+          
+          git apply --ignore-whitespace ./scripts/patches/vitepress+1.3.4.patch
+          npm run docs:build
+      - name: Upload docs
+        uses: actions/upload-artifact@v4
+        with:
+          include-hidden-files: true
+          retention-days: 2
+          name: "docs-site"
+          path: docs-site
+    #      - name: Upload docs to GitHub Pages
+    #        uses: actions/upload-pages-artifact@v3
+    #        with:
+    #          name: pages-docs
+    #          path: docs-site
+    #      - name: Deploy docs to GitHub Pages
+    #        uses: actions/deploy-pages@v4
+    #        with:
+    #          artifact_name: pages-docs
+    #      - name: Update feed
+    #        run: |
+    #          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"
