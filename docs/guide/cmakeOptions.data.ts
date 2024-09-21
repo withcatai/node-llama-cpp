@@ -45,7 +45,10 @@ function renderCmakeOptionsTable(cmakeOptions: ReturnType<typeof parseCmakeOptio
             "Default value"
         ].map(htmlEscape),
         cmakeOptions.map((option) => {
-            const url = githubFileUrl + "#L" + option.lineNumber;
+            let url = githubFileUrl + "#L" + option.lineNumber;
+
+            if (option.totalLines > 1)
+                url += "-L" + (option.lineNumber + option.totalLines - 1);
 
             return [
                 `<a href=${JSON.stringify(url)}>` +
