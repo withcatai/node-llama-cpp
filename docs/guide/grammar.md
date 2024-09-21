@@ -1,5 +1,5 @@
 # Using Grammar
-Use this to force a model to generate response in a specific format of text, like `JSON` for example.
+Use this to enforce a model to generate response in a specific format of text, like `JSON` for example.
 
 ::: tip NOTE
 

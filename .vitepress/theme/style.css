@@ -547,6 +547,10 @@ html.blog-page .vp-doc h2 {
     border-top: none;
 }
 
+html.blog-page .vp-doc>div>hr:first-of-type {
+    display: none;
+}
+
 /*#VPContent {*/
 /*    background-image: radial-gradient(1200px 380px at 50% 0%, color-mix(in srgb, var(--vp-c-brand-1) 32%, transparent), transparent 64%);*/
 /*}*/

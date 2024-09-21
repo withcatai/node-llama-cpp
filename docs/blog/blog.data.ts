@@ -1,5 +1,6 @@
 import {createContentLoader} from "vitepress";
 import {ensureLocalImage} from "../../.vitepress/utils/ensureLocalImage.js";
+import {htmlEscape} from "../../.vitepress/utils/htmlEscape.js";
 
 const loader = {
     async load() {
@@ -17,7 +18,11 @@ const loader = {
                         return {
                             title: post.frontmatter.title as string | undefined,
                             date: post.frontmatter.date as string | undefined,
-                            description: post.excerpt || post.frontmatter.description as string | undefined,
+                            description: post.excerpt || (
+                                (post.frontmatter.description as string | undefined) != null
+                                    ? htmlEscape(post.frontmatter.description as string)
+                                    : undefined
+                            ),
                             link: post.url,
                             image: await getImage(
                                 typeof post.frontmatter.image === "string"

@@ -47,7 +47,7 @@ const dateText = new Date(props.date).toLocaleDateString("en-US", {
                     }"
                 />
             </a>
-            <p class="description">{{ props.description }}</p>
+            <p class="description" v-html="props.description"></p>
             <a class="readMore" :href="withBase(props.link)">
                 Read more
                 <span class="vpi-arrow-right"></span>

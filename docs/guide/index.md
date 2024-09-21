@@ -39,6 +39,7 @@ as well as balances the default settings to get the best performance from your h
 No need to manually configure anything.
 
 **Metal:** Enabled by default on Macs with Apple Silicon. If you're using a Mac with an Intel chip, [you can manually enable it](./Metal.md).
+[Accelerate framework](https://developer.apple.com/accelerate/) is always enabled.
 
 **CUDA:** Used by default when support is detected. For more details, see the [CUDA guide](./CUDA.md).
 
@@ -126,7 +127,7 @@ console.log("AI: " + a2);
 
 
 ### Chatbot With JSON Schema {#chatbot-with-json-schema}
-To force a model to generate output according to a JSON schema, use [`llama.createGrammarForJsonSchema()`](../api/classes/Llama.md#creategrammarforjsonschema).
+To enforce a model to generate output according to a JSON schema, use [`llama.createGrammarForJsonSchema()`](../api/classes/Llama.md#creategrammarforjsonschema).
 
 It'll force the model to generate output according to the JSON schema you provide, and it'll do it on the text generation level.
 
