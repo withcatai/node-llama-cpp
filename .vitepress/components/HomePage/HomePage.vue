@@ -244,6 +244,16 @@ getElectronExampleAppDownloadLink()
     }
 }
 
+:global(.VPHome .VPHero .container .main) {
+    &:global(>.name) {
+        font-weight: 701;
+    }
+
+    &:global(>.text) {
+        font-weight: 699;
+    }
+}
+
 :global(html.start-animation) {
     .content {
         transition: opacity 0.5s 0.25s, transform 0.5s 0.25s, translate 0.5s, display 1s ease-in-out;
@@ -292,7 +302,7 @@ getElectronExampleAppDownloadLink()
             }
         }
 
-        &:global(> .text) {
+        &:global(>.text) {
             transition: font-weight 0.5s ease-in-out;
 
             @starting-style {
@@ -301,7 +311,7 @@ getElectronExampleAppDownloadLink()
             }
         }
 
-        &:global(> .tagline) {
+        &:global(>.tagline) {
             transition: transform 0.5s ease-in-out;
 
             @starting-style {

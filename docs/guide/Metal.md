@@ -8,6 +8,12 @@ and when building from source on macOS on Apple Silicon Macs, Metal support is e
 
 `llama.cpp` doesn't support Metal well on Intel Macs, so it is disabled by default on those machines.
 
+<div class="info custom-block" style="padding-top: 8px">
+
+[Accelerate framework](https://developer.apple.com/accelerate/) is always enabled on Mac.
+
+</div>
+
 ## Toggling Metal Support {#building}
 ### Prerequisites
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)

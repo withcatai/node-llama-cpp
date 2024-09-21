@@ -324,7 +324,22 @@ export default defineConfig({
         search: {
             provider: "local",
             options: {
-                detailedView: true
+                detailedView: true,
+                miniSearch: {
+                    searchOptions: {
+                        boostDocument(term, documentId, storedFields) {
+                            const firstTitle = (storedFields?.titles as string[])?.[0];
+                            if (firstTitle?.startsWith("Type Alias: "))
+                                return -0.8;
+                            else if (firstTitle?.startsWith("Class: "))
+                                return -0.9;
+                            else if (firstTitle?.startsWith("Function: "))
+                                return -0.95;
+
+                            return 1;
+                        }
+                    }
+                }
             }
         },
         sidebar: {
