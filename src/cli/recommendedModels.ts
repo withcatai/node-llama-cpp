@@ -259,6 +259,45 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, */ {
+    name: "OLMoE 1b 7B MoE",
+    abilities: ["chat"],
+    description: "OLMoE models were created by AllenAI, and are fully open source models that utilize a Mixture of Experts architecture" +
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model includes 64 expert models, with a total of 7 billion parameters.\n" +
+        "This model generates output extremely fast.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q6_k.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q5_k_m.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q4_k_s.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q4_k_m.gguf"
+        }
+    }]
+}, {
     name: "Gemma 2 9B",
     abilities: ["chat", "complete"],
     description: "Gemma models were created by Google and are optimized suited for variety of text generation tasks, " +
