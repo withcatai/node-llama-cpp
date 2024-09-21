@@ -643,8 +643,8 @@ jobs:
       (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta') &&
       needs.build.result == 'success' &&
       needs.resolve-next-release.result == 'success' &&
-      needs.resolve-next-release.outputs.next-version != '' && (
-        needs.resolve-next-release.outputs.next-version == 'false' ||
+      needs.resolve-next-release.outputs.next-version != '' &&
+      needs.resolve-next-release.outputs.next-version != 'false' && (
         needs.release.result == 'skipped' || (
           needs.release.result == 'success' &&
           needs.release.outputs.package-version != ''
@@ -659,7 +659,7 @@ jobs:
       - build
       - resolve-next-release
       - release
-    steps:
+    steps: &update-documentation-website-steps
       - uses: actions/checkout@v4
         with:
           lfs: true
@@ -719,3 +719,22 @@ jobs:
 #      - name: Update feed
 #        run: |
 #          curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"
+
+  update-documentation-website-no-release:
+    name: Update documentation website - no version release
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta') &&
+      needs.build.result == 'success' &&
+      needs.resolve-next-release.result == 'success' &&
+      needs.resolve-next-release.outputs.next-version == 'false'
+    runs-on: ubuntu-latest
+    concurrency: update-documentation-website-${{ github.ref }}
+    environment:
+      name: Documentation website
+#      url: "https://node-llama-cpp.withcat.ai"
+    needs:
+      - build
+      - resolve-next-release
+    steps: *update-documentation-website-steps
