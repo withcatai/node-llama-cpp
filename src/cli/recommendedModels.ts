@@ -158,8 +158,8 @@ export const recommendedModels: ModelRecommendation[] = [{
     name: "Mixtral 8x7B MoE",
     abilities: ["chat", "complete"],
     description: "Mixtral models were created by Mistal AI and are general purpose models that utilize a Mixture of Experts architecture.\n" +
-        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n"
-        + "This model includes 8 expert models, each with 7 billion parameters.",
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model includes 8 expert models, each with 7 billion parameters.",
 
     fileOptions: [{
         huggingFace: {
@@ -178,7 +178,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     name: "Mistral 7B Instruct v0.2",
     abilities: ["chat", "complete"],
     description: "Mistral models were created by Mistal AI and are general purpose models.\n" +
-        + "This is the 7 billion parameters version of the model.",
+        "This is the 7 billion parameters version of the model.",
 
     fileOptions: [{
         huggingFace: {
@@ -518,6 +518,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     abilities: ["code", "complete", "infill"],
     description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
         "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This model is not suited for chat.\n" +
         "This is the 2 billion parameters version of the model.\n",
 
     fileOptions: [{
@@ -556,6 +557,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     abilities: ["code", "complete", "infill"],
     description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
         "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This model is not suited for chat.\n" +
         "This is the 7 billion parameters version of the model.\n",
 
     fileOptions: [{

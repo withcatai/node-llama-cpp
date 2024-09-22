@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
-import {cliModelsDirectory} from "../config.js";
+import {cliModelsDirectory, isCI} from "../config.js";
 import {safeEventCallback} from "./safeEventCallback.js";
 import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
 import {pushAll} from "./pushAll.js";
@@ -312,6 +312,7 @@ export class ModelDownloader {
                 directory: this._dirPath,
                 fileName: this._fileName ?? getFilenameForBinarySplitGgufPartUrls(binarySplitPartUrls),
                 cliProgress: this._showCliProgress,
+                cliStyle: isCI ? "ci" : "fancy",
                 headers: this._headers ?? {},
                 tryHeaders: this._tryHeaders.slice(),
                 skipExisting: this._skipExisting
@@ -335,6 +336,7 @@ export class ModelDownloader {
                 directory: this._dirPath,
                 fileName: this._fileName ?? undefined,
                 cliProgress: this._showCliProgress,
+                cliStyle: isCI ? "ci" : "fancy",
                 headers: this._headers ?? {},
                 tryHeaders: this._tryHeaders.slice(),
                 skipExisting: this._skipExisting
@@ -364,6 +366,7 @@ export class ModelDownloader {
         this._downloader = await downloadSequence(
             {
                 cliProgress: this._showCliProgress,
+                cliStyle: isCI ? "ci" : "fancy",
                 parallelDownloads: this._parallelDownloads
             },
             ...partDownloads
@@ -541,6 +544,7 @@ export class CombinedModelDownloader {
         this._downloader = await downloadSequence(
             {
                 cliProgress: this._showCliProgress,
+                cliStyle: isCI ? "ci" : "fancy",
                 parallelDownloads: this._parallelDownloads
             },
             ...(await Promise.all(this._downloaders)).flatMap((downloader) => downloader._specificFileDownloaders)

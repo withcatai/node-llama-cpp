@@ -5,6 +5,7 @@ import fs from "fs-extra";
 import chalk from "chalk";
 import withStatusLogs from "../../src/utils/withStatusLogs.js";
 import {withLockfile} from "../../src/utils/withLockfile.js";
+import {isCI} from "../../src/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,7 +45,8 @@ export async function getModelFile(modelName: keyof typeof supportedModels) {
                 url: modelUrl,
                 directory: path.dirname(modelFilePath),
                 fileName: path.basename(modelFilePath),
-                cliProgress: true
+                cliProgress: true,
+                cliStyle: isCI ? "ci" : "fancy"
             });
             await downloader.download();
 
@@ -89,6 +91,7 @@ export async function downloadAllModels() {
         console.info(`Downloading ${pendingDownloads.length} model${pendingDownloads.length === 1 ? "" : "s"}`);
         const downloader = await downloadSequence({
             cliProgress: true,
+            cliStyle: isCI ? "ci" : "fancy",
             parallelDownloads: 4
         }, ...pendingDownloads);
         await downloader.download();
