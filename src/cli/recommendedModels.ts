@@ -518,6 +518,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     abilities: ["code", "complete", "infill"],
     description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
         "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This model is not suited for chat.\n" +
         "This is the 2 billion parameters version of the model.\n",
 
     fileOptions: [{
@@ -556,6 +557,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     abilities: ["code", "complete", "infill"],
     description: "CodeGemma models were created by Google and are optimized for code completion, code generation, " +
         "natual language understanding, mathematical reasoning, and instruction following.\n" +
+        "This model is not suited for chat.\n" +
         "This is the 7 billion parameters version of the model.\n",
 
     fileOptions: [{

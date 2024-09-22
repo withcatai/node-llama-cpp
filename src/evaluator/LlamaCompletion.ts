@@ -265,6 +265,8 @@ export class LlamaCompletion {
         const bosToken = this._sequence.model.tokens.bos;
         const shouldPrependBosToken = this._sequence.model.tokens.shouldPrependBosToken;
 
+        const extraEosTokens = getExtraCompletionEosTokens(this._sequence.model);
+
         async function fitInputIntoContext({
             maxTokens, tokens
         }: {
@@ -348,7 +350,8 @@ export class LlamaCompletion {
                             tokens: [...resolvedInput, ...res, ...pendingTokens]
                         })
                     };
-                }
+                },
+                extraEosTokens
             });
         });
     }
@@ -838,6 +841,26 @@ async function resolveContextShiftSize(
         );
 
     return defaultContextShiftSize(sequence);
+}
+
+function getExtraCompletionEosTokens(model: LlamaModel) {
+    const extraEosTokens = new Set<Token>();
+
+    if (model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma ||
+        model.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2
+    ) {
+        for (const token of model.iterateAllTokens()) {
+            const tokenText = model.detokenize([token], true);
+            if (tokenText === "<|file_separator|>" || tokenText === "<|fim_prefix|>") {
+                extraEosTokens.add(token);
+
+                if (extraEosTokens.size === 2)
+                    break;
+            }
+        }
+    }
+
+    return extraEosTokens;
 }
 
 function getExtraInfillEosTokens(model: LlamaModel) {
