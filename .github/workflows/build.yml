@@ -23,7 +23,8 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        run: node ./dist/cli/cli.js source download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
+        # Switched to `b3808` instead of `latest` due to a build failure on the latest version. `b3808` is the previous release.
+        run: node ./dist/cli/cli.js source download --release b3808 --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
