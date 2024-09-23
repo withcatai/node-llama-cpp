@@ -22,14 +22,14 @@ export default {
         const hideDate = new Date("2025-01-01T00:00:00Z");
 
         return h(LayoutContainer, null, h(Theme.Layout, null, {
-            // "home-hero-info-before": () => h(LatestVersionHomeBadge, {
-            //     type: "desktop",
-            //     text, link, hideDate
-            // }),
-            // "home-hero-actions-after": () => h(LatestVersionHomeBadge, {
-            //     type: "mobile",
-            //     text, link, hideDate
-            // }),
+            "home-hero-info-before": () => h(LatestVersionHomeBadge, {
+                type: "desktop",
+                text, link, hideDate
+            }),
+            "home-hero-actions-after": () => h(LatestVersionHomeBadge, {
+                type: "mobile",
+                text, link, hideDate
+            }),
             "doc-after": () => h(CommentsSection)
         }));
     },
