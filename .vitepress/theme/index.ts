@@ -17,7 +17,7 @@ import type {EnhanceAppContext} from "vitepress";
 export default {
     extends: Theme,
     Layout: () => {
-        const text = "v3.0.0 is here!";
+        const text = "v3.0 is here!";
         const link = "/blog/v3";
         const hideDate = new Date("2025-01-01T00:00:00Z");
 
