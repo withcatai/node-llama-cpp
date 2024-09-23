@@ -1,0 +1,143 @@
+.appChatHistory {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: start;
+    overflow: auto;
+    padding: 24px 0px;
+
+    > .message {
+        &.user {
+            align-self: flex-end;
+            background-color: var(--user-message-background-color);
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            margin-inline-start: 48px;
+            margin-inline-end: 12px;
+            color: var(--user-message-text-color);
+            word-break: break-word;
+            max-width: calc(100% - 48px - 12px);
+            box-sizing: border-box;
+
+            &:not(:first-child) {
+                margin-top: 36px;
+            }
+        }
+
+        &.model {
+            align-self: flex-start;
+            margin-inline-end: 48px;
+            padding-inline-start: 24px;
+            word-break: break-word;
+            max-width: calc(100% - 48px);
+            box-sizing: border-box;
+
+            &:hover + .buttons {
+                opacity: 1;
+            }
+
+            &.active {
+                &:empty:after,
+                &:not(:empty)>:last-child:not(ol, ul, table):after,
+                &:not(:empty)>:last-child:where(ol, ul)>:last-child:after,
+                &:not(:empty)>:last-child:where(table)>:last-child>:last-child>:last-child:after {
+                    content: "";
+                    position: static;
+                    display: inline-block;
+                    background-color: currentColor;
+                    width: 8px;
+                    height: 8px;
+                    translate: 0px -2px;
+                    border-radius: 9999px;
+                    margin-inline-start: 8px;
+                    vertical-align: middle;
+
+                    animation: activeModelMessageIndicator 2s infinite ease-in-out;
+                }
+            }
+        }
+
+        > :first-child {
+            margin-top: 0px;
+        }
+
+        > :last-child {
+            margin-bottom: 0px;
+        }
+
+        h2 {
+            margin: 16px 0px;
+            padding-top: 24px;
+        }
+
+        h3 {
+            margin: 32px 0px 0px 0px;
+        }
+
+        table {
+            display: block;
+            border-style: hidden;
+            border-radius: 12px;
+            outline: solid 1px var(--message-table-outline-color);
+            outline-offset: -1px;
+            max-width: max-content;
+            border-collapse: collapse;
+            overflow-x: auto;
+            background-color: var(--background-color);
+
+            thead {
+                text-align: justify;
+            }
+
+            tr {
+                background-color: var(--message-table-background-color);
+                border-top: 1px solid var(--message-table-outline-color);
+
+                &:nth-child(2n) td {
+                    background-color: var(--message-table-even-background-color);
+                }
+
+                th {
+                    background-color: var(--message-table-even-background-color);
+                    border: 1px solid var(--message-table-outline-color);
+                    padding: 8px 16px;
+                }
+
+                td {
+                    border: 1px solid var(--message-table-outline-color);
+                    padding: 8px 16px;
+                }
+            }
+        }
+    }
+
+    > .buttons {
+        display: flex;
+        flex-direction: row;
+        padding: 8px 18px;
+        opacity: 0;
+
+        transition: opacity 0.1s ease-in-out;
+
+        &:hover,
+        &:focus-visible {
+            opacity: 1;
+        }
+    }
+}
+
+@keyframes activeModelMessageIndicator {
+    0% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+    50% {
+        transform: scale(1.4);
+        opacity: 0.32;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+}

@@ -1,0 +1,144 @@
+#root {
+    margin: 0 auto;
+    padding: 16px;
+    text-align: center;
+    width: 100%;
+    min-height: 100%;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+    max-width: 1280px;
+
+    > .message {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        align-items: center;
+        gap: 48px;
+        overflow: auto;
+        padding: 24px 0px;
+
+        > .error {
+            border: solid 1px var(--error-border-color);
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0px 8px 32px -16px var(--error-border-color);
+        }
+
+        > .loadModel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 64px;
+            text-align: start;
+
+            > .hint {
+                margin-top: 64px;
+                opacity: 0.6;
+            }
+
+            > .actions {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: var(--actions-block-background-color);
+                border: solid 1px var(--actions-block-border-color);
+                box-shadow: var(--actions-block-box-shadow);
+                padding: 16px 24px;
+                border-radius: 12px;
+                gap: 16px;
+
+                > .starLink {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 8px;
+                    color: var(--star-link-color);
+
+                    &:hover {
+                        color: var(--star-hover-color);
+                    }
+
+                    > .starIcon {
+                        flex-shrink: 0;
+                        fill: currentColor;
+                    }
+                }
+
+                > .links {
+                    display: flex;
+                    flex-direction: row;
+
+                    > a {
+                        display: flex;
+                        flex-direction: row;
+                        align-items: center;
+                        gap: 8px;
+
+                        > .downloadIcon {
+                            flex-shrink: 0;
+                            fill: currentColor;
+                        }
+                    }
+
+                    > .separator {
+                        width: 1px;
+                        background-color: var(--link-color);
+                        opacity: 0.2;
+                        margin: 0px 16px;
+                        height: 0.8lh;
+                        align-self: center;
+                    }
+                }
+
+                > .browseLink {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 8px;
+
+                    > .searchIcon {
+                        flex-shrink: 0;
+                        fill: currentColor;
+                    }
+                }
+            }
+        }
+
+        > .loading {
+            opacity: 0.6;
+            font-weight: bold;
+
+            mask: linear-gradient(
+                to right,
+                rgb(0 0 0 / 48%) 34%,
+                black,
+                rgb(0 0 0 / 48%) 66%
+            ) content-box 0 0 / 300% 100% no-repeat;
+            animation: loading-animation 2s infinite ease-in-out;
+        }
+
+        > .typeMessage {
+            opacity: 0.6;
+        }
+    }
+}
+
+@keyframes loading-animation {
+    0% {
+        mask-position: 100% 100%;
+    }
+
+    100% {
+        mask-position: 0 100%;
+    }
+}

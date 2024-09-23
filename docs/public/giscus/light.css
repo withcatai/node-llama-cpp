@@ -1,0 +1,27 @@
+@import "./original/light.css";
+@import "./style.css";
+
+main {
+    --vp-c-bg: #ffffff;
+    --vp-c-bg-alt: #f6f6f7;
+    --vp-c-bg-elv: #ffffff;
+    --vp-c-bg-soft: #f6f6f7;
+
+    --vp-c-text-1: rgba(60, 60, 67);
+    --vp-c-text-2: rgba(60, 60, 67, 0.78);
+    --vp-c-text-3: rgba(60, 60, 67, 0.56);
+
+    --vp-c-border: #c2c2c4;
+    --vp-c-divider: #e2e2e3;
+    --vp-c-gutter: #e2e2e3;
+
+    --vp-c-brand-1: #b26134;
+    --vp-c-brand-2: #cc6e3a;
+    --vp-c-brand-3: #cd8156;
+    --vp-c-brand-soft: rgb(255 156 100 / 14%);
+
+    --g-comment-bg: var(--vp-c-bg-alt);
+    --g-comment-bg-alt: var(--vp-c-bg);
+    --color-btn-primary-disabled-text: var(--vp-c-bg);
+    --color-btn-primary-disabled-bg: color-mix(in srgb, var(--vp-c-brand-3) 36%, transparent);
+}

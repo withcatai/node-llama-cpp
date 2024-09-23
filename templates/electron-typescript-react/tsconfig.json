@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "lib": ["es2022", "DOM", "DOM.Iterable"],
+        "module": "es2022",
+        "skipLibCheck": true,
+
+        "esModuleInterop": true,
+        "removeComments": false,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "moduleDetection": "force",
+
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "jsx": "react-jsx",
+
+        "strict": true,
+        "strictNullChecks": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noImplicitOverride": true
+    },
+    "include": [
+        "./src",
+        "./electron"
+    ],
+    "references": [{ "path": "./tsconfig.node.json" }]
+}

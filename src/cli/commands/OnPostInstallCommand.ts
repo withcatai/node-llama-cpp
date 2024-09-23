@@ -1,9 +1,7 @@
 import {CommandModule} from "yargs";
-import {
-    defaultLlamaCppCudaSupport, defaultLlamaCppGitHubRepo, defaultLlamaCppMetalSupport, defaultLlamaCppRelease, defaultSkipDownload
-} from "../../config.js";
-import {getPrebuildBinPath} from "../../utils/getBin.js";
-import {DownloadLlamaCppCommand} from "./DownloadCommand.js";
+import {defaultSkipDownload} from "../../config.js";
+import {getLlamaForOptions} from "../../bindings/getLlama.js";
+import {setForceShowConsoleLogPrefix} from "../../state.js";
 
 type OnPostInstallCommand = null;
 
@@ -14,16 +12,16 @@ export const OnPostInstallCommand: CommandModule<object, OnPostInstallCommand> =
         if (defaultSkipDownload)
             return;
 
-        if (await getPrebuildBinPath() != null)
-            return;
+        setForceShowConsoleLogPrefix(false);
 
         try {
-            await DownloadLlamaCppCommand({
-                repo: defaultLlamaCppGitHubRepo,
-                release: defaultLlamaCppRelease,
-                metal: defaultLlamaCppMetalSupport,
-                cuda: defaultLlamaCppCudaSupport
+            await getLlamaForOptions({
+                progressLogs: true
+            }, {
+                updateLastBuildInfoOnCompile: true
             });
+
+            process.exit(0);
         } catch (err) {
             console.error(err);
             process.exit(1);

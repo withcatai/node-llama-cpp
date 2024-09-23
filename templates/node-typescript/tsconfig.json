@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "lib": ["es2022"],
+        "module": "es2022",
+        "target": "es2022",
+        "esModuleInterop": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noImplicitOverride": true,
+        "removeComments": false,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "moduleDetection": "force",
+        "skipLibCheck": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": false,
+        "strictNullChecks": true,
+        "isolatedModules": true,
+        "noEmit": false,
+        "outDir": "./dist",
+        "strict": true,
+        "sourceMap": true,
+        "composite": false,
+        "declaration": true
+    },
+    "files": [
+        "./src/index.ts"
+    ],
+    "include": [
+        "./src"
+    ]
+}

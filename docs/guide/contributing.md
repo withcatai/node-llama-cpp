@@ -7,10 +7,10 @@ This document describes the guidelines of how to open a PR on the `node-llama-cp
 ## Development
 To set up your development environment, read the [development guide](./development.md).
 
-## <a name="commit"></a> Commit Message Guidelines
+## Commit Message Guidelines {#commit}
 
 This repository has very precise rules over how git commit messages can be formatted.
-This leads to **more readable messages** that are easy to follow when looking through **project history**.
+This leads to **more readable messages** that are easy to follow when looking through the **project history**.
 But also, git commit messages as used to **generate changelog**.
 
 ### Commit Message Format
@@ -60,7 +60,7 @@ The body should include the motivation for the change and contrast this with the
 The footer should contain any information about **Breaking Changes**
 and is also the place to reference GitHub issues that this commit **Closes**.
 
-**Breaking Changes** should start with the word `BREAKING CHANGE:` with a space or two newlines.
+**Breaking Changes** should start with the text `BREAKING CHANGE:` with a space or two newlines.
 The rest of the commit message is then used for this.
 
 ### Examples
@@ -72,7 +72,7 @@ Closes: #123456
 ```
 Implement new feature:
 ```
-feat: support more model type
+feat: support more model types
 
 This new feature adds support for importing model types 1, 2, and 3.
 
@@ -80,11 +80,14 @@ Closes: #22222
 ```
 Docs update:
 ```
-docs: update documentation for `prompt` function
+docs: update documentation for the `prompt` function
 ```
 Breaking change:
 ```
-refactor: refactor function `prompt`
+refactor: refactor the function `prompt`
 
 BREAKING CHANGE: description of breaking change in `prompt`
 ```
+
+## PR Title Guidelines
+The title of the PR should be `<type>: <subject>` as described in the [Commit Message Guidelines](#commit).

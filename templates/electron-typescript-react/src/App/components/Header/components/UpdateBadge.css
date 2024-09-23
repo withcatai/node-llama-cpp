@@ -1,0 +1,32 @@
+.appHeader > .updateBadge {
+    pointer-events: all;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-inline-start: 16px;
+
+    > .currentVersion {
+        opacity: 0.4;
+        margin: 14px;
+
+        > code {
+            background-color: transparent;
+        }
+    }
+
+    > .newVersion {
+        background-color: var(--update-badge-background-color);
+        border: solid 1px var(--update-badge-border-color);
+        box-shadow: var(--update-badge-box-shadow);
+        border-radius: 12px;
+        backdrop-filter: blur(8px);
+        padding: 8px 12px;
+        margin: 0px 8px;
+
+        > .version {
+            margin: 0px 4px;
+            font-family: monospace;
+        }
+    }
+}

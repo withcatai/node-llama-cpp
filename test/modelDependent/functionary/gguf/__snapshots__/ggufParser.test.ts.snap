@@ -1,0 +1,391 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`gguf > parser > should fetch GGUF metadata 1`] = `
+{
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 8192,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 500000,
+    },
+    "vocab_size": 128256,
+  },
+  "fullTensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        128256,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 295501824,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 295518208,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 328548352,
+    },
+  ],
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": 2,
+      "name": "llama3-functionary-hf",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 8192,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 500000,
+      },
+      "vocab_size": 128256,
+    },
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+' + message['content'] + '<|eot_id|>' }}{% elif message['role'] == 'tool' %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+' + 'name=' + message['name'] + '
+' + message['content'] + '<|eot_id|>' }}{% else %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+'}}{% if message['content'] is not none %}
+{{ message['content'] }}{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{{ '<|reserved_special_token_249|>' + tool_call['function']['name'] + '
+' + tool_call['function']['arguments'] }}{% endfor %}
+{% endif %}
+{{ '<|eot_id|>' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|start_header_id|>{role}<|end_header_id|>
+
+' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 128000,
+        "eos_token_id": 128001,
+        "merges": [
+          "Ä  Ä ",
+          "Ä  Ä Ä Ä ",
+          "Ä Ä  Ä Ä ",
+          "Ä Ä Ä  Ä ",
+          "i n",
+          "Ä  t",
+          "Ä  Ä Ä Ä Ä Ä Ä Ä ",
+          "Ä Ä  Ä Ä Ä Ä Ä Ä ",
+          "Ä Ä Ä Ä  Ä Ä Ä Ä ",
+          "Ä Ä Ä  Ä Ä Ä Ä Ä ",
+        ],
+        "model": "gpt2",
+        "padding_token_id": 128001,
+        "pre": "llama-bpe",
+        "token_type": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+        ],
+        "tokens": [
+          "!",
+          """,
+          "#",
+          "$",
+          "%",
+          "&",
+          "'",
+          "(",
+          ")",
+          "*",
+        ],
+      },
+    },
+  },
+  "metadataSize": 7819208,
+  "splicedParts": 1,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        128256,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 295501824,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 295518208,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 328548352,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "totalMetadataSize": 7819208,
+  "totalTensorCount": 291,
+  "totalTensorInfoSize": 17286,
+  "version": 3,
+}
+`;
+
+exports[`gguf > parser > should parse local gguf model 1`] = `
+{
+  "architectureMetadata": {
+    "attention": {
+      "head_count": 32,
+      "head_count_kv": 8,
+      "layer_norm_rms_epsilon": 0.000009999999747378752,
+    },
+    "block_count": 32,
+    "context_length": 8192,
+    "embedding_length": 4096,
+    "feed_forward_length": 14336,
+    "rope": {
+      "dimension_count": 128,
+      "freq_base": 500000,
+    },
+    "vocab_size": 128256,
+  },
+  "fullTensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        128256,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 295501824,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 295518208,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 328548352,
+    },
+  ],
+  "metadata": {
+    "general": {
+      "architecture": "llama",
+      "file_type": 2,
+      "name": "llama3-functionary-hf",
+      "quantization_version": 2,
+    },
+    "llama": {
+      "attention": {
+        "head_count": 32,
+        "head_count_kv": 8,
+        "layer_norm_rms_epsilon": 0.000009999999747378752,
+      },
+      "block_count": 32,
+      "context_length": 8192,
+      "embedding_length": 4096,
+      "feed_forward_length": 14336,
+      "rope": {
+        "dimension_count": 128,
+        "freq_base": 500000,
+      },
+      "vocab_size": 128256,
+    },
+    "tokenizer": {
+      "chat_template": "{% for message in messages %}
+{% if message['role'] == 'user' or message['role'] == 'system' %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+' + message['content'] + '<|eot_id|>' }}{% elif message['role'] == 'tool' %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+' + 'name=' + message['name'] + '
+' + message['content'] + '<|eot_id|>' }}{% else %}
+{{ '<|start_header_id|>' + message['role'] + '<|end_header_id|>
+
+'}}{% if message['content'] is not none %}
+{{ message['content'] }}{% endif %}
+{% if 'tool_calls' in message and message['tool_calls'] is not none %}
+{% for tool_call in message['tool_calls'] %}
+{{ '<|reserved_special_token_249|>' + tool_call['function']['name'] + '
+' + tool_call['function']['arguments'] }}{% endfor %}
+{% endif %}
+{{ '<|eot_id|>' }}{% endif %}
+{% endfor %}
+{% if add_generation_prompt %}{{ '<|start_header_id|>{role}<|end_header_id|>
+
+' }}{% endif %}",
+      "ggml": {
+        "bos_token_id": 128000,
+        "eos_token_id": 128001,
+        "merges": [
+          "Ä  Ä ",
+          "Ä  Ä Ä Ä ",
+          "Ä Ä  Ä Ä ",
+          "Ä Ä Ä  Ä ",
+          "i n",
+          "Ä  t",
+          "Ä  Ä Ä Ä Ä Ä Ä Ä ",
+          "Ä Ä  Ä Ä Ä Ä Ä Ä ",
+          "Ä Ä Ä Ä  Ä Ä Ä Ä ",
+          "Ä Ä Ä  Ä Ä Ä Ä Ä ",
+        ],
+        "model": "gpt2",
+        "padding_token_id": 128001,
+        "pre": "llama-bpe",
+        "token_type": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+        ],
+        "tokens": [
+          "!",
+          """,
+          "#",
+          "$",
+          "%",
+          "&",
+          "'",
+          "(",
+          ")",
+          "*",
+        ],
+      },
+    },
+  },
+  "metadataSize": 7819208,
+  "splicedParts": 1,
+  "tensorCount": 291,
+  "tensorInfo": [
+    {
+      "dimensions": [
+        4096,
+        128256,
+      ],
+      "ggmlType": 2,
+      "name": "token_embd.weight",
+      "offset": 0,
+    },
+    {
+      "dimensions": [
+        4096,
+      ],
+      "ggmlType": 0,
+      "name": "blk.0.attn_norm.weight",
+      "offset": 295501824,
+    },
+    {
+      "dimensions": [
+        14336,
+        4096,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_down.weight",
+      "offset": 295518208,
+    },
+    {
+      "dimensions": [
+        4096,
+        14336,
+      ],
+      "ggmlType": 2,
+      "name": "blk.0.ffn_gate.weight",
+      "offset": 328548352,
+    },
+  ],
+  "tensorInfoSize": 17286,
+  "totalMetadataSize": 7819208,
+  "totalTensorCount": 291,
+  "totalTensorInfoSize": 17286,
+  "version": 3,
+}
+`;

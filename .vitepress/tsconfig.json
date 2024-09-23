@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "lib": ["es2022"],
+        "lib": ["es2022", "dom"],
         "module": "es2022",
         "target": "es2022",
         "esModuleInterop": true,
@@ -12,8 +12,10 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true,
         "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "moduleDetection": "force",
         "skipLibCheck": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "strictNullChecks": true,
         "isolatedModules": true,
@@ -31,9 +33,10 @@
     "include": [
         "./config.ts",
         "./utils",
+        "./config",
+        "./components/**/*.vue",
+        "./components.d.ts",
+        "./theme",
         "../docs"
-    ],
-    "ts-node": {
-        "esm": true
-    }
+    ]
 }

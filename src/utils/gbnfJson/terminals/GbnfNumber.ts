@@ -10,7 +10,7 @@ export class GbnfNumber extends GbnfTerminal {
         this.allowFractional = allowFractional;
     }
 
-    getGrammar(): string {
+    public getGrammar(): string {
         const numberGrammar = '("-"? ([0-9] | [1-9] [0-9]*))';
 
         if (this.allowFractional)
@@ -19,7 +19,7 @@ export class GbnfNumber extends GbnfTerminal {
         return numberGrammar;
     }
 
-    override getRuleName(): string {
+    protected override getRuleName(): string {
         if (this.allowFractional)
             return reservedRuleNames.number.fractional;
 

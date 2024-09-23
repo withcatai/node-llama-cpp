@@ -25,22 +25,29 @@ export type GbnfJsonArraySchema = {
 };
 
 
+/**
+ * Converts a GBNF JSON schema to a TypeScript type
+ */
 export type GbnfJsonSchemaToType<T> = GbnfJsonSchemaToTSType<T>;
 
 export type GbnfJsonSchemaToTSType<T> =
-    T extends GbnfJsonBasicSchema
-        ? GbnfJsonBasicSchemaToType<T["type"]>
-        : T extends GbnfJsonConstSchema
-            ? T["const"]
-            : T extends GbnfJsonEnumSchema
-                ? T["enum"][number]
-                : T extends GbnfJsonOneOfSchema
-                    ? GbnfJsonSchemaToType<T["oneOf"][number]>
-                    : T extends GbnfJsonObjectSchema
-                        ? GbnfJsonObjectSchemaToType<T["properties"]>
-                        : T extends GbnfJsonArraySchema
-                            ? GbnfJsonSchemaToType<T["items"]>[]
-                            : never;
+    GbnfJsonBasicSchema extends T
+        ? undefined
+        : undefined extends T
+            ? undefined
+            : T extends GbnfJsonBasicSchema
+                ? GbnfJsonBasicSchemaToType<T["type"]>
+                : T extends GbnfJsonConstSchema
+                    ? T["const"]
+                    : T extends GbnfJsonEnumSchema
+                        ? T["enum"][number]
+                        : T extends GbnfJsonOneOfSchema
+                            ? GbnfJsonSchemaToType<T["oneOf"][number]>
+                            : T extends GbnfJsonObjectSchema
+                                ? GbnfJsonObjectSchemaToType<T["properties"]>
+                                : T extends GbnfJsonArraySchema
+                                    ? GbnfJsonSchemaToType<T["items"]>[]
+                                    : undefined;
 
 type GbnfJsonBasicSchemaToType<T> =
     T extends GbnfJsonSchemaImmutableType

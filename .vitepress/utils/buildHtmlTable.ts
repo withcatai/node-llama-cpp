@@ -14,7 +14,7 @@ export function buildHtmlTable(header: string[], rows: string[][]) {
     }
 
     if (rows.length > 0) {
-        res += "" + "<tbody>\n";
+        res += "" + '<tbody style="white-space: pre-wrap">\n';
 
         for (const row of rows) {
             res += "" + "" + "<tr>\n";

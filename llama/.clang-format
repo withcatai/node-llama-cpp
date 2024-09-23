@@ -1,23 +1,23 @@
 BasedOnStyle: Google
-IndentWidth: 2
+IndentWidth: 4
 UseTab: Never
-TabWidth: 2
-ColumnLimit: 500
+TabWidth: 4
+ColumnLimit: 140
 AllowShortCaseLabelsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: true
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
 AlignTrailingComments: false
 SpaceAfterTemplateKeyword: false
-AllowShortBlocksOnASingleLine: true
+AllowShortBlocksOnASingleLine: false
 MaxEmptyLinesToKeep: 3
 NamespaceIndentation: None
 CommentPragmas: '^[^ ]'
 FixNamespaceComments: false
-AccessModifierOffset: -4
+IndentAccessModifiers: true
 SpaceAfterCStyleCast: false
 PointerAlignment: Left
-IndentCaseLabels: false
+IndentCaseLabels: true
 BinPackArguments: false
 BinPackParameters: false
 Cpp11BracedListStyle: false
@@ -29,8 +29,8 @@ AlwaysBreakTemplateDeclarations: No
 DeriveLineEnding: false
 UseCRLF: false
 AllowAllArgumentsOnNextLine: true
-AlignAfterOpenBracket: DontAlign
 PackConstructorInitializers: CurrentLine
+AlignAfterOpenBracket: BlockIndent
 BraceWrapping:
   AfterStruct: false
   AfterClass: false

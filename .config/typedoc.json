@@ -1,6 +1,6 @@
 {
     "$schema": "https://typedoc.org/schema.json",
-    "entryPoints": ["../src/index.ts"],
+    "entryPoints": ["../src/apiDocsIndex.ts"],
     "out": "../docs/api",
     "tsconfig": "../tsconfig.json",
     "customCss": "./typedoc.css",
@@ -11,12 +11,22 @@
     "githubPages": true,
     "hideGenerator": true,
     "jsDocCompatibility": true,
-    "htmlLang": "en",
+    "lang": "en",
     "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme", "typedoc-plugin-mdn-links"],
     "hideBreadcrumbs": true,
     "hidePageHeader": true,
     "preserveAnchorCasing": true,
     "useCodeBlocks": true,
     "expandObjects": true,
-    "parametersFormat": "table"
+    "expandParameters": true,
+    "parametersFormat": "table",
+    "propertiesFormat": "list",
+    "enumMembersFormat": "table",
+    "typeDeclarationFormat": "list",
+    "classPropertiesFormat": "list",
+    "interfacePropertiesFormat": "list",
+    "sort": ["source-order"],
+    "docsRoot": "../docs",
+    "intentionallyNotExported": ["MergeOptionalUnionTypes", "GbnfJsonSchemaToTSType", "_LlamaText"],
+    "useHTMLEncodedBrackets": true
 }
