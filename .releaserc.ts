@@ -1,4 +1,5 @@
 import {createRequire} from "module";
+import fs from "fs-extra";
 import {getBinariesGithubRelease} from "./dist/bindings/utils/binariesGithubRelease.js";
 import {cliBinName, defaultLlamaCppGitHubRepo} from "./dist/config.js";
 
@@ -65,11 +66,13 @@ const config: Omit<GlobalConfig, "repositoryUrl" | "tagFormat"> = {
 
 function getDryRunResult() {
     try {
-        const dryRunResultEnvVarValue = process.env.DRY_RUN_RESULT;
+        const dryRunResultEnvVarValue = process.env.DRY_RUN_RESULT_FILE_PATH;
         if (dryRunResultEnvVarValue == null)
             return null;
 
-        const res: SemanticReleaseDryRunResult = JSON.parse(dryRunResultEnvVarValue);
+        const dryRunResultValue = fs.readFileSync(dryRunResultEnvVarValue, "utf8");
+
+        const res: SemanticReleaseDryRunResult = JSON.parse(dryRunResultValue);
         if (res === false)
             return null;
 
