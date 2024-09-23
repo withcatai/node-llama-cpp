@@ -17,19 +17,19 @@ import type {EnhanceAppContext} from "vitepress";
 export default {
     extends: Theme,
     Layout: () => {
-        const text = "v3.0.0 is here!";
+        const text = "v3.0 is here!";
         const link = "/blog/v3";
         const hideDate = new Date("2025-01-01T00:00:00Z");
 
         return h(LayoutContainer, null, h(Theme.Layout, null, {
-            // "home-hero-info-before": () => h(LatestVersionHomeBadge, {
-            //     type: "desktop",
-            //     text, link, hideDate
-            // }),
-            // "home-hero-actions-after": () => h(LatestVersionHomeBadge, {
-            //     type: "mobile",
-            //     text, link, hideDate
-            // }),
+            "home-hero-info-before": () => h(LatestVersionHomeBadge, {
+                type: "desktop",
+                text, link, hideDate
+            }),
+            "home-hero-actions-after": () => h(LatestVersionHomeBadge, {
+                type: "mobile",
+                text, link, hideDate
+            }),
             "doc-after": () => h(CommentsSection)
         }));
     },

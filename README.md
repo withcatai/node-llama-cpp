@@ -15,7 +15,7 @@
 
 </div>
 
-✨ New! [`v3.0.0` is here!](https://github.com/withcatai/node-llama-cpp/pull/105) ✨ (included: function calling, automatic chat wrapper detection, embedding support, and more)
+✨ [`v3.0` is here!](https://node-llama-cpp.withcat.ai/blog/v3) ✨
 
 ## Features
 * Run LLMs locally on your machine
