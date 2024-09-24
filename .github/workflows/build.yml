@@ -440,7 +440,6 @@ jobs:
       name: npm
       url: ${{ steps.set-npm-url.outputs.npm-url }}
     permissions:
-      pages: write
       id-token: write
       contents: write
       issues: write
@@ -656,6 +655,10 @@ jobs:
     environment:
       name: Documentation website
       url: "https://node-llama-cpp.withcat.ai"
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
     needs:
       - build
       - resolve-next-release
@@ -732,6 +735,10 @@ jobs:
     environment:
       name: Documentation website
       url: "https://node-llama-cpp.withcat.ai"
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
     needs:
       - build
       - resolve-next-release
