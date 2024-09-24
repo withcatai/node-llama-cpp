@@ -49,7 +49,8 @@ console.log();
 const q3 = "What are the verbs in this sentence: 'The cat sat on the mat'";
 console.log(chalk.yellow("User: ") + q3);
 
-// force the model to respond in accordance to the specified JSON schema format, so we can parse it and use it programmatically
+// force the model to respond in accordance to the specified JSON schema format,
+// so we can parse it and use it programmatically
 const responseGrammar = await llama.createGrammarForJsonSchema({
     type: "object",
     properties: {
@@ -61,7 +62,7 @@ const responseGrammar = await llama.createGrammarForJsonSchema({
         }
     }
 });
-const a3 = await session.prompt(q2, {grammar: responseGrammar});
+const a3 = await session.prompt(q3, {grammar: responseGrammar});
 const parsedResponse = responseGrammar.parse(a3);
 console.log(chalk.yellow("AI:"), parsedResponse.verbs);
 console.log();
