@@ -23,8 +23,7 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        # Switched to `b3808` instead of `latest` due to a build failure on the latest version. `b3808` is the previous release.
-        run: node ./dist/cli/cli.js source download --release b3808 --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
+        run: node ./dist/cli/cli.js source download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -800,3 +799,35 @@ jobs:
         run: |
           curl -X POST "https://pubsubhubbub.appspot.com/" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "hub.mode=publish" --data-urlencode "hub.url=https://node-llama-cpp.withcat.ai/blog/feed.atom"
 
+#  fix-broken-github-release:
+#    name: Fix broken GitHub release
+#    if: github.event_name == 'pull_request' && github.head_ref == 'gilad/smallerLogoFile'
+#    runs-on: ubuntu-latest
+#    permissions:
+#      id-token: write
+#      actions: read
+#      contents: write
+#      issues: write
+#      pull-requests: write
+#      discussions: write
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: actions/setup-node@v4
+#        with:
+#          node-version: "20"
+#      - name: Install modules
+#        run: npm ci
+#
+#      - name: Pull artifact from broken release
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: resolved-next-release
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          repository: "${{ github.repository }}"
+#          run-id: "<run id here>"
+#          path: scripts/resolved-next-release-artifact
+#
+#      - name: Fix broken release
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        run: npx --no vite-node ./scripts/rerunSemanticReleaseGithubSuccess.ts

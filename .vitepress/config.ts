@@ -33,7 +33,6 @@ const urlBase = env.get("DOCS_URL_BASE")
 const packageVersion = env.get("DOCS_PACKAGE_VERSION")
     .default(packageJson.version)
     .asString();
-const googleSiteVerificationCode = "7b4Hd_giIK0EFsin6a7PWLmM_OeaC7APLZUxVGwwI6Y";
 
 const hostname = "https://node-llama-cpp.withcat.ai/";
 
@@ -124,7 +123,6 @@ export default defineConfig({
     ],
     async transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
-            head.push(["meta", {name: "google-site-verification", content: googleSiteVerificationCode}]);
             head.push(...defaultImageMetaTags);
         } else if (pageData.relativePath === "404.md")
             head.push(...defaultImageMetaTags);
