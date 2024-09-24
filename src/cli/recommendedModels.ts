@@ -78,6 +78,38 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
+    name: "Mistral Nemo 12B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Mistral Nemo model was created by Mistral AI and was trained on large proportion of multilingual and code data, with support for function calling.\n" +
+        "It was trained jointly by Mistral AI and NVIDIA.\n" +
+        "This is a 12 billion parameters model.",
+
+    fileOptions: [{
+        huggingFace: {
+            model: "mradermacher/Mistral-Nemo-Instruct-2407-GGUF",
+            branch: "main",
+            file: "Mistral-Nemo-Instruct-2407.Q8_0.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Mistral-Nemo-Instruct-2407-GGUF",
+            branch: "main",
+            file: "Mistral-Nemo-Instruct-2407.Q6_K.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Mistral-Nemo-Instruct-2407-GGUF",
+            branch: "main",
+            file: "Mistral-Nemo-Instruct-2407.Q4_K_M.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "mradermacher/Mistral-Nemo-Instruct-2407-GGUF",
+            branch: "main",
+            file: "Mistral-Nemo-Instruct-2407.Q4_K_S.gguf"
+        }
+    }]
+}, {
     name: "Phi 3 3.8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Phi 3 model was created by Microsoft and is optimized for strong reasoning (especially math and logic).\n" +
@@ -97,61 +129,42 @@ export const recommendedModels: ModelRecommendation[] = [{
         }
     }]
 }, {
-    name: "Llama 2 Chat 7B",
-    abilities: ["chat", "complete"],
-    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
-        "This is the 7 billion parameters version of the model.",
+    name: "OLMoE 1B 7B MoE",
+    abilities: ["chat"],
+    description: "OLMoE models were created by AllenAI, and are fully open source models that utilize a Mixture of Experts architecture.\n" +
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model includes 64 expert models, with a total of 7 billion parameters.\n" +
+        "This model generates output extremely fast.",
 
     fileOptions: [{
         huggingFace: {
-            model: "TheBloke/Llama-2-7B-Chat-GGUF",
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
             branch: "main",
-            file: "llama-2-7b-chat.Q5_K_M.gguf"
+            file: "olmoe-1b-7b-0924-instruct-q8_0.gguf"
         }
     }, {
         huggingFace: {
-            model: "TheBloke/Llama-2-7B-Chat-GGUF",
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
             branch: "main",
-            file: "llama-2-7b-chat.Q4_K_M.gguf"
-        }
-    }]
-}, {
-    name: "Llama 2 Chat 13B",
-    abilities: ["chat", "complete"],
-    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
-        "This is the 13 billion parameters version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "TheBloke/Llama-2-13B-chat-GGUF",
-            branch: "main",
-            file: "llama-2-13b-chat.Q5_K_M.gguf"
+            file: "olmoe-1b-7b-0924-instruct-q6_k.gguf"
         }
     }, {
         huggingFace: {
-            model: "TheBloke/Llama-2-13B-chat-GGUF",
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
             branch: "main",
-            file: "llama-2-13b-chat.Q4_K_M.gguf"
-        }
-    }]
-}, {
-    name: "Llama 2 Chat 70B",
-    abilities: ["chat", "complete"],
-    description: "Llama 2 Chat model was created by Meta and is optimized for an assistant-like chat use cases.\n" +
-        "This is the 70 billion parameters version of the model. " +
-        "You need a GPU with a lot of VRAM to use this version.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "TheBloke/Llama-2-70B-Chat-GGUF",
-            branch: "main",
-            file: "llama-2-70b-chat.Q5_K_M.gguf"
+            file: "olmoe-1b-7b-0924-instruct-q5_k_m.gguf"
         }
     }, {
         huggingFace: {
-            model: "TheBloke/Llama-2-70B-Chat-GGUF",
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
             branch: "main",
-            file: "llama-2-70b-chat.Q4_K_M.gguf"
+            file: "olmoe-1b-7b-0924-instruct-q4_k_s.gguf"
+        }
+    }, {
+        huggingFace: {
+            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
+            branch: "main",
+            file: "olmoe-1b-7b-0924-instruct-q4_k_m.gguf"
         }
     }]
 }, {
@@ -211,90 +224,6 @@ export const recommendedModels: ModelRecommendation[] = [{
             model: "TheBloke/dolphin-2.5-mixtral-8x7b-GGUF",
             branch: "main",
             file: "dolphin-2.5-mixtral-8x7b.Q4_K_M.gguf"
-        }
-    }]
-}, /* {
-    name: "Functionary Medium v2.4",
-    abilities: ["chat", "complete", "functionCalling"],
-    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
-        "This is the medium version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "meetkai/functionary-medium-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-medium-v2.4.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-medium-v2.4-GGUF",
-            branch: "main",
-            file: "functionary-medium-v2.4.Q4_0.gguf"
-        }
-    }]
-}, */ /* {
-    name: "Functionary Small v2.5",
-    abilities: ["chat", "complete", "functionCalling"],
-    description: "Functionary models were created by Meetkai and are optimized for function calling.\n" +
-        "This model is based on Llama 3.\n" +
-        "This is the small version of the model.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.5-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.5.f16.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.5-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.5.Q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "meetkai/functionary-small-v2.5-GGUF",
-            branch: "main",
-            file: "functionary-small-v2.5.Q4_0.gguf"
-        }
-    }]
-}, */ {
-    name: "OLMoE 1b 7B MoE",
-    abilities: ["chat"],
-    description: "OLMoE models were created by AllenAI, and are fully open source models that utilize a Mixture of Experts architecture" +
-        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
-        "This model includes 64 expert models, with a total of 7 billion parameters.\n" +
-        "This model generates output extremely fast.",
-
-    fileOptions: [{
-        huggingFace: {
-            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
-            branch: "main",
-            file: "olmoe-1b-7b-0924-instruct-q8_0.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
-            branch: "main",
-            file: "olmoe-1b-7b-0924-instruct-q6_k.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
-            branch: "main",
-            file: "olmoe-1b-7b-0924-instruct-q5_k_m.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
-            branch: "main",
-            file: "olmoe-1b-7b-0924-instruct-q4_k_s.gguf"
-        }
-    }, {
-        huggingFace: {
-            model: "allenai/OLMoE-1B-7B-0924-Instruct-GGUF",
-            branch: "main",
-            file: "olmoe-1b-7b-0924-instruct-q4_k_m.gguf"
         }
     }]
 }, {
