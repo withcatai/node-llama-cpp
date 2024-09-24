@@ -6,7 +6,7 @@ import {verifyConditions as githubVerifyConditions, success as githubSuccess} fr
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const brokenReleaseDryRunResult = fs.readJSONSync(path.join(__dirname, "semanticReleaseDryRunReleaseResult.json"));
+const brokenReleaseDryRunResult = fs.readJSONSync(path.join(__dirname, "resolved-next-release-artifact", "semanticReleaseDryRunReleaseResult.json"));
 
 console.log("Broken release dry run result:", brokenReleaseDryRunResult);
 

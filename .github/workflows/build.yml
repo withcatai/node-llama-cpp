@@ -825,9 +825,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: "${{ github.repository }}"
           run-id: "11004286824"
-          path: scripts/semanticReleaseDryRunReleaseResult.json
+          path: scripts/resolved-next-release-artifact
 
-      - name: Resolve next release
+      - name: Fix broken release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx --no vite-node ./scripts/rerunSemanticReleaseGithubSuccess.ts
+        run: |
+          ls scripts/resolved-next-release-artifact
+          npx --no vite-node ./scripts/rerunSemanticReleaseGithubSuccess.ts
