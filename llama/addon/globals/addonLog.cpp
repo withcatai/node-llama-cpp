@@ -5,6 +5,7 @@
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
 int addonLoggerLogLevel = 5;
+int addonLastLoggerLogLevel = 6;
 
 static int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     switch (level) {
@@ -13,6 +14,7 @@ static int addonGetGgmlLogLevelNumber(ggml_log_level level) {
         case GGML_LOG_LEVEL_INFO: return 4;
         case GGML_LOG_LEVEL_NONE: return 5;
         case GGML_LOG_LEVEL_DEBUG: return 6;
+        case GGML_LOG_LEVEL_CONT: return addonLastLoggerLogLevel;
     }
 
     return 1;
@@ -53,6 +55,7 @@ void addonCallJsLogCallback(
 
 void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user_data) {
     int logLevelNumber = addonGetGgmlLogLevelNumber(level);
+    addonLastLoggerLogLevel = logLevelNumber;
 
     if (logLevelNumber > addonLoggerLogLevel) {
         return;
