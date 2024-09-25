@@ -502,6 +502,7 @@ jobs:
           echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           export DRY_RUN_RESULT_FILE_PATH="$(pwd)/semanticReleaseDryRunReleaseResult.json"
           
+          git apply --ignore-whitespace ./scripts/patches/@semantic-release+github+11.0.0.patch
           npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
         id: set-npm-url

@@ -1,0 +1,11 @@
+diff --git a/node_modules/@semantic-release/github/lib/definitions/retry.js b/node_modules/@semantic-release/github/lib/definitions/retry.js
+index 9b5021c..b684e52 100644
+--- a/node_modules/@semantic-release/github/lib/definitions/retry.js
++++ b/node_modules/@semantic-release/github/lib/definitions/retry.js
+@@ -5,5 +5,5 @@ export const RETRY_CONF = {
+   // By default, Octokit does not retry on 404s.
+   // But we want to retry on 404s to account for replication lag.
+   doNotRetry: [400, 401, 403, 422],
+-  retries: 3,
++  retries: 25,
+ };
