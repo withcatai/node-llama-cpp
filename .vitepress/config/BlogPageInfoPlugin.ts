@@ -86,13 +86,19 @@ export function BlogPageInfoPlugin({
 
             let newCode = frontmatterCode + (
                 "# " + frontmatter.title + "\n\n" +
-                `<p class="blog-date">${
-                    htmlEscape(new Date(frontmatter.date).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric"
-                    }))
-                }</p>`
+                    [
+                        "",
+                        '<script setup lang="ts">',
+                        `const articleDate = new Date(${JSON.stringify(new Date(frontmatter.date).toISOString())}).toLocaleDateString("en-US", {`,
+                        '    year: "numeric",',
+                        '    month: "long",',
+                        '    day: "numeric"',
+                        "});",
+                        "</script>",
+                        "",
+                        '<p class="blog-date">{{ articleDate }}</p>',
+                        ""
+                    ].join("\n")
             );
 
             if (frontmatter.image != null) {

@@ -91,16 +91,49 @@ export default defineConfig({
     sitemap: {
         hostname,
         transformItems(items) {
-            return items.map((item) => {
-                if (item.url.includes("api/") || item.url.includes("cli/")) {
-                    item = {
-                        ...item,
-                        lastmod: undefined
-                    };
+            function priorityMatch(a: {url: string}, b: {url: string}, matchers: ((url: string) => boolean)[]): number {
+                for (const matcher of matchers) {
+                    const aMatch = matcher(a.url);
+                    const bMatch = matcher(b.url);
+
+                    if (aMatch && !bMatch)
+                        return -1;
+                    else if (!aMatch && bMatch)
+                        return 1;
                 }
 
-                return item;
-            });
+                return 0;
+            }
+
+            return items
+                .map((item) => {
+                    if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
+                        item = {
+                            ...item,
+                            lastmod: undefined
+                        };
+                    }
+
+                    return item;
+                })
+                .sort((a, b) => {
+                    return priorityMatch(a, b, [
+                        (url) => url === "",
+                        (url) => url === "blog/",
+                        (url) => url.startsWith("blog/"),
+                        (url) => url === "guide/",
+                        (url) => url.startsWith("guide/"),
+                        (url) => url === "cli/",
+                        (url) => url.startsWith("cli/"),
+                        (url) => url === "api/",
+                        (url) => url.startsWith("api/functions/"),
+                        (url) => url.startsWith("api/classes/"),
+                        (url) => url.startsWith("api/type-aliases/"),
+                        (url) => url.startsWith("api/enumerations/"),
+                        (url) => url.startsWith("api/variables/"),
+                        (url) => url.startsWith("api/")
+                    ]);
+                });
         }
     },
     head: [
