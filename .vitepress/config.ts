@@ -91,23 +91,15 @@ export default defineConfig({
     sitemap: {
         hostname,
         transformItems(items) {
-            function prioritizeUrl(a: {url: string}, b: {url: string}, matcher: (url: string) => boolean) {
-                const aMatch = matcher(a.url);
-                const bMatch = matcher(b.url);
-
-                if (aMatch && !bMatch)
-                    return -1;
-                else if (!aMatch && bMatch)
-                    return 1;
-
-                return 0;
-            }
-
-            function firstPriority(matchers: (() => number)[]): number {
+            function priorityMatch(a: {url: string}, b: {url: string}, matchers: ((url: string) => boolean)[]): number {
                 for (const matcher of matchers) {
-                    const res = matcher();
-                    if (res !== 0)
-                        return res;
+                    const aMatch = matcher(a.url);
+                    const bMatch = matcher(b.url);
+
+                    if (aMatch && !bMatch)
+                        return -1;
+                    else if (!aMatch && bMatch)
+                        return 1;
                 }
 
                 return 0;
@@ -125,22 +117,21 @@ export default defineConfig({
                     return item;
                 })
                 .sort((a, b) => {
-                    return firstPriority([
-                        () => prioritizeUrl(a, b, (url) => url === ""),
-                        () => prioritizeUrl(a, b, (url) => url === "blog/"),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("blog/")),
-                        () => prioritizeUrl(a, b, (url) => url === "guide/"),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("guide/")),
-                        () => prioritizeUrl(a, b, (url) => url === "cli/"),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("cli/")),
-                        () => prioritizeUrl(a, b, (url) => url === "api/"),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/functions/")),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/classes/")),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/type-aliases/")),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/enumerations/")),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/variables/")),
-                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/"))
-                        // () => a.url.localeCompare(b.url)
+                    return priorityMatch(a, b, [
+                        (url) => url === "",
+                        (url) => url === "blog/",
+                        (url) => url.startsWith("blog/"),
+                        (url) => url === "guide/",
+                        (url) => url.startsWith("guide/"),
+                        (url) => url === "cli/",
+                        (url) => url.startsWith("cli/"),
+                        (url) => url === "api/",
+                        (url) => url.startsWith("api/functions/"),
+                        (url) => url.startsWith("api/classes/"),
+                        (url) => url.startsWith("api/type-aliases/"),
+                        (url) => url.startsWith("api/enumerations/"),
+                        (url) => url.startsWith("api/variables/"),
+                        (url) => url.startsWith("api/")
                     ]);
                 });
         }
