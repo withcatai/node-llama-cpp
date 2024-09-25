@@ -212,9 +212,10 @@ export default defineConfig({
     },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/")) {
+            pageData.frontmatter ||= {};
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
-            pageData.frontmatter ||= {};
+            pageData.lastUpdated = undefined;
             pageData.frontmatter.outline = [2, 3];
             pageData.frontmatter.nolebase = {
                 gitChangelog: false
@@ -222,15 +223,19 @@ export default defineConfig({
         }
 
         if (pageData.filePath.startsWith("cli/")) {
+            pageData.frontmatter ||= {};
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
+            pageData.lastUpdated = undefined;
             pageData.frontmatter.nolebase = {
                 gitChangelog: false
             };
         }
 
         if (pageData.filePath.startsWith("blog/")) {
+            pageData.frontmatter ||= {};
             pageData.frontmatter.editLink = false;
+            pageData.frontmatter.lastUpdated = false;
             pageData.frontmatter.aside = false;
             pageData.frontmatter.outline = false
             pageData.frontmatter.nolebase = {
