@@ -19,7 +19,7 @@ getElectronExampleAppDownloadLink()
         <div class="container other-color">
             <div class="panels vp-doc">
                 <div class="panel">
-                    <h1>Chat with many popular models</h1>
+                    <h2>Chat with many popular models</h2>
                     <p>Experience the ease of running models on your machine</p>
                     <div class="code">
                         <slot name="chat-command" />
@@ -30,7 +30,7 @@ getElectronExampleAppDownloadLink()
                     </div>
                 </div>
                 <div class="panel">
-                    <h1>Inspect your hardware</h1>
+                    <h2>Inspect your hardware</h2>
                     <p>Check out your hardware capabilities</p>
                     <div class="code">
                         <slot name="inspect-command" />
@@ -39,7 +39,7 @@ getElectronExampleAppDownloadLink()
                 </div>
             </div>
             <div class="features-list vp-doc">
-                <h1>A complete package</h1>
+                <h2>A complete package</h2>
                 <p>Everything you need to use large language models in your project</p>
                 <div class="content">
                     <slot name="features-list" />
@@ -49,7 +49,7 @@ getElectronExampleAppDownloadLink()
         <div class="container">
             <div class="panels vp-doc">
                 <div class="panel">
-                    <h1>Prompt a model</h1>
+                    <h2>Prompt a model</h2>
                     <p>Integrate <code>node-llama-cpp</code> in your codebase and prompt models</p>
                     <div class="code">
                         <slot name="simple-code" />
@@ -57,7 +57,7 @@ getElectronExampleAppDownloadLink()
                     </div>
                 </div>
                 <div class="panel">
-                    <h1>Embed documents</h1>
+                    <h2>Embed documents</h2>
                     <p>Get embedding for a given text</p>
                     <div class="code">
                         <slot name="simple-embedding" />
@@ -69,7 +69,7 @@ getElectronExampleAppDownloadLink()
         <div class="container">
             <div class="panels vp-doc">
                 <div class="panel">
-                    <h1>Enforce a JSON schema</h1>
+                    <h2>Enforce a JSON schema</h2>
                     <p>Force a model response to follow your JSON schema</p>
                     <div class="code">
                         <slot name="json-schema" />
@@ -77,7 +77,7 @@ getElectronExampleAppDownloadLink()
                     </div>
                 </div>
                 <div class="panel">
-                    <h1>Prompt with function calling</h1>
+                    <h2>Prompt with function calling</h2>
                     <p>Let a model call functions to retrieve data or perform actions</p>
                     <div class="code">
                         <slot name="function-calling" />
@@ -144,8 +144,17 @@ getElectronExampleAppDownloadLink()
         border-radius: 12px;
         flex-basis: 0%;
 
-        > h1 {
+        > h2 {
+            letter-spacing: -0.02em;
+            line-height: 40px;
+            font-size: 28px;
             margin: 16px 0px;
+            padding-top: 0px;
+            border-top: none;
+
+            @media (min-width: 768px) {
+                font-size: 32px;
+            }
         }
 
         .learn-more {
@@ -188,8 +197,17 @@ getElectronExampleAppDownloadLink()
     margin: 32px calc(-1*(100svw - 100%) / 2) 0px calc(-1*(100svw - 100%) / 2);
     overflow: hidden;
 
-    > h1 {
+    > h2 {
+        letter-spacing: -0.02em;
+        line-height: 40px;
+        font-size: 28px;
         margin: 16px 0px;
+        padding-top: 0px;
+        border-top: none;
+
+        @media (min-width: 768px) {
+            font-size: 32px;
+        }
     }
 
     > .content {
