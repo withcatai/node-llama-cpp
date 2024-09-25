@@ -91,16 +91,58 @@ export default defineConfig({
     sitemap: {
         hostname,
         transformItems(items) {
-            return items.map((item) => {
-                if (item.url.includes("api/") || item.url.includes("cli/")) {
-                    item = {
-                        ...item,
-                        lastmod: undefined
-                    };
+            function prioritizeUrl(a: {url: string}, b: {url: string}, matcher: (url: string) => boolean) {
+                const aMatch = matcher(a.url);
+                const bMatch = matcher(b.url);
+
+                if (aMatch && !bMatch)
+                    return -1;
+                else if (!aMatch && bMatch)
+                    return 1;
+
+                return 0;
+            }
+
+            function firstPriority(matchers: (() => number)[]): number {
+                for (const matcher of matchers) {
+                    const res = matcher();
+                    if (res !== 0)
+                        return res;
                 }
 
-                return item;
-            });
+                return 0;
+            }
+
+            return items
+                .map((item) => {
+                    if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
+                        item = {
+                            ...item,
+                            lastmod: undefined
+                        };
+                    }
+
+                    return item;
+                })
+                .sort((a, b) => {
+                    return firstPriority([
+                        () => prioritizeUrl(a, b, (url) => url === ""),
+                        () => prioritizeUrl(a, b, (url) => url === "blog/"),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("blog/")),
+                        () => prioritizeUrl(a, b, (url) => url === "guide/"),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("guide/")),
+                        () => prioritizeUrl(a, b, (url) => url === "cli/"),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("cli/")),
+                        () => prioritizeUrl(a, b, (url) => url === "api/"),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/functions/")),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/classes/")),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/type-aliases/")),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/enumerations/")),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/variables/")),
+                        () => prioritizeUrl(a, b, (url) => url.startsWith("api/"))
+                        // () => a.url.localeCompare(b.url)
+                    ]);
+                });
         }
     },
     head: [
