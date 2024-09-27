@@ -59,7 +59,6 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
 
         noToolInstructions?: boolean,
 
-        /** @internal */
         _specialTokensTextForPreamble?: boolean
     } = {}) {
         super();
