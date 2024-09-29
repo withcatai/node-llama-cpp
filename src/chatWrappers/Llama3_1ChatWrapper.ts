@@ -36,13 +36,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     /**
      * @param options
      */
-    public constructor({
-        cuttingKnowledgeDate = new Date("2023-12-01T00:00:00Z"),
-        todayDate = () => new Date(),
-        noToolInstructions = false,
-
-        _specialTokensTextForPreamble = false
-    }: {
+    public constructor(options: {
         /**
          * Set to `null` to disable
          *
@@ -63,6 +57,14 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         _specialTokensTextForPreamble?: boolean
     } = {}) {
         super();
+
+        const {
+            cuttingKnowledgeDate = new Date("2023-12-01T00:00:00Z"),
+            todayDate = () => new Date(),
+            noToolInstructions = false,
+
+            _specialTokensTextForPreamble = false
+        } = options;
 
         this.cuttingKnowledgeDate = cuttingKnowledgeDate == null
             ? null

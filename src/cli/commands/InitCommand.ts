@@ -6,7 +6,6 @@ import logSymbols from "log-symbols";
 import validateNpmPackageName from "validate-npm-package-name";
 import fs from "fs-extra";
 import {consolePromptQuestion} from "../utils/consolePromptQuestion.js";
-import {isUrl} from "../../utils/isUrl.js";
 import {basicChooseFromListConsoleInteraction} from "../utils/basicChooseFromListConsoleInteraction.js";
 import {splitAnsiToLines} from "../utils/splitAnsiToLines.js";
 import {arrowChar} from "../../consts.js";
@@ -21,6 +20,7 @@ import {ProjectTemplateOption, projectTemplates} from "../projectTemplates.js";
 import {getReadablePath} from "../utils/getReadablePath.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
+import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 
 type InitCommand = {
     name?: string,
@@ -93,7 +93,7 @@ export async function InitCommandHandler({name, template, gpu}: InitCommand) {
             logLevel: LlamaLogLevel.error
         });
 
-    const modelUrl = await interactivelyAskForModel({
+    const modelUri = await interactivelyAskForModel({
         llama,
         allowLocalModels: false,
         downloadIntent: false
@@ -113,29 +113,53 @@ export async function InitCommandHandler({name, template, gpu}: InitCommand) {
 
         await fs.ensureDir(targetDirectory);
 
-        const modelDownloader = await createModelDownloader({
-            modelUrl,
-            showCliProgress: false,
-            deleteTempFileOnCancel: false
-        });
-        const modelEntrypointFilename = modelDownloader.entrypointFilename;
+        async function resolveModelInfo() {
+            const resolvedModelDestination = resolveModelDestination(modelUri);
+
+            if (resolvedModelDestination.type === "uri")
+                return {
+                    modelUriOrUrl: resolvedModelDestination.uri,
+                    modelUriOrFilename: resolvedModelDestination.uri,
+                    cancelDownloader: async () => void 0
+                };
+
+            if (resolvedModelDestination.type === "file")
+                throw new Error("Unexpected file model destination");
+
+            const modelDownloader = await createModelDownloader({
+                modelUri: resolvedModelDestination.url,
+                showCliProgress: false,
+                deleteTempFileOnCancel: false
+            });
+            const modelEntrypointFilename = modelDownloader.entrypointFilename;
+
+            return {
+                modelUriOrUrl: resolvedModelDestination.url,
+                modelUriOrFilename: modelEntrypointFilename,
+                async cancelDownloader() {
+                    try {
+                        await modelDownloader.cancel();
+                    } catch (err) {
+                        // do nothing
+                    }
+                }
+            };
+        }
+
+        const {modelUriOrFilename, modelUriOrUrl, cancelDownloader} = await resolveModelInfo();
 
         await scaffoldProjectTemplate({
             template,
             directoryPath: targetDirectory,
             parameters: {
                 [ProjectTemplateParameter.ProjectName]: projectName,
-                [ProjectTemplateParameter.ModelUrl]: modelUrl,
-                [ProjectTemplateParameter.ModelFilename]: modelEntrypointFilename,
+                [ProjectTemplateParameter.ModelUriOrUrl]: modelUriOrUrl,
+                [ProjectTemplateParameter.ModelUriOrFilename]: modelUriOrFilename,
                 [ProjectTemplateParameter.CurrentModuleVersion]: await getModuleVersion()
             }
         });
 
-        try {
-            await modelDownloader.cancel();
-        } catch (err) {
-            // do nothing
-        }
+        await cancelDownloader();
 
         await new Promise((resolve) => setTimeout(resolve, Math.max(0, minScaffoldTime - (Date.now() - startTime))));
     });
@@ -213,10 +237,7 @@ async function askForProjectName(currentDirectory: string) {
             if (item == null)
                 return "";
 
-            if (isUrl(item, false))
-                return logSymbols.success + " Entered project name " + chalk.blue(item);
-            else
-                return logSymbols.success + " Entered project name " + chalk.blue(item);
+            return logSymbols.success + " Entered project name " + chalk.blue(item);
         }
     });
 

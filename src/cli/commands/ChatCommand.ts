@@ -77,9 +77,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
         return yargs
             .option("modelPath", {
-                alias: ["m", "model", "path", "url"],
+                alias: ["m", "model", "path", "url", "uri"],
                 type: "string",
-                description: "Model file to use for the chat. Can be a path to a local file or a URL of a model file to download. Leave empty to choose from a list of recommended models"
+                description: "Model file to use for the chat. Can be a path to a local file or a URI of a model file to download. Leave empty to choose from a list of recommended models"
             })
             .option("header", {
                 alias: ["H"],

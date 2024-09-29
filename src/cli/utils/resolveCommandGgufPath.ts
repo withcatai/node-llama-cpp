@@ -1,12 +1,10 @@
-import path from "path";
 import process from "process";
 import chalk from "chalk";
 import fs from "fs-extra";
 import {cliModelsDirectory} from "../../config.js";
-import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUrl.js";
 import {Llama} from "../../bindings/Llama.js";
-import {isUrl} from "../../utils/isUrl.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
+import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
@@ -16,10 +14,8 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 }: {
     targetDirectory?: string, flashAttention?: boolean
 } = {}) {
-    let resolvedGgufPath = ggufPath;
-
-    if (resolvedGgufPath == null)
-        resolvedGgufPath = await interactivelyAskForModel({
+    if (ggufPath == null)
+        ggufPath = await interactivelyAskForModel({
             llama,
             modelsDirectory: targetDirectory,
             allowLocalModels: true,
@@ -27,23 +23,22 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             flashAttention
         });
 
-    if (!isUrl(resolvedGgufPath)) {
+    const resolvedModelDestination = resolveModelDestination(ggufPath);
+    if (resolvedModelDestination.type === "file") {
         try {
-            const resolvedPath = path.resolve(process.cwd(), resolvedGgufPath);
-
-            if (await fs.pathExists(resolvedPath))
-                return resolvedPath;
+            if (await fs.pathExists(resolvedModelDestination.path))
+                return resolvedModelDestination.path;
         } catch (err) {
-            throw new Error(`Invalid path: ${resolvedGgufPath}`);
+            throw new Error(`Invalid path: ${resolvedModelDestination.path}`);
         }
 
-        throw new Error(`File does not exist: ${path.resolve(process.cwd(), resolvedGgufPath)}`);
+        throw new Error(`File does not exist: ${resolvedModelDestination.path}`);
     }
 
-    resolvedGgufPath = normalizeGgufDownloadUrl(resolvedGgufPath);
-
     const downloader = await createModelDownloader({
-        modelUrl: resolvedGgufPath,
+        modelUri: resolvedModelDestination.type === "uri"
+            ? resolvedModelDestination.uri
+            : resolvedModelDestination.url,
         dirPath: targetDirectory,
         headers: fetchHeaders,
         showCliProgress: true,
@@ -95,4 +90,3 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
     return downloader.entrypointFilePath;
 }
-

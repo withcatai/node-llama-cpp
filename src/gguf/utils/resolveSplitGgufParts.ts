@@ -2,18 +2,18 @@ import {isUrl} from "../../utils/isUrl.js";
 
 const splitGgufPartRegex = /-(?<part>\d{5})-of-(?<parts>\d{5})\.gguf$/;
 
-export function resolveSplitGgufParts(ggufPathOrUrl: string) {
-    if (isUrl(ggufPathOrUrl)) {
-        const parsedUrl = new URL(ggufPathOrUrl);
+export function resolveSplitGgufParts(ggufPathOrUri: string) {
+    if (isUrl(ggufPathOrUri)) {
+        const parsedUrl = new URL(ggufPathOrUri);
 
         return resolveParts(parsedUrl.pathname).map((part) => {
-            const url = new URL(ggufPathOrUrl);
+            const url = new URL(ggufPathOrUri);
             url.pathname = part;
             return url.href;
         });
     }
 
-    return resolveParts(ggufPathOrUrl);
+    return resolveParts(ggufPathOrUri);
 }
 
 function resolveParts(ggufPath: string) {
@@ -68,7 +68,18 @@ export function getGgufSplitPartsInfo(ggufPath: string) {
 }
 
 export function createSplitPartFilename(filename: string, part: number, parts: number) {
-    if (filename.endsWith(".gguf"))
+    const splitPartMatch = filename.match(splitGgufPartRegex);
+    if (splitPartMatch != null) {
+        const partsInfo = getGgufSplitPartsInfo(filename);
+        if (partsInfo != null) {
+            const {matchLength} = partsInfo;
+            const commonPath = filename.slice(0, filename.length - matchLength);
+
+            filename = commonPath + ".gguf";
+        }
+    }
+
+    if (filename.toLowerCase().endsWith(".gguf"))
         filename = filename.slice(0, -".gguf".length);
 
     return `${filename}-${String(part).padStart(5, "0")}-of-${String(parts).padStart(5, "0")}.gguf`;

@@ -34,13 +34,13 @@ export const PullCommand: CommandModule<object, PullCommand> = {
         return yargs
             .option("urls", {
                 type: "string",
-                alias: ["url"],
+                alias: ["url", "uris", "uri"],
                 array: true,
                 description: [
-                    "A `.gguf` model URL to pull.",
-                    !isInDocumentationMode && "Automatically handles split and binary-split models files, so only pass the URL to the first file of a model.",
+                    "A `.gguf` model URI to pull.",
+                    !isInDocumentationMode && "Automatically handles split and binary-split models files, so only pass the URI to the first file of a model.",
                     !isInDocumentationMode && "If a file already exists and its size matches the expected size, it will not be downloaded again unless the `--override` flag is used.",
-                    "Pass multiple URLs to download multiple models at once."
+                    "Pass multiple URIs to download multiple models at once."
                 ].filter(Boolean).join(
                     isInDocumentationMode
                         ? "\n"
@@ -104,13 +104,13 @@ export const PullCommand: CommandModule<object, PullCommand> = {
         const headers = resolveHeaderFlag(headerArg);
 
         if (urls.length === 0)
-            throw new Error("At least one URL must be provided");
+            throw new Error("At least one URI must be provided");
         else if (urls.length > 1 && filename != null)
-            throw new Error("The `--filename` flag can only be used when a single URL is passed");
+            throw new Error("The `--filename` flag can only be used when a single URI is passed");
 
         if (urls.length === 1) {
             const downloader = await createModelDownloader({
-                modelUrl: urls[0]!,
+                modelUri: urls[0]!,
                 dirPath: directory,
                 headers,
                 showCliProgress: !noProgress,
@@ -155,14 +155,13 @@ export const PullCommand: CommandModule<object, PullCommand> = {
             console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
         } else {
             const downloader = await combineModelDownloaders(
-                urls.map((url) => createModelDownloader({
-                    modelUrl: url,
+                urls.map((uri) => createModelDownloader({
+                    modelUri: uri,
                     dirPath: directory,
                     headers,
                     showCliProgress: false,
                     deleteTempFileOnCancel: noTempFile,
-                    skipExisting: !override,
-                    fileName: filename || undefined
+                    skipExisting: !override
                 })),
                 {
                     showCliProgress: !noProgress,

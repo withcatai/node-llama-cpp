@@ -2,17 +2,30 @@ import process from "process";
 import path from "path";
 import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
-import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {cliModelsDirectory, isCI} from "../config.js";
 import {safeEventCallback} from "./safeEventCallback.js";
 import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
 import {pushAll} from "./pushAll.js";
+import {resolveModelDestination} from "./resolveModelDestination.js";
 
-export type ModelDownloaderOptions = {
-    modelUrl: string,
-
+export type ModelDownloaderOptions = ({
+    /**
+     * The URI to download the model from.
+     *
+     * The supported URI schemes are:
+     * - **HTTP:** `https://`, `http://`
+     * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
+     */
+    modelUri: string
+} | {
+    /**
+     * @hidden
+     * @deprecated Use `modelUri` instead.
+     */
+    modelUrl: string
+}) & {
     /**
      * The directory to save the model file to.
      * Default to `node-llama-cpp`'s default global models directory (`~/.node-llama-cpp/models`).
@@ -54,18 +67,22 @@ export type ModelDownloaderOptions = {
 };
 
 /**
- * Create a model downloader to download a model from a URL.
+ * Create a model downloader to download a model from a URI.
  * Uses [`ipull`](https://github.com/ido-pluto/ipull) to download a model file as fast as possible with parallel connections
  * and other optimizations.
  *
- * If the url points to a `.gguf` file that is split into multiple parts (for example, `model-00001-of-00009.gguf`),
+ * If the uri points to a `.gguf` file that is split into multiple parts (for example, `model-00001-of-00009.gguf`),
  * all the parts will be downloaded to the specified directory.
  *
- * If the url points to a `.gguf` file that is binary split into multiple parts (for example, `model.gguf.part1of9`),
+ * If the uri points to a `.gguf` file that is binary split into multiple parts (for example, `model.gguf.part1of9`),
  * all the parts will be spliced into a single file and be downloaded to the specified directory.
  *
- * If the url points to a `.gguf` file that is not split or binary spliced (for example, `model.gguf`),
+ * If the uri points to a `.gguf` file that is not split or binary spliced (for example, `model.gguf`),
  * the file will be downloaded to the specified directory.
+ *
+ * The supported URI schemes are:
+ * - **HTTP:** `https://`, `http://`
+ * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
  * @example
  * ```typescript
  * import {fileURLToPath} from "url";
@@ -75,7 +92,26 @@ export type ModelDownloaderOptions = {
  * const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *
  * const downloader = await createModelDownloader({
- *     modelUrl: "https://example.com/model.gguf",
+ *     modelUri: "https://example.com/model.gguf",
+ *     dirPath: path.join(__dirname, "models")
+ * });
+ * const modelPath = await downloader.download();
+ *
+ * const llama = await getLlama();
+ * const model = await llama.loadModel({
+ *     modelPath
+ * });
+ * ```
+ * @example
+ * ```typescript
+ * import {fileURLToPath} from "url";
+ * import path from "path";
+ * import {createModelDownloader, getLlama} from "node-llama-cpp";
+ *
+ * const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ *
+ * const downloader = await createModelDownloader({
+ *     modelUri: "hf:user/model/model-file.gguf",
  *     dirPath: path.join(__dirname, "models")
  * });
  * const modelPath = await downloader.download();
@@ -107,11 +143,11 @@ export async function createModelDownloader(options: ModelDownloaderOptions) {
  *
  * const downloaders = [
  *     createModelDownloader({
- *         modelUrl: "https://example.com/model1.gguf",
+ *         modelUri: "https://example.com/model1.gguf",
  *         dirPath: path.join(__dirname, "models")
  *     }),
  *     createModelDownloader({
- *         modelUrl: "https://example.com/model2.gguf",
+ *         modelUri: "hf:user/model/model2.gguf",
  *         dirPath: path.join(__dirname, "models")
  *     })
  * ];
@@ -160,16 +196,31 @@ export class ModelDownloader {
     /** @internal */ private _totalFiles?: number;
     /** @internal */ private _tryHeaders: Record<string, string>[] = [];
 
-    private constructor({
-        modelUrl, dirPath = cliModelsDirectory, fileName, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
-        skipExisting = true, parallelDownloads = 4, tokens
-    }: ModelDownloaderOptions) {
-        if (modelUrl == null || dirPath == null)
-            throw new Error("modelUrl and dirPath cannot be null");
+    private constructor(options: ModelDownloaderOptions) {
+        const {
+            modelUri, modelUrl,
+            dirPath = cliModelsDirectory, fileName, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
+            skipExisting = true, parallelDownloads = 4, tokens
+        } = options as ModelDownloaderOptions & {
+            modelUri: string,
+            modelUrl: string
+        };
+        const resolvedModelUri = modelUri || modelUrl;
 
-        this._modelUrl = normalizeGgufDownloadUrl(modelUrl);
+        if (resolvedModelUri == null || dirPath == null)
+            throw new Error("modelUri and dirPath cannot be null");
+
+        const resolvedModelDestination = resolveModelDestination(resolvedModelUri);
+
+        this._modelUrl = resolvedModelDestination.type === "file"
+            ? path.join(dirPath, resolvedModelUri)
+            : resolvedModelDestination.url;
         this._dirPath = path.resolve(process.cwd(), dirPath);
-        this._fileName = fileName;
+        this._fileName = fileName || (
+            resolvedModelDestination.type === "uri"
+                ? resolvedModelDestination.parsedUri.fullFilename
+                : undefined
+        );
         this._headers = headers;
         this._showCliProgress = showCliProgress;
         this._onProgress = safeEventCallback(onProgress);

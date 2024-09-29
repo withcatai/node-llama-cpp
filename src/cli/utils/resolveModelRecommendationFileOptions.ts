@@ -1,5 +1,13 @@
-import {normalizeGgufDownloadUrl} from "../../gguf/utils/normalizeGgufDownloadUrl.js";
+import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 
+export type ModelURI = `${
+    `http://${string}/${string}` |
+    `https://${string}/${string}` |
+    `hf:${string}/${string}/${string}` |
+    `huggingface:${string}/${string}/${string}`
+}${
+    ".gguf" | `.gguf.part${number}of${number}`
+}`;
 export type ModelRecommendation = {
     name: string,
     abilities: ("code" | "chat" | "complete" | "infill" | "functionCalling")[],
@@ -11,19 +19,19 @@ export type ModelRecommendation = {
      * will be used (and the rest of the files won't even be tested),
      * otherwise, the file with the highest compatibility will be used.
      */
-    fileOptions: Array<{
-        huggingFace: {
-            model: `${string}/${string}`,
-            branch: string,
-            file: `${string}.gguf` | `${string}.gguf.part${number}of${number}`
-        }
-    }>
+    fileOptions: ModelURI[]
 };
 
 export function resolveModelRecommendationFileOptions(modelRecommendation: ModelRecommendation) {
     return modelRecommendation.fileOptions.map((fileOption) => {
-        return normalizeGgufDownloadUrl(
-            `https://huggingface.co/${fileOption.huggingFace.model}/resolve/${fileOption.huggingFace.branch}/${fileOption.huggingFace.file}`
-        );
+        const resolvedModelDestination = resolveModelDestination(fileOption, true);
+
+        if (resolvedModelDestination.type === "file")
+            throw new Error(`File option "${fileOption}" is not a valid model URI`);
+
+        if (resolvedModelDestination.type === "uri")
+            return resolvedModelDestination.uri;
+
+        return resolvedModelDestination.url;
     });
 }

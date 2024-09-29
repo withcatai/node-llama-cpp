@@ -51,9 +51,9 @@ npx --no node-llama-cpp inspect gpu
 ```
 
 ## Getting a Model File
-We recommend you to get a GGUF model from either [Michael Radermacher on Hugging Face](https://huggingface.co/mradermacher) or [search HuggingFace directly](https://huggingface.co/models?library=gguf) for a GGUF model.
+We recommend getting a GGUF model from either [Michael Radermacher on Hugging Face](https://huggingface.co/mradermacher) or by [searching HuggingFace directly](https://huggingface.co/models?library=gguf) for a GGUF model.
 
-We recommend you to start by getting a small model that doesn't have a lot of parameters just to ensure everything works, so try downloading a `7B`/`8B` parameters model first (search for models with both `7B`/`8B` and `GGUF` in their name).
+We recommend starting by getting a small model that doesn't have a lot of parameters just to ensure everything works, so try downloading a `7B`/`8B` parameters model first (search for models with both `7B`/`8B` and `GGUF` in their name).
 
 For improved download speeds, you can use the [`pull`](../cli/pull.md) command to download a model:
 ```shell

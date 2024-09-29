@@ -1,18 +1,22 @@
 import {fileURLToPath} from "url";
 import path from "path";
 import chalk from "chalk";
-import {getLlama, LlamaChatSession} from "node-llama-cpp";
+import {getLlama, LlamaChatSession, resolveModelFile} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const modelsFolderDirectory = path.join(__dirname, "..", "models");
+const modelsDirectory = path.join(__dirname, "..", "models");
 
 
 const llama = await getLlama();
 
+console.log(chalk.yellow("Resolving model file..."));
+const modelPath = await resolveModelFile(
+    "{{modelUriOrFilename|escape}}",
+    modelsDirectory
+);
+
 console.log(chalk.yellow("Loading model..."));
-const model = await llama.loadModel({
-    modelPath: path.join(modelsFolderDirectory, "{{modelFilename|escape}}")
-});
+const model = await llama.loadModel({modelPath});
 
 console.log(chalk.yellow("Creating context..."));
 const context = await model.createContext();

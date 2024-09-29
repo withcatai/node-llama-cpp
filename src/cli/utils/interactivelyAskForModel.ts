@@ -15,6 +15,7 @@ import {readGgufFileInfo} from "../../gguf/readGgufFileInfo.js";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
 import {isUrl} from "../../utils/isUrl.js";
+import {isModelUri, parseModelUri} from "../../utils/parseModelUri.js";
 import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendationFileOptions.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
@@ -36,13 +37,13 @@ type ModelOption = {
     type: "recommendedModel",
     title: string | (() => string),
     description?: string,
-    potentialUrls: string[],
-    selectedUrl?: {
-        url: string,
+    potentialUris: string[],
+    selectedUri?: {
+        uri: string,
         ggufInsights: GgufInsights,
         compatibilityScore: Awaited<ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>>
     },
-    urlSelectionLoadingState?: "done" | "loading"
+    uriSelectionLoadingState?: "done" | "loading"
 } | {
     type: "separator",
     text: string | (() => string)
@@ -154,13 +155,13 @@ export async function interactivelyAskForModel({
         const {recommendedModels} = await import("../recommendedModels.js");
 
         for (const recommendedModel of recommendedModels) {
-            const potentialUrls = resolveModelRecommendationFileOptions(recommendedModel);
+            const potentialUris = resolveModelRecommendationFileOptions(recommendedModel);
 
-            if (potentialUrls.length > 0)
+            if (potentialUris.length > 0)
                 recommendedModelOptions.push({
                     type: "recommendedModel",
                     title: recommendedModel.name,
-                    potentialUrls,
+                    potentialUris,
                     description: recommendedModel.description
                 });
         }
@@ -173,8 +174,8 @@ export async function interactivelyAskForModel({
         {
             type: "action",
             text: allowLocalModels
-                ? "Enter a model URL or file path..."
-                : "Enter a model URL...",
+                ? "Enter a model URI or file path..."
+                : "Enter a model URI...",
             key: "getPath"
         },
         ...(
@@ -283,7 +284,7 @@ export async function interactivelyAskForModel({
                         " ".repeat(leftPad) + chalk.bold.gray("Model description") + "\n" +
                         lines.map((line) => (" ".repeat(leftPad) + line))
                             .join("\n") + "\n" +
-                        splitAnsiToLines(renderRecommendedModelTechnicalInfo(item.selectedUrl, maxWidth, canUseGpu), maxWidth)
+                        splitAnsiToLines(renderRecommendedModelTechnicalInfo(item.selectedUri, maxWidth, canUseGpu), maxWidth)
                             .map((line) => (" ".repeat(leftPad) + line))
                             .join("\n");
                 },
@@ -296,7 +297,7 @@ export async function interactivelyAskForModel({
                 },
                 canSelectItem(item) {
                     if (item.type === "recommendedModel")
-                        return item.selectedUrl != null;
+                        return item.selectedUri != null;
 
                     return item.type === "localModel" || item.type === "action";
                 },
@@ -330,17 +331,17 @@ export async function interactivelyAskForModel({
                 continue;
             else if (selectedItem.type === "localModel")
                 return selectedItem.path;
-            else if (selectedItem.type === "recommendedModel" && selectedItem.selectedUrl != null)
-                return selectedItem.selectedUrl.url;
+            else if (selectedItem.type === "recommendedModel" && selectedItem.selectedUri != null)
+                return selectedItem.selectedUri.uri;
             else if (selectedItem.type === "action") {
                 if (selectedItem.key === "getPath") {
                     initialFocusIndex = 0;
-                    const selectedModelUrlOrPath = await askForModelUrlOrPath(allowLocalModels);
+                    const selectedModelUriOrPath = await askForModelUriOrPath(allowLocalModels);
 
-                    if (selectedModelUrlOrPath == null)
+                    if (selectedModelUriOrPath == null)
                         continue;
 
-                    return selectedModelUrlOrPath;
+                    return selectedModelUriOrPath;
                 }
             }
         }
@@ -349,11 +350,11 @@ export async function interactivelyAskForModel({
     }
 }
 
-async function askForModelUrlOrPath(allowLocalModels: boolean): Promise<string | null> {
+async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string | null> {
     return await consolePromptQuestion(
         allowLocalModels
-            ? chalk.bold("Enter a model URL or file path: ")
-            : chalk.bold("Enter a model URL: "),
+            ? chalk.bold("Enter a model URI or file path: ")
+            : chalk.bold("Enter a model URI: "),
         {
             exitOnCtrlC: false,
             async validate(input) {
@@ -365,8 +366,19 @@ async function askForModelUrlOrPath(allowLocalModels: boolean): Promise<string |
                     }
 
                     return null;
-                } else if (!allowLocalModels)
-                    return "Only URLs are allowed";
+                }
+
+                try {
+                    if (parseModelUri(input) != null)
+                        return null;
+                } catch (err) {
+                    return err instanceof Error
+                        ? (err?.message || "Invalid model URI")
+                        : "Invalid model URI";
+                }
+
+                if (!allowLocalModels)
+                    return "Only URIs are allowed";
 
                 try {
                     if (await fs.pathExists(input))
@@ -383,7 +395,9 @@ async function askForModelUrlOrPath(allowLocalModels: boolean): Promise<string |
 
                 if (isUrl(item, false))
                     return logSymbols.success + " Entered model URL " + chalk.blue(item);
-                else
+                else if (isModelUri(item)) {
+                    return logSymbols.success + " Entered model URI " + chalk.blue(item);
+                } else
                     return logSymbols.success + " Entered model path " + chalk.blue(item);
             }
         }
@@ -409,9 +423,9 @@ function renderSelectionItem(
             ? item.title()
             : item.title;
 
-        if (item.selectedUrl == null) {
-            if (item.urlSelectionLoadingState == null) {
-                item.urlSelectionLoadingState = "loading";
+        if (item.selectedUri == null) {
+            if (item.uriSelectionLoadingState == null) {
+                item.uriSelectionLoadingState = "loading";
                 void selectFileForModelRecommendation({
                     recommendedModelOption: item,
                     abortSignal,
@@ -421,17 +435,17 @@ function renderSelectionItem(
                 });
             }
 
-            if (item.urlSelectionLoadingState === "loading")
+            if (item.uriSelectionLoadingState === "loading")
                 modelText += " " + chalk.bgGray.yellow(" Loading info ");
-            else if (item.urlSelectionLoadingState === "done")
+            else if (item.uriSelectionLoadingState === "done")
                 modelText += " " + chalk.bgGray.yellow(" Failed to load info ");
             else
-                void (item.urlSelectionLoadingState satisfies never);
+                void (item.uriSelectionLoadingState satisfies never);
         } else
             modelText += "  " + renderModelCompatibility(
-                item.selectedUrl.ggufInsights,
-                item.selectedUrl.compatibilityScore.compatibilityScore,
-                item.selectedUrl.compatibilityScore.resolvedValues.contextSize
+                item.selectedUri.ggufInsights,
+                item.selectedUri.compatibilityScore.compatibilityScore,
+                item.selectedUri.compatibilityScore.resolvedValues.contextSize
             );
 
         return renderSelectableItem(modelText, focused);
@@ -481,15 +495,15 @@ function renderModelCompatibility(
 }
 
 function renderRecommendedModelTechnicalInfo(
-    modelSelectedUrl: (ModelOption & { type: "recommendedModel" })["selectedUrl"],
+    modelSelectedUri: (ModelOption & { type: "recommendedModel" })["selectedUri"],
     maxWidth: number,
     canUseGpu: boolean
 ) {
-    if (modelSelectedUrl == null)
+    if (modelSelectedUri == null)
         return " \n" + chalk.bgGray.yellow(" Loading info ") + "\n ";
 
-    const ggufInsights = modelSelectedUrl.ggufInsights;
-    const compatibilityScore = modelSelectedUrl.compatibilityScore;
+    const ggufInsights = modelSelectedUri.ggufInsights;
+    const compatibilityScore = modelSelectedUri.compatibilityScore;
 
     const longestTitle = Math.max("Model info".length, "Resolved config".length) + 1;
     return " \n" + [
@@ -546,14 +560,14 @@ async function selectFileForModelRecommendation({
 }) {
     try {
         let bestScore: number | undefined = undefined;
-        let bestScoreSelectedUrl: (ModelOption & { type: "recommendedModel" })["selectedUrl"] | undefined = undefined;
+        let bestScoreSelectedUri: (ModelOption & { type: "recommendedModel" })["selectedUri"] | undefined = undefined;
 
-        for (const potentialUrl of recommendedModelOption.potentialUrls) {
+        for (const potentialUri of recommendedModelOption.potentialUris) {
             if (abortSignal.aborted)
                 return;
 
             try {
-                const ggufFileInfo = await readGgufFileInfo(potentialUrl, {
+                const ggufFileInfo = await readGgufFileInfo(potentialUri, {
                     sourceType: "network",
                     signal: abortSignal
                 });
@@ -568,8 +582,8 @@ async function selectFileForModelRecommendation({
 
                 if (bestScore == null || compatibilityScore.compatibilityScore > bestScore) {
                     bestScore = compatibilityScore.compatibilityScore;
-                    bestScoreSelectedUrl = {
-                        url: potentialUrl,
+                    bestScoreSelectedUri = {
+                        uri: potentialUri,
                         ggufInsights,
                         compatibilityScore
                     };
@@ -582,11 +596,11 @@ async function selectFileForModelRecommendation({
             }
         }
 
-        recommendedModelOption.selectedUrl = bestScoreSelectedUrl;
-        recommendedModelOption.urlSelectionLoadingState = "done";
+        recommendedModelOption.selectedUri = bestScoreSelectedUri;
+        recommendedModelOption.uriSelectionLoadingState = "done";
         rerenderOption();
     } catch (err) {
-        recommendedModelOption.urlSelectionLoadingState = "done";
+        recommendedModelOption.uriSelectionLoadingState = "done";
         rerenderOption();
     }
 }

@@ -7,7 +7,7 @@ export const ggufDefaultFetchRetryOptions: retry.Options = {
     maxTimeout: 1000 * 16
 } as const;
 
-export const defaultExtraAllocationSize = 1024 * 1024 * 1.5; // 1.5MB
+export const defaultExtraAllocationSize = 1024 * 1024 * 4; // 4MB
 
 export const noDirectSubNestingGGufMetadataKeys: readonly string[] = [
     "general.license",

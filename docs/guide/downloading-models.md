@@ -69,6 +69,50 @@ This option is recommended for more advanced use cases, such as downloading mode
 If you know the exact model URLs you're going to need every time in your project, it's better to download the models
 automatically after running `npm install` as described in the [Using the CLI](#cli) section.
 
+## Model URIs {#model-uris}
+You can reference models using a URI instead of their full download URL when using the CLI and relevant methods.
+
+When downloading a model from a URI, the model files will be prefixed with a corresponding adaptation of the URI.
+
+To reference a model from Hugging Face, you can use the scheme
+<br/>
+`hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional).
+
+Here's an example usage of the Hugging Face URI scheme:
+```
+hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
+```
+
+When using a URI to reference a model,
+it's recommended [to add it to your `package.json` file](#cli) to ensure it's downloaded when running `npm install`,
+and also resolve it using the [`resolveModelFile`](../api/functions/resolveModelFile.md) method to get the full path of the resolved model file.
+
+Here's and example usage of the [`resolveModelFile`](../api/functions/resolveModelFile.md) method:
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, resolveModelFile} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const modelsDirectory = path.join(__dirname, "models");
+
+const modelPath = await resolveModelFile(
+    "hf:user/model/model-file.gguf",
+    modelsDirectory
+);
+
+const llama = await getLlama();
+const model = await llama.loadModel({modelPath});
+```
+
+::: tip NOTE
+If a corresponding model file is not found in the given directory, the model will automatically be downloaded.
+
+When a file is being downloaded, the download progress is shown in the console by default.
+<br/>
+Set the [`cli`](../api/type-aliases/ResolveModelFileOptions#cli) option to `false` to disable this behavior.
+:::
+
 ## Downloading Gated Models From Hugging Face {#hf-token}
 Some models on Hugging Face are "gated", meaning they require a manual consent from you before you can download them.
 
@@ -76,9 +120,10 @@ To download such models, after completing the consent form on the model card, yo
 * Set an environment variable called `HF_TOKEN` the token
 * Set the `~/.cache/huggingface/token` file content to the token
 
-Now, using the CLI or the [`createModelDownloader`](../api/functions/createModelDownloader.md) method will automatically use the token to download gated models.
+Now, using the CLI, the [`createModelDownloader`](../api/functions/createModelDownloader.md) method,
+or the [`resolveModelFile`](../api/functions/resolveModelFile.md) method will automatically use the token to download gated models.
 
-Alternatively, you can use the token in the [`tokens`](../api/type-aliases/ModelDownloaderOptions.md#tokens) option when using [`createModelDownloader`](../api/functions/createModelDownloader.md).
+Alternatively, you can use the token in the [`tokens`](../api/type-aliases/ModelDownloaderOptions.md#tokens) option when using [`createModelDownloader`](../api/functions/createModelDownloader.md) or [`resolveModelFile`](../api/functions/resolveModelFile.md).
 
 ## Inspecting Remote Models
 You can inspect the metadata of a remote model without downloading it by either using the [`inspect gguf` command](../cli/inspect/gguf.md) with a URL,

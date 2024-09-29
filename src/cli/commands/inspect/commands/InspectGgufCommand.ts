@@ -7,13 +7,12 @@ import fs from "fs-extra";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
-import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
-import {isUrl} from "../../../../utils/isUrl.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
-import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
 import withOra from "../../../../utils/withOra.js";
+import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
+import {printModelDestination} from "../../../utils/printModelDestination.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -34,10 +33,10 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
     builder(yargs) {
         return yargs
             .option("modelPath", {
-                alias: ["m", "model", "path", "url"],
+                alias: ["m", "model", "path", "url", "uri"],
                 type: "string",
                 demandOption: true,
-                description: "The path or URL of the GGUF file to inspect. If a URL is provided, the metadata will be read from the remote file without downloading the entire file.",
+                description: "The path or URI of the GGUF file to inspect. If a URI is provided, the metadata will be read from the remote file without downloading the entire file.",
                 group: "Required:"
             })
             .option("header", {
@@ -83,23 +82,21 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
     async handler({
         modelPath: ggufPath, header: headerArg, noSplice, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
     }: InspectGgufCommand) {
-        const isPathUrl = isUrl(ggufPath);
-        const resolvedGgufPath = isPathUrl
-            ? normalizeGgufDownloadUrl(ggufPath)
-            : path.resolve(ggufPath);
+        const resolvedModelDestination = resolveModelDestination(ggufPath);
+        const resolvedGgufPath = resolvedModelDestination.type == "file"
+            ? resolvedModelDestination.path
+            : resolvedModelDestination.url;
 
         const headers = resolveHeaderFlag(headerArg);
 
-        if (!plainJson) {
-            if (isPathUrl)
-                console.info(`${chalk.yellow("URL:")} ${resolvedGgufPath}`);
-            else
-                console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
-        }
+        if (!plainJson)
+            printModelDestination(resolvedModelDestination);
 
         const parsedMetadata = plainJson
-            ? await readGgufFileInfo(ggufPath, {
-                fetchHeaders: isPathUrl ? headers : undefined,
+            ? await readGgufFileInfo(resolvedGgufPath, {
+                fetchHeaders: resolvedModelDestination.type === "file"
+                    ? undefined
+                    : headers,
                 spliceSplitFiles: !noSplice
             })
             : await withOra({
@@ -108,8 +105,10 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 fail: chalk.blue("Failed to read model metadata"),
                 noSuccessLiveStatus: true
             }, async () => {
-                return await readGgufFileInfo(ggufPath, {
-                    fetchHeaders: isPathUrl ? headers : undefined,
+                return await readGgufFileInfo(resolvedGgufPath, {
+                    fetchHeaders: resolvedModelDestination.type === "file"
+                        ? undefined
+                        : headers,
                     spliceSplitFiles: !noSplice
                 });
             });
