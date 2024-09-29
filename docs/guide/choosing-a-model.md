@@ -164,3 +164,7 @@ npx --no node-llama-cpp pull --dir ./models <model-file-url>
 > 
 > If the model file URL is of a single part of a multi-part model (for example, [this model](https://huggingface.co/bartowski/Meta-Llama-3-70B-Instruct-GGUF/blob/main/Meta-Llama-3-70B-Instruct-Q5_K_L.gguf/Meta-Llama-3-70B-Instruct-Q5_K_L-00001-of-00002.gguf)),
 > it will also download all the other parts as well into the same directory.
+
+::: tip
+Consider using [model URIs](./downloading-models.md#model-uris) to download and load models.
+:::

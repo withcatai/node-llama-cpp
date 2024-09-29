@@ -11,7 +11,7 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 
 type PullCommand = {
-    uris: string[],
+    urls: string[],
     header?: string[],
     override: boolean,
     noProgress: boolean,
@@ -22,19 +22,19 @@ type PullCommand = {
 };
 
 export const PullCommand: CommandModule<object, PullCommand> = {
-    command: "pull [uris..]",
+    command: "pull [urls..]",
     aliases: ["get"],
     describe: withCliCommandDescriptionDocsUrl(
-        "Download models from URIs",
+        "Download models from URLs",
         documentationPageUrls.CLI.Pull
     ),
     builder(yargs) {
         const isInDocumentationMode = getIsInDocumentationMode();
 
         return yargs
-            .option("uris", {
+            .option("urls", {
                 type: "string",
-                alias: ["uri", "urls", "url"],
+                alias: ["url", "uris", "uri"],
                 array: true,
                 description: [
                     "A `.gguf` model URI to pull.",
@@ -100,17 +100,17 @@ export const PullCommand: CommandModule<object, PullCommand> = {
                 group: "Optional:"
             });
     },
-    async handler({uris, header: headerArg, override, noProgress, noTempFile, directory, filename, parallel}: PullCommand) {
+    async handler({urls, header: headerArg, override, noProgress, noTempFile, directory, filename, parallel}: PullCommand) {
         const headers = resolveHeaderFlag(headerArg);
 
-        if (uris.length === 0)
+        if (urls.length === 0)
             throw new Error("At least one URI must be provided");
-        else if (uris.length > 1 && filename != null)
+        else if (urls.length > 1 && filename != null)
             throw new Error("The `--filename` flag can only be used when a single URI is passed");
 
-        if (uris.length === 1) {
+        if (urls.length === 1) {
             const downloader = await createModelDownloader({
-                modelUri: uris[0]!,
+                modelUri: urls[0]!,
                 dirPath: directory,
                 headers,
                 showCliProgress: !noProgress,
@@ -155,7 +155,7 @@ export const PullCommand: CommandModule<object, PullCommand> = {
             console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
         } else {
             const downloader = await combineModelDownloaders(
-                uris.map((uri) => createModelDownloader({
+                urls.map((uri) => createModelDownloader({
                     modelUri: uri,
                     dirPath: directory,
                     headers,

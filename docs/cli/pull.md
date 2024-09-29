@@ -21,6 +21,8 @@ The supported URI schemes are:
 - **HTTP:** `https://`, `http://`
 - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
 
+Learn more about using model URIs in the [Downloading Models guide](../guide/downloading-models.md#model-uris).
+
 > To programmatically download a model file in your code, use [`createModelDownloader()`](../api/functions/createModelDownloader.md)
 
 ## Usage

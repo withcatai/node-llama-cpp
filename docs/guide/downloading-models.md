@@ -78,7 +78,7 @@ To reference a model from Hugging Face, you can use the scheme
 <br/>
 `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional).
 
-Here's an example usage of the Hugging Face scheme:
+Here's an example usage of the Hugging Face URI scheme:
 ```
 hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
 ```
