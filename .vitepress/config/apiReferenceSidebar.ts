@@ -10,6 +10,7 @@ const categoryOrder = [
 
 const functionsOrder = [
     "getLlama",
+    "resolveModelFile",
     "defineChatSessionFunction",
     "createModelDownloader",
     "resolveChatWrapper",

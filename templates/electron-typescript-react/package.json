@@ -11,7 +11,7 @@
   },
   "scripts": {
     "_postinstall": "npm run models:pull",
-    "models:pull": "node-llama-cpp pull --dir ./models \"{{modelUrl|escape|escape}}\"",
+    "models:pull": "node-llama-cpp pull --dir ./models \"{{modelUriOrUrl|escape|escape}}\"",
     "start": "vite dev",
     "start:build": "electron ./dist-electron",
     "prebuild": "rimraf ./dist ./dist-electron ./release",

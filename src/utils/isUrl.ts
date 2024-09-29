@@ -1,5 +1,5 @@
 export function isUrl(text: string, throwOnInvalidUrl: boolean = true) {
-    if (text.startsWith("http://") || text.startsWith("https://")) {
+    if (text.toLowerCase().startsWith("http://") || text.toLowerCase().startsWith("https://")) {
         try {
             new URL(text);
             return true;

@@ -40,7 +40,7 @@ export function getFilenameForBinarySplitGgufPartUrls(urls: string[]) {
     const firstParsedUrl = new URL(urls[0]!);
 
     if (binarySplitGgufPartsRegex.test(firstParsedUrl.pathname)) {
-        const ggufIndex = firstParsedUrl.pathname.indexOf(".gguf");
+        const ggufIndex = firstParsedUrl.pathname.toLowerCase().indexOf(".gguf");
         const urlWithoutPart = firstParsedUrl.pathname.slice(0, ggufIndex + ".gguf".length);
 
         const filename = decodeURIComponent(urlWithoutPart.split("/").pop()!);

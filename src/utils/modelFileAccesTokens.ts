@@ -2,6 +2,7 @@ import process from "process";
 import path from "path";
 import os from "os";
 import fs from "fs-extra";
+import {isUrl} from "./isUrl.js";
 
 export type ModelFileAccessTokens = {
     huggingFace?: string
@@ -14,7 +15,7 @@ export async function resolveModelFileAccessTokensTryHeaders(
 ) {
     const res: Record<string, string>[] = [];
 
-    if (tokens == null)
+    if (tokens == null || !isUrl(modelUrl))
         return res;
 
     const parsedUrl = new URL(modelUrl);

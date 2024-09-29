@@ -4,8 +4,8 @@ import fs from "fs-extra";
 export const enum ProjectTemplateParameter {
     ProjectName = "projectName",
     CurrentModuleVersion = "currentNodeLlamaCppModuleVersion",
-    ModelUrl = "modelUrl",
-    ModelFilename = "modelFilename",
+    ModelUriOrUrl = "modelUriOrUrl",
+    ModelUriOrFilename = "modelUriOrFilename"
 }
 
 export type PackagedFileEntry = {

@@ -1,6 +1,7 @@
 import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
 import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
+import {isModelUri, parseModelUri} from "../utils/parseModelUri.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -13,10 +14,10 @@ import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
 /**
  * Read a GGUF file and return its metadata and tensor info (unless `readTensorInfo` is set to `false`).
  * Only the parts of the file required for the metadata and tensor info are read.
- * @param pathOrUrl
+ * @param pathOrUri
  * @param options
  */
-export async function readGgufFileInfo(pathOrUrl: string, {
+export async function readGgufFileInfo(pathOrUri: string, {
     readTensorInfo = true,
     sourceType,
     ignoreKeys = [],
@@ -70,12 +71,13 @@ export async function readGgufFileInfo(pathOrUrl: string, {
 
     tokens?: ModelFileAccessTokens
 } = {}) {
-    const useNetworkReader = sourceType === "network" || (sourceType == null && isUrl(pathOrUrl));
+    const useNetworkReader = sourceType === "network" || (sourceType == null && (isUrl(pathOrUri) || isModelUri(pathOrUri)));
 
-    function createFileReader(pathOrUrl: string) {
+    function createFileReader(pathOrUri: string) {
         if (useNetworkReader) {
+            const parsedModelUri = parseModelUri(pathOrUri);
             return new GgufNetworkFetchFileReader({
-                url: normalizeGgufDownloadUrl(pathOrUrl),
+                url: parsedModelUri?.resolvedUrl ?? normalizeGgufDownloadUrl(pathOrUri),
                 retryOptions: fetchRetryOptions,
                 headers: fetchHeaders,
                 signal,
@@ -83,7 +85,7 @@ export async function readGgufFileInfo(pathOrUrl: string, {
             });
         } else if (sourceType === "filesystem" || sourceType == null) {
             return new GgufFsFileReader({
-                filePath: pathOrUrl,
+                filePath: pathOrUri,
                 signal
             });
         }
@@ -92,8 +94,8 @@ export async function readGgufFileInfo(pathOrUrl: string, {
         throw new Error(`Unsupported sourceType: ${sourceType}`);
     }
 
-    async function readSingleFile(pathOrUrl: string) {
-        const fileReader = createFileReader(pathOrUrl);
+    async function readSingleFile(pathOrUri: string) {
+        const fileReader = createFileReader(pathOrUri);
         return await parseGguf({
             fileReader,
             ignoreKeys,
@@ -103,9 +105,9 @@ export async function readGgufFileInfo(pathOrUrl: string, {
     }
 
     if (!spliceSplitFiles)
-        return await readSingleFile(pathOrUrl);
+        return await readSingleFile(pathOrUri);
 
-    const allSplitPartPaths = resolveSplitGgufParts(pathOrUrl);
+    const allSplitPartPaths = resolveSplitGgufParts(pathOrUri);
 
     if (allSplitPartPaths.length === 1)
         return await readSingleFile(allSplitPartPaths[0]!);

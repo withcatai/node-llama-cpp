@@ -5,6 +5,7 @@ import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {
     type LlamaGpuType, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType
 } from "./bindings/types.js";
+import {resolveModelFile, type ResolveModelFileOptions} from "./utils/resolveModelFile.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
 import {TokenAttributes} from "./evaluator/LlamaModel/utils/TokenAttributes.js";
 import {LlamaGrammar, type LlamaGrammarOptions} from "./evaluator/LlamaGrammar.js";
@@ -109,6 +110,8 @@ export {
     type LlamaGpuType,
     LlamaLogLevel,
     NoBinaryFoundError,
+    resolveModelFile,
+    type ResolveModelFileOptions,
     LlamaModel,
     LlamaModelTokens,
     LlamaModelInfillTokens,

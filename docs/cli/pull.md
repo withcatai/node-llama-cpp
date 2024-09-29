@@ -13,9 +13,13 @@ const commandDoc = docs.pull;
 A wrapper around [`ipull`](https://www.npmjs.com/package/ipull)
 to download model files as fast as possible with parallel connections and other optimizations.
 
-Automatically handles split and binary-split models files, so only pass the URL to the first file of a model.
+Automatically handles split and binary-split models files, so only pass the URI to the first file of a model.
 
 If a file already exists and its size matches the expected size, it will not be downloaded again unless the `--override` flag is used.
+
+The supported URI schemes are:
+- **HTTP:** `https://`, `http://`
+- **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
 
 > To programmatically download a model file in your code, use [`createModelDownloader()`](../api/functions/createModelDownloader.md)
 

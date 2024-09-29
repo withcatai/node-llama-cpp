@@ -40,8 +40,8 @@ await scaffoldProjectTemplate({
     directoryPath: resolvedPackageFolderPath,
     parameters: {
         [ProjectTemplateParameter.ProjectName]: projectName,
-        [ProjectTemplateParameter.ModelUrl]: "https://github.com/withcatai/node-llama-cpp",
-        [ProjectTemplateParameter.ModelFilename]: "model.gguf",
+        [ProjectTemplateParameter.ModelUriOrUrl]: "https://github.com/withcatai/node-llama-cpp",
+        [ProjectTemplateParameter.ModelUriOrFilename]: "model.gguf",
         [ProjectTemplateParameter.CurrentModuleVersion]: packageVersion
     }
 });

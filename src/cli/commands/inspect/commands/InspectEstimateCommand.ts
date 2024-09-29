@@ -1,12 +1,8 @@
-import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import bytes from "bytes";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
-import {normalizeGgufDownloadUrl} from "../../../../gguf/utils/normalizeGgufDownloadUrl.js";
-import {isUrl} from "../../../../utils/isUrl.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
-import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
 import {printInfoLine} from "../../../utils/printInfoLine.js";
@@ -22,6 +18,8 @@ import {Llama} from "../../../../bindings/Llama.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import withOra from "../../../../utils/withOra.js";
+import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
+import {printModelDestination} from "../../../utils/printModelDestination.js";
 
 type InspectEstimateCommand = {
     modelPath: string,
@@ -41,10 +39,10 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
     builder(yargs) {
         return yargs
             .option("modelPath", {
-                alias: ["m", "model", "path", "url"],
+                alias: ["m", "model", "path", "url", "uri"],
                 type: "string",
                 demandOption: true,
-                description: "The path or URL of the GGUF file to use. If a URL is provided, the metadata will be read from the remote file without downloading the entire file.",
+                description: "The path or URI of the GGUF file to use. If a URI is provided, the metadata will be read from the remote file without downloading the entire file.",
                 group: "Required:"
             })
             .option("header", {
@@ -117,10 +115,10 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
         if (contextSizeArg === -1) contextSizeArg = undefined;
         if (contextSizeArg === -2) contextSizeArg = "train";
 
-        const isPathUrl = isUrl(ggufPath);
-        const resolvedGgufPath = isPathUrl
-            ? normalizeGgufDownloadUrl(ggufPath)
-            : path.resolve(ggufPath);
+        const resolvedModelDestination = resolveModelDestination(ggufPath);
+        const resolvedGgufPath = resolvedModelDestination.type == "file"
+            ? resolvedModelDestination.path
+            : resolvedModelDestination.url;
 
         const headers = resolveHeaderFlag(headerArg);
 
@@ -133,10 +131,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 logLevel: LlamaLogLevel.error
             });
 
-        if (isPathUrl)
-            console.info(`${chalk.yellow("URL:")} ${resolvedGgufPath}`);
-        else
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
+        printModelDestination(resolvedModelDestination);
 
         if (embedding)
             console.info(`${chalk.yellow("Estimating for an embedding context")}`);
@@ -147,8 +142,10 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             fail: chalk.blue("Failed to read model metadata"),
             noSuccessLiveStatus: true
         }, async () => {
-            return await readGgufFileInfo(ggufPath, {
-                fetchHeaders: isPathUrl ? headers : undefined
+            return await readGgufFileInfo(resolvedGgufPath, {
+                fetchHeaders: resolvedModelDestination.type === "file"
+                    ? undefined
+                    : headers
             });
         });
         const ggufInsights = await GgufInsights.from(ggufFileInfo, llama);
