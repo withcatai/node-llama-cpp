@@ -141,19 +141,25 @@ export class GgufInsightsConfigurationResolver {
      * - Whether all layers can be offloaded to the GPU (gives additional points)
      * - Whether the resolved context size is at least as large as the specified `contextSize`
      *
-     * IF the resolved context size is larger than the specified context size, for each multiplier of the specified `contextSize`
+     * If the resolved context size is larger than the specified context size, for each multiplier of the specified `contextSize`
      * that the resolved context size is larger by, 1 bonus point is given in the `bonusScore`.
+     *
+     * `maximumFittedContextSizeMultiplier` is used to improve the proportionality of the bonus score between models.
+     * Set this to any value higher than `<max compared model context size> / contextSize`.
+     * Defaults to `100`.
      *
      * `contextSize` defaults to `4096` (if the model train context size is lower than this, the model train context size is used instead).
      */
     public async scoreModelConfigurationCompatibility({
         contextSize = Math.min(4096, this._ggufInsights.trainContextSize ?? 4096),
         embeddingContext = false,
-        flashAttention = false
+        flashAttention = false,
+        maximumFittedContextSizeMultiplier = 100
     }: {
         contextSize?: number,
         embeddingContext?: boolean,
-        flashAttention?: boolean
+        flashAttention?: boolean,
+        maximumFittedContextSizeMultiplier?: number
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => ({total: os.totalmem(), free: os.freemem()})),
@@ -269,7 +275,12 @@ export class GgufInsightsConfigurationResolver {
                         )
                     )
         );
-        const bonusContextSizePoints = 10 * Math.min(1, Math.max(0, resolvedContextSize - contextSize) / contextSize);
+        const bonusContextSizePoints = 10 * Math.min(
+            1,
+            (
+                Math.max(0, resolvedContextSize - contextSize) / contextSize
+            ) / maximumFittedContextSizeMultiplier
+        );
 
         const compatibilityScore = canUseGpu
             ? (
