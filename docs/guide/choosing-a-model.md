@@ -83,7 +83,7 @@ npx --no node-llama-cpp inspect estimate <model-file-url>
 ```
 :::
 
-### What do you need this model for? (chat, code completion, analyzing data, classification, etc.)
+### What do you need this model for? (chat, code completion, analyzing data, classification, etc.) {#model-purpose}
 There are plenty of models with different areas of expertise and capabilities.
 
 When you choose a model that is more specialized in the task you need it for, it will usually perform better than a general model.

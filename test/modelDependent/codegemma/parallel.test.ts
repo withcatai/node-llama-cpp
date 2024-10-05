@@ -166,10 +166,10 @@ describe("CodeGemma", () => {
             });
 
             const resPromise = completion.generateCompletion("const singleLineArrayFromOneToHundred = [1, 2, 3, ", {
-                maxTokens: 40
+                maxTokens: 20
             });
             const resPromise2 = completion2.generateCompletion("const singleLineArrayFromOneToHundred = [100, 99, 98, 97, 96, ", {
-                maxTokens: 40
+                maxTokens: 20
             });
 
             const [

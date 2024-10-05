@@ -151,3 +151,8 @@ const context = await model.createContext({
 
 If you found that the memory estimation is indeed inaccurate,
 please [open a new issue on GitHub](https://github.com/withcatai/node-llama-cpp/issues/new/choose) with a link to the model you're using and the output of the [`inspect measure`](../cli/inspect/measure.md) command.
+
+## Getting an `The specified module could not be found \\?\C:\Users\Administrator\AppData\Roaming\npm\node_modules` Error on a Windows Machine
+The common cause for this issue is when using the `Administrator` to run `npm install` and then trying to run the code with a different user.
+
+Ensure you're not using the `Administrator` user for `npm install` nor to run the code.

@@ -3,6 +3,7 @@
     --vp-c-brand-2: #cc6e3a;
     --vp-c-brand-3: #cd8156;
     --vp-c-brand-soft: rgb(255 156 100 / 14%);
+    color-scheme: light;
 }
 
 .dark {
@@ -10,6 +11,7 @@
     --vp-c-brand-2: #e78e5c;
     --vp-c-brand-3: #dd773e;
     --vp-c-brand-soft: rgb(255 156 100 / 16%);
+    color-scheme: dark;
 }
 
 :root {
@@ -72,6 +74,13 @@
     --vp-c-bg-alt: rgb(0 0 2 / 0.2);
     --vp-c-divider: rgb(240 240 255 / 0.087);
     --vp-c-neutral-inverse: rgb(0 0 0 / 60%);
+}
+
+.VPNavBarTitle>.title>.logo {
+    margin-bottom: -2px;
+}
+.VPNavBar.home .VPNavBarTitle>.title>.logo {
+    display: none;
 }
 
 .VPNavBar:before {

@@ -321,6 +321,7 @@ export default defineConfig({
         ]
     },
     themeConfig: {
+        logo: "/icon.svg",
         editLink: {
             pattern: "https://github.com/withcatai/node-llama-cpp/edit/master/docs/:path"
         },

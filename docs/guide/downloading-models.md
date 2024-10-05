@@ -126,7 +126,7 @@ or the [`resolveModelFile`](../api/functions/resolveModelFile.md) method will au
 Alternatively, you can use the token in the [`tokens`](../api/type-aliases/ModelDownloaderOptions.md#tokens) option when using [`createModelDownloader`](../api/functions/createModelDownloader.md) or [`resolveModelFile`](../api/functions/resolveModelFile.md).
 
 ## Inspecting Remote Models
-You can inspect the metadata of a remote model without downloading it by either using the [`inspect gguf` command](../cli/inspect/gguf.md) with a URL,
+You can inspect the metadata of a remote model without downloading it by either using the [`inspect gguf`](../cli/inspect/gguf.md) command with a URL,
 or using the [`readGgufFileInfo`](../api/functions/readGgufFileInfo.md) method with a URL:
 ```typescript
 import {readGgufFileInfo} from "node-llama-cpp";
@@ -140,7 +140,7 @@ const modelMetadata = await readGgufFileInfo("<model url>");
 It's handy to check the compatibility of a remote model with your current machine hardware before downloading it,
 so you won't waste time downloading a model that won't work on your machine.
 
-You can do so using the [`inspect estimate` command](../cli/inspect/estimate.md) with a URL:
+You can do so using the [`inspect estimate`](../cli/inspect/estimate.md) command with a URL:
 ```shell
 npx --no node-llama-cpp inspect estimate <model-url>
 ```

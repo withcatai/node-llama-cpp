@@ -55,6 +55,8 @@ We recommend getting a GGUF model from either [Michael Radermacher on Hugging Fa
 
 We recommend starting by getting a small model that doesn't have a lot of parameters just to ensure everything works, so try downloading a `7B`/`8B` parameters model first (search for models with both `7B`/`8B` and `GGUF` in their name).
 
+To ensure you can chat with the model, make sure you [choose an Instruct model](./choosing-a-model.md#model-purpose) by looking for `Instruct` or `it` in the model name.
+
 For improved download speeds, you can use the [`pull`](../cli/pull.md) command to download a model:
 ```shell
 npx --no node-llama-cpp pull --dir ./models <model-file-url>
