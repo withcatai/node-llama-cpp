@@ -87,7 +87,7 @@ When using a URI to reference a model,
 it's recommended [to add it to your `package.json` file](#cli) to ensure it's downloaded when running `npm install`,
 and also resolve it using the [`resolveModelFile`](../api/functions/resolveModelFile.md) method to get the full path of the resolved model file.
 
-Here's and example usage of the [`resolveModelFile`](../api/functions/resolveModelFile.md) method:
+Here's an example usage of the [`resolveModelFile`](../api/functions/resolveModelFile.md) method:
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
