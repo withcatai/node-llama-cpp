@@ -100,6 +100,7 @@ import {
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
 import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
 import {type OverridesObject} from "./utils/OverridesObject.js";
+import type {LlamaClasses} from "./utils/getLlamaClasses.js";
 
 
 export {
@@ -108,6 +109,7 @@ export {
     type LlamaOptions,
     type LastBuildOptions,
     type LlamaGpuType,
+    type LlamaClasses,
     LlamaLogLevel,
     NoBinaryFoundError,
     resolveModelFile,

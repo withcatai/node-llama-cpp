@@ -7,6 +7,7 @@ import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
 import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
+import {getLlamaClasses, LlamaClasses} from "../utils/getLlamaClasses.js";
 import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
@@ -56,6 +57,7 @@ export class Llama {
     /** @internal */ private _nextLogNeedNewLine: boolean = false;
     /** @internal */ private _disposed: boolean = false;
 
+    private _classes?: LlamaClasses;
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
@@ -135,6 +137,13 @@ export class Llama {
 
     public get disposed() {
         return this._disposed;
+    }
+
+    public get classes() {
+        if (this._classes == null)
+            this._classes = getLlamaClasses();
+
+        return this._classes;
     }
 
     public get gpu() {
