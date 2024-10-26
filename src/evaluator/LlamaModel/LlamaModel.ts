@@ -684,7 +684,7 @@ export class LlamaModel {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
             defaultContextFlashAttention: resolvedDefaultContextFlashAttention
         });
-        const vramRequiredEstimate = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers}).gpuVram;
+        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers});
 
         const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
             _fileInfo: fileInfo,
@@ -694,9 +694,12 @@ export class LlamaModel {
             _flashAttentionSupported: flashAttentionSupported,
             _defaultContextFlashAttention: resolvedDefaultContextFlashAttention
         });
-        const modelCreationMemoryReservation = modelOptions.ignoreMemorySafetyChecks
+        const modelCreationVramReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
-            : _llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
+            : _llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.gpuVram);
+        const modelCreationRamReservation = modelOptions.ignoreMemorySafetyChecks
+            ? null
+            : _llama._ramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
         const loggedWarnings = new Set<string>();
 
         function onAbort() {
@@ -741,7 +744,8 @@ export class LlamaModel {
             return model;
         } finally {
             loadSignal?.removeEventListener("abort", onAbort);
-            modelCreationMemoryReservation?.dispose?.();
+            modelCreationVramReservation?.dispose?.();
+            modelCreationRamReservation?.dispose?.();
         }
     }
 }

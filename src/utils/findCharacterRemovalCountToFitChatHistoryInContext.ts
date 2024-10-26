@@ -1,6 +1,8 @@
 import {ChatHistoryItem, Tokenizer} from "../types.js";
 import {ChatWrapper} from "../ChatWrapper.js";
 
+const maxSequentialUnhelpfulIterations = 100;
+
 export async function findCharacterRemovalCountToFitChatHistoryInContext({
     compressChatHistory,
     chatHistory,
@@ -9,7 +11,8 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
     chatWrapper,
     initialCharactersRemovalCount = 0,
     estimatedCharactersPerToken = 5,
-    maxDecompressionAttempts = 2
+    maxDecompressionAttempts = 2,
+    failedCompressionErrorMessage = "Failed to compress chat history. Consider increasing the context size."
 }: {
     compressChatHistory(options: {
         chatHistory: readonly ChatHistoryItem[], charactersToRemove: number, estimatedCharactersPerToken: number
@@ -20,7 +23,8 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
     chatWrapper: ChatWrapper,
     initialCharactersRemovalCount?: number,
     estimatedCharactersPerToken?: number,
-    maxDecompressionAttempts?: number
+    maxDecompressionAttempts?: number,
+    failedCompressionErrorMessage?: string
 }): Promise<{
     removedCharactersCount: number,
     compressedChatHistory: ChatHistoryItem[]
@@ -55,6 +59,8 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
 
     let latestCompressionAttempt = await getResultForCharacterRemovalCount(initialCharactersRemovalCount);
     const firstCompressionAttempt = latestCompressionAttempt;
+    let latestCompressionAttemptTokensCount = latestCompressionAttempt.tokensCount;
+    let sameTokensCountRepetitions = 0;
 
     if (latestCompressionAttempt.tokensCount === tokensCountToFit ||
         (latestCompressionAttempt.tokensCount < tokensCountToFit && latestCompressionAttempt.characterRemovalCount === 0)
@@ -116,6 +122,19 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
             latestCompressionAttempt.characterRemovalCount < bestCompressionAttempt.characterRemovalCount
         ))
             bestCompressionAttempt = latestCompressionAttempt;
+
+        if (latestCompressionAttempt.tokensCount === latestCompressionAttemptTokensCount)
+            sameTokensCountRepetitions++;
+        else {
+            latestCompressionAttemptTokensCount = latestCompressionAttempt.tokensCount;
+            sameTokensCountRepetitions = 0;
+        }
+
+        if (decompressionAttempts === 0 &&
+            compressionAttempts >= maxSequentialUnhelpfulIterations &&
+            sameTokensCountRepetitions >= maxSequentialUnhelpfulIterations
+        )
+            throw new Error(failedCompressionErrorMessage);
     }
 
     return {

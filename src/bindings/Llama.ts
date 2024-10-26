@@ -1,3 +1,4 @@
+import os from "os";
 import chalk from "chalk";
 import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
@@ -34,6 +35,9 @@ export class Llama {
     /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _vramPadding: MemoryReservation;
+    /** @internal */ public readonly _ramOrchestrator: MemoryOrchestrator;
+    /** @internal */ public readonly _ramPadding: MemoryReservation;
+    /** @internal */ public readonly _swapOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _debug: boolean;
     /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
     /** @internal */ private readonly _gpu: LlamaGpuType;
@@ -61,7 +65,8 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, maxThreads, vramOrchestrator, vramPadding
+        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, maxThreads, vramOrchestrator, vramPadding,
+        ramOrchestrator, ramPadding, swapOrchestrator
     }: {
         bindings: BindingModule,
         logLevel: LlamaLogLevel,
@@ -76,7 +81,10 @@ export class Llama {
         gpu: BuildGpu,
         maxThreads?: number,
         vramOrchestrator: MemoryOrchestrator,
-        vramPadding: MemoryReservation
+        vramPadding: MemoryReservation,
+        ramOrchestrator: MemoryOrchestrator,
+        ramPadding: MemoryReservation,
+        swapOrchestrator: MemoryOrchestrator
     }) {
         this._bindings = bindings;
         this._gpu = gpu;
@@ -88,6 +96,9 @@ export class Llama {
         this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
+        this._ramOrchestrator = ramOrchestrator;
+        this._ramPadding = ramPadding;
+        this._swapOrchestrator = swapOrchestrator;
         this._threadsSplitter = new ThreadsSplitter(
             maxThreads ?? (
                 this._gpu === false
@@ -235,15 +246,60 @@ export class Llama {
         return this._vramPadding.size;
     }
 
+    /**
+     * The total amount of VRAM that is currently being used.
+     *
+     * `unifiedSize` represents the amount of VRAM that is shared between the CPU and GPU.
+     * On SoC devices, this is usually the same as `total`.
+     */
     public async getVramState() {
         this._ensureNotDisposed();
 
-        const {total, used} = this._bindings.getGpuVramInfo();
+        const {total, used, unifiedSize} = this._bindings.getGpuVramInfo();
 
         return {
             total,
             used,
-            free: Math.max(0, total - used)
+            free: Math.max(0, total - used),
+            unifiedSize
+        };
+    }
+
+    /**
+     * Get the state of the swap memory.
+     *
+     * **`maxSize`** - The maximum size of the swap memory that the system can allocate.
+     * If the swap size is dynamic (like on macOS), this will be `Infinity`.
+     *
+     * **`allocated`** - The total size allocated by the system for swap memory.
+     *
+     * **`used`** - The amount of swap memory that is currently being used from the `allocated` size.
+     *
+     * On Windows, this will return the info for the page file.
+     */
+    public async getSwapState(): Promise<{
+        /**
+         * The maximum size of the swap memory that the system can allocate.
+         * If the swap size is dynamic (like on macOS), this will be `Infinity`
+         */
+        maxSize: number,
+
+        /** The total size allocated by the system for swap memory */
+        allocated: number,
+
+        /** The amount of swap memory that is currently being used from the `allocated` size */
+        used: number
+    }> {
+        this._ensureNotDisposed();
+
+        const {total, maxSize, free} = this._bindings.getSwapInfo();
+
+        return {
+            maxSize: maxSize === -1
+                ? Infinity
+                : maxSize,
+            allocated: total,
+            used: total - free
         };
     }
 
@@ -383,7 +439,7 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, maxThreads, skipLlamaInit = false, debug
+        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads, skipLlamaInit = false, debug
     }: {
         bindings: BindingModule,
         buildType: "localBuild" | "prebuilt",
@@ -392,16 +448,45 @@ export class Llama {
         logger: (level: LlamaLogLevel, message: string) => void,
         maxThreads?: number,
         vramPadding: number | ((totalVram: number) => number),
+        ramPadding: number | ((totalRam: number) => number),
         skipLlamaInit?: boolean,
         debug: boolean
     }) {
         const gpu = bindings.getGpuType() ?? false;
         const vramOrchestrator = new MemoryOrchestrator(() => {
-            const {total, used} = bindings.getGpuVramInfo();
+            const {total, used, unifiedSize} = bindings.getGpuVramInfo();
 
             return {
                 total,
-                free: Math.max(0, total - used)
+                free: Math.max(0, total - used),
+                unifiedSize
+            };
+        });
+        const ramOrchestrator = new MemoryOrchestrator(() => {
+            const used = process.memoryUsage().rss;
+            const total = os.totalmem();
+
+            return {
+                total,
+                free: Math.max(0, total - used),
+                unifiedSize: total
+            };
+        });
+        const swapOrchestrator = new MemoryOrchestrator(() => {
+            const {total, maxSize, free} = bindings.getSwapInfo();
+            const used = total - free;
+
+            if (maxSize === -1)
+                return {
+                    total: Infinity,
+                    free: Infinity,
+                    unifiedSize: Infinity
+                };
+
+            return {
+                total: maxSize,
+                free:  maxSize - used,
+                unifiedSize: maxSize
             };
         });
 
@@ -412,6 +497,12 @@ export class Llama {
             resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding((await vramOrchestrator.getMemoryState()).total));
         else
             resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding);
+
+        let resolvedRamPadding: MemoryReservation;
+        if (ramPadding instanceof Function)
+            resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding((await ramOrchestrator.getMemoryState()).total));
+        else
+            resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding);
 
         const llama =  new Llama({
             bindings,
@@ -427,7 +518,10 @@ export class Llama {
             gpu,
             vramOrchestrator,
             maxThreads,
-            vramPadding: resolvedVramPadding
+            vramPadding: resolvedVramPadding,
+            ramOrchestrator,
+            ramPadding: resolvedRamPadding,
+            swapOrchestrator
         });
 
         if (!skipLlamaInit)

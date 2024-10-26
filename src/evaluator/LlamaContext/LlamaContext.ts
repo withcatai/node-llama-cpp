@@ -702,19 +702,22 @@ export class LlamaContext {
 
         async function createContext(contextSize: number) {
             const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
-            const vramRequiredEstimate = _model.fileInsights.estimateContextResourceRequirements({
+            const resourceRequirementsEstimation = _model.fileInsights.estimateContextResourceRequirements({
                 contextSize,
                 sequences,
                 isEmbeddingContext: options._embeddings,
                 modelGpuLayers: _model.gpuLayers,
                 batchSize,
                 flashAttention
-            }).gpuVram;
+            });
 
             const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
-            const contextCreationMemoryReservation = options.ignoreMemorySafetyChecks
+            const contextCreationVramReservation = options.ignoreMemorySafetyChecks
                 ? null
-                : _model._llama._vramOrchestrator.reserveMemory(vramRequiredEstimate);
+                : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.gpuVram);
+            const contextCreationRamReservation = options.ignoreMemorySafetyChecks
+                ? null
+                : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
 
             try {
                 if (createSignal?.aborted)
@@ -730,7 +733,8 @@ export class LlamaContext {
                 } else if (!contextLoaded)
                     throw new Error("Failed to create context");
 
-                contextCreationMemoryReservation?.dispose?.();
+                contextCreationVramReservation?.dispose?.();
+                contextCreationRamReservation?.dispose?.();
 
                 if (loraOptions != null && loraOptions.adapters.length > 0) {
                     let loadedAdapters = 0;
@@ -768,7 +772,8 @@ export class LlamaContext {
 
                 return context;
             } finally {
-                contextCreationMemoryReservation?.dispose?.();
+                contextCreationVramReservation?.dispose?.();
+                contextCreationRamReservation?.dispose?.();
             }
         }
 
