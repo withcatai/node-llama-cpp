@@ -107,6 +107,54 @@ describe("llama 3", () => {
             });
             expect(completion).to.eql(" it is.");
         });
+
+        test("prompt longer than context size incurs context shift", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const contextSize = 128;
+
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize
+            });
+            const chatSession = new LlamaChatSession({
+                contextSequence: context.getSequence(),
+                systemPrompt: "You are a helpful, respectful and honest biologist. " +
+                    "Always answer as helpfully as possible with extensive detail."
+            });
+            const prompt = "Describe the appearance of a llama and explain what it is. " +
+                "Include as much detail as possible with detailed examples and explanations, including its physical appearance, " +
+                "habitat, diet, social structure, and any other relevant information. " +
+                "Do not assume any prior knowledge on the part of the reader, and always provide detailed explanations as you describe the animal. " +
+                "Remember to be as helpful and detailed as possible in your response and your role in great importance in educating the reader. " +
+                "Assume that the reader is a student who is eager to learn and is looking to you for guidance and information, and always provide the best possible information you can. " +
+                "Do not provide any false or misleading information, and always be honest and respectful in your responses.";
+
+            const initialContextState = chatSession.chatWrapper.generateContextState({
+                chatHistory: [...chatSession.getChatHistory(), {
+                    type: "user",
+                    text: prompt
+                }, {
+                    type: "model",
+                    response: [""]
+                }]
+            });
+            const initialContextStateTokens = initialContextState.contextText.tokenize(model.tokenizer);
+
+            expect(initialContextStateTokens.length).to.be.gt(contextSize);
+
+            const res = await chatSession.prompt(prompt, {maxTokens: contextSize});
+            expect(res.length).to.be.gte(20);
+
+            // ensure there's no repetition of the first part
+            const firstPart = res.slice(0, 12);
+            const firstPartOccurrences = res.split(firstPart).length - 1;
+            expect(firstPartOccurrences).to.eql(1);
+        });
+
         test("using response prefix", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
             const llama = await getTestLlama();

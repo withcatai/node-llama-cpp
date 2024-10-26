@@ -104,6 +104,16 @@ export class GgufInsights {
         return true;
     }
 
+    public get isRecurrent() {
+        switch (this._ggufFileInfo.metadata?.general?.architecture) {
+            case GgufArchitectureType.mamba:
+            case GgufArchitectureType.rwkv6:
+                return true;
+        }
+
+        return false;
+    }
+
     public estimateModelResourceRequirements({gpuLayers}: {gpuLayers: number}): GgufInsightsResourceRequirements {
         const {cpu, gpu} = this._getTensorResourceSplit(gpuLayers);
 

@@ -910,6 +910,61 @@ export class LlamaContextSequence {
     }
 
     /**
+     * Erase parts of the context state to align it with the given tokens.
+     *
+     * If the given tokens do not align with the current context state, the context state will be erased to align with the given tokens.
+     *
+     * To find the first different token index between the context state and the given tokens, access the `nextTokenIndex` property.
+     *
+     * If `allowShift` is `true` (the default), shifting tokens may happen to align the context state with the given tokens,
+     * which incurs token evaluation of the shifted tokens.
+     */
+    public async adaptStateToTokens(tokens: Token[], allowShift: boolean = true) {
+        if (this.model.fileInsights.isRecurrent || !allowShift) {
+            const {firstDifferentIndex} = this.compareContextTokens(tokens);
+            if (firstDifferentIndex < this._nextTokenIndex)
+                await this.eraseContextTokenRanges([{
+                    start: firstDifferentIndex,
+                    end: this._nextTokenIndex
+                }]);
+
+            return;
+        }
+
+        const eraseRanges: ContextTokensDeleteRange[] = [];
+
+        let tokensIndex = 0;
+        let differentTokenIndex: number | undefined = undefined;
+        for (let i = 0; i < this._contextTokens.length && tokensIndex < tokens.length; i++) {
+            if (compareTokens(this._contextTokens[i], tokens[tokensIndex])) {
+                if (differentTokenIndex != null) {
+                    eraseRanges.push({
+                        start: differentTokenIndex,
+                        end: i
+                    });
+
+                    differentTokenIndex = undefined;
+                }
+
+                tokensIndex++;
+                continue;
+            }
+
+            if (differentTokenIndex == null)
+                differentTokenIndex = i;
+        }
+
+        if (differentTokenIndex != null)
+            eraseRanges.push({
+                start: differentTokenIndex,
+                end: this._nextTokenIndex
+            });
+
+        if (eraseRanges.length > 0)
+            await this.eraseContextTokenRanges(eraseRanges);
+    }
+
+    /**
      * Clear the history of the sequence.
      * If `prependBos` was enabled, the BOS token will be prepended to the sequence again.
      */
@@ -975,15 +1030,23 @@ export class LlamaContextSequence {
                 if (deletionSuccessful)
                     deletionSuccessful &&= this._context._ctx.removeTokenCellsFromSequence(this._sequenceId, range.start, range.end);
 
-                if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start)
+                if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== range.start) {
                     this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, range.start, -removedTokens);
+                    const shiftedTokens = range.start - lastDeleteRangeEndPos;
+                    this._tokenMeter.useTokens(shiftedTokens, "input");
+                }
 
                 removedTokens += range.end - range.start;
                 lastDeleteRangeEndPos = range.end;
             }
 
-            if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 && lastDeleteRangeEndPos !== this._nextTokenIndex)
+            if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 &&
+                lastDeleteRangeEndPos !== this._nextTokenIndex
+            ) {
                 this._context._ctx.shiftSequenceTokenCells(this._sequenceId, lastDeleteRangeEndPos, this._nextTokenIndex, -removedTokens);
+                const shiftedTokens = this._nextTokenIndex - lastDeleteRangeEndPos;
+                this._tokenMeter.useTokens(shiftedTokens, "input");
+            }
 
             this._nextTokenIndex -= removedTokens;
 

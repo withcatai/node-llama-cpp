@@ -2166,21 +2166,24 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public async alignCurrentSequenceStateWithCurrentTokens() {
-        let {firstDifferentIndex} = this.llamaChat.sequence.compareContextTokens(this.tokens);
-
-        // we need to decode at least one token to generate a response
-        if (firstDifferentIndex === this.tokens.length && firstDifferentIndex > 0)
-            firstDifferentIndex -= 1;
-
-        this.tokens.splice(0, firstDifferentIndex);
-
-        if (firstDifferentIndex < this.llamaChat.sequence.nextTokenIndex) {
+        if (this.tokens.length === 1 && this.llamaChat.sequence.nextTokenIndex !== 0) {
             await this.llamaChat.sequence.eraseContextTokenRanges([{
-                start: firstDifferentIndex,
+                start: 0,
                 end: this.llamaChat.sequence.nextTokenIndex
             }]);
-            this.ensureNotAborted();
+            return;
         }
+
+        const lastToken = this.tokens[this.tokens.length - 1]!;
+
+        // we need to decode at least one token to generate a response
+        this.tokens.pop();
+        await this.llamaChat.sequence.adaptStateToTokens(this.tokens, false);
+        this.tokens.push(lastToken);
+        this.ensureNotAborted();
+
+        const firstDifferentIndex = this.llamaChat.sequence.nextTokenIndex;
+        this.tokens.splice(0, firstDifferentIndex);
     }
 
     public async evaluateWithoutGeneratingNewTokens() {
