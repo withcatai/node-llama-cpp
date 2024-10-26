@@ -85,3 +85,37 @@ npx --no node-llama-cpp source download
 ```
 
 Now, just use `node-llama-cpp` as you normally would.
+
+## Intel AMX {#intel-amx}
+> Intel AMX (Advanced Matrix Extensions) is a dedicated hardware block found on Intel Xeon processors
+> that helps optimize and accelerate matrix multiplication operations.
+> 
+> It's available on the 4th Gen and newer Intel Xeon processors.
+
+Intel AMX can improve CPU inference performance [by 2x and up to even 14x](https://github.com/ggerganov/llama.cpp/pull/7707) faster inference times on supported CPUs (on specific conditions).
+
+If you're using a 4th Gen or newer Intel Xeon processor,
+you might want to [build `llama.cpp` from source](./building-from-source.md) to utilize these hardware-specific optimizations available on your hardware.
+
+To do this, run this command inside your project on the machine you run your project on:
+```shell
+npx --no node-llama-cpp source download
+```
+
+Alternatively, you can force `node-llama-cpp` to not use its prebuilt binaries
+and instead build from source when calling [`getLlama`](../api/functions/getLlama.md) for the first time on a Xeon CPU:
+
+```typescript
+import os from "os";
+import {getLlama} from "node-llama-cpp";
+
+const llama = await getLlama({
+    usePrebuiltBinaries: !os.cpus().some((cpu) => (
+        cpu.model.toLowerCase().includes("Xeon".toLowerCase())
+    ))
+});
+```
+::: info NOTE
+Building from source can take some time (when using CUDA even up to an hour in extreme cases),
+so ensure you dedicate some time for this as part of the deployment process.
+:::

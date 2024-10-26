@@ -94,6 +94,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (ciMode) {
                     if (!cmakeCustomOptions.has("GGML_OPENMP"))
                         cmakeCustomOptions.set("GGML_OPENMP", "OFF");
+
+                    if (!cmakeCustomOptions.has("GGML_AMX"))
+                        cmakeCustomOptions.set("GGML_AMX", "OFF");
                 }
 
                 await fs.remove(outDirectory);

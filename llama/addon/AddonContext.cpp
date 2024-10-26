@@ -447,7 +447,7 @@ Napi::Value AddonContext::AddToBatch(const Napi::CallbackInfo& info) {
     GGML_ASSERT(batch.n_tokens + tokensLength <= batch_n_tokens);
 
     for (size_t i = 0; i < tokensLength; i++) {
-        llama_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
+        common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
     }
 
     if (generateLogitAtTheEnd) {
