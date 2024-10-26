@@ -34,7 +34,8 @@ const packageVersion = env.get("DOCS_PACKAGE_VERSION")
     .default(packageJson.version)
     .asString();
 
-const hostname = "https://node-llama-cpp.withcat.ai/";
+const hostname = "https://node-llama-cpp.withcat.ai/"
+const buildDate = new Date();
 
 const socialPosterLink = hostname + "social.poster.jpg";
 const defaultPageTitle = "node-llama-cpp - node.js bindings for llama.cpp";
@@ -90,7 +91,7 @@ export default defineConfig({
     base: urlBase,
     sitemap: {
         hostname,
-        transformItems(items) {
+        async transformItems(items) {
             function priorityMatch(a: {url: string}, b: {url: string}, matchers: ((url: string) => boolean)[]): number {
                 for (const matcher of matchers) {
                     const aMatch = matcher(a.url);
@@ -105,13 +106,38 @@ export default defineConfig({
                 return 0;
             }
 
+            const blogPosts = await createContentLoader("blog/*.md", {
+                excerpt: true,
+                render: true
+            })
+                .load();
+            const blogPostMap = new Map<string, typeof blogPosts[number]>();
+            for (const blogPost of blogPosts) {
+                let url = blogPost.url;
+                if (url.startsWith("/"))
+                    url = url.slice("/".length);
+
+                blogPostMap.set(url, blogPost);
+            }
+
             return items
                 .map((item) => {
-                    if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
+                    if (item.url === "" || item.url === "blog/") {
+                        item.lastmod = new Date(buildDate);
+                    } else if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
                         item = {
                             ...item,
-                            lastmod: undefined
+                            lastmod: new Date(buildDate)
                         };
+                    } else if (item.lastmod == null && item.url.startsWith("blog/")) {
+                        const postDate = blogPostMap.get(item.url)?.frontmatter.date;
+                        if (postDate != null) {
+                            const parsedDate = new Date(postDate);
+                            if (Number.isFinite(parsedDate.getTime()))
+                                item.lastmod = parsedDate;
+                        }
+                    } else if (item.lastmod == null) {
+                        item.lastmod = new Date(buildDate);
                     }
 
                     return item;
