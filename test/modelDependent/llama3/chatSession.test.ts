@@ -107,6 +107,32 @@ describe("llama 3", () => {
             });
             expect(completion).to.eql(" it is.");
         });
+        test("using response prefix", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("Meta-Llama-3-8B-Instruct-Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const context = await model.createContext({
+                contextSize: 2048
+            });
+            const chatSession = new LlamaChatSession({
+                contextSequence: context.getSequence()
+            });
+
+            expect(chatSession.chatWrapper).to.be.an.instanceof(Llama3ChatWrapper);
+
+            const prompt = "Describe the appearance of a llama";
+            const responsePrefix = "Of course! A llama is";
+            const res = await chatSession.prompt(prompt, {
+                responsePrefix,
+                maxTokens: 10
+            });
+
+            expect(res.startsWith(responsePrefix)).to.eql(true);
+            expect(res).toMatchInlineSnapshot('"Of course! A llama is a domesticated mammal that belongs to the camel"');
+        });
 
         // disabled due to getting timeout in the CI due to taking too long
         test.skip("context shift works correctly", {timeout: 1000 * 60 * 60 * 2}, async () => {
