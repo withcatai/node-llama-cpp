@@ -35,11 +35,10 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: >-
+      description: |-
         Your bug can be investigated much faster if your code can be run without any dependencies other than `node-llama-cpp`.
         Issues without reproduction steps or code examples may be closed as not actionable.
-        Please try to provide a Minimal, Complete, and Verifiable example ([link](http://stackoverflow.com/help/mcve)).
-        Please include a link to the model file you used if possible.
+        Please try to provide a Minimal, Complete, and Verifiable example ([link](http://stackoverflow.com/help/mcve)), including a link to the model file you used if possible.
         Also, please enable enable debug logs by using `getLlama({debug: true})` to get more information.
       placeholder: >-
         Please try to provide a Minimal, Complete, and Verifiable example.
@@ -50,10 +49,9 @@ body:
     id: env
     attributes:
       label: My Environment
-      description: >-
+      description: |-
         Please include the result of the command `npx --yes node-llama-cpp inspect gpu`.
-        Please also add any other relevant dependencies to this table at the end.
-        For example: Electron, Bun, Webpack.
+        Please also add any other relevant dependencies to this table at the end. For example: Electron, Bun, Webpack.
       value: |
         | Dependency               | Version             |
         | ---                      | ---                 |

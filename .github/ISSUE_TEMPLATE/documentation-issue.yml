@@ -13,7 +13,7 @@ body:
     id: details
     attributes:
       label: What was unclear or otherwise insufficient?
-      description: >-
+      description: |-
         If relevant, please be clear about the documentation URL, as well as the location within the page.
         Add a link to the relevant documentation you're referring to.
       placeholder: >-
