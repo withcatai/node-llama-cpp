@@ -1,6 +1,7 @@
 import path from "path";
 import {fileURLToPath} from "url";
 import process from "process";
+import os from "os";
 import fs from "fs-extra";
 import chalk from "chalk";
 import which from "which";
@@ -17,7 +18,7 @@ import {getModuleVersion} from "../../utils/getModuleVersion.js";
 import {ensureLlamaCppRepoIsCloned, isLlamaCppRepoCloned} from "./cloneLlamaCppRepo.js";
 import {getBuildFolderNameForBuildOptions} from "./getBuildFolderNameForBuildOptions.js";
 import {setLastBuildInfo} from "./lastBuildInfo.js";
-import {getPlatform} from "./getPlatform.js";
+import {BinaryPlatform, getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
 import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
@@ -45,6 +46,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         ciMode = false
     } = compileOptions;
 
+    const platform = getPlatform();
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
     const finalBuildFolderName = includeBuildOptionsInBinaryFolderName
         ? buildFolderName.withCustomCmakeOptions
@@ -123,6 +125,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         "--arch=" + buildOptions.arch,
                         "--out", path.relative(llamaDirectory, outDirectory),
                         "--runtime-version=" + runtimeVersion,
+                        "--parallel=" + getParallelBuildThreadsToUse(platform),
                         ...cmakePathArgs,
                         ...(
                             [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
@@ -174,7 +177,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
             }
         });
     } catch (err) {
-        const platform = getPlatform();
         if (platform === "linux" && await which("make", {nothrow: true}) == null) {
             console.info("\n" +
                 getConsoleLogPrefix(true) +
@@ -455,4 +457,16 @@ async function getToolchainFileForArch(targetArch: string) {
         return filePath;
 
     return null;
+}
+
+function getParallelBuildThreadsToUse(platform: BinaryPlatform) {
+    const cpuCount = os.cpus().length;
+
+    if (cpuCount <= 4)
+        return cpuCount;
+
+    if (platform === "mac" && process.arch === "arm64")
+        return cpuCount - 1;
+
+    return cpuCount - 2;
 }

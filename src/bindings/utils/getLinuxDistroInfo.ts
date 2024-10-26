@@ -29,7 +29,7 @@ async function getOsReleaseInfo() {
             if (!(await fs.pathExists(osReleasePath)))
                 continue;
 
-            const osReleaseFile = await fs.readFile(osReleasePath, "utf-8");
+            const osReleaseFile = await fs.readFile(osReleasePath, "utf8");
 
             const res = new Map<string, string>();
             for (const line of osReleaseFile.split("\n")) {
