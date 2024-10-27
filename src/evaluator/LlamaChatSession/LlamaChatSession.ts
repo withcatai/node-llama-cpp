@@ -149,7 +149,7 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     trimWhitespaceSuffix?: boolean,
 
     /**
-     * Force a given text prefix to be the start of the model response, to make the model follow a specific path.
+     * Force a given text prefix to be the start of the model response, to make the model follow a certain direction.
      *
      * May cause some models to not use the given functions in some scenarios where they would have been used otherwise,
      * so avoid using it together with function calling if you notice unexpected behavior.

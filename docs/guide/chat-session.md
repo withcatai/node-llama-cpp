@@ -671,3 +671,34 @@ await new Promise(resolve => setTimeout(resolve, 1500));
 const cachedCompletion = completionEngine.complete("Hi there! How");
 console.log("Cached completion:", cachedCompletion);
 ```
+
+## Response Prefix {#response-prefix}
+You can force the model response to start with a specific prefix,
+to make the model follow a certain direction in its response.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession, GeneralChatWrapper} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    chatWrapper: new GeneralChatWrapper()
+});
+
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1, {
+    responsePrefix: "The weather today is"
+});
+console.log("AI: " + a1);
+```
