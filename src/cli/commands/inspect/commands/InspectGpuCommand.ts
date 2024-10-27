@@ -208,7 +208,7 @@ async function logSwapUsage(llama: Llama) {
     const swapState = await llama.getSwapState();
 
     console.info(`${chalk.yellow("Used swap:")} ${getPercentageString(swapState.used, swapState.allocated)}% ${chalk.gray("(" + bytes(swapState.used) + "/" + bytes(swapState.allocated) + ")")}`);
-    console.info(`${chalk.yellow("Max size:")} ${swapState.maxSize === Infinity ? "dynamic" : bytes(swapState.maxSize)}`);
+    console.info(`${chalk.yellow("Max swap size:")} ${swapState.maxSize === Infinity ? "dynamic" : bytes(swapState.maxSize)}`);
 }
 
 function getPercentageString(amount: number, total: number) {

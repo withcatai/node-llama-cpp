@@ -13,10 +13,12 @@ import {documentationPageUrls} from "../../../../config.js";
 import withOra from "../../../../utils/withOra.js";
 import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
+import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
 
 type InspectGgufCommand = {
     modelPath: string,
     header?: string[],
+    key?: string,
     noSplice: boolean,
     fullTensorInfo: boolean,
     fullMetadataArrays: boolean,
@@ -44,6 +46,12 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 type: "string",
                 array: true,
                 description: "Headers to use when reading a model file from a URL, in the format `key: value`. You can pass this option multiple times to add multiple headers.",
+                group: "Optional:"
+            })
+            .option("key", {
+                alias: ["k"],
+                type: "string",
+                description: "A single metadata key to print the value of. If not provided, all metadata will be printed",
                 group: "Optional:"
             })
             .option("noSplice", {
@@ -80,7 +88,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, noSplice, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
+        modelPath: ggufPath, header: headerArg, key, noSplice, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
     }: InspectGgufCommand) {
         const resolvedModelDestination = resolveModelDestination(ggufPath);
         const resolvedGgufPath = resolvedModelDestination.type == "file"
@@ -116,16 +124,30 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {
-            const outputJson = JSON.stringify({
-                splicedParts: parsedMetadata.splicedParts,
-                version: parsedMetadata.version,
-                fileType: fileTypeName,
-                tensorCount: parsedMetadata.totalTensorCount,
-                metadataSize: parsedMetadata.totalMetadataSize,
-                tensorInfoSize: parsedMetadata.totalTensorInfoSize,
-                metadata: parsedMetadata.metadata,
-                tensorInfo: parsedMetadata.fullTensorInfo
-            }, undefined, 4);
+            const getOutputJson = () => {
+                if (key != null) {
+                    const keyValue = getGgufMetadataKeyValue(parsedMetadata.metadata, key);
+                    if (keyValue === undefined) {
+                        console.log(`Key not found: ${key}`);
+                        process.exit(1);
+                    }
+
+                    return JSON.stringify(keyValue, undefined, 4);
+                }
+
+                return JSON.stringify({
+                    splicedParts: parsedMetadata.splicedParts,
+                    version: parsedMetadata.version,
+                    fileType: fileTypeName,
+                    tensorCount: parsedMetadata.totalTensorCount,
+                    metadataSize: parsedMetadata.totalMetadataSize,
+                    tensorInfoSize: parsedMetadata.totalTensorInfoSize,
+                    metadata: parsedMetadata.metadata,
+                    tensorInfo: parsedMetadata.fullTensorInfo
+                }, undefined, 4);
+            };
+
+            const outputJson = getOutputJson();
 
             if (outputToJsonFile != null) {
                 const filePath = path.resolve(process.cwd(), outputToJsonFile);
@@ -134,6 +156,27 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             } else {
                 console.info(outputJson);
             }
+        } else if (key != null) {
+            const keyValue = getGgufMetadataKeyValue(parsedMetadata.metadata, key);
+            if (keyValue === undefined) {
+                console.log(`${chalk.red("Metadata key not found:")} ${key}`);
+                process.exit(1);
+            }
+
+            const metadataPrettyPrintOptions: PrettyPrintObjectOptions = {
+                maxArrayValues: fullMetadataArrays
+                    ? undefined
+                    : 10,
+                useNumberGrouping: true,
+                maxArrayItemsWidth: process.stdout.columns - 1
+            };
+
+            console.info(`${chalk.yellow("Metadata key:")} ${prettyPrintObject(key)}`);
+            console.info(`${chalk.yellow("Metadata:")} ${
+                typeof keyValue === "string"
+                    ? keyValue
+                    : prettyPrintObject(keyValue, undefined, metadataPrettyPrintOptions)
+            }`);
         } else {
             const metadataPrettyPrintOptions: PrettyPrintObjectOptions = {
                 maxArrayValues: fullMetadataArrays
