@@ -383,7 +383,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-13
+    runs-on: macos-15
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
@@ -416,6 +416,9 @@ jobs:
 
       - name: Build binary
         run: node ./dist/cli/cli.js source build --noUsageExample
+
+      - name: Inspect hardware
+        run: node ./dist/cli/cli.js inspect gpu
 
       - name: Cache models
         id: cache-test-models
