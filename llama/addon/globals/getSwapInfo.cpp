@@ -64,6 +64,6 @@ Napi::Value getSwapInfo(const Napi::CallbackInfo& info) {
     Napi::Object obj = Napi::Object::New(info.Env());
     obj.Set("total", Napi::Number::New(info.Env(), totalSwap));
     obj.Set("free", Napi::Number::New(info.Env(), freeSwap));
-    obj.Set("maxSize", Napi::Number::New(info.Env(), maxSizeSet ? maxSize : -1));
+    obj.Set("maxSize", maxSizeSet ? Napi::Number::New(info.Env(), maxSize) : Napi::Number::New(info.Env(), -1));
     return obj;
 }
