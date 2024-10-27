@@ -544,6 +544,9 @@ function renderRecommendedModelTechnicalInfo(
                 show: canUseGpu,
                 title: "VRAM usage",
                 value: () => bytes(compatibilityScore.resolvedValues.totalVramUsage)
+            }, {
+                title: "RAM usage",
+                value: () => bytes(compatibilityScore.resolvedValues.totalRamUsage)
             }]
         })
     ].join("\n");
