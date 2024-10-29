@@ -276,7 +276,7 @@ export class GgufInsightsConfigurationResolver {
             allLayersAreOffloaded: 10,
             contextSize: 30,
             ramUsageFitsInRam: 10,
-            cpuOnlySmallModelSize: 60, // also defined inside `scoreModelSizeForCpuOnlyUsage`
+            cpuOnlySmallModelSize: 70, // also defined inside `scoreModelSizeForCpuOnlyUsage`
             bonusContextSize: 10
         } as const;
 
@@ -434,16 +434,16 @@ export class GgufInsightsConfigurationResolver {
 
 function scoreModelSizeForCpuOnlyUsage(modelSize: number) {
     const s1GB = Math.pow(1024, 3);
-    return 60 - scoreLevels(modelSize, [{
+    return 70 - scoreLevels(modelSize, [{
         start: s1GB,
         end: s1GB * 2.5,
-        points: 40
+        points: 46
     }, {
         start: s1GB * 2.5,
         end: s1GB * 4,
-        points: 15
+        points: 17
     }, {
         start: s1GB * 4,
-        points: 5
+        points: 7
     }]);
 }
