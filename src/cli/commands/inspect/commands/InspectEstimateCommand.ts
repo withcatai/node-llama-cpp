@@ -256,7 +256,6 @@ function logCompatibilityScore(
             title: "VRAM usage",
             value: () => bytes(compatibilityScore.resolvedValues.totalVramUsage)
         }, {
-            show: compatibilityScore.resolvedValues.totalRamUsage > 0,
             title: "RAM usage",
             value: () => bytes(compatibilityScore.resolvedValues.totalRamUsage)
         }, {

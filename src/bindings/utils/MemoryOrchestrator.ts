@@ -1,12 +1,12 @@
 import {EventRelay} from "lifecycle-utils";
 
 export class MemoryOrchestrator {
-    /** @internal */ private readonly _getMemoryState: () => {free: number, total: number};
+    /** @internal */ private readonly _getMemoryState: () => {free: number, total: number, unifiedSize: number};
     /** @internal */ private _reservedMemory: number = 0;
 
     public readonly onMemoryReservationRelease = new EventRelay<void>();
 
-    public constructor(getMemoryState: () => {free: number, total: number}) {
+    public constructor(getMemoryState: () => {free: number, total: number, unifiedSize: number}) {
         this._getMemoryState = getMemoryState;
     }
 
@@ -20,11 +20,12 @@ export class MemoryOrchestrator {
     }
 
     public async getMemoryState() {
-        const {free, total} = this._getMemoryState();
+        const {free, total, unifiedSize} = this._getMemoryState();
 
         return {
             free: Math.max(0, free - this._reservedMemory),
-            total
+            total,
+            unifiedSize
         };
     }
 }

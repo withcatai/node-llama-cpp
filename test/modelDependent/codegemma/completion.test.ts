@@ -19,13 +19,13 @@ describe("CodeGemma", () => {
                 contextSequence: context.getSequence()
             });
 
-            const res = await completion.generateCompletion("Here is a list of sweet fruits:\n* ", {
-                maxTokens: 10
+            const res = await completion.generateCompletion("Sweet fruit names:\n* ", {
+                maxTokens: 10,
+                seed: 30
             });
             expect(res).toMatchInlineSnapshot(`
-              "🍎
-              * 🍊
-              * 🍋
+              "1. Apple
+              * 2. Banana
               "
             `);
         });

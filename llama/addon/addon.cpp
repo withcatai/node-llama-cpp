@@ -8,6 +8,7 @@
 #include "globals/addonLog.h"
 #include "globals/addonProgress.h"
 #include "globals/getGpuInfo.h"
+#include "globals/getSwapInfo.h"
 
 bool backendInitialized = false;
 bool backendDisposed = false;
@@ -203,6 +204,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
         Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
+        Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });

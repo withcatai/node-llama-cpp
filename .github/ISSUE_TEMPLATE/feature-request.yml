@@ -51,7 +51,11 @@ body:
           required: false
         - label: CUDA support
           required: false
+        - label: Vulkan support
+          required: false
         - label: Grammar
+          required: false
+        - label: Function calling
           required: false
   - type: dropdown
     id: pr

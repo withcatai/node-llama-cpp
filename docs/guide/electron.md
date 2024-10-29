@@ -37,3 +37,27 @@ so that `node-llama-cpp` can find them.
 Cross packaging from one platform to another is not supported, since binaries for other platforms are not downloaded to you machine when your run `npm install`.
 
 Packaging an `arm64` app on an `x64` machine is supported, but packaging an `x64` app on an `arm64` machine is not.
+
+## Bundling
+When bundling your code for Electron using [Electron Vite](https://electron-vite.org) or Webpack,
+ensure that `node-llama-cpp` is not bundled, and is instead treated as an external module.
+
+Marking `node-llama-cpp` as an external module will prevent its code from being bundled with your application code,
+and instead, it'll be loaded from the `node_modules` directory at runtime (which should be packed into a `.asar` archive).
+
+The file structure of `node-llama-cpp` is crucial for it to function correctly,
+so bundling it will break its functionality.
+Moreover, since `node-llama-cpp` includes prebuilt binaries (and also local builds from source),
+those files must be retained in their original structure for it to work.
+
+Electron has [its own bundling solution called ASAR](https://www.electronjs.org/docs/latest/tutorial/asar-archives) that is designed to work with node modules.
+ASAR retains the original file structure of node modules by packing all the files into a single `.asar` archive file that Electron will read from at runtime like it would from the file system.
+This method ensures node modules work as intended in Electron applications, even though they are bundled into a single file.
+
+Using ASAR is the recommended way to bundle `node-llama-cpp` in your Electron app.
+
+If you're using the scaffolded Electron app, this is already taken care of.
+
+::: tip NOTE
+We recommend using [Electron Vite](https://electron-vite.org) over Webpack for your Electron app due to to Vite's speed and Webpack's lack of proper ESM support in the output bundle, which complicates the bundling process.
+:::

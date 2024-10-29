@@ -149,6 +149,14 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     trimWhitespaceSuffix?: boolean,
 
     /**
+     * Force a given text prefix to be the start of the model response, to make the model follow a certain direction.
+     *
+     * May cause some models to not use the given functions in some scenarios where they would have been used otherwise,
+     * so avoid using it together with function calling if you notice unexpected behavior.
+     */
+    responsePrefix?: string,
+
+    /**
      * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
      */
     evaluationPriority?: EvaluationPriority,
@@ -403,6 +411,7 @@ export class LlamaChatSession {
             seed,
             grammar,
             trimWhitespaceSuffix = false,
+            responsePrefix,
             repeatPenalty,
             tokenBias,
             customStopTriggers
@@ -415,7 +424,7 @@ export class LlamaChatSession {
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
             onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar, trimWhitespaceSuffix,
-            repeatPenalty, tokenBias, customStopTriggers
+            responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
 
         return responseText;
@@ -441,6 +450,7 @@ export class LlamaChatSession {
         seed,
         grammar,
         trimWhitespaceSuffix = false,
+        responsePrefix,
         repeatPenalty,
         tokenBias,
         customStopTriggers,
@@ -467,16 +477,29 @@ export class LlamaChatSession {
                 ? undefined
                 : appendUserMessageToChatHistory(lastEvaluation?.contextWindow, prompt);
 
+            const resolvedResponsePrefix = (responsePrefix != null && responsePrefix !== "")
+                ? responsePrefix
+                : undefined;
+
             newChatHistory.push({
                 type: "model",
-                response: []
+                response: resolvedResponsePrefix != null
+                    ? [resolvedResponsePrefix]
+                    : []
             });
 
             if (newContextWindowChatHistory != null)
                 newContextWindowChatHistory.push({
                     type: "model",
-                    response: []
+                    response: resolvedResponsePrefix != null
+                        ? [resolvedResponsePrefix]
+                        : []
                 });
+
+            if (resolvedResponsePrefix != null) {
+                safeEventCallback(onToken)?.(this.model.tokenize(resolvedResponsePrefix));
+                safeEventCallback(onTextChunk)?.(resolvedResponsePrefix);
+            }
 
             // eslint-disable-next-line no-constant-condition
             while (true) {

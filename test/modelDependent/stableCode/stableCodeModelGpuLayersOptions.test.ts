@@ -18,9 +18,15 @@ describe("stableCode", () => {
             const s1GB = Math.pow(1024, 3);
 
             async function resolveGpuLayers(gpuLayers: LlamaModelOptions["gpuLayers"], {
-                totalVram, freeVram, ignoreMemorySafetyChecks = false, llamaGpu = "metal"
+                totalVram, freeVram, unifiedMemorySize = 0,
+                totalRam = s1GB * 10, freeRam = s1GB * 10, // TODO: update all tests to test different RAM sizes
+                totalSwap = 0, freeSwap = 0,
+                ignoreMemorySafetyChecks = false, llamaGpu = "metal"
             }: {
-                totalVram: number, freeVram: number, ignoreMemorySafetyChecks?: boolean, llamaGpu?: BuildGpu
+                totalVram: number, freeVram: number, unifiedMemorySize?: number,
+                totalRam?: number, freeRam?: number,
+                totalSwap?: number, freeSwap?: number,
+                ignoreMemorySafetyChecks?: boolean, llamaGpu?: BuildGpu
             }) {
                 const resolvedGpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(gpuLayers, {
                     ignoreMemorySafetyChecks,
@@ -34,27 +40,31 @@ describe("stableCode", () => {
                 });
 
                 async function resolveAutoContextSize() {
-                    const modelVram = ggufInsights.estimateModelResourceRequirements({
-                        gpuLayers: resolvedGpuLayers
-                    }).gpuVram;
+                    const resolvedConfig = await ggufInsights.configurationResolver.resolveAndScoreConfig({
+                        targetGpuLayers: resolvedGpuLayers
+                    }, {
+                        llamaGpu,
+                        getVramState: async () => ({
+                            total: llamaGpu === false ? 0 : totalVram,
+                            free: llamaGpu === false ? 0 : freeVram,
+                            unifiedSize: unifiedMemorySize
+                        }),
+                        getRamState: async () => ({
+                            total: totalRam,
+                            free: freeRam
+                        }),
+                        getSwapState: async () => ({
+                            total: totalSwap,
+                            free: freeSwap
+                        }),
+                        llamaSupportsGpuOffloading: llamaGpu !== false,
+                        llamaVramPaddingSize: defaultLlamaVramPadding(llamaGpu === false ? 0 : totalVram)
+                    });
 
-                    try {
-                        return await ggufInsights.configurationResolver.resolveContextContextSize("auto", {
-                            batchSize: undefined,
-                            sequences: 1,
-                            modelGpuLayers: resolvedGpuLayers,
-                            modelTrainContextSize: ggufInsights.trainContextSize ?? 4096,
-                            getVramState: async () => ({
-                                total: llamaGpu === false ? 0 : totalVram,
-                                free: llamaGpu === false ? 0 : (freeVram - modelVram)
-                            }),
-                            llamaGpu,
-                            ignoreMemorySafetyChecks: false,
-                            isEmbeddingContext: false
-                        });
-                    } catch (err) {
+                    if (resolvedConfig.compatibilityScore === 0)
                         return null;
-                    }
+
+                    return resolvedConfig.resolvedValues.contextSize;
                 }
 
                 return {
@@ -130,7 +140,7 @@ describe("stableCode", () => {
                         ignoreMemorySafetyChecks: true
                     });
                     expect(res.gpuLayers).to.eql(16);
-                    expect(res.contextSize).to.eql(null);
+                    expect(res.contextSize).to.toMatchInlineSnapshot("133");
                 }
 
 
@@ -180,7 +190,7 @@ describe("stableCode", () => {
                         ignoreMemorySafetyChecks: true
                     });
                     expect(res.gpuLayers).to.eql(32);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("null");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("94");
                 }
 
                 {
@@ -229,7 +239,7 @@ describe("stableCode", () => {
                         ignoreMemorySafetyChecks: true
                     });
                     expect(res.gpuLayers).to.eql(33);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("null");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("94");
                 }
 
                 {
@@ -291,7 +301,7 @@ describe("stableCode", () => {
                         ignoreMemorySafetyChecks: true
                     });
                     expect(res.gpuLayers).to.eql(33);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("null");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("94");
                 }{
                     const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,

@@ -133,6 +133,17 @@ export type LlamaOptions = {
     vramPadding?: number | ((totalVram: number) => number),
 
     /**
+     * Pad the available RAM for the memory size calculations, as these calculations are not always accurate.
+     * Recommended to ensure stability.
+     *
+     * Defaults to `25%` of the total RAM or 6GB (1GB on Linux), whichever is lower.
+     * Set to `0` to disable.
+     *
+     * > Since the OS also needs RAM to function, the default value can get up to 6GB on Windows and macOS, and 1GB on Linux.
+     */
+    ramPadding?: number | ((totalRam: number) => number),
+
+    /**
      * Enable debug mode to find issues with llama.cpp.
      * Makes logs print directly to the console from `llama.cpp` and not through the provided logger.
      *
@@ -197,6 +208,17 @@ export type LastBuildOptions = {
     vramPadding?: number | ((totalVram: number) => number),
 
     /**
+     * Pad the available RAM for the memory size calculations, as these calculations are not always accurate.
+     * Recommended to ensure stability.
+     *
+     * Defaults to `25%` of the total RAM or 6GB (1GB on Linux), whichever is lower.
+     * Set to `0` to disable.
+     *
+     * > Since the OS also needs RAM to function, the default value can get up to 6GB on Windows and macOS, and 1GB on Linux.
+     */
+    ramPadding?: number | ((totalRam: number) => number),
+
+    /**
      * Enable debug mode to find issues with llama.cpp.
      * Makes logs print directly to the console from `llama.cpp` and not through the provided logger.
      *
@@ -210,6 +232,14 @@ export type LastBuildOptions = {
 export const getLlamaFunctionName = "getLlama";
 
 export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 1024 * 1024 * 1024));
+export const defaultLlamaRamPadding = (totalRam: number) => {
+    const platform = getPlatform();
+
+    if (platform === "linux")
+        return Math.floor(Math.min(totalRam * 0.25, 1024 * 1024 * 1024));
+
+    return Math.floor(Math.min(totalRam * 0.25, 1024 * 1024 * 1024 * 6));
+};
 const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInElectron
     ? "never"
     : "auto";
@@ -251,6 +281,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload,
             maxThreads: lastBuildOptions?.maxThreads,
             vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
+            ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
             debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
         };
 
@@ -274,6 +305,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppLogLevel,
                     maxThreads: lastBuildOptions?.maxThreads,
                     vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
+                    ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
                     debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
                 });
             } catch (err) {
@@ -300,6 +332,7 @@ export async function getLlamaForOptions({
     skipDownload = defaultSkipDownload,
     maxThreads,
     vramPadding = defaultLlamaVramPadding,
+    ramPadding = defaultLlamaRamPadding,
     debug = defaultLlamaCppDebugMode
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
@@ -320,6 +353,7 @@ export async function getLlamaForOptions({
     if (progressLogs == null) progressLogs = true;
     if (skipDownload == null) skipDownload = defaultSkipDownload;
     if (vramPadding == null) vramPadding = defaultLlamaVramPadding;
+    if (ramPadding == null) ramPadding = defaultLlamaRamPadding;
     if (debug == null) debug = defaultLlamaCppDebugMode;
 
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
@@ -376,6 +410,7 @@ export async function getLlamaForOptions({
                 skipLlamaInit,
                 maxThreads,
                 vramPadding,
+                ramPadding,
                 fallbackMessage: !isLastItem
                     ? `falling back to using ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}`
                     : (
@@ -437,6 +472,7 @@ export async function getLlamaForOptions({
                 updateLastBuildInfoOnCompile,
                 maxThreads,
                 vramPadding,
+                ramPadding,
                 skipLlamaInit,
                 debug
             });
@@ -473,6 +509,7 @@ async function loadExistingLlamaBinary({
     skipLlamaInit,
     maxThreads,
     vramPadding,
+    ramPadding,
     fallbackMessage,
     debug
 }: {
@@ -487,6 +524,7 @@ async function loadExistingLlamaBinary({
     skipLlamaInit: boolean,
     maxThreads: number | undefined,
     vramPadding: Required<LlamaOptions>["vramPadding"],
+    ramPadding: Required<LlamaOptions>["ramPadding"],
     fallbackMessage: string | null,
     debug: boolean
 }) {
@@ -520,6 +558,7 @@ async function loadExistingLlamaBinary({
                     logger,
                     maxThreads,
                     vramPadding,
+                    ramPadding,
                     skipLlamaInit,
                     debug
                 });
@@ -576,6 +615,7 @@ async function loadExistingLlamaBinary({
                         logger,
                         maxThreads,
                         vramPadding,
+                        ramPadding,
                         skipLlamaInit,
                         debug
                     });
@@ -630,6 +670,7 @@ async function buildAndLoadLlamaBinary({
     updateLastBuildInfoOnCompile,
     maxThreads,
     vramPadding,
+    ramPadding,
     skipLlamaInit,
     debug
 }: {
@@ -640,6 +681,7 @@ async function buildAndLoadLlamaBinary({
     updateLastBuildInfoOnCompile: boolean,
     maxThreads: number | undefined,
     vramPadding: Required<LlamaOptions>["vramPadding"],
+    ramPadding: Required<LlamaOptions>["ramPadding"],
     skipLlamaInit: boolean,
     debug: boolean
 }) {
@@ -671,6 +713,7 @@ async function buildAndLoadLlamaBinary({
         logger,
         maxThreads,
         vramPadding,
+        ramPadding,
         skipLlamaInit,
         debug
     });

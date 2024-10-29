@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="node-llama-cpp Logo" src="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.avif" width="360px" />
+    <a href="https://node-llama-cpp.withcat.ai" target="_blank"><img alt="node-llama-cpp Logo" src="https://raw.githubusercontent.com/withcatai/node-llama-cpp/master/assets/logo.v3.roundEdges.avif" width="360px" /></a>
     <h1>node-llama-cpp</h1>
     <p>Run AI models locally on your machine</p>
     <sub>Pre-built bindings are provided with a fallback to building from source with cmake</sub>

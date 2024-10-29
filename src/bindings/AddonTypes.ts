@@ -63,12 +63,18 @@ export type BindingModule = {
     setLoggerLogLevel(level: number): void,
     getGpuVramInfo(): {
         total: number,
-        used: number
+        used: number,
+        unifiedSize: number
     },
     getGpuDeviceInfo(): {
         deviceNames: string[]
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
+    getSwapInfo(): {
+        total: number,
+        maxSize: number,
+        free: number
+    },
     init(): Promise<void>,
     dispose(): Promise<void>
 };

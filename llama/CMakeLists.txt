@@ -22,6 +22,12 @@ execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
                 OUTPUT_VARIABLE NODE_ADDON_API_DIR
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+set(LLAMA_BUILD_COMMON ON)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-c++17-extensions)
+endif()
+
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")

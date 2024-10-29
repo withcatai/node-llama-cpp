@@ -26,6 +26,7 @@ void logVulkanWarning(const char* message) {
 Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     uint64_t total = 0;
     uint64_t used = 0;
+    uint64_t unifiedVramSize = 0;
 
 #ifdef GPU_INFO_USE_CUDA
     size_t cudaDeviceTotal = 0;
@@ -41,26 +42,31 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_VULKAN
     uint64_t vulkanDeviceTotal = 0;
     uint64_t vulkanDeviceUsed = 0;
-    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, logVulkanWarning);
+    uint64_t vulkanDeviceUnifiedVramSize = 0;
+    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, &vulkanDeviceUnifiedVramSize, logVulkanWarning);
 
     if (vulkanDeviceSupportsMemoryBudgetExtension) {
         total += vulkanDeviceTotal;
         used += vulkanDeviceUsed;
+        unifiedVramSize += vulkanDeviceUnifiedVramSize;
     }
 #endif
 
 #ifdef GPU_INFO_USE_METAL
     uint64_t metalDeviceTotal = 0;
     uint64_t metalDeviceUsed = 0;
-    getMetalGpuInfo(&metalDeviceTotal, &metalDeviceUsed);
+    uint64_t metalDeviceUnifiedVramSize = 0;
+    getMetalGpuInfo(&metalDeviceTotal, &metalDeviceUsed, &metalDeviceUnifiedVramSize);
 
     total += metalDeviceTotal;
     used += metalDeviceUsed;
+    unifiedVramSize += metalDeviceUnifiedVramSize;
 #endif
 
     Napi::Object result = Napi::Object::New(info.Env());
     result.Set("total", Napi::Number::From(info.Env(), total));
     result.Set("used", Napi::Number::From(info.Env(), used));
+    result.Set("unifiedSize", Napi::Number::From(info.Env(), unifiedVramSize));
 
     return result;
 }

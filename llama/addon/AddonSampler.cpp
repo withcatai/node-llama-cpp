@@ -52,11 +52,6 @@ void AddonSampler::dispose() {
         topPSampler = nullptr;
     }
 
-    if (softmaxSampler != nullptr) {
-        llama_sampler_free(softmaxSampler);
-        softmaxSampler = nullptr;
-    }
-
     if (seedSampler != nullptr) {
         llama_sampler_free(seedSampler);
         seedSampler = nullptr;
@@ -135,10 +130,6 @@ void AddonSampler::rebuildChainIfNeeded() {
             llama_sampler_chain_add(chain, temperatureSampler);
         }
 
-        if (softmaxSampler != nullptr) {
-            llama_sampler_chain_add(chain, softmaxSampler);
-        }
-
         if (seedSampler != nullptr) {
             llama_sampler_chain_add(chain, seedSampler);
         }
@@ -204,10 +195,6 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         if (greedySampler == nullptr) {
             greedySampler = llama_sampler_init_greedy();
         }
-    }
-
-    if (softmaxSampler == nullptr) {
-        softmaxSampler = llama_sampler_init_softmax();
     }
 
     if (config.Has("minP")) {

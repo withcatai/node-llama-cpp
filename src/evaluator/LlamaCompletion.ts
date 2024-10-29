@@ -660,20 +660,22 @@ export class LlamaCompletion {
 
             let shouldContextShift = false;
 
-            let {firstDifferentIndex} = sequence.compareContextTokens(inputTokens);
-
-            // we need to decode at least one token to generate a response
-            if (firstDifferentIndex === inputTokens.length && firstDifferentIndex > 0)
-                firstDifferentIndex -= 1;
-
-            inputTokens.splice(0, firstDifferentIndex);
-
-            if (firstDifferentIndex < sequence.nextTokenIndex) {
+            if (inputTokens.length === 1 && sequence.nextTokenIndex !== 0)
                 await sequence.eraseContextTokenRanges([{
-                    start: firstDifferentIndex,
+                    start: 0,
                     end: sequence.nextTokenIndex
                 }]);
+            else {
+                const lastToken = inputTokens[inputTokens.length - 1]!;
+
+                // we need to decode at least one token to generate a response
+                inputTokens.pop();
+                await sequence.adaptStateToTokens(inputTokens, false);
+                inputTokens.push(lastToken);
                 ensureNotAborted();
+
+                const firstDifferentIndex = sequence.nextTokenIndex;
+                inputTokens.splice(0, firstDifferentIndex);
             }
 
             const evaluationIterator = sequence.evaluate(inputTokens, removeNullFields({

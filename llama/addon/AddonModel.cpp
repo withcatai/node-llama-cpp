@@ -426,7 +426,7 @@ Napi::Value AddonModel::Tokenize(const Napi::CallbackInfo& info) {
     std::string text = info[0].As<Napi::String>().Utf8Value();
     bool specialTokens = info[1].As<Napi::Boolean>().Value();
 
-    std::vector<llama_token> tokens = llama_tokenize(model, text, false, specialTokens);
+    std::vector<llama_token> tokens = common_tokenize(model, text, false, specialTokens);
 
     Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
     for (size_t i = 0; i < tokens.size(); ++i) {
@@ -539,7 +539,7 @@ Napi::Value AddonModel::PrefixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_prefix(model));
+    return getNapiToken(info, model, llama_token_fim_pre(model));
 }
 Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -547,7 +547,7 @@ Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_middle(model));
+    return getNapiToken(info, model, llama_token_fim_mid(model));
 }
 Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -555,7 +555,7 @@ Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_suffix(model));
+    return getNapiToken(info, model, llama_token_fim_suf(model));
 }
 Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
     if (disposed) {

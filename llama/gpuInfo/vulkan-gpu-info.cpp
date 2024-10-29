@@ -5,7 +5,7 @@
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
@@ -14,6 +14,7 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNa
 
     size_t usedMem = 0;
     size_t totalMem = 0;
+    size_t totalUnifiedMemorySize = 0;
 
     for (size_t i = 0; i < physicalDevices.size(); i++) {
         vk::PhysicalDevice physicalDevice = physicalDevices[i];
@@ -41,16 +42,20 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNa
             physicalDevice.getMemoryProperties2(&memProps2);
 
             for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-                if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+                const auto flags = memProps.memoryHeaps[i].flags;
+
+                if (flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
                     const auto size = memProps.memoryHeaps[i].size;
                     totalMem += size;
                     usedMem += memoryBudgetProperties.heapUsage[i];
 
+                    if (flags & vk::MemoryHeapFlagBits::eMultiInstance) {
+                        totalUnifiedMemorySize += size;
+                    }
+
                     if (size > 0 && addDeviceNames) {
                         (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
                     }
-
-                    break;
                 }
             }
         } else {
@@ -58,9 +63,8 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNa
             warningLogCallback(
                 (
                     "Vulkan VK_EXT_memory_budget extension not supported for device \"" +
-                    std::string(deviceProps.deviceName.data()) + "\", so VRAM info cannot be determained for it"
-                )
-                    .c_str()
+                    std::string(deviceProps.deviceName.data()) + "\", so VRAM info cannot be determined for it"
+                ).c_str()
             );
             return false;
         }
@@ -68,16 +72,19 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, bool addDeviceNa
 
     *total = totalMem;
     *used = usedMem;
+    *unifiedMemorySize = totalUnifiedMemorySize;
+
     return true;
 }
 
-bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    return enumerateVulkanDevices(total, used, false, nullptr, warningLogCallback);
+bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback);
 }
 
 bool gpuInfoGetVulkanDeviceNames(std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     size_t vulkanDeviceTotal = 0;
     size_t vulkanDeviceUsed = 0;
+    size_t unifiedMemorySize = 0;
 
-    return enumerateVulkanDevices(&vulkanDeviceTotal, &vulkanDeviceUsed, true, deviceNames, warningLogCallback);
+    return enumerateVulkanDevices(&vulkanDeviceTotal, &vulkanDeviceUsed, &unifiedMemorySize, true, deviceNames, warningLogCallback);
 }
