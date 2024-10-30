@@ -19,7 +19,7 @@ jobs:
       - name: Install modules
         run: npm ci
       - name: ESLint
-        run: npx eslint --ext .js --ext .ts .
+        run: npx eslint
       - name: TypeScript validity
         run: npm run test:typescript
 
