@@ -1,22 +1,22 @@
-import {createContentLoader, defineConfig, HeadConfig} from "vitepress";
 import path from "path";
 import {createRequire} from "node:module";
 import process from "process";
-import fs from "fs-extra";
 import {fileURLToPath} from "url";
+import fs from "fs-extra";
+import {createContentLoader, defineConfig, HeadConfig} from "vitepress";
 import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
 import envVar from "env-var";
 import {Feed} from "feed";
 import {rehype} from "rehype";
-import {Element as HastElement, Parent} from "hast";
 import sharp from "sharp";
 import {GitChangelog, GitChangelogMarkdownSection} from "@nolebase/vitepress-plugin-git-changelog/vite";
 import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-image/vitepress";
-import {Resvg, initWasm as initResvgWasm, ResvgRenderOptions} from "@resvg/resvg-wasm";
+import {Resvg, initWasm as initResvgWasm, type ResvgRenderOptions} from "@resvg/resvg-wasm";
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
 import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
 import {ensureLocalImage} from "./utils/ensureLocalImage.js";
+import type {Element as HastElement, Parent} from "hast";
 
 import type {Node as UnistNode} from "unist";
 import type {ShikiTransformer} from "shiki";
@@ -34,7 +34,7 @@ const packageVersion = env.get("DOCS_PACKAGE_VERSION")
     .default(packageJson.version)
     .asString();
 
-const hostname = "https://node-llama-cpp.withcat.ai/"
+const hostname = "https://node-llama-cpp.withcat.ai/";
 const buildDate = new Date();
 
 const socialPosterLink = hostname + "social.poster.jpg";
@@ -178,7 +178,7 @@ export default defineConfig({
             "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());" +
             "gtag('config','G-Q2SWE5Z1ST');"
         ],
-        ["style", {}],
+        ["style", {}]
     ],
     async transformHead({pageData, head}) {
         if (pageData.filePath === "index.md") {
@@ -263,7 +263,7 @@ export default defineConfig({
             pageData.frontmatter.editLink = false;
             pageData.frontmatter.lastUpdated = false;
             pageData.frontmatter.aside = false;
-            pageData.frontmatter.outline = false
+            pageData.frontmatter.outline = false;
             pageData.frontmatter.nolebase = {
                 gitChangelog: false
             };
@@ -507,7 +507,7 @@ export default defineConfig({
                 "inter-latin-ext-400-normal.woff2",
                 "inter-latin-ext-500-normal.woff2",
                 "inter-latin-ext-600-normal.woff2",
-                "inter-latin-ext-700-normal.woff2",
+                "inter-latin-ext-700-normal.woff2"
             ];
 
             return await Promise.all(
@@ -532,7 +532,7 @@ export default defineConfig({
         const innerSvgImages = loadInnerSvgImages();
 
         async function renderSvg(svgPath: string, destPngPath: string, options: ResvgRenderOptions) {
-            console.info(`Rendering "${svgPath}" to "${destPngPath}"`)
+            console.info(`Rendering "${svgPath}" to "${destPngPath}"`);
 
             const svgContent = await fs.readFile(svgPath, "utf8");
             const svgImages = await innerSvgImages;
@@ -665,7 +665,7 @@ export default defineConfig({
                 author: {
                     name: typeof packageJson.author === "string"
                         ? packageJson.author
-                        : (packageJson.author as undefined | { name?: string })?.name
+                        : (packageJson.author as undefined | {name?: string})?.name
                 },
                 hub: "https://pubsubhubbub.appspot.com/"
             });

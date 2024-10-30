@@ -104,7 +104,7 @@ export class ChatModelFunctionsDocumentationGenerator {
             .join("\n\n");
     }
 
-    /* eslint-disable max-len */
+    /* eslint-disable @stylistic/max-len */
     /**
      * Example:
      * ```
@@ -146,5 +146,5 @@ export class ChatModelFunctionsDocumentationGenerator {
             })
             .join("\n\n");
     }
-    /* eslint-enable max-len */
+    /* eslint-enable @stylistic/max-len */
 }

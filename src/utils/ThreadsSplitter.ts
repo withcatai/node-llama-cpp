@@ -48,7 +48,7 @@ export class ThreadsSplitter {
         if (allocatedThreads === idealThreads) {
             this._callOnActiveThreadsFreeIfCan(initialActiveThreads);
             return idealThreads;
-        } if (allocatedThreads > idealThreads) {
+        } else if (allocatedThreads > idealThreads) {
             this._activeThreads -= allocatedThreads - idealThreads;
             this._callOnActiveThreadsFreeIfCan(initialActiveThreads);
             return idealThreads;
@@ -92,7 +92,7 @@ export class ThreadsSplitter {
 
     /** @internal */
     public _waitForFreeThread() {
-        return new Promise<void>(resolve => this._threadFreeCallbacks.push(resolve));
+        return new Promise<void>((resolve) => this._threadFreeCallbacks.push(resolve));
     }
 
     /** @internal */

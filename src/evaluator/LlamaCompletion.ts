@@ -648,13 +648,12 @@ export class LlamaCompletion {
                 const nlToken = model.tokens.nl;
 
                 if (nlToken != null)
-                    punishTokens = punishTokens.filter(token => token !== nlToken);
+                    punishTokens = punishTokens.filter((token) => token !== nlToken);
             }
 
             return punishTokens;
         };
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             ensureNotAborted();
 
@@ -723,7 +722,7 @@ export class LlamaCompletion {
                 if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
                     model.isEogToken(token) || extraEosTokens.has(token)
                 ) {
-                    const triggeredStops  = stopGenerationDetector.hasTriggeredStops
+                    const triggeredStops = stopGenerationDetector.hasTriggeredStops
                         ? stopGenerationDetector.getTriggeredStops()
                         : customStopGenerationTriggersDetector.getTriggeredStops();
                     const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);

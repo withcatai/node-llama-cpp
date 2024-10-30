@@ -47,7 +47,7 @@ export class GgufInsightsConfigurationResolver {
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
-        getSwapState = (() =>  this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
+        getSwapState = (() => this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize,
         llamaGpu = this._ggufInsights._llama.gpu,
         llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading
@@ -124,7 +124,7 @@ export class GgufInsightsConfigurationResolver {
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
-        getSwapState = (() =>  this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
+        getSwapState = (() => this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize,
         llamaGpu = this._ggufInsights._llama.gpu,
         llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading
@@ -391,7 +391,7 @@ export class GgufInsightsConfigurationResolver {
         flashAttention = false,
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
-        getSwapState = (() =>  this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
+        getSwapState = (() => this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
         llamaGpu = this._ggufInsights._llama.gpu,
         ignoreMemorySafetyChecks = false,
         isEmbeddingContext = false,

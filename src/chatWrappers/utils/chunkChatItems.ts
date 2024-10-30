@@ -40,7 +40,7 @@ export function chunkChatItems(chatHistory: readonly ChatHistoryItem[], {
             currentAggregateFocus = "system";
             systemTexts.push(LlamaText.fromJSON(item.text));
         } else if (item.type === "user") {
-            if (!joinAdjacentMessagesOfTheSameType || currentAggregateFocus !== "system" && currentAggregateFocus !== "user")
+            if (!joinAdjacentMessagesOfTheSameType || (currentAggregateFocus !== "system" && currentAggregateFocus !== "user"))
                 flush();
 
             currentAggregateFocus = "user";

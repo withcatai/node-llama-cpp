@@ -44,8 +44,8 @@ export class GemmaChatWrapper extends ChatWrapper {
                             "\n\n---\n\n",
                             userText
                         ]);
-
                 }
+
                 resultItems.push({
                     user: userText,
                     model: LlamaText.joinValues("\n\n", modelTexts)

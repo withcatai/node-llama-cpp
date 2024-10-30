@@ -1,12 +1,12 @@
 import {Argv, CommandModule, Options} from "yargs";
+import {cliBinName, npxRunPrefix} from "../../src/config.js";
+import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 import {htmlEscape} from "./htmlEscape.js";
 import {buildHtmlTable} from "./buildHtmlTable.js";
 import {buildHtmlHeading} from "./buildHtmlHeading.js";
 import {htmlEscapeWithCodeMarkdown} from "./htmlEscapeWithCodeMarkdown.js";
 import {getInlineCodeBlockHtml} from "./getInlineCodeBlockHtml.js";
 import {getMarkdownRenderer} from "./getMarkdownRenderer.js";
-import {cliBinName, npxRunPrefix} from "../../src/config.js";
-import {withoutCliCommandDescriptionDocsUrl} from "../../src/cli/utils/withCliCommandDescriptionDocsUrl.js";
 
 export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
     cliName = cliBinName,
@@ -73,7 +73,7 @@ export async function getCommandHtmlDoc(command: CommandModule<any, any>, {
             res += renderOptionsGroupOptionsTable(optionGroups[0]!.options) + "\n";
         } else {
             for (const group of optionGroups) {
-                let groupName = group.name;
+                const groupName = group.name;
                 if (groupName !== "default") {
                     res += buildHtmlHeading("h3", htmlEscapeWithCodeMarkdown(groupName), encodeURIComponent(groupName.toLowerCase()));
                 }
@@ -222,7 +222,7 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
             }
         }
 
-        let optionDescription: string[] = option.description != null ? [htmlEscapeWithCodeMarkdown(option.description)] : [];
+        const optionDescription: string[] = option.description != null ? [htmlEscapeWithCodeMarkdown(option.description)] : [];
 
         const hasDefaultDescription = option.defaultDescription != null && option.defaultDescription.trim().length > 0;
         if (option.default != null || hasDefaultDescription) {
@@ -250,7 +250,7 @@ function renderOptionsGroupOptionsTable(options: {name: string, option: Options}
             );
         }
 
-        tableRows.push([optionName.join(", "), optionDescription.join(" ")])
+        tableRows.push([optionName.join(", "), optionDescription.join(" ")]);
     }
 
     return buildHtmlTable(tableHeaders, tableRows);

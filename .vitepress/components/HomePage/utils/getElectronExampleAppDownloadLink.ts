@@ -35,7 +35,7 @@ export async function getElectronExampleAppDownloadLink() {
 
     const isMacOs = platformInfo?.platform != null
         ? platformInfo.platform === "macOS"
-        : (navigator.userAgent.includes("Mac OS X") || navigator.userAgent.includes("Macintosh"))
+        : (navigator.userAgent.includes("Mac OS X") || navigator.userAgent.includes("Macintosh"));
     const isWindows = platformInfo?.platform != null
         ? platformInfo.platform === "Windows"
         : navigator.userAgent.includes("Windows");
@@ -73,17 +73,17 @@ export async function getElectronExampleAppDownloadLink() {
                 relevantAssets = assets
                     .filter((asset) => asset.name.includes(".macOS."))
                     .filter(filterByArchitecture)
-                    .filter((asset) => asset.name.endsWith(".dmg"))
+                    .filter((asset) => asset.name.endsWith(".dmg"));
             } else if (isWindows) {
                 relevantAssets = assets
                     .filter((asset) => asset.name.includes(".Windows."))
                     .filter(filterByArchitecture)
-                    .filter((asset) => asset.name.endsWith(".exe"))
+                    .filter((asset) => asset.name.endsWith(".exe"));
             } else if (isLinux) {
                 relevantAssets = assets
                     .filter((asset) => asset.name.includes(".Linux."))
                     .filter(filterByArchitecture)
-                    .filter((asset) => asset.name.endsWith(".AppImage"))
+                    .filter((asset) => asset.name.endsWith(".AppImage"));
             }
 
             if (relevantAssets.length > 0 && relevantAssets[0]!.browser_download_url != null)

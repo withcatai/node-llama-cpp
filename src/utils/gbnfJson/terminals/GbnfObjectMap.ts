@@ -8,11 +8,11 @@ import {GbnfGrammar} from "./GbnfGrammar.js";
 
 
 export class GbnfObjectMap extends GbnfTerminal {
-    public readonly fields: Array<Readonly<{ key: GbnfString | GbnfStringValue, value: GbnfTerminal, required: true }>>;
+    public readonly fields: Array<Readonly<{key: GbnfString | GbnfStringValue, value: GbnfTerminal, required: true}>>;
     public readonly scopeState: GbnfJsonScopeState;
 
     public constructor(
-        fields: Array<Readonly<{ key: GbnfString | GbnfStringValue, value: GbnfTerminal, required: true }>>,
+        fields: Array<Readonly<{key: GbnfString | GbnfStringValue, value: GbnfTerminal, required: true}>>,
         scopeState: GbnfJsonScopeState = new GbnfJsonScopeState()
     ) {
         super();

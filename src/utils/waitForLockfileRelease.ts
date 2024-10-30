@@ -7,7 +7,6 @@ export async function waitForLockfileRelease({
 }: {
     resourcePath: string, checkInterval?: number, staleDuration?: number
 }) {
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         if (isLockActive(lockfileLockScope, resourcePath)) {
             await waitForLockRelease(lockfileLockScope, resourcePath);

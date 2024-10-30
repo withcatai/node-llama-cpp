@@ -452,7 +452,6 @@ export class LlamaChat {
                 };
                 const loadContextWindowForFunctionCallingLoop = async () => loadContextWindow(true);
 
-                // eslint-disable-next-line no-constant-condition
                 while (true) {
                     generateResponseState.startTokenLoop();
                     generateResponseState.canAvoidReloadingHistory = false;
@@ -617,7 +616,6 @@ export class LlamaChat {
                     ? lastResolvedHistoryItem.text
                     : "";
 
-                // eslint-disable-next-line no-constant-condition
                 while (true) {
                     generateResponseState.startTokenLoop();
                     const {userTextSuffix} = await generateResponseState.loadContextWindow(
@@ -1308,7 +1306,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     // token evaluation loop
     public evaluationIterator?: AsyncGenerator<Token, void | Token>;
-    public currentIteration?:  IteratorResult<Token, void | Token>;
+    public currentIteration?: IteratorResult<Token, void | Token>;
     public currentIterationReplacementToken?: Token;
     public currentToken?: Token;
     public currentTokens: Token[] = [];
@@ -1476,7 +1474,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             const nlToken = this.llamaChat.model.tokens.nl;
 
             if (nlToken != null)
-                punishTokens = punishTokens.filter(token => token !== nlToken);
+                punishTokens = punishTokens.filter((token) => token !== nlToken);
         }
 
         return punishTokens;
@@ -1702,7 +1700,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             return undefined;
         }
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             if (this.functionEvaluationMode === "prefixOrDisengage") {
                 this.functionsGrammar = undefined;

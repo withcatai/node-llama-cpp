@@ -30,5 +30,5 @@ export function parseCmakeListsTxtOptions(cmakeListsTxtString: string) {
                 defaultValue
             };
         })
-        .filter((option) => option != null)
+        .filter((option) => option != null);
 }

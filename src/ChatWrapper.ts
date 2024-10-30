@@ -230,7 +230,7 @@ export abstract class ChatWrapper {
         return [{}] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 
-    /** @internal */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    /** @internal */
     public static _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         return true;
     }

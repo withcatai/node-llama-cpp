@@ -108,7 +108,7 @@ export abstract class GgufFileReader {
         });
     }
 
-    protected _addToBuffer(buffer: Buffer){
+    protected _addToBuffer(buffer: Buffer) {
         const newBuffer = Buffer.alloc(this._buffer.byteLength + buffer.byteLength);
         this._buffer.copy(newBuffer);
         buffer.copy(newBuffer, this._buffer.byteLength);

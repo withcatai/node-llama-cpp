@@ -26,9 +26,11 @@ const homepageUrlWithoutTrailingSlash = homepageUrl.endsWith("/")
     ? homepageUrl.slice(0, -1)
     : homepageUrl;
 
+/* eslint-disable @stylistic/max-len */
 const newFooterTemplate = defaultFooterTemplate + "\n---\n\n" +
     `Shipped with \`llama.cpp\` release [\`${binariesSourceRelease.split("`").join("")}\`](https://github.com/${defaultLlamaCppGitHubRepo}/releases/tag/${encodeURIComponent(binariesSourceRelease)})\n\n` +
     `> To use the latest \`llama.cpp\` release available, run \`npx -n ${cliBinName} source download --release latest\`. ([learn more](${homepageUrlWithoutTrailingSlash}/guide/building-from-source#download-new-release))\n`;
+/* eslint-enable @stylistic/max-len */
 
 const githubPluginConfig = {
     discussionCategoryName: "Releases" as string | boolean

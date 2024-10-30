@@ -329,7 +329,7 @@ export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInC
             const lowercaseName = name?.toLowerCase();
             const lowercaseSubType = subType?.toLowerCase();
             const splitLowercaseSubType = (lowercaseSubType?.split("-") ?? []).concat(
-                otherInfo.map(info => info.toLowerCase())
+                otherInfo.map((info) => info.toLowerCase())
             );
             const firstSplitLowercaseSubType = splitLowercaseSubType[0];
 

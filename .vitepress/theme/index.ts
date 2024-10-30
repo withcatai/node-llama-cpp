@@ -1,3 +1,4 @@
+/* eslint-disable import/order */
 import "./smoothLoad.css";
 
 import {h} from "vue";

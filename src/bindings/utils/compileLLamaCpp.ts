@@ -376,7 +376,7 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildO
                 moduleImport(),
                 getModuleVersion()
             ]);
-            const {binsDir, packageVersion} =  binariesModule?.getBinsDir?.() ?? {};
+            const {binsDir, packageVersion} = binariesModule?.getBinsDir?.() ?? {};
 
             if (binsDir == null || packageVersion !== currentModuleVersion)
                 return null;
@@ -387,6 +387,7 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildO
         }
     }
 
+    /* eslint-disable import/no-unresolved */
     if (buildOptions.platform === "mac") {
         if (buildOptions.arch === "arm64" && buildOptions.gpu === "metal")
             // @ts-ignore
@@ -426,6 +427,7 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildO
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@node-llama-cpp/win-arm64"));
     }
+    /* eslint-enable import/no-unresolved */
 
     return null;
 }

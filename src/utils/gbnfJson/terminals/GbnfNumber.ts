@@ -5,7 +5,7 @@ import {reservedRuleNames} from "./gbnfConsts.js";
 export class GbnfNumber extends GbnfTerminal {
     public readonly allowFractional: boolean;
 
-    public constructor({allowFractional = true}: { allowFractional: boolean }) {
+    public constructor({allowFractional = true}: {allowFractional: boolean}) {
         super();
         this.allowFractional = allowFractional;
     }

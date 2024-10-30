@@ -1090,7 +1090,6 @@ function applyGgufMetadataOverrides(
                 (object as any)[key] = value;
             else
                 applyOverride((object as any)[key], value);
-
         }
     }
 

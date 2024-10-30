@@ -33,7 +33,7 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
         failedCompressionErrorMessage: "Failed to compress chat history for context shift due to a too long prompt or system message that cannot be compressed without affecting the generation quality. " +
             "Consider increasing the context size or shortening the long prompt or system message.",
         compressChatHistory({chatHistory, charactersToRemove, estimatedCharactersPerToken}) {
-            const res = chatHistory.map(item => structuredClone(item));
+            const res = chatHistory.map((item) => structuredClone(item));
             let charactersLeftToRemove = charactersToRemove;
 
             function compressFunctionCalls() {
