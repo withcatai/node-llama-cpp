@@ -22,7 +22,6 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
                             </div>
                         }
                     </>;
-
                 } else if (item.type === "user")
                     return <MarkdownContent key={index} className="message user">
                         {item.message}
@@ -37,7 +36,7 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
                 simplifiedChat[simplifiedChat.length - 1]!.type !== "model" &&
                 generatingResult
             ) &&
-            <div className="message model active"/>
+            <div className="message model active" />
         }
     </div>;
 }

@@ -104,7 +104,7 @@ export function InputRow({
             />
             <div className="autocomplete" ref={autocompleteRef}>
                 <div className={classNames("content", autocompleteText === "" && "hide")}>
-                    <div className="currentText" ref={autocompleteCurrentTextRef}/>
+                    <div className="currentText" ref={autocompleteCurrentTextRef} />
                     <div className="completion">{autocompleteText}</div>
                     <div className="pressTab">Tab</div>
                 </div>

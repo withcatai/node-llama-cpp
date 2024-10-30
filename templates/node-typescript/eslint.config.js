@@ -1,31 +1,14 @@
 // @ts-check
 
-import path from "path";
-import {fileURLToPath} from "url";
 import importPlugin from "eslint-plugin-import";
 import jsdoc from "eslint-plugin-jsdoc";
 import n from "eslint-plugin-n";
 import tseslint from "typescript-eslint";
 import stylistic from "@stylistic/eslint-plugin";
-import {includeIgnoreFile} from "@eslint/compat";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const gitignorePath = path.join(__dirname, ".gitignore");
 
 
 export default tseslint.config({
-    ignores: [
-        "dist/",
-        "**/dist/",
-        "**/dist-electron/",
-        "llama/",
-        "docs-site/",
-        "templates/",
-        ".vitepress/.cache/",
-        "packages/create-node-llama-cpp/dist/",
-        "packages/@node-llama-cpp/*/dist/",
-        ...includeIgnoreFile(gitignorePath).ignores
-    ]
+    ignores: ["dist/", "models/"]
 }, {
     files: ["**/**.{,c,m}{js,ts}"],
     extends: [
@@ -104,9 +87,7 @@ export default tseslint.config({
         "no-duplicate-imports": ["error", {
             includeExports: true
         }],
-        camelcase: ["warn", {
-            allow: ["\\d+_\\d+"]
-        }],
+        camelcase: ["warn"],
         "@stylistic/jsx-quotes": ["warn"],
         yoda: ["error", "never", {
             exceptRange: true
@@ -196,10 +177,5 @@ export default tseslint.config({
         "jsdoc/require-jsdoc": ["off"],
         "jsdoc/require-yields": ["off"],
         "jsdoc/require-param-description": ["off"]
-    }
-}, {
-    files: ["test/**/**.ts"],
-    rules: {
-        "@stylistic/max-len": ["off"]
     }
 });

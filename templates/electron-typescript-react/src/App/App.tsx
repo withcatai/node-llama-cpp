@@ -115,7 +115,7 @@ export function App() {
                         <div className="hint">Click the button above to load a model</div>
                         <div className="actions">
                             <a className="starLink" target="_blank" href="https://github.com/withcatai/node-llama-cpp">
-                                <StarIconSVG className="starIcon"/>
+                                <StarIconSVG className="starIcon" />
                                 <div className="text">
                                     Star <code>node-llama-cpp</code> on GitHub
                                 </div>
@@ -125,20 +125,20 @@ export function App() {
                                     target="_blank"
                                     href="https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
                                 >
-                                    <DownloadIconSVG className="downloadIcon"/>
+                                    <DownloadIconSVG className="downloadIcon" />
                                     <div className="text">Get Llama 3.1 8B model</div>
                                 </a>
-                                <div className="separator"/>
+                                <div className="separator" />
                                 <a
                                     target="_blank"
                                     href="https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf"
                                 >
-                                    <DownloadIconSVG className="downloadIcon"/>
+                                    <DownloadIconSVG className="downloadIcon" />
                                     <div className="text">Get Gemma 2 2B model</div>
                                 </a>
                             </div>
                             <a className="browseLink" target="_blank" href="https://huggingface.co/mradermacher">
-                                <SearchIconSVG className="searchIcon"/>
+                                <SearchIconSVG className="searchIcon" />
                                 <div className="text">Find more models</div>
                             </a>
                         </div>

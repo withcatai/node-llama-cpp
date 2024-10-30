@@ -1,41 +1,22 @@
 // @ts-check
 
-import path from "path";
-import {fileURLToPath} from "url";
 import importPlugin from "eslint-plugin-import";
 import jsdoc from "eslint-plugin-jsdoc";
-import n from "eslint-plugin-n";
+import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import stylistic from "@stylistic/eslint-plugin";
-import {includeIgnoreFile} from "@eslint/compat";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const gitignorePath = path.join(__dirname, ".gitignore");
+import pluginReactHooks from "eslint-plugin-react-hooks";
 
 
 export default tseslint.config({
-    ignores: [
-        "dist/",
-        "**/dist/",
-        "**/dist-electron/",
-        "llama/",
-        "docs-site/",
-        "templates/",
-        ".vitepress/.cache/",
-        "packages/create-node-llama-cpp/dist/",
-        "packages/@node-llama-cpp/*/dist/",
-        ...includeIgnoreFile(gitignorePath).ignores
-    ]
+    ignores: ["dist/", "dist-electron/", "release/", "models/"]
 }, {
-    files: ["**/**.{,c,m}{js,ts}"],
+    files: ["**/**.{,c,m}{js,ts}{,x}"],
     extends: [
         stylistic.configs["recommended-flat"],
         jsdoc.configs["flat/recommended"],
         importPlugin.flatConfigs.recommended
     ],
-    plugins: {
-        n
-    },
     languageOptions: {
         globals: {
             Atomics: "readonly",
@@ -95,7 +76,6 @@ export default tseslint.config({
             groups: ["builtin", "external", "internal", "parent", "sibling", "index", "type", "object", "unknown"],
             warnOnUnassignedImports: true
         }],
-        "n/file-extension-in-import": ["error", "always"],
         "newline-per-chained-call": ["error", {
             ignoreChainWithDepth: 2
         }],
@@ -104,9 +84,7 @@ export default tseslint.config({
         "no-duplicate-imports": ["error", {
             includeExports: true
         }],
-        camelcase: ["warn", {
-            allow: ["\\d+_\\d+"]
-        }],
+        camelcase: ["warn"],
         "@stylistic/jsx-quotes": ["warn"],
         yoda: ["error", "never", {
             exceptRange: true
@@ -144,11 +122,15 @@ export default tseslint.config({
         "@stylistic/no-trailing-spaces": ["warn"]
     }
 }, {
-    files: ["**/**.{,c,m}ts"],
+    files: ["**/**.{ts,tsx}"],
     extends: [
         jsdoc.configs["flat/recommended-typescript"],
         ...tseslint.configs.recommended
     ],
+    plugins: {
+        "react-hooks": pluginReactHooks,
+        "react-refresh": reactRefresh
+    },
     settings: {
         "import/resolver": {
             typescript: true,
@@ -156,6 +138,7 @@ export default tseslint.config({
         }
     },
     rules: {
+        ...pluginReactHooks.configs.recommended.rules,
         "no-constant-condition": ["warn"],
         "@typescript-eslint/explicit-module-boundary-types": ["off"],
         "@typescript-eslint/ban-ts-comment": ["off"],
@@ -187,6 +170,12 @@ export default tseslint.config({
             },
             multilineDetection: "brackets"
         }],
+        "@stylistic/jsx-wrap-multilines": ["off"],
+        "@stylistic/jsx-indent-props": ["warn", 4],
+        "@stylistic/jsx-one-expression-per-line": ["off"],
+        "@stylistic/jsx-closing-tag-location": ["warn", "line-aligned"],
+        "@stylistic/jsx-closing-bracket-location": ["warn", "line-aligned"],
+        "@stylistic/jsx-tag-spacing": ["warn"],
 
         "jsdoc/require-param": ["off"],
         "jsdoc/check-param-names": ["warn", {
@@ -195,11 +184,11 @@ export default tseslint.config({
         "jsdoc/require-returns": ["off"],
         "jsdoc/require-jsdoc": ["off"],
         "jsdoc/require-yields": ["off"],
-        "jsdoc/require-param-description": ["off"]
-    }
-}, {
-    files: ["test/**/**.ts"],
-    rules: {
-        "@stylistic/max-len": ["off"]
+        "jsdoc/require-param-description": ["off"],
+
+        "react-refresh/only-export-components": ["warn", {
+            "allowConstantExport": true
+        }],
+        "react-hooks/exhaustive-deps": ["off"]
     }
 });
