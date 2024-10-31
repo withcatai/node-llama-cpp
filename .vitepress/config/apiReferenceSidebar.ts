@@ -1,4 +1,5 @@
 import {DefaultTheme} from "vitepress";
+/* eslint import/no-unresolved: "off" */
 import typedocSidebar from "../../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 
 const categoryOrder = [
