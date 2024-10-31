@@ -195,7 +195,6 @@ async function getLinuxCudaLibraryPaths() {
                     `${cudaTargetsFolder}/${cudaTargetFolderName}/lib/stubs`
                 );
             }
-
         }
     } catch (err) {
         console.error(getConsoleLogPrefix() + 'Failed to search "/usr/local/" for CUDA library paths', err);

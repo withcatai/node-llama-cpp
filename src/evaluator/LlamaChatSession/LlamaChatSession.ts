@@ -501,7 +501,6 @@ export class LlamaChatSession {
                 safeEventCallback(onTextChunk)?.(resolvedResponsePrefix);
             }
 
-            // eslint-disable-next-line no-constant-condition
             while (true) {
                 const functionCallsAndResults: Array<Promise<null | {
                     functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>,
@@ -543,7 +542,7 @@ export class LlamaChatSession {
                         history: newContextWindowChatHistory,
                         minimumOverlapPercentageToPreventContextShift: 0.5
                     },
-                    onFunctionCall: async(functionCall) => {
+                    onFunctionCall: async (functionCall) => {
                         functionCallsAndResults.push(
                             (async () => {
                                 try {

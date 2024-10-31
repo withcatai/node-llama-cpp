@@ -19,12 +19,12 @@ describe("utils", () => {
             Promise.resolve(allocationPromise).then(() => {
                 allocationPromiseResolved = true;
             });
-            await new Promise(resolve => setTimeout(resolve, 0));
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
             expect(allocationPromiseResolved).toBe(false);
 
             handle1.dispose();
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
             expect(allocationPromiseResolved).toBe(true);
 
             const [allocation2, handle2] = await allocationPromise;
@@ -64,15 +64,15 @@ describe("utils", () => {
             Promise.resolve(allocationPromise).then(() => {
                 allocationPromiseResolved = true;
             });
-            await new Promise(resolve => setTimeout(resolve, 0));
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
             expect(allocationPromiseResolved).toBe(false);
 
             handle1.dispose();
             consumer1.dispose();
 
-            await new Promise(resolve => setTimeout(resolve, 0));
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
             expect(allocationPromiseResolved).toBe(true);
 
             const [allocation3, handle3] = await allocationPromise;

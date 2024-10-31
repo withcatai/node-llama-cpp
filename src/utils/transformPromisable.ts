@@ -23,10 +23,10 @@ export function transformPromisable<T, R>(value: Promisable<T>, transformer: (va
  * @param transformer - The transformer function
  */
 export function transformPromisables<const Types extends readonly any[], R>(
-    values: { [Index in keyof Types]: Promisable<Types[Index]> },
-    transformer: (values: { [Index in keyof Types]: Types[Index] }) => Promisable<R>
+    values: {[Index in keyof Types]: Promisable<Types[Index]>},
+    transformer: (values: {[Index in keyof Types]: Types[Index]}) => Promisable<R>
 ): Promisable<R> {
-    if (values.some(value => value instanceof Promise))
+    if (values.some((value) => value instanceof Promise))
         return Promise.all(values).then(transformer);
 
     return transformer(values);
@@ -57,7 +57,6 @@ export function promisableLoop<R>({
     returnValue: () => Promisable<R>
 }): Promisable<R> {
     function iterate(): Promisable<R> {
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             const shouldContinue = condition();
 

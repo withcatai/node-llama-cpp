@@ -595,7 +595,7 @@ export function tokenizeText(text: string | LlamaText, tokenizer: Tokenizer) {
         return text.tokenize(tokenizer);
 }
 
-type Mutable<T> = { -readonly [P in keyof T]: T[P] };
+type Mutable<T> = {-readonly [P in keyof T]: T[P]};
 
 function createHistoryFromStringsAndValues(values: readonly LlamaTextInputValue[]): readonly LlamaTextValue[] {
     function addItemToRes(res: LlamaTextValue[], item: LlamaTextInputValue): LlamaTextValue[] {

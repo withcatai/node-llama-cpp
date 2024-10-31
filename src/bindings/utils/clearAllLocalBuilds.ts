@@ -11,12 +11,12 @@ export async function clearAllLocalBuilds(waitForLocks = false) {
         const itemsToRemove = Array.from(
             new Set(
                 (await fs.readdir(llamaLocalBuildBinsDirectory))
-                    .map(item => (
+                    .map((item) => (
                         item.endsWith(".lock")
                             ? item.slice(0, -".lock".length)
                             : item
                     ))
-                    .filter(item => !item.startsWith("."))
+                    .filter((item) => !item.startsWith("."))
             )
         );
 

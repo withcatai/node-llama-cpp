@@ -1,6 +1,6 @@
 import {BatchItem, PrioritizedBatchItem} from "../../types.js";
 
-export function firstInFirstOutStrategy({items, size}: { items: readonly BatchItem[], size: number }) {
+export function firstInFirstOutStrategy({items, size}: {items: readonly BatchItem[], size: number}) {
     const res: PrioritizedBatchItem[] = [];
 
     const sortedItems = items

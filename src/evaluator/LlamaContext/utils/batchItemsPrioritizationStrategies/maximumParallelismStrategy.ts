@@ -1,6 +1,6 @@
 import {BatchItem, PrioritizedBatchItem} from "../../types.js";
 
-export function maximumParallelismStrategy({items, size}: { items: readonly BatchItem[], size: number }) {
+export function maximumParallelismStrategy({items, size}: {items: readonly BatchItem[], size: number}) {
     let leftFreeTokens = size;
     const minTokensForEachItem = Math.floor(leftFreeTokens / items.length);
 

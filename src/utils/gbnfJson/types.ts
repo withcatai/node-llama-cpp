@@ -16,7 +16,7 @@ export type GbnfJsonOneOfSchema = {
 };
 export type GbnfJsonObjectSchema<Keys extends string = string> = {
     type: "object",
-    properties: Readonly<{ [key in Keys]: GbnfJsonSchema }>,
+    properties: Readonly<{[key in Keys]: GbnfJsonSchema}>,
     required?: readonly Keys[]
 };
 export type GbnfJsonArraySchema = {

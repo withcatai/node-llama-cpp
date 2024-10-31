@@ -59,7 +59,7 @@ export function spawnCommand(
         });
         child.on("error", reject);
         child.on("disconnect", () => reject(new Error(`Command ${getCommandString()} disconnected`)));
-        child.on("close", code => {
+        child.on("close", (code) => {
             if (code == 0)
                 resolve(createResult());
             else

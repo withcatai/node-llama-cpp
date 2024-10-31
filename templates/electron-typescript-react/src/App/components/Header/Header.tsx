@@ -31,13 +31,13 @@ export function Header({appVersion, canShowCurrentVersion, modelName, onLoadClic
                 disabled={onResetChatClick == null}
                 onClick={onResetChatClick}
             >
-                <DeleteIconSVG className="icon"/>
+                <DeleteIconSVG className="icon" />
             </button>
             <button className="loadModelButton" onClick={onLoadClick} disabled={onLoadClick == null}>
-                <LoadFileIconSVG className="icon"/>
+                <LoadFileIconSVG className="icon" />
             </button>
         </div>
-        <div className="spacer"/>
+        <div className="spacer" />
         <UpdateBadge
             appVersion={appVersion}
             canShowCurrentVersion={canShowCurrentVersion}

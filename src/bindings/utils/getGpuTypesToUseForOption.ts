@@ -20,7 +20,7 @@ export async function getGpuTypesToUseForOption(gpu: Required<LlamaOptions>["gpu
             ? new Set(gpu.exclude ?? [])
             : new Set();
 
-        return gpuTypes.filter(gpuType => !resolvedExcludeTypes.has(gpuType));
+        return gpuTypes.filter((gpuType) => !resolvedExcludeTypes.has(gpuType));
     }
 
     const resolvedGpu = resolveValidGpuOptionForPlatform(resolvedGpuOption, {

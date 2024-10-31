@@ -1,6 +1,5 @@
-import {MarkdownEnv, Plugin} from "vitepress";
 import path from "path";
-import {htmlEscape} from "../utils/htmlEscape.js";
+import {MarkdownEnv, Plugin} from "vitepress";
 import {getMarkdownRenderer} from "../utils/getMarkdownRenderer.js";
 import {renderHtmlTag} from "../utils/renderHtmlTag.js";
 import {ensureLocalImage, resolveImageBuffers, relativeToAbsoluteImageUrls} from "../utils/ensureLocalImage.js";
@@ -8,7 +7,7 @@ import {ensureLocalImage, resolveImageBuffers, relativeToAbsoluteImageUrls} from
 export function BlogPageInfoPlugin({
     include
 }: {
-    include(id: string): boolean,
+    include(id: string): boolean
 }): Plugin {
     const refIdToUrlPath = new Map<string, string>();
     let root = "";
@@ -84,12 +83,13 @@ export function BlogPageInfoPlugin({
             const frontmatterCode = code.slice(0, frontmatterEndIndex);
             const markdownCode = code.slice(frontmatterEndIndex);
 
+            const frontmatterDate = new Date(frontmatter.date);
             let newCode = frontmatterCode + (
                 "# " + frontmatter.title + "\n\n" +
                     [
                         "",
                         '<script setup lang="ts">',
-                        `const articleDate = new Date(${JSON.stringify(new Date(frontmatter.date).toISOString())}).toLocaleDateString("en-US", {`,
+                        `const articleDate = new Date(${JSON.stringify(frontmatterDate.toISOString())}).toLocaleDateString("en-US", {`,
                         '    year: "numeric",',
                         '    month: "long",',
                         '    day: "numeric"',
@@ -118,10 +118,9 @@ export function BlogPageInfoPlugin({
                         alt: frontmatter.title,
                         width: width,
                         height: height,
-                        style: 'background-image: url(' + JSON.stringify(previewUrlPath.absolute) + ');'
+                        style: "background-image: url(" + JSON.stringify(previewUrlPath.absolute) + ");"
                     });
-                }
-                else if (typeof (frontmatter.image as any).url === "string") {
+                } else if (typeof (frontmatter.image as any).url === "string") {
                     const {
                         urlPath, previewUrlPath, width, height
                     } = await ensureLocalImage((frontmatter.image as any).url, "cover", {
@@ -133,7 +132,7 @@ export function BlogPageInfoPlugin({
                         alt: (frontmatter.image as any).alt ?? frontmatter.title,
                         width: width ?? (frontmatter.image as any).width,
                         height: height ?? (frontmatter.image as any).height,
-                        style: 'background-image: url(' + JSON.stringify(previewUrlPath.absolute) + ');'
+                        style: "background-image: url(" + JSON.stringify(previewUrlPath.absolute) + ");"
                     });
                 }
             }
@@ -143,7 +142,7 @@ export function BlogPageInfoPlugin({
 
             return newCode;
         }
-    }
+    };
 }
 
 function findFrontmatterEndIndex(mdCode: string): number {

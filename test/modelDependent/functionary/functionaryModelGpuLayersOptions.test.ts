@@ -607,7 +607,8 @@ describe("functionary", () => {
                         });
                         expect(res.gpuLayers).to.eql(0);
                         expect(res.contextSize).to.toMatchInlineSnapshot("2213");
-                    }{
+                    }
+                    {
                         const res = await resolveGpuLayers(32, {
                             totalVram: 0,
                             freeVram: 0,

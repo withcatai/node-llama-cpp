@@ -370,7 +370,7 @@ async function RunCompletion({
     });
 
     // this is for ora to not interfere with readline
-    await new Promise(resolve => setTimeout(resolve, 1));
+    await new Promise((resolve) => setTimeout(resolve, 1));
 
     const replHistory: string[] = [];
 
@@ -387,7 +387,6 @@ async function RunCompletion({
         return res;
     }
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const input = initialText != null
             ? initialText

@@ -3,6 +3,7 @@
 import path from "path";
 import {fileURLToPath} from "url";
 import fs from "node:fs/promises";
+/* eslint import/no-unresolved: "off" */
 // @ts-ignore
 import {_startCreateCli} from "node-llama-cpp/commands";
 

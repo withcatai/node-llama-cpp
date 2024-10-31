@@ -394,7 +394,7 @@ async function RunInfill({
     });
 
     // this is for ora to not interfere with readline
-    await new Promise(resolve => setTimeout(resolve, 1));
+    await new Promise((resolve) => setTimeout(resolve, 1));
 
     if (!completion.infillSupported) {
         console.log(chalk.red("Infill is not supported for this model"));
@@ -419,7 +419,6 @@ async function RunInfill({
         return res;
     }
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const prefixInput = initialPrefix != null
             ? initialPrefix

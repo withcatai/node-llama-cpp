@@ -13,8 +13,8 @@ export class GbnfOr extends GbnfTerminal {
 
     public getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
         const mappedValues = this.values
-            .map(v => v.resolve(grammarGenerator))
-            .filter(value => value !== "" && value !== grammarNoValue);
+            .map((v) => v.resolve(grammarGenerator))
+            .filter((value) => value !== "" && value !== grammarNoValue);
 
         if (mappedValues.length === 0)
             return grammarNoValue;
@@ -26,8 +26,8 @@ export class GbnfOr extends GbnfTerminal {
 
     public override resolve(grammarGenerator: GbnfGrammarGenerator): string {
         const mappedValues = this.values
-            .map(v => v.resolve(grammarGenerator))
-            .filter(value => value !== "" && value !== grammarNoValue);
+            .map((v) => v.resolve(grammarGenerator))
+            .filter((value) => value !== "" && value !== grammarNoValue);
 
         if (mappedValues.length === 0)
             return grammarNoValue;

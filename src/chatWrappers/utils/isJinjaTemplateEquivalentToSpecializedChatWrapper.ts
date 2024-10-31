@@ -141,7 +141,7 @@ function checkEquivalence(
                     if (normalizedJinjaTrigger.values.length === 0)
                         return true;
 
-                    const foundSimilarTriggers =  specializedWrapperRes.stopGenerationTriggers.some((specializedTrigger) => (
+                    const foundSimilarTriggers = specializedWrapperRes.stopGenerationTriggers.some((specializedTrigger) => (
                         normalizedJinjaTrigger.includes(specializedTrigger)
                     ));
 

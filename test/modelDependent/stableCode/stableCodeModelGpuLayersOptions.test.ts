@@ -302,7 +302,8 @@ describe("stableCode", () => {
                     });
                     expect(res.gpuLayers).to.eql(33);
                     expect(res.contextSize).to.toMatchInlineSnapshot("94");
-                }{
+                }
+                {
                     const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
                         freeVram: s1GB * 4

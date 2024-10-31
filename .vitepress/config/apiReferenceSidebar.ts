@@ -1,5 +1,6 @@
-import typedocSidebar from "../../docs/api/typedoc-sidebar.json";
-import {DefaultTheme} from "vitepress"; // if this import fails, run `npm run docs:generateTypedoc`
+import {DefaultTheme} from "vitepress";
+/* eslint import/no-unresolved: "off" */
+import typedocSidebar from "../../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
 
 const categoryOrder = [
     "Functions",
@@ -85,7 +86,7 @@ function getSidebar() {
 
                     if (item.items instanceof Array)
                         item.items = item.items.map((subItem) => {
-                            if ((subItem as { collapsed?: boolean }).collapsed)
+                            if ((subItem as {collapsed?: boolean}).collapsed)
                                 // @ts-ignore
                                 delete subItem.collapsed;
 
@@ -129,7 +130,7 @@ function applyOverrides(sidebar: typeof typedocSidebar) {
 
     const llamaTextFunction = functions?.items?.find((item) => item.text === "LlamaText");
     if (llamaTextFunction != null) {
-        delete (llamaTextFunction as { link?: string }).link;
+        delete (llamaTextFunction as {link?: string}).link;
     }
 
     const classes = sidebar.find((item) => item.text === "Classes");
@@ -372,7 +373,7 @@ function groupItems(
     items: DefaultTheme.SidebarItem[] | undefined,
     findParent: (item: DefaultTheme.SidebarItem) => boolean | undefined,
     findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    {collapsed = true, moveToEndIfGrouped = true}: { collapsed?: boolean, moveToEndIfGrouped?: boolean } = {}
+    {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
 ) {
     const children: DefaultTheme.SidebarItem[] = [];
 
@@ -412,7 +413,7 @@ function ensureParentAndGroupItems(
     items: DefaultTheme.SidebarItem[] | undefined,
     parentText: string,
     findChildren: (item: DefaultTheme.SidebarItem) => boolean | undefined,
-    {collapsed = true, moveToEndIfGrouped = true}: { collapsed?: boolean, moveToEndIfGrouped?: boolean } = {}
+    {collapsed = true, moveToEndIfGrouped = true}: {collapsed?: boolean, moveToEndIfGrouped?: boolean} = {}
 ) {
     if (items == null || !(items instanceof Array))
         return;

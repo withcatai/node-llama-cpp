@@ -6,7 +6,7 @@ export const enum TokenAttribute {
     unknown = 1 << 0,
     unused = 1 << 1,
     normal = 1 << 2,
-    control = 1 << 3,  // SPECIAL
+    control = 1 << 3, // SPECIAL
     userDefined = 1 << 4,
     byte = 1 << 5,
     normalized = 1 << 6,

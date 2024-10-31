@@ -20,7 +20,6 @@ export async function consolePromptQuestion(question: string, {
 
     process.stdout.moveCursor(0, -1);
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const rl = readline.createInterface({
             input: process.stdin,

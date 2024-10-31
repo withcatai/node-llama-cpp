@@ -172,7 +172,7 @@ export async function combineModelDownloaders(
     downloaders: (ModelDownloader | Promise<ModelDownloader>)[],
     options?: CombinedModelDownloaderOptions
 ) {
-    const downloader =  CombinedModelDownloader._create(await Promise.all(downloaders), options);
+    const downloader = CombinedModelDownloader._create(await Promise.all(downloaders), options);
     await downloader._init();
     return downloader;
 }

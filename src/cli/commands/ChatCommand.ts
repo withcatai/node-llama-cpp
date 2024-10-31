@@ -496,7 +496,7 @@ async function RunChat({
     });
 
     // this is for ora to not interfere with readline
-    await new Promise(resolve => setTimeout(resolve, 1));
+    await new Promise((resolve) => setTimeout(resolve, 1));
 
     const replHistory = await ReplHistory.load(chatCommandHistoryFilePath, !noHistory);
 
@@ -517,7 +517,6 @@ async function RunChat({
         void session.preloadPrompt("")
             .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         let hadNoWhitespaceTextInThisIteration = false;
         let nextPrintLeftovers = "";

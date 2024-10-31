@@ -29,7 +29,7 @@ export async function testCmakeBinary(cmakeBinaryPath?: string, {
         });
         child.on("error", reject);
         child.on("disconnect", () => resolve(false));
-        child.on("close", code => {
+        child.on("close", (code) => {
             if (code == 0)
                 resolve(true);
             else

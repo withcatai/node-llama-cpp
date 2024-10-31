@@ -323,7 +323,7 @@ export class StopGenerationDetector<T extends string = string> {
     ): StopGenerationTrigger {
         return simplifyStopTrigger(
             llamaText.values
-                .filter(value => value !== "")
+                .filter((value) => value !== "")
                 .map((value) => {
                     if (typeof value === "string")
                         return [value];

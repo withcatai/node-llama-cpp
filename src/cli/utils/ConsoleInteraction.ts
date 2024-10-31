@@ -5,7 +5,7 @@ export const enum ConsoleInteractionKey {
     ctrlC = "\u0003",
     upArrow = "\u001b[A",
     downArrow = "\u001b[B",
-    enter = "\r",
+    enter = "\r"
 }
 
 export class ConsoleInteraction {

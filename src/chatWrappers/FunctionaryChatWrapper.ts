@@ -118,6 +118,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                 }
             };
     }
+
     public override generateContextState({
         chatHistory, availableFunctions, documentFunctionParams
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {

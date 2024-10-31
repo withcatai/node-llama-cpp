@@ -3,7 +3,7 @@ import {htmlEscape} from "./htmlEscape.js";
 export function htmlEscapeWithCodeMarkdown(string?: string | number | boolean) {
     const escapedString = htmlEscape(string);
 
-    let res = ""
+    let res = "";
     let backtickIndex = escapedString.indexOf("`");
     let textIndex = 0;
 

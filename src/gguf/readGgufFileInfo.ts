@@ -134,7 +134,7 @@ export async function readGgufFileInfo(pathOrUri: string, {
         totalMetadataSize: first.totalMetadataSize + rest.reduce((acc, part) => acc + part.totalMetadataSize, 0),
         fullTensorInfo: first.fullTensorInfo == null
             ? undefined
-            : [first, ...rest].flatMap(part => (part.fullTensorInfo ?? [])),
+            : [first, ...rest].flatMap((part) => (part.fullTensorInfo ?? [])),
         tensorInfoSize: first.tensorInfoSize
     } satisfies GgufFileInfo;
 }

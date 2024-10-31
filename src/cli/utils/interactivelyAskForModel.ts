@@ -67,8 +67,8 @@ export async function interactivelyAskForModel({
     downloadIntent?: boolean,
     flashAttention?: boolean
 }): Promise<string> {
-    let localModelFileOptions: (ModelOption & { type: "localModel" })[] = [];
-    const recommendedModelOptions: (ModelOption & { type: "recommendedModel" })[] = [];
+    let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
+    const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
     const activeInteractionController = new AbortController();
     let scheduledTitleRerenderTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
     let vramState = await llama.getVramState();
@@ -215,7 +215,6 @@ export async function interactivelyAskForModel({
     ];
 
     try {
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             const minWidth = Math.min(80 + (flashAttention ? 26 : 0), process.stdout.columns - 1);
             const selectedItem = await basicChooseFromListConsoleInteraction({
@@ -495,7 +494,7 @@ function renderModelCompatibility(
 }
 
 function renderRecommendedModelTechnicalInfo(
-    modelSelectedUri: (ModelOption & { type: "recommendedModel" })["selectedUri"],
+    modelSelectedUri: (ModelOption & {type: "recommendedModel"})["selectedUri"],
     maxWidth: number,
     canUseGpu: boolean
 ) {
@@ -555,7 +554,7 @@ function renderRecommendedModelTechnicalInfo(
 async function selectFileForModelRecommendation({
     recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention
 }: {
-    recommendedModelOption: ModelOption & { type: "recommendedModel" },
+    recommendedModelOption: ModelOption & {type: "recommendedModel"},
     llama: Llama,
     abortSignal: AbortSignal,
     rerenderOption(): void,
@@ -563,7 +562,7 @@ async function selectFileForModelRecommendation({
 }) {
     try {
         let bestScore: number | undefined = undefined;
-        let bestScoreSelectedUri: (ModelOption & { type: "recommendedModel" })["selectedUri"] | undefined = undefined;
+        let bestScoreSelectedUri: (ModelOption & {type: "recommendedModel"})["selectedUri"] | undefined = undefined;
 
         for (const potentialUri of recommendedModelOption.potentialUris) {
             if (abortSignal.aborted)

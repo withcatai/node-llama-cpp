@@ -1,4 +1,4 @@
-export function scoreLevels(num: number, levels: { start: number, end?: number, points: number }[]) {
+export function scoreLevels(num: number, levels: {start: number, end?: number, points: number}[]) {
     let res = 0;
 
     for (let i = 0; i < levels.length; i++) {

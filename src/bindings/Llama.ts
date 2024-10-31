@@ -485,7 +485,7 @@ export class Llama {
 
             return {
                 total: maxSize,
-                free:  maxSize - used,
+                free: maxSize - used,
                 unifiedSize: maxSize
             };
         });
@@ -504,7 +504,7 @@ export class Llama {
         else
             resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding);
 
-        const llama =  new Llama({
+        const llama = new Llama({
             bindings,
             buildType,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
@@ -559,7 +559,6 @@ export class Llama {
                 console.warn(getConsoleLogPrefix() + getColorForLogLevel(LlamaLogLevel.warn)(`Unknown log level: ${level}`));
                 console.log(prefixAndColorMessage(message, getColorForLogLevel(level)));
         }
-
     }
 }
 
@@ -582,7 +581,7 @@ function prefixAndColorMessage(message: string, color: (message: string) => stri
     return getConsoleLogPrefix() + (
         message
             .split("\n")
-            .map(line => color(line))
+            .map((line) => color(line))
             .join("\n" + getConsoleLogPrefix())
     );
 }
