@@ -99,6 +99,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                     if (!cmakeCustomOptions.has("GGML_AMX"))
                         cmakeCustomOptions.set("GGML_AMX", "OFF");
+
+                    if (!cmakeCustomOptions.has("GGML_NATIVE"))
+                        cmakeCustomOptions.set("GGML_NATIVE", "OFF");
                 }
 
                 await fs.remove(outDirectory);

@@ -39,41 +39,6 @@ unset(GPU_INFO_HEADERS)
 unset(GPU_INFO_SOURCES)
 unset(GPU_INFO_EXTRA_LIBS)
 
-if (GGML_CUDA)
-    cmake_minimum_required(VERSION 3.17)
-
-    find_package(CUDAToolkit)
-    if (CUDAToolkit_FOUND)
-        message(STATUS "Using CUDA for GPU info")
-
-        enable_language(CUDA)
-
-        list(APPEND GPU_INFO_HEADERS gpuInfo/cuda-gpu-info.h)
-        list(APPEND GPU_INFO_SOURCES gpuInfo/cuda-gpu-info.cu)
-
-        add_compile_definitions(GPU_INFO_USE_CUDA)
-
-        if (GGML_STATIC)
-            list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cudart_static)
-        else()
-            list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cudart)
-        endif()
-
-        list(APPEND GPU_INFO_EXTRA_LIBS CUDA::cuda_driver)
-
-        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            # copied from llama.cpp/CMakLists.txt under "if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)"
-            if (GGML_CUDA_F16 OR GGML_CUDA_DMMV_F16)
-                set(CMAKE_CUDA_ARCHITECTURES "60;61;70;75")
-            else()
-                set(CMAKE_CUDA_ARCHITECTURES "52;61;70;75")
-            endif()
-        endif()
-    else()
-        message(FATAL_ERROR "CUDA was not found")
-    endif()
-endif()
-
 if (GGML_VULKAN OR GGML_KOMPUTE)
     find_package(Vulkan)
     if (Vulkan_FOUND)
@@ -92,51 +57,6 @@ if (GGML_VULKAN OR GGML_KOMPUTE)
     else()
         message(FATAL_ERROR "Vulkan was not found")
     endif()
-endif()
-
-if (GGML_HIPBLAS)
-    list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
-
-    if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-        message(WARNING "Only LLVM is supported for HIP, hint: CC=/opt/rocm/llvm/bin/clang")
-    endif()
-    if (NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
-    endif()
-
-    find_package(hip)
-    find_package(hipblas)
-    find_package(rocblas)
-
-    if (${hipblas_FOUND} AND ${hip_FOUND})
-        message(STATUS "Using HIP and hipBLAS for GPU info")
-        add_compile_definitions(GPU_INFO_USE_HIPBLAS GPU_INFO_USE_CUDA)
-        add_library(gpu-info-rocm OBJECT gpuInfo/cuda-gpu-info.cu gpuInfo/cuda-gpu-info.h)
-        set_source_files_properties(gpuInfo/cuda-gpu-info.cu PROPERTIES LANGUAGE CXX)
-        target_link_libraries(gpu-info-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
-
-        list(APPEND GPU_INFO_EXTRA_LIBS gpu-info-rocm)
-    else()
-        message(FATAL_ERROR "hipBLAS or HIP was not found. Try setting CMAKE_PREFIX_PATH=/opt/rocm")
-    endif()
-endif()
-
-if (GGML_METAL)
-    find_library(FOUNDATION_LIBRARY Foundation REQUIRED)
-    find_library(METAL_FRAMEWORK    Metal      REQUIRED)
-    find_library(METALKIT_FRAMEWORK MetalKit   REQUIRED)
-
-    message(STATUS "Using Metal for GPU info")
-    list(APPEND GPU_INFO_HEADERS gpuInfo/metal-gpu-info.h)
-    list(APPEND GPU_INFO_SOURCES gpuInfo/metal-gpu-info.mm)
-
-    add_compile_definitions(GPU_INFO_USE_METAL)
-
-    list(APPEND GPU_INFO_EXTRA_LIBS
-        ${FOUNDATION_LIBRARY}
-        ${METAL_FRAMEWORK}
-        ${METALKIT_FRAMEWORK}
-        )
 endif()
 
 list(REMOVE_DUPLICATES GPU_INFO_HEADERS)

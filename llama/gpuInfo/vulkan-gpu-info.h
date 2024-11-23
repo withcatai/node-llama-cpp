@@ -6,4 +6,3 @@
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback);
-bool gpuInfoGetVulkanDeviceNames(std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback);
