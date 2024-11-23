@@ -446,6 +446,7 @@ export class LlamaChat {
                 const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
                     await generateResponseState.loadContextWindow(
                         generateResponseState.getResolvedHistoryWithCurrentModelResponse(),
+                        generateResponseState.getContextWindowsHistoryWithCurrentModelResponse(),
                         false,
                         avoidReloadingHistory
                     );
@@ -611,10 +612,17 @@ export class LlamaChat {
         return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsUser();
-                const lastResolvedHistoryItem = generateResponseState.resolvedHistory[generateResponseState.resolvedHistory.length - 1];
-                const initialUserMessage = lastResolvedHistoryItem?.type === "user"
-                    ? lastResolvedHistoryItem.text
-                    : "";
+                const getInitialUserMessage = (history: ChatHistoryItem[]) => {
+                    const lastResolvedHistoryItem = history[history.length - 1];
+
+                    if (lastResolvedHistoryItem?.type === "user")
+                        return lastResolvedHistoryItem.text;
+
+                    return "";
+                };
+
+                const initialUserMessage = getInitialUserMessage(generateResponseState.resolvedHistory);
+                const contextWindowInitialUserMessage = getInitialUserMessage(generateResponseState.lastContextWindowHistory);
 
                 while (true) {
                     generateResponseState.startTokenLoop();
@@ -622,6 +630,11 @@ export class LlamaChat {
                         setLastUserTextInChatHistory(
                             generateResponseState.resolvedHistory,
                             initialUserMessage + initialUserPrompt + this.model.detokenize(generateResponseState.res)
+                        ),
+                        setLastUserTextInChatHistory(
+                            generateResponseState.lastContextWindowHistory,
+                            contextWindowInitialUserMessage + initialUserPrompt +
+                            this.model.detokenize(generateResponseState.contextWindowsRes)
                         ),
                         true
                     );
@@ -1240,7 +1253,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly maxParallelFunctionCalls: LLamaChatGenerateResponseOptions<Functions>["maxParallelFunctionCalls"];
     private readonly contextShift: LLamaChatGenerateResponseOptions<Functions>["contextShift"];
     private readonly customStopTriggers: LLamaChatGenerateResponseOptions<Functions>["customStopTriggers"];
-    private readonly lastEvaluationContextWindowHistory: Exclude<LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"], undefined>["history"];
     private readonly minimumOverlapPercentageToPreventContextShift: Exclude<Exclude<LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"], undefined>["minimumOverlapPercentageToPreventContextShift"], undefined>;
 
     public readonly functionsEnabled: boolean;
@@ -1369,7 +1381,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.maxParallelFunctionCalls = maxParallelFunctionCalls;
         this.contextShift = contextShift;
         this.customStopTriggers = customStopTriggers;
-        this.lastEvaluationContextWindowHistory = lastEvaluationContextWindowHistory;
         this.minimumOverlapPercentageToPreventContextShift = minimumOverlapPercentageToPreventContextShift;
 
         this.functionsEnabled = (this.functions != null && Object.keys(this.functions).length > 0);
@@ -1404,7 +1415,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.functionsGrammar = undefined;
         this.functionsEvaluationState = undefined;
 
-        this.lastContextWindowHistory = this.resolvedHistory;
+        this.lastContextWindowHistory = lastEvaluationContextWindowHistory ?? this.resolvedHistory;
         this.lastHistoryCompressionMetadata = this.resolvedContextShift;
 
         if (this.customStopTriggers != null)
@@ -1495,6 +1506,24 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return setLastModelTextResponseInChatHistory(
             this.resolvedHistory,
             this.lastModelResponse + modelResponse
+        );
+    }
+
+    public getContextWindowsHistoryWithCurrentModelResponse() {
+        if (this.contextWindowsRes.length === 0)
+            return this.lastContextWindowHistory;
+
+        let modelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
+
+        if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix)
+            modelResponse = modelResponse.trimEnd();
+
+        if (modelResponse === "")
+            return this.lastContextWindowHistory;
+
+        return setLastModelTextResponseInChatHistory(
+            this.lastContextWindowHistory,
+            this.contextWindowLastModelResponse + modelResponse
         );
     }
 
@@ -1598,6 +1627,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public async loadContextWindow(
         resolvedHistory: ChatHistoryItem[],
+        resolvedContextWindowsHistory: ChatHistoryItem[],
         endWithUserText: boolean = false,
         avoidReloadingHistory: boolean = false
     ): Promise<{userTextSuffix?: LlamaText}> {
@@ -1622,7 +1652,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length,
                 isFirstEvaluation: this.isFirstEvaluation,
                 chatWrapper: this.chatWrapper,
-                lastEvaluationContextWindowHistory: this.lastEvaluationContextWindowHistory,
+                lastEvaluationContextWindowHistory: resolvedContextWindowsHistory,
                 minimumOverlapPercentageToPreventContextShift: this.minimumOverlapPercentageToPreventContextShift,
                 sequence: this.llamaChat.sequence,
                 minFreeContextTokens: 1,
@@ -1658,7 +1688,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         ];
 
         if (avoidReloadingHistory && this.tokens.length >= this.llamaChat.sequence.context.contextSize - 1)
-            return await this.loadContextWindow(resolvedHistory, endWithUserText, false);
+            return await this.loadContextWindow(resolvedHistory, resolvedContextWindowsHistory, endWithUserText, false);
 
         return {
             userTextSuffix: this.userTextSuffix
