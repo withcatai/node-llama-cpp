@@ -35,10 +35,10 @@ export default {
         "dist-electron",
         "!node_modules/node-llama-cpp/bins/**/*",
         "node_modules/node-llama-cpp/bins/${os}-${arch}*/**/*",
-        "!node_modules/@node-llama-cpp/*/bins/**/*",
-        "node_modules/@node-llama-cpp/${os}-${arch}*/bins/**/*",
         "!node_modules/node-llama-cpp/llama/localBuilds/**/*",
-        "node_modules/node-llama-cpp/llama/localBuilds/${os}-${arch}*/**/*"
+        "node_modules/node-llama-cpp/llama/localBuilds/${os}-${arch}*/**/*",
+        "!node_modules/@node-llama-cpp/*/bins/**/*",
+        "node_modules/@node-llama-cpp/${os}-${arch}*/bins/**/*"
     ],
     asarUnpack: [
         "node_modules/node-llama-cpp/bins",
