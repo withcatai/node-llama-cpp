@@ -470,7 +470,7 @@ export class LlamaChatSession {
                 throw new DisposedError();
 
             const supportsParallelFunctionCalling = this._chat.chatWrapper.settings.functions.parallelism != null;
-            const abortController = wrapAbortSignal(signal);
+            const [abortController, disposeAbortController] = wrapAbortSignal(signal);
             let lastEvaluation = this._lastEvaluation;
             let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
             let newContextWindowChatHistory = lastEvaluation?.contextWindow == null
@@ -501,179 +501,185 @@ export class LlamaChatSession {
                 safeEventCallback(onTextChunk)?.(resolvedResponsePrefix);
             }
 
-            while (true) {
-                const functionCallsAndResults: Array<Promise<null | {
-                    functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>,
-                    functionDefinition: ChatSessionModelFunction<any>,
-                    functionCallResult: any
-                }>> = [];
-                let canThrowFunctionCallingErrors = false;
-                let abortedOnFunctionCallError = false;
+            try {
+                while (true) {
+                    const functionCallsAndResults: Array<Promise<null | {
+                        functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>,
+                        functionDefinition: ChatSessionModelFunction<any>,
+                        functionCallResult: any
+                    }>> = [];
+                    let canThrowFunctionCallingErrors = false;
+                    let abortedOnFunctionCallError = false;
 
-                const initialOutputTokens = this._chat.sequence.tokenMeter.usedOutputTokens;
-                const {
-                    lastEvaluation: currentLastEvaluation,
-                    metadata
-                } = await this._chat.generateResponse<Functions>(newChatHistory, {
-                    functions,
-                    documentFunctionParams,
-                    maxParallelFunctionCalls,
-                    grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
-                    onTextChunk: safeEventCallback(onTextChunk),
-                    onToken: safeEventCallback(onToken),
-                    signal: abortController.signal,
-                    stopOnAbortSignal,
-                    repeatPenalty,
-                    minP,
-                    topK,
-                    topP,
-                    seed,
-                    tokenBias,
-                    customStopTriggers,
-                    maxTokens,
-                    temperature,
-                    trimWhitespaceSuffix,
-                    contextShift: {
-                        ...this._contextShift,
-                        lastEvaluationMetadata: lastEvaluation?.contextShiftMetadata
-                    },
-                    evaluationPriority,
-                    lastEvaluationContextWindow: {
-                        history: newContextWindowChatHistory,
-                        minimumOverlapPercentageToPreventContextShift: 0.5
-                    },
-                    onFunctionCall: async (functionCall) => {
-                        functionCallsAndResults.push(
-                            (async () => {
-                                try {
-                                    const functionDefinition = functions?.[functionCall.functionName];
+                    const initialOutputTokens = this._chat.sequence.tokenMeter.usedOutputTokens;
+                    const {
+                        lastEvaluation: currentLastEvaluation,
+                        metadata
+                    } = await this._chat.generateResponse<Functions>(newChatHistory, {
+                        functions,
+                        documentFunctionParams,
+                        maxParallelFunctionCalls,
+                        grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
+                        onTextChunk: safeEventCallback(onTextChunk),
+                        onToken: safeEventCallback(onToken),
+                        signal: abortController.signal,
+                        stopOnAbortSignal,
+                        repeatPenalty,
+                        minP,
+                        topK,
+                        topP,
+                        seed,
+                        tokenBias,
+                        customStopTriggers,
+                        maxTokens,
+                        temperature,
+                        trimWhitespaceSuffix,
+                        contextShift: {
+                            ...this._contextShift,
+                            lastEvaluationMetadata: lastEvaluation?.contextShiftMetadata
+                        },
+                        evaluationPriority,
+                        lastEvaluationContextWindow: {
+                            history: newContextWindowChatHistory,
+                            minimumOverlapPercentageToPreventContextShift: 0.5
+                        },
+                        onFunctionCall: async (functionCall) => {
+                            functionCallsAndResults.push(
+                                (async () => {
+                                    try {
+                                        const functionDefinition = functions?.[functionCall.functionName];
 
-                                    if (functionDefinition == null)
-                                        throw new Error(
-                                            `The model tried to call function "${functionCall.functionName}" which is not defined`
-                                        );
+                                        if (functionDefinition == null)
+                                            throw new Error(
+                                                `The model tried to call function "${functionCall.functionName}" which is not defined`
+                                            );
 
-                                    const functionCallResult = await functionDefinition.handler(functionCall.params);
+                                        const functionCallResult = await functionDefinition.handler(functionCall.params);
 
-                                    return {
-                                        functionCall,
-                                        functionDefinition,
-                                        functionCallResult
-                                    };
-                                } catch (err) {
-                                    if (!abortController.signal.aborted) {
-                                        abortedOnFunctionCallError = true;
-                                        abortController.abort(err);
+                                        return {
+                                            functionCall,
+                                            functionDefinition,
+                                            functionCallResult
+                                        };
+                                    } catch (err) {
+                                        if (!abortController.signal.aborted) {
+                                            abortedOnFunctionCallError = true;
+                                            abortController.abort(err);
+                                        }
+
+                                        if (canThrowFunctionCallingErrors)
+                                            throw err;
+
+                                        return null;
                                     }
-
-                                    if (canThrowFunctionCallingErrors)
-                                        throw err;
-
-                                    return null;
-                                }
-                            })()
-                        );
-                    }
-                });
-                this._ensureNotDisposed();
-                if (abortController.signal.aborted && (abortedOnFunctionCallError || !stopOnAbortSignal))
-                    throw abortController.signal.reason;
-
-                if (maxTokens != null)
-                    maxTokens = Math.max(0, maxTokens - (this._chat.sequence.tokenMeter.usedOutputTokens - initialOutputTokens));
-
-                lastEvaluation = currentLastEvaluation;
-                newChatHistory = lastEvaluation.cleanHistory;
-
-                if (functionCallsAndResults.length > 0) {
-                    canThrowFunctionCallingErrors = true;
-                    const functionCallResultsPromise = Promise.all(functionCallsAndResults);
-                    await Promise.race([
-                        functionCallResultsPromise,
-                        new Promise<void>((accept, reject) => {
-                            abortController.signal.addEventListener("abort", () => {
-                                if (abortedOnFunctionCallError || !stopOnAbortSignal)
-                                    reject(abortController.signal.reason);
-                                else
-                                    accept();
-                            });
-
-                            if (abortController.signal.aborted) {
-                                if (abortedOnFunctionCallError || !stopOnAbortSignal)
-                                    reject(abortController.signal.reason);
-                                else
-                                    accept();
-                            }
-                        })
-                    ]);
+                                })()
+                            );
+                        }
+                    });
                     this._ensureNotDisposed();
+                    if (abortController.signal.aborted && (abortedOnFunctionCallError || !stopOnAbortSignal))
+                        throw abortController.signal.reason;
 
-                    if (!abortController.signal.aborted) {
-                        const functionCallResults = (await functionCallResultsPromise)
-                            .filter((result): result is Exclude<typeof result, null> => result != null);
+                    if (maxTokens != null)
+                        maxTokens = Math.max(0, maxTokens - (this._chat.sequence.tokenMeter.usedOutputTokens - initialOutputTokens));
+
+                    lastEvaluation = currentLastEvaluation;
+                    newChatHistory = lastEvaluation.cleanHistory;
+
+                    if (functionCallsAndResults.length > 0) {
+                        canThrowFunctionCallingErrors = true;
+                        const functionCallResultsPromise = Promise.all(functionCallsAndResults);
+                        const raceEventAbortController = new AbortController();
+                        await Promise.race([
+                            functionCallResultsPromise,
+                            new Promise<void>((accept, reject) => {
+                                abortController.signal.addEventListener("abort", () => {
+                                    if (abortedOnFunctionCallError || !stopOnAbortSignal)
+                                        reject(abortController.signal.reason);
+                                    else
+                                        accept();
+                                }, {signal: raceEventAbortController.signal});
+
+                                if (abortController.signal.aborted) {
+                                    if (abortedOnFunctionCallError || !stopOnAbortSignal)
+                                        reject(abortController.signal.reason);
+                                    else
+                                        accept();
+                                }
+                            })
+                        ]);
+                        raceEventAbortController.abort();
                         this._ensureNotDisposed();
 
-                        if (abortController.signal.aborted)
-                            throw abortController.signal.reason;
+                        if (!abortController.signal.aborted) {
+                            const functionCallResults = (await functionCallResultsPromise)
+                                .filter((result): result is Exclude<typeof result, null> => result != null);
+                            this._ensureNotDisposed();
 
-                        newContextWindowChatHistory = lastEvaluation.contextWindow;
+                            if (abortController.signal.aborted)
+                                throw abortController.signal.reason;
 
-                        let startNewChunk = supportsParallelFunctionCalling;
-                        for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
-                            newChatHistory = addFunctionCallToChatHistory({
-                                chatHistory: newChatHistory,
-                                functionName: functionCall.functionName,
-                                functionDescription: functionDefinition.description,
-                                callParams: functionCall.params,
-                                callResult: functionCallResult,
-                                rawCall: functionCall.raw,
-                                startsNewChunk: startNewChunk
-                            });
+                            newContextWindowChatHistory = lastEvaluation.contextWindow;
 
-                            newContextWindowChatHistory = addFunctionCallToChatHistory({
-                                chatHistory: newContextWindowChatHistory,
-                                functionName: functionCall.functionName,
-                                functionDescription: functionDefinition.description,
-                                callParams: functionCall.params,
-                                callResult: functionCallResult,
-                                rawCall: functionCall.raw,
-                                startsNewChunk: startNewChunk
-                            });
+                            let startNewChunk = supportsParallelFunctionCalling;
+                            for (const {functionCall, functionDefinition, functionCallResult} of functionCallResults) {
+                                newChatHistory = addFunctionCallToChatHistory({
+                                    chatHistory: newChatHistory,
+                                    functionName: functionCall.functionName,
+                                    functionDescription: functionDefinition.description,
+                                    callParams: functionCall.params,
+                                    callResult: functionCallResult,
+                                    rawCall: functionCall.raw,
+                                    startsNewChunk: startNewChunk
+                                });
 
-                            startNewChunk = false;
+                                newContextWindowChatHistory = addFunctionCallToChatHistory({
+                                    chatHistory: newContextWindowChatHistory,
+                                    functionName: functionCall.functionName,
+                                    functionDescription: functionDefinition.description,
+                                    callParams: functionCall.params,
+                                    callResult: functionCallResult,
+                                    rawCall: functionCall.raw,
+                                    startsNewChunk: startNewChunk
+                                });
+
+                                startNewChunk = false;
+                            }
+
+                            lastEvaluation.cleanHistory = newChatHistory;
+                            lastEvaluation.contextWindow = newContextWindowChatHistory;
+
+                            continue;
                         }
-
-                        lastEvaluation.cleanHistory = newChatHistory;
-                        lastEvaluation.contextWindow = newContextWindowChatHistory;
-
-                        continue;
                     }
-                }
 
-                this._lastEvaluation = lastEvaluation;
-                this._chatHistory = newChatHistory;
-                this._chatHistoryStateRef = {};
+                    this._lastEvaluation = lastEvaluation;
+                    this._chatHistory = newChatHistory;
+                    this._chatHistoryStateRef = {};
 
-                const lastModelResponseItem = getLastModelResponseItem(newChatHistory);
-                const responseText = lastModelResponseItem.response
-                    .filter((item): item is string => typeof item === "string")
-                    .join("");
+                    const lastModelResponseItem = getLastModelResponseItem(newChatHistory);
+                    const responseText = lastModelResponseItem.response
+                        .filter((item): item is string => typeof item === "string")
+                        .join("");
 
-                if (metadata.stopReason === "customStopTrigger")
+                    if (metadata.stopReason === "customStopTrigger")
+                        return {
+                            response: lastModelResponseItem.response,
+                            responseText,
+                            stopReason: metadata.stopReason,
+                            customStopTrigger: metadata.customStopTrigger,
+                            remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
+                        };
+
                     return {
                         response: lastModelResponseItem.response,
                         responseText,
                         stopReason: metadata.stopReason,
-                        customStopTrigger: metadata.customStopTrigger,
                         remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
                     };
-
-                return {
-                    response: lastModelResponseItem.response,
-                    responseText,
-                    stopReason: metadata.stopReason,
-                    remainingGenerationAfterStop: metadata.remainingGenerationAfterStop
-                };
+                }
+            } finally {
+                disposeAbortController();
             }
         });
     }
@@ -755,7 +761,7 @@ export class LlamaChatSession {
                 throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
         }
 
-        const abortController = wrapAbortSignal(signal);
+        const [abortController, disposeAbortController] = wrapAbortSignal(signal);
         this._preloadAndCompleteAbortControllers.add(abortController);
 
         try {
@@ -821,6 +827,7 @@ export class LlamaChatSession {
             });
         } finally {
             this._preloadAndCompleteAbortControllers.delete(abortController);
+            disposeAbortController();
         }
     }
 

@@ -1,10 +1,17 @@
-export function wrapAbortSignal(abortSignal?: AbortSignal) {
+export function wrapAbortSignal(abortSignal?: AbortSignal): [controller: AbortController, dispose: (() => void)] {
     const controller = new AbortController();
 
-    if (abortSignal != null)
-        abortSignal.addEventListener("abort", () => {
-            controller.abort(abortSignal.reason);
-        });
+    function onAbort() {
+        controller.abort(abortSignal!.reason);
+    }
 
-    return controller;
+    function dispose() {
+        if (abortSignal != null)
+            abortSignal.removeEventListener("abort", onAbort);
+    }
+
+    if (abortSignal != null)
+        abortSignal.addEventListener("abort", onAbort);
+
+    return [controller, dispose];
 }
