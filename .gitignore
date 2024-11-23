@@ -24,7 +24,10 @@ node_modules
 /llama/lastBuild.json
 /llama/gitRelease.bundle
 /llama/.temp
+/llama/.cache
+/llama/build
 /llama/.idea
+/llama/.vscode
 /llama/cmake-build-debug
 /llama/localBuilds
 /llama/Release
