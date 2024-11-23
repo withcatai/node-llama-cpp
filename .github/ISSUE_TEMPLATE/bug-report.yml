@@ -27,8 +27,9 @@ body:
     attributes:
       label: Actual Behavior
       description: >-
-        A clear and concise description of what actually happened. Please wrap
-        any error messages or output in code tags, instead of images.
+        A clear and concise description of what actually happened.
+        Please wrap any error messages or output in code tags, instead of images.
+        Please attach logs if relevant.
     validations:
       required: true
   - type: textarea
@@ -60,6 +61,11 @@ body:
         | Node.js version          | x.y.zzz             |
         | Typescript version       | x.y.zzz             |
         | `node-llama-cpp` version | x.y.zzz             |
+        
+        `npx --yes node-llama-cpp inspect gpu` output:
+        ```
+        Result of running `npx --yes node-llama-cpp inspect gpu`
+        ```
     validations:
       required: true
   - type: textarea
