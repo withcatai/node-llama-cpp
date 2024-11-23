@@ -122,12 +122,22 @@ export default defineConfig({
 
             return items
                 .map((item) => {
-                    if (item.url === "" || item.url === "blog/") {
+                    if (item.url === "") {
+                        item.lastmod = undefined;
+                        item.changefreq = "daily";
+                        item.priority = 1;
+                    } else if (item.url === "blog/") {
                         item.lastmod = new Date(buildDate);
+                        item.changefreq = "daily";
+                        item.priority = 0.9;
                     } else if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
                         item = {
                             ...item,
-                            lastmod: new Date(buildDate)
+                            lastmod: new Date(buildDate),
+                            changefreq: "weekly",
+                            priority: item.url.startsWith("cli/")
+                                ? 0.7
+                                : 0.5
                         };
                     } else if (item.lastmod == null && item.url.startsWith("blog/")) {
                         const postDate = blogPostMap.get(item.url)?.frontmatter.date;
@@ -138,6 +148,13 @@ export default defineConfig({
                         }
                     } else if (item.lastmod == null) {
                         item.lastmod = new Date(buildDate);
+                        item.changefreq = "weekly";
+                        item.priority = 0.4;
+                    }
+
+                    if (item.url !== "blog/" && item.url.startsWith("blog/")) {
+                        item.priority = 0.8;
+                        item.changefreq = "hourly";
                     }
 
                     return item;
