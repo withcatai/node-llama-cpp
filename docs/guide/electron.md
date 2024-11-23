@@ -34,9 +34,66 @@ You also need to call [`getLlama`](../api/functions/getLlama.md) with the CMake 
 so that `node-llama-cpp` can find them.
 
 ## Cross Compilation
-Cross packaging from one platform to another is not supported, since binaries for other platforms are not downloaded to you machine when your run `npm install`.
+Cross packaging from one platform to another is not supported, since binaries for other platforms are not downloaded to you machine when you run `npm install`.
 
 Packaging an `arm64` app on an `x64` machine is supported, but packaging an `x64` app on an `arm64` machine is not.
+
+::: details GitHub Actions template for cross-compilation
+
+<span v-pre>
+
+```yml
+name: Build
+on: [push]
+
+jobs:
+  build-electron:
+    name: Build Electron app - ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Windows"
+            os: windows-2022
+          - name: "Ubuntu"
+            os: ubuntu-22.04
+          - name: "macOS"
+            os: macos-13
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies on Ubuntu
+        if: matrix.config.name == 'Ubuntu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libarchive-tools rpm
+          sudo snap install snapcraft --classic
+
+      - name: Install modules
+        run: npm ci
+
+      - name: Build electron app
+        id: build
+        shell: bash
+        timeout-minutes: 480
+        run: npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          include-hidden-files: true
+          name: "electron-app-${{ matrix.config.name }}"
+          path: "./release"
+```
+
+</span>
+
+:::
 
 ## Bundling
 When bundling your code for Electron using [Electron Vite](https://electron-vite.org) or Webpack,
