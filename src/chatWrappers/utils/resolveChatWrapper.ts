@@ -11,14 +11,17 @@ import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../gene
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
+import {Llama3_2LightweightChatWrapper} from "../Llama3_2LightweightChatWrapper.js";
 import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
+import {includesText} from "../../utils/includesText.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
+import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -37,6 +40,7 @@ export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNam
 export const chatWrappers = Object.freeze({
     "general": GeneralChatWrapper,
     "llama3.1": Llama3_1ChatWrapper,
+    "llama3.2-lightweight": Llama3_2LightweightChatWrapper,
     "llama3": Llama3ChatWrapper,
     "llama2Chat": Llama2ChatWrapper,
     "mistral": MistralChatWrapper,
@@ -143,28 +147,6 @@ export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInC
             ...(defaultSettings ?? {}),
             ...(chatWrapperSettings ?? {})
         });
-    }
-
-    function getModelLinageNames(): string[][] {
-        const res: string[][] = [];
-
-        if (fileInfo == null)
-            return res;
-
-        const currentModelInfo = [fileInfo.metadata?.general?.name, fileInfo.metadata?.general?.basename]
-            .filter((v): v is string => v != null);
-        if (currentModelInfo.length > 0)
-            res.push(currentModelInfo);
-
-        if (typeof fileInfo.metadata?.general?.base_model?.count === "number") {
-            for (let i = 0; i < fileInfo.metadata.general.base_model.count; i++) {
-                const baseModel = fileInfo.metadata.general.base_model[String(i) as `${bigint}`];
-                if (baseModel?.name != null)
-                    res.push([baseModel.name]);
-            }
-        }
-
-        return res;
     }
 
     if (type !== "auto" && type != null) {
@@ -293,8 +275,10 @@ export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInC
         }
     }
 
-    for (const modelNames of getModelLinageNames()) {
-        if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+    for (const modelNames of getModelLinageNames(fileInfo?.metadata)) {
+        if (includesText(modelNames, ["llama 3.2", "llama-3.2", "llama3.2"]) && Llama3_2LightweightChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+            return createSpecializedChatWrapper(Llama3_2LightweightChatWrapper);
+        else if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
             return createSpecializedChatWrapper(Llama3_1ChatWrapper);
         else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
             return createSpecializedChatWrapper(Llama3ChatWrapper);
@@ -391,25 +375,6 @@ export function isSpecializedChatWrapperType(type: string): type is SpecializedC
 
 export function isTemplateChatWrapperType(type: string): type is TemplateChatWrapperTypeName {
     return templateChatWrapperTypeNames.includes(type as any);
-}
-
-function includesText(
-    value: string | string[] | null | undefined,
-    textToCheckFor: string | string[],
-    strictCase: boolean = false
-): boolean {
-    if (value instanceof Array)
-        return value.some((v) => includesText(v, textToCheckFor, strictCase));
-    else if (typeof value !== "string")
-        return false;
-
-    if (textToCheckFor instanceof Array)
-        return textToCheckFor.some((t) => includesText(value, t, strictCase));
-
-    if (strictCase)
-        return value.includes(textToCheckFor);
-
-    return value.toLowerCase().includes(textToCheckFor.toLowerCase());
 }
 
 // this is needed because TypeScript guards don't work automatically with class references

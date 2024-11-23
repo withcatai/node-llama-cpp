@@ -131,7 +131,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "string",
                 default: "auto" as ChatCommand["wrapper"],
                 choices: ["auto", ...specializedChatWrapperTypeNames] as const,
-                description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's BOS token"
+                description: "Chat wrapper to use. Use `auto` to automatically select a wrapper based on the model's metadata and tokenizer"
             })
             .option("noJinja", {
                 type: "boolean",
