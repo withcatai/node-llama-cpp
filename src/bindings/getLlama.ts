@@ -586,7 +586,7 @@ async function loadExistingLlamaBinary({
                 buildMetadata
             });
             const binaryCompatible = shouldTestBinaryBeforeLoading
-                ? await testBindingBinary(localBuildBinPath)
+                ? await testBindingBinary(localBuildBinPath, buildOptions.gpu)
                 : true;
 
             if (binaryCompatible) {
@@ -643,7 +643,7 @@ async function loadExistingLlamaBinary({
                     buildMetadata
                 });
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(prebuiltBinDetails.binaryPath)
+                    ? await testBindingBinary(prebuiltBinDetails.binaryPath, buildOptions.gpu)
                     : true;
 
                 if (binaryCompatible) {

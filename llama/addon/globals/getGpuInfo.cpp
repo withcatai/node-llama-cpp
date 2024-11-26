@@ -103,5 +103,14 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
         }
     }
 
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        const auto deviceName = std::string(ggml_backend_dev_name(device));
+        
+        if (deviceName == "CPU") {
+            return Napi::Boolean::New(info.Env(), false);
+        }
+    }
+
     return info.Env().Undefined();
 }

@@ -4,6 +4,7 @@ import {createRequire} from "module";
 import path from "path";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {runningInElectron} from "../../utils/runtime.js";
+import {BuildGpu} from "../types.js";
 import type {BindingModule} from "../AddonTypes.js";
 
 const require = createRequire(import.meta.url);
@@ -11,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const detectedFileName = path.basename(__filename);
 const expectedFileName = "testBindingBinary";
 
-export async function testBindingBinary(bindingBinaryPath: string, testTimeout: number = 1000 * 60 * 5): Promise<boolean> {
+export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu, testTimeout: number = 1000 * 60 * 5): Promise<boolean> {
     if (!detectedFileName.startsWith(expectedFileName)) {
         console.warn(
             getConsoleLogPrefix() +
@@ -163,10 +164,14 @@ export async function testBindingBinary(bindingBinaryPath: string, testTimeout: 
                 onMessage(message: ChildToParentMessage) {
                     if (message.type === "ready") {
                         forkSucceeded = true;
-                        subProcess!.sendMessage({type: "start", bindingBinaryPath} satisfies ParentToChildMessage);
+                        subProcess!.sendMessage({
+                            type: "start",
+                            bindingBinaryPath,
+                            gpu
+                        });
                     } else if (message.type === "done") {
                         testPassed = true;
-                        subProcess!.sendMessage({type: "exit"} satisfies ParentToChildMessage);
+                        subProcess!.sendMessage({type: "exit"});
                     }
                 },
                 onExit(code: number) {
@@ -194,6 +199,12 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 await binding.init();
                 binding.getGpuVramInfo();
                 binding.getGpuDeviceInfo();
+
+                const gpuType = binding.getGpuType();
+                void (gpuType as BuildGpu satisfies typeof gpuType);
+                if (gpuType !== message.gpu)
+                    throw new Error(`GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
+
                 sendMessage({type: "done"});
             } catch (err) {
                 console.error(err);
@@ -214,7 +225,8 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
 
 type ParentToChildMessage = {
     type: "start",
-    bindingBinaryPath: string
+    bindingBinaryPath: string,
+    gpu: BuildGpu
 } | {
     type: "exit"
 };

@@ -215,6 +215,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonContext::init(exports);
     AddonSampler::init(exports);
 
+    ggml_backend_load_all();
     llama_log_set(addonLlamaCppLogCallback, nullptr);
 
     exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
