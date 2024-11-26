@@ -203,7 +203,7 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 const gpuType = binding.getGpuType();
                 void (gpuType as BuildGpu satisfies typeof gpuType);
                 if (gpuType !== message.gpu)
-                    throw new Error(`GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
+                    throw new Error(`Binary GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
 
                 sendMessage({type: "done"});
             } catch (err) {
