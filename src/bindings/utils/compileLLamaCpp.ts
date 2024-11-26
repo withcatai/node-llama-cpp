@@ -100,7 +100,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (!cmakeCustomOptions.has("GGML_AMX"))
                         cmakeCustomOptions.set("GGML_AMX", "OFF");
 
-                    if (!cmakeCustomOptions.has("GGML_NATIVE"))
+                    if (!cmakeCustomOptions.has("GGML_NATIVE") && buildOptions.platform !== "mac")
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
                 }
 

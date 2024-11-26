@@ -65,9 +65,12 @@ jobs:
           - name: "Ubuntu"
             os: ubuntu-22.04
             artifact: "linux"
-          - name: "macOS"
+          - name: "macOS x64"
             os: macos-13
-            artifact: "mac"
+            artifact: "mac-x64"
+          - name: "macOS arm64"
+            os: macos-14
+            artifact: "mac-arm64"
 
     steps:
       - uses: actions/checkout@v4
@@ -212,9 +215,10 @@ jobs:
             await buildBinary("x64", ["--gpu", "vulkan"]);
             await buildBinary("arm64", ["--gpu", "false"]);
             await buildBinary("armv7l", ["--gpu", "false"]);
-          } else if (process.env.ARTIFACT_NAME === "mac") {
-            await buildBinary("arm64", ["--gpu", "metal"]);
+          } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
+          } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
+            await buildBinary("arm64", ["--gpu", "metal"]);
           }
           
           // move binaries to bins
