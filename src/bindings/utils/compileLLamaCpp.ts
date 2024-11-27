@@ -252,8 +252,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 (!ignoreWorkarounds.includes("reduceParallelBuildThreads") || !ignoreWorkarounds.includes("singleBuildThread")) &&
                 (platform === "win" || platform === "linux") &&
                 err instanceof SpawnError &&
-                reduceParallelBuildThreads(parallelBuildThreads) !== parallelBuildThreads &&
-                err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
+                reduceParallelBuildThreads(parallelBuildThreads) !== parallelBuildThreads && (
+                    err.combinedStd.toLowerCase().includes("LLVM error : out of memory".toLowerCase()) ||
+                    err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
+                )
             ) {
                 if (buildOptions.progressLogs) {
                     if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))

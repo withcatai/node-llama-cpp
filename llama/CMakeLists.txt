@@ -28,6 +28,16 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Ap
     add_compile_options(-Wno-c++17-extensions)
 endif()
 
+if(APPLE)
+    set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+    set(CMAKE_BUILD_RPATH "@loader_path")
+    set(CMAKE_INSTALL_RPATH "@loader_path")
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+else()
+    set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+endif()
+
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
@@ -64,16 +74,6 @@ list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
 list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
 
 file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
-
-if(APPLE)
-    set(CMAKE_SKIP_BUILD_RPATH  FALSE)
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-    set(CMAKE_BUILD_RPATH "@loader_path")
-    set(CMAKE_INSTALL_RPATH "@loader_path")
-    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-else()
-    set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
-endif()
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} ${GPU_INFO_HEADERS})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
