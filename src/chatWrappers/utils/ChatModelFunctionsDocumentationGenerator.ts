@@ -147,4 +147,41 @@ export class ChatModelFunctionsDocumentationGenerator {
             .join("\n\n");
     }
     /* eslint-enable @stylistic/max-len */
+
+    /* eslint-disable @stylistic/max-len */
+    /**
+     * Example:
+     * ```
+     * {"name": "getDate", "description": "Retrieve the current date"}
+     *
+     * {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}
+     * ```
+     * @param options
+     * @param [options.documentParams] - Whether to document the parameters of the functions
+     */
+    public getLlama3_2LightweightFunctionSignatures({documentParams = true}: {documentParams?: boolean} = {}) {
+        const chatModelFunctions = this.chatModelFunctions;
+
+        if (!this.hasAnyFunctions || chatModelFunctions == null)
+            return "";
+
+        const functionNames = Object.keys(chatModelFunctions);
+
+        const functionsLines = functionNames
+            .map((functionName) => {
+                const functionDefinition = chatModelFunctions[functionName];
+
+                const addDescription = functionDefinition?.description != null && functionDefinition.description.trim() !== "";
+
+                return jsonDumps({
+                    name: functionName,
+                    ...(addDescription ? {description: functionDefinition.description} : {}),
+                    ...(documentParams && functionDefinition?.params != null ? {parameters: functionDefinition.params} : {})
+                });
+            })
+            .join("\n\n");
+
+        return functionsLines;
+    }
+    /* eslint-enable @stylistic/max-len */
 }

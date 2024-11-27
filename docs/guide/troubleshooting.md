@@ -156,3 +156,10 @@ please [open a new issue on GitHub](https://github.com/withcatai/node-llama-cpp/
 The common cause for this issue is when using the `Administrator` to run `npm install` and then trying to run the code with a different user.
 
 Ensure you're not using the `Administrator` user for `npm install` nor to run the code.
+
+## Getting an `EPERM: operation not permitted` Error on a Windows Machine When Building an Electron App
+`electron-builder` needs to create symlinks to perform the build process, which requires enabling Developer Mode on Windows.
+
+To do that, go to `Settings > Update & Security > For developers` and enable `Developer mode`.
+
+After that, delete the `.cache` folder under your user directory and try building the app again.

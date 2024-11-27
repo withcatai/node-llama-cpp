@@ -49,6 +49,18 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF/Mistral-Nemo-Instruct-2407.Q4_K_S.gguf"
     ]
 }, {
+    name: "Llama 3.2 3B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Llama 3.2 3B model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is smarter than the 1B model, but is still relatively small and can run on less capable machines.",
+
+    fileOptions: [
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q8_0.gguf",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q6_K.gguf",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q4_K_M.gguf",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q4_K_S.gguf"
+    ]
+}, {
     name: "Phi 3 3.8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Phi 3 model was created by Microsoft and is optimized for strong reasoning (especially math and logic).\n" +

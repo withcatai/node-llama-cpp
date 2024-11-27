@@ -1,22 +1,15 @@
 #include "getGpuInfo.h"
 #include "addonLog.h"
 
-#ifdef GPU_INFO_USE_CUDA
-#  include "../../gpuInfo/cuda-gpu-info.h"
+#ifdef __APPLE__
+    #include <TargetConditionals.h>
 #endif
+
 #ifdef GPU_INFO_USE_VULKAN
 #  include "../../gpuInfo/vulkan-gpu-info.h"
 #endif
-#ifdef GPU_INFO_USE_METAL
-#  include "../../gpuInfo/metal-gpu-info.h"
-#endif
 
 
-#ifdef GPU_INFO_USE_CUDA
-void logCudaError(const char* message) {
-    addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, (std::string("CUDA error: ") + std::string(message)).c_str(), nullptr);
-}
-#endif
 #ifdef GPU_INFO_USE_VULKAN
 void logVulkanWarning(const char* message) {
     addonLlamaCppLogCallback(GGML_LOG_LEVEL_WARN, (std::string("Vulkan warning: ") + std::string(message)).c_str(), nullptr);
@@ -24,20 +17,31 @@ void logVulkanWarning(const char* message) {
 #endif
 
 Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
+    ggml_backend_dev_t device = NULL;
+    size_t deviceTotal = 0;
+    size_t deviceFree = 0;
+
     uint64_t total = 0;
     uint64_t used = 0;
     uint64_t unifiedVramSize = 0;
 
-#ifdef GPU_INFO_USE_CUDA
-    size_t cudaDeviceTotal = 0;
-    size_t cudaDeviceUsed = 0;
-    bool cudeGetInfoSuccess = gpuInfoGetTotalCudaDevicesInfo(&cudaDeviceTotal, &cudaDeviceUsed, logCudaError);
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        device = ggml_backend_dev_get(i);
+        if (ggml_backend_dev_type(device) == GGML_BACKEND_DEVICE_TYPE_GPU) {
+            deviceTotal = 0;
+            deviceFree = 0;
+            ggml_backend_dev_memory(device, &deviceFree, &deviceTotal);
 
-    if (cudeGetInfoSuccess) {
-        total += cudaDeviceTotal;
-        used += cudaDeviceUsed;
-    }
+            total += deviceTotal;
+            used += deviceTotal - deviceFree;
+
+#if defined(__arm64__) || defined(__aarch64__)
+            if (std::string(ggml_backend_dev_name(device)) == "Metal") {
+                unifiedVramSize += deviceTotal;
+            }
 #endif
+        }
+    }
 
 #ifdef GPU_INFO_USE_VULKAN
     uint64_t vulkanDeviceTotal = 0;
@@ -46,21 +50,13 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
     const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, &vulkanDeviceUnifiedVramSize, logVulkanWarning);
 
     if (vulkanDeviceSupportsMemoryBudgetExtension) {
-        total += vulkanDeviceTotal;
-        used += vulkanDeviceUsed;
+        if (vulkanDeviceUnifiedVramSize > total) {
+            // this means that we counted memory from devices that aren't used by llama.cpp
+            vulkanDeviceUnifiedVramSize = 0;
+        }
+        
         unifiedVramSize += vulkanDeviceUnifiedVramSize;
     }
-#endif
-
-#ifdef GPU_INFO_USE_METAL
-    uint64_t metalDeviceTotal = 0;
-    uint64_t metalDeviceUsed = 0;
-    uint64_t metalDeviceUnifiedVramSize = 0;
-    getMetalGpuInfo(&metalDeviceTotal, &metalDeviceUsed, &metalDeviceUnifiedVramSize);
-
-    total += metalDeviceTotal;
-    used += metalDeviceUsed;
-    unifiedVramSize += metalDeviceUnifiedVramSize;
 #endif
 
     Napi::Object result = Napi::Object::New(info.Env());
@@ -74,17 +70,13 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
     std::vector<std::string> deviceNames;
 
-#ifdef GPU_INFO_USE_CUDA
-    gpuInfoGetCudaDeviceNames(&deviceNames, logCudaError);
-#endif
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        if (ggml_backend_dev_type(device) == GGML_BACKEND_DEVICE_TYPE_GPU) {
 
-#ifdef GPU_INFO_USE_VULKAN
-    gpuInfoGetVulkanDeviceNames(&deviceNames, logVulkanWarning);
-#endif
-
-#ifdef GPU_INFO_USE_METAL
-    getMetalGpuDeviceNames(&deviceNames);
-#endif
+            deviceNames.push_back(std::string(ggml_backend_dev_description(device)));
+        }
+    }
 
     Napi::Object result = Napi::Object::New(info.Env());
 
@@ -98,17 +90,27 @@ Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value getGpuType(const Napi::CallbackInfo& info) {
-#ifdef GPU_INFO_USE_CUDA
-    return Napi::String::New(info.Env(), "cuda");
-#endif
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        const auto deviceName = std::string(ggml_backend_dev_name(device));
+        
+        if (deviceName == "Metal") {
+            return Napi::String::New(info.Env(), "metal");
+        } else if (std::string(deviceName).find("Vulkan") == 0) {
+            return Napi::String::New(info.Env(), "vulkan");
+        } else if (std::string(deviceName).find("CUDA") == 0 || std::string(deviceName).find("ROCm") == 0 || std::string(deviceName).find("MUSA") == 0) {
+            return Napi::String::New(info.Env(), "cuda");
+        }
+    }
 
-#ifdef GPU_INFO_USE_VULKAN
-    return Napi::String::New(info.Env(), "vulkan");
-#endif
-
-#ifdef GPU_INFO_USE_METAL
-    return Napi::String::New(info.Env(), "metal");
-#endif
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        const auto deviceName = std::string(ggml_backend_dev_name(device));
+        
+        if (deviceName == "CPU") {
+            return Napi::Boolean::New(info.Env(), false);
+        }
+    }
 
     return info.Env().Undefined();
 }

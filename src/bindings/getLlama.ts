@@ -72,6 +72,9 @@ export type LlamaOptions = {
      * Otherwise, throw a `NoBinaryFoundError` error.
      * - **`"forceRebuild"`**: Always build from source.
      * Be cautious with this option, as it will cause the build to fail on Windows when the binaries are in use by another process.
+     * - **`"try"`**: If a local build is found, use it.
+     * Otherwise, try to build from source and use the resulting binary.
+     * If building from source fails, use a prebuilt binary if found.
      *
      * When running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
      * To allow building from source in Electron apps, make sure you ship `node-llama-cpp` as an unpacked module.
@@ -79,7 +82,7 @@ export type LlamaOptions = {
      * Defaults to `"auto"`.
      * On Electron, defaults to `"never"`.
      */
-    build?: "auto" | "never" | "forceRebuild",
+    build?: "auto" | "never" | "forceRebuild" | "try",
 
     /**
      * Set custom CMake options for llama.cpp
@@ -380,6 +383,45 @@ export async function getLlamaForOptions({
     if (buildGpusToTry.length === 0)
         throw new Error("No GPU types available to try building with");
 
+    if (build === "try") {
+        if (canUsePrebuiltBinaries) {
+            try {
+                return await getLlamaForOptions({
+                    gpu,
+                    logLevel,
+                    logger,
+                    build: "auto",
+                    cmakeOptions,
+                    existingPrebuiltBinaryMustMatchBuildOptions,
+                    usePrebuiltBinaries: false,
+                    progressLogs,
+                    skipDownload,
+                    maxThreads,
+                    vramPadding,
+                    ramPadding,
+                    debug
+                });
+            } catch (err) {
+                return await getLlamaForOptions({
+                    gpu,
+                    logLevel,
+                    logger,
+                    build: "never",
+                    cmakeOptions,
+                    existingPrebuiltBinaryMustMatchBuildOptions,
+                    usePrebuiltBinaries,
+                    progressLogs,
+                    skipDownload,
+                    maxThreads,
+                    vramPadding,
+                    ramPadding,
+                    debug
+                });
+            }
+        } else
+            build = "auto";
+    }
+
     if (build === "auto" || build === "never") {
         for (let i = 0; i < buildGpusToTry.length; i++) {
             const gpu = buildGpusToTry[i];
@@ -544,7 +586,7 @@ async function loadExistingLlamaBinary({
                 buildMetadata
             });
             const binaryCompatible = shouldTestBinaryBeforeLoading
-                ? await testBindingBinary(localBuildBinPath)
+                ? await testBindingBinary(localBuildBinPath, buildOptions.gpu)
                 : true;
 
             if (binaryCompatible) {
@@ -601,7 +643,7 @@ async function loadExistingLlamaBinary({
                     buildMetadata
                 });
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(prebuiltBinDetails.binaryPath)
+                    ? await testBindingBinary(prebuiltBinDetails.binaryPath, buildOptions.gpu)
                     : true;
 
                 if (binaryCompatible) {

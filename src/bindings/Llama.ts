@@ -10,7 +10,7 @@ import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
 import {getLlamaClasses, LlamaClasses} from "../utils/getLlamaClasses.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel, LlamaLogLevelGreaterThanOrEqual} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
 const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
@@ -125,6 +125,11 @@ export class Llama {
             this._bindings.setLogger(this._onAddonLog);
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
         }
+
+        this._bindings.loadBackends();
+        const loadedGpu = bindings.getGpuType();
+        if (loadedGpu == null || (loadedGpu === false && gpu !== false))
+            this._bindings.loadBackends(true);
 
         this._onExit = this._onExit.bind(this);
 
@@ -413,7 +418,9 @@ export class Llama {
             }
 
             try {
-                this._logger(level, message);
+                const transformedLogLevel = getTransformedLogLevel(level, message);
+                if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevel))
+                    this._logger(transformedLogLevel, message);
             } catch (err) {
                 // the native addon code calls this function, so there's no use to throw an error here
             }
@@ -596,4 +603,15 @@ function logMessageIsOnlyDots(message: string | null) {
     }
 
     return true;
+}
+
+function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLogLevel {
+    if (level === LlamaLogLevel.warn && message.endsWith("the full capacity of the model will not be utilized"))
+        return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("ggml_metal_init: skipping kernel_") && message.endsWith("(not supported)"))
+        return LlamaLogLevel.log;
+    else if (level === LlamaLogLevel.warn && message.startsWith("ggml_cuda_init: GGML_CUDA_FORCE_") && message.endsWith(" no"))
+        return LlamaLogLevel.log;
+
+    return level;
 }

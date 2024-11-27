@@ -69,13 +69,14 @@ export type BindingModule = {
     getGpuDeviceInfo(): {
         deviceNames: string[]
     },
-    getGpuType(): "cuda" | "vulkan" | "metal" | undefined,
+    getGpuType(): "cuda" | "vulkan" | "metal" | false | undefined,
     getSwapInfo(): {
         total: number,
         maxSize: number,
         free: number
     },
     init(): Promise<void>,
+    loadBackends(forceLoadLibraries?: boolean): void,
     dispose(): Promise<void>
 };
 

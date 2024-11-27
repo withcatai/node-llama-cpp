@@ -65,9 +65,12 @@ jobs:
           - name: "Ubuntu"
             os: ubuntu-22.04
             artifact: "linux"
-          - name: "macOS"
+          - name: "macOS x64"
             os: macos-13
-            artifact: "mac"
+            artifact: "mac-x64"
+          - name: "macOS arm64"
+            os: macos-14
+            artifact: "mac-arm64"
 
     steps:
       - uses: actions/checkout@v4
@@ -87,10 +90,17 @@ jobs:
           name: llama.cpp
           path: llama
 
-      - name: Install dependencies on Windows
-        if: startsWith(matrix.config.os, 'windows')
+      - name: Install dependencies on Windows for x64
+        if: matrix.config.name == 'Windows for x64'
         run: |
           choco install ninja cmake
+
+      - name: Install dependencies on Windows
+        if: matrix.config.name == 'Windows for Arm'
+        run: |
+          choco install cmake.install --version=3.31.1
+          choco install cmake --version=3.31.1
+          choco install ninja
 
       - name: Install dependencies on Ubuntu
         if: matrix.config.name == 'Ubuntu'
@@ -148,7 +158,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 200
+        timeout-minutes: 300
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
@@ -212,9 +222,10 @@ jobs:
             await buildBinary("x64", ["--gpu", "vulkan"]);
             await buildBinary("arm64", ["--gpu", "false"]);
             await buildBinary("armv7l", ["--gpu", "false"]);
-          } else if (process.env.ARTIFACT_NAME === "mac") {
-            await buildBinary("arm64", ["--gpu", "metal"]);
+          } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
+          } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
+            await buildBinary("arm64", ["--gpu", "metal"]);
           }
           
           // move binaries to bins

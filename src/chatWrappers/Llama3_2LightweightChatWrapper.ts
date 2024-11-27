@@ -5,12 +5,11 @@ import {
 } from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
-import {jsonDumps} from "./utils/jsonDumps.js";
 import {isLlama3_2LightweightModel} from "./utils/isLlama3_2LightweightModel.js";
 
-// source: https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_1
-export class Llama3_1ChatWrapper extends ChatWrapper {
-    public readonly wrapperName: string = "Llama 3.1";
+// source: https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_2/
+export class Llama3_2LightweightChatWrapper extends ChatWrapper {
+    public readonly wrapperName: string = "Llama 3.2 lightweight";
 
     public readonly cuttingKnowledgeDate?: Date | (() => Date) | null;
     public readonly todayDate: Date | (() => Date) | null;
@@ -23,12 +22,12 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         functions: {
             call: {
                 optionalPrefixSpace: true,
-                prefix: LlamaText(new SpecialTokensText("<function=")),
-                paramsPrefix: LlamaText(new SpecialTokensText(">")),
-                suffix: LlamaText(new SpecialTokensText("</function><|eom_id|>"))
+                prefix: '{"name": "',
+                paramsPrefix: '", "parameters": ',
+                suffix: LlamaText("}", new SpecialToken("EOT"))
             },
             result: {
-                prefix: LlamaText(new SpecialTokensText("\n<|start_header_id|>ipython<|end_header_id|>\n\n")),
+                prefix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>ipython<|end_header_id|>\n\n")),
                 suffix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
             }
         }
@@ -245,33 +244,16 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             return LlamaText([]);
 
         return LlamaText.joinValues("\n", [
-            "You have access to the following functions:",
+            "You have access to the following functions. To call a function, please respond with JSON for a function call.",
+            'Respond in the format {"name": function name, "parameters": function call parameters}.',
+            "Do not use variables.",
             "",
-            functionsDocumentationGenerator.getLlama3_1FunctionSignatures({documentParams}),
+            functionsDocumentationGenerator.getLlama3_2LightweightFunctionSignatures({documentParams}),
             "",
-            "",
-            "If you choose to call a function ONLY reply in the following format:",
-            "<{start_tag}={function_name}>{parameters}{end_tag}",
-            "where",
-            "",
-            "start_tag => `<function`",
-            "parameters => a JSON dict with the function argument name as key and function argument value as value.",
-            "end_tag => `</function>`",
-            "",
-            "Here is an example,",
-            LlamaText([
-                new SpecialTokensText("<function="),
-                "example_function_name",
-                new SpecialTokensText(">"),
-                jsonDumps({"example_name": "example_value"}),
-                new SpecialTokensText("</function>")
-            ]),
-            "",
-            "Reminder:",
-            "- Function calls MUST follow the specified format",
-            "- Only call one function at a time",
-            "- Put the entire function call reply on one line",
-            "- Always add your sources when using search results to answer the user query"
+            "After calling a function, the result will appear afterwards and is only visible to you.",
+            "To make information visible to the user, you must include it in your response.",
+            "Do not tell the user about the functions your are using.",
+            "Only call functions when needed."
         ]);
     }
 
@@ -308,16 +290,6 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             lines.push(`Today Date: ${formatDate(date, undefined)}`);
         }
 
-        if (!this.noToolInstructions) {
-            if (lines.length > 0)
-                lines.push("");
-
-            lines.push("# Tool Instructions");
-            lines.push("- When looking for real time information use relevant functions if available");
-            lines.push("");
-            lines.push("");
-        }
-
         if (lines.length > 0)
             res.unshift({
                 type: "system",
@@ -333,10 +305,10 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     public static override _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         if (options.tokenizer != null) {
             const tokens = options.tokenizer("<|eom_id|>", true, "trimLeadingSpace");
-            return tokens.length === 1 && options.tokenizer.isSpecialToken(tokens[0]!) && !isLlama3_2LightweightModel(options);
+            return tokens.length === 1 && options.tokenizer.isSpecialToken(tokens[0]!) && isLlama3_2LightweightModel(options);
         }
 
-        return !isLlama3_2LightweightModel(options);
+        return isLlama3_2LightweightModel(options);
     }
 
     /** @internal */

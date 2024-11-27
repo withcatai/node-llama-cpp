@@ -9,7 +9,7 @@ import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
 } from "../../config.js";
-import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
+import {BuildGpu, BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
 import {spawnCommand, SpawnError} from "../../utils/spawnCommand.js";
 import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "../../utils/cmake.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
@@ -31,7 +31,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     includeBuildOptionsInBinaryFolderName?: boolean,
     ensureLlamaCppRepoIsCloned?: boolean,
     downloadCmakeIfNeeded?: boolean,
-    ignoreWorkarounds?: ("cudaArchitecture")[],
+    ignoreWorkarounds?: ("cudaArchitecture" | "reduceParallelBuildThreads" | "singleBuildThread")[],
     envVars?: typeof process.env,
     ciMode?: boolean
 }): Promise<void> {
@@ -53,6 +53,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         : buildFolderName.withoutCustomCmakeOptions;
 
     const outDirectory = path.join(llamaLocalBuildBinsDirectory, finalBuildFolderName);
+
+    let parallelBuildThreads = getParallelBuildThreadsToUse(platform, buildOptions.gpu, ciMode);
+    if (ignoreWorkarounds.includes("singleBuildThread"))
+        parallelBuildThreads = 1;
+    else if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
+        parallelBuildThreads = reduceParallelBuildThreads(parallelBuildThreads);
 
     await fs.mkdirp(llamaLocalBuildBinsDirectory);
     try {
@@ -99,6 +105,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                     if (!cmakeCustomOptions.has("GGML_AMX"))
                         cmakeCustomOptions.set("GGML_AMX", "OFF");
+
+                    if (!cmakeCustomOptions.has("GGML_NATIVE") && buildOptions.platform !== "mac")
+                        cmakeCustomOptions.set("GGML_NATIVE", "OFF");
                 }
 
                 await fs.remove(outDirectory);
@@ -125,7 +134,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         "--arch=" + buildOptions.arch,
                         "--out", path.relative(llamaDirectory, outDirectory),
                         "--runtime-version=" + runtimeVersion,
-                        "--parallel=" + getParallelBuildThreadsToUse(platform),
+                        "--parallel=" + parallelBuildThreads,
                         ...cmakePathArgs,
                         ...(
                             [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
@@ -238,6 +247,40 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         if (buildOptions.progressLogs)
                             console.error(getConsoleLogPrefix(true, false), err);
                     }
+                }
+            } else if (
+                (!ignoreWorkarounds.includes("reduceParallelBuildThreads") || !ignoreWorkarounds.includes("singleBuildThread")) &&
+                (platform === "win" || platform === "linux") &&
+                err instanceof SpawnError &&
+                reduceParallelBuildThreads(parallelBuildThreads) !== parallelBuildThreads && (
+                    err.combinedStd.toLowerCase().includes("LLVM error : out of memory".toLowerCase()) ||
+                    err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
+                )
+            ) {
+                if (buildOptions.progressLogs) {
+                    if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
+                        console.info(
+                            getConsoleLogPrefix(true) + "Trying to compile again with a single build thread"
+                        );
+                    else
+                        console.info(
+                            getConsoleLogPrefix(true) + "Trying to compile again with reduced parallel build threads"
+                        );
+                }
+
+                try {
+                    return await compileLlamaCpp(buildOptions, {
+                        ...compileOptions,
+                        ignoreWorkarounds: [
+                            ...ignoreWorkarounds,
+                            ignoreWorkarounds.includes("reduceParallelBuildThreads")
+                                ? "singleBuildThread"
+                                : "reduceParallelBuildThreads"
+                        ]
+                    });
+                } catch (err) {
+                    if (buildOptions.progressLogs)
+                        console.error(getConsoleLogPrefix(true, false), err);
                 }
             }
 
@@ -461,8 +504,11 @@ async function getToolchainFileForArch(targetArch: string) {
     return null;
 }
 
-function getParallelBuildThreadsToUse(platform: BinaryPlatform) {
+function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, ciMode: boolean = false) {
     const cpuCount = os.cpus().length;
+
+    if (ciMode && platform === "win" && gpu === "cuda" && cpuCount === 4)
+        return 3; // workaround for `compiler is out of heap space` error on GitHub Actions on Windows when building with CUDA
 
     if (cpuCount <= 4)
         return cpuCount;
@@ -471,4 +517,8 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform) {
         return cpuCount - 1;
 
     return cpuCount - 2;
+}
+
+function reduceParallelBuildThreads(originalParallelBuildThreads: number) {
+    return Math.max(1, Math.round(originalParallelBuildThreads / 2));
 }

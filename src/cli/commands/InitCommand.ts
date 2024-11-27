@@ -25,6 +25,7 @@ import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 type InitCommand = {
     name?: string,
     template?: string,
+    model?: string,
     gpu?: BuildGpu | "auto"
 };
 
@@ -44,6 +45,10 @@ export const InitCommand: CommandModule<object, InitCommand> = {
                 type: "string",
                 choices: projectTemplates.map((template) => template.name),
                 description: "Template to use. If omitted, you will be prompted to select one"
+            })
+            .option("model", {
+                type: "string",
+                description: "Model URI to use. If omitted, you will be prompted to select one interactively"
             })
             .option("gpu", {
                 type: "string",
@@ -73,7 +78,7 @@ export const CreateCliCommand: CommandModule<object, InitCommand> = {
     handler: InitCommandHandler
 };
 
-export async function InitCommandHandler({name, template, gpu}: InitCommand) {
+export async function InitCommandHandler({name, template, model, gpu}: InitCommand) {
     const currentDirectory = path.resolve(process.cwd());
     const projectName = (name != null && validateNpmPackageName(name ?? "").validForNewPackages)
         ? name
@@ -84,20 +89,36 @@ export async function InitCommandHandler({name, template, gpu}: InitCommand) {
             : undefined
     ) ?? await askForTemplate();
 
-    const llama = gpu == null
-        ? await getLlama("lastBuild", {
-            logLevel: LlamaLogLevel.error
-        })
-        : await getLlama({
-            gpu,
-            logLevel: LlamaLogLevel.error
-        });
+    async function resolveModelUri() {
+        if (model != null && model !== "") {
+            try {
+                const resolvedModelDestination = resolveModelDestination(model, true);
+                if (resolvedModelDestination.type === "uri")
+                    return resolvedModelDestination.uri;
+                else if (resolvedModelDestination.type === "url")
+                    return resolvedModelDestination.url;
+            } catch (err) {
+                // do nothing
+            }
+        }
 
-    const modelUri = await interactivelyAskForModel({
-        llama,
-        allowLocalModels: false,
-        downloadIntent: false
-    });
+        const llama = gpu == null
+            ? await getLlama("lastBuild", {
+                logLevel: LlamaLogLevel.error
+            })
+            : await getLlama({
+                gpu,
+                logLevel: LlamaLogLevel.error
+            });
+
+        return await interactivelyAskForModel({
+            llama,
+            allowLocalModels: false,
+            downloadIntent: false
+        });
+    }
+
+    const modelUri = await resolveModelUri();
 
     const targetDirectory = path.join(currentDirectory, projectName);
     const readableTargetDirectoryPath = getReadablePath(targetDirectory);
