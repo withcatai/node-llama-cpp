@@ -151,7 +151,7 @@ jobs:
       - name: Setup & Build
         id: build
         shell: bash
-        timeout-minutes: 200
+        timeout-minutes: 300
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
         run: |
