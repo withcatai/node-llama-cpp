@@ -9,7 +9,7 @@ import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
 } from "../../config.js";
-import {BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
+import {BuildGpu, BuildMetadataFile, BuildOptions, convertBuildOptionsToBuildOptionsJSON} from "../types.js";
 import {spawnCommand, SpawnError} from "../../utils/spawnCommand.js";
 import {downloadCmakeIfNeeded, fixXpackPermissions, getCmakePath, hasBuiltinCmake} from "../../utils/cmake.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
@@ -54,7 +54,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
     const outDirectory = path.join(llamaLocalBuildBinsDirectory, finalBuildFolderName);
 
-    let parallelBuildThreads = getParallelBuildThreadsToUse(platform);
+    let parallelBuildThreads = getParallelBuildThreadsToUse(platform, buildOptions.gpu, ciMode);
     if (ignoreWorkarounds.includes("singleBuildThread"))
         parallelBuildThreads = 1;
     else if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
@@ -502,8 +502,11 @@ async function getToolchainFileForArch(targetArch: string) {
     return null;
 }
 
-function getParallelBuildThreadsToUse(platform: BinaryPlatform) {
+function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, ciMode: boolean = false) {
     const cpuCount = os.cpus().length;
+
+    if (ciMode && platform === "win" && gpu === "cuda" && cpuCount === 4)
+        return 3; // workaround for `compiler is out of heap space` error on GitHub Actions on Windows when building with CUDA
 
     if (cpuCount <= 4)
         return cpuCount;
