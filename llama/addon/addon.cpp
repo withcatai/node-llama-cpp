@@ -152,7 +152,17 @@ class AddonBackendUnloadWorker : public Napi::AsyncWorker {
 };
 
 Napi::Value addonLoadBackends(const Napi::CallbackInfo& info) {
-    ggml_backend_load_all();
+    const bool forceLoadLibraries = info.Length() == 0
+        ? false
+        : info[0].IsBoolean()
+            ? info[0].As<Napi::Boolean>().Value()
+            : false;
+
+    ggml_backend_reg_count();
+
+    if (forceLoadLibraries) {
+        ggml_backend_load_all();
+    }
 
     return info.Env().Undefined();
 }

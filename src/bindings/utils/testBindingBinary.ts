@@ -196,7 +196,12 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
         if (message.type === "start") {
             try {
                 const binding: BindingModule = require(message.bindingBinaryPath);
+
                 binding.loadBackends();
+                const loadedGpu = binding.getGpuType();
+                if (loadedGpu == null || (loadedGpu === false && message.gpu !== false))
+                    binding.loadBackends(true);
+
                 await binding.init();
                 binding.getGpuVramInfo();
                 binding.getGpuDeviceInfo();

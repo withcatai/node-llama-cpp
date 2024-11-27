@@ -76,7 +76,7 @@ export type BindingModule = {
         free: number
     },
     init(): Promise<void>,
-    loadBackends(): void,
+    loadBackends(forceLoadLibraries?: boolean): void,
     dispose(): Promise<void>
 };
 

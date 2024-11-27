@@ -127,6 +127,9 @@ export class Llama {
         }
 
         this._bindings.loadBackends();
+        const loadedGpu = bindings.getGpuType();
+        if (loadedGpu == null || (loadedGpu === false && gpu !== false))
+            this._bindings.loadBackends(true);
 
         this._onExit = this._onExit.bind(this);
 
