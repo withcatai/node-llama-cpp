@@ -90,13 +90,8 @@ jobs:
           name: llama.cpp
           path: llama
 
-      - name: Install dependencies on Windows for x64
-        if: matrix.config.name == 'Windows for x64'
-        run: |
-          choco install ninja cmake
-
       - name: Install dependencies on Windows
-        if: matrix.config.name == 'Windows for Arm'
+        if: startsWith(matrix.config.os, 'windows')
         run: |
           choco install cmake.install --version=3.31.1
           choco install cmake --version=3.31.1
