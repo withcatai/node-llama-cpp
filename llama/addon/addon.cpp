@@ -151,6 +151,12 @@ class AddonBackendUnloadWorker : public Napi::AsyncWorker {
         }
 };
 
+Napi::Value addonLoadBackends(const Napi::CallbackInfo& info) {
+    ggml_backend_load_all();
+
+    return info.Env().Undefined();
+}
+
 Napi::Value addonInit(const Napi::CallbackInfo& info) {
     if (backendInitialized) {
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
@@ -205,6 +211,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
+        Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });
@@ -215,7 +222,6 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonContext::init(exports);
     AddonSampler::init(exports);
 
-    ggml_backend_load_all();
     llama_log_set(addonLlamaCppLogCallback, nullptr);
 
     exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));

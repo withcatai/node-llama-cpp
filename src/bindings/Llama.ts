@@ -126,6 +126,8 @@ export class Llama {
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
         }
 
+        this._bindings.loadBackends();
+
         this._onExit = this._onExit.bind(this);
 
         process.on("exit", this._onExit);
@@ -604,6 +606,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
     if (level === LlamaLogLevel.warn && message.endsWith("the full capacity of the model will not be utilized"))
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("ggml_metal_init: skipping kernel_") && message.endsWith("(not supported)"))
+        return LlamaLogLevel.log;
+    else if (level === LlamaLogLevel.warn && message.startsWith("ggml_cuda_init: GGML_CUDA_FORCE_") && message.endsWith(" no"))
         return LlamaLogLevel.log;
 
     return level;
