@@ -1,4 +1,5 @@
 import {GbnfTerminal} from "../GbnfTerminal.js";
+import {GbnfGrammarGenerator} from "../GbnfGrammarGenerator.js";
 
 
 export class GbnfStringValue extends GbnfTerminal {
@@ -22,5 +23,9 @@ export class GbnfStringValue extends GbnfTerminal {
             '\\"',
             '"'
         ].join("");
+    }
+
+    protected override generateRuleName(grammarGenerator: GbnfGrammarGenerator): string {
+        return grammarGenerator.generateRuleNameForLiteralValue(this.value);
     }
 }

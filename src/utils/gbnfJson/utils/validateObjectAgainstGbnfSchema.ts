@@ -69,9 +69,37 @@ function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): o
     if (!(object instanceof Array))
         throw new TechnicalValidationError(`Expected an array but got "${typeof object}"`);
 
+    const minItems = Math.max(schema.minItems ?? 0, schema.prefixItems?.length ?? 0);
+    const maxItems = schema.maxItems == null
+        ? undefined
+        : Math.max(schema.maxItems, minItems);
+
+    if (object.length < minItems) {
+        if (maxItems != null && minItems === maxItems)
+            throw new TechnicalValidationError(`Expected exactly ${minItems} items but got ${object.length}`);
+
+        throw new TechnicalValidationError(`Expected at least ${minItems} items but got ${object.length}`);
+    } else if (maxItems != null && object.length > maxItems) {
+        if (minItems === maxItems)
+            throw new TechnicalValidationError(`Expected exactly ${minItems} items but got ${object.length}`);
+
+        throw new TechnicalValidationError(`Expected at most ${maxItems} items but got ${object.length}`);
+    }
+
     let res = true;
-    for (const item of object)
-        res &&= validateObjectWithGbnfSchema(item, schema.items);
+    let index = 0;
+
+    if (schema.prefixItems != null) {
+        for (const item of schema.prefixItems) {
+            res &&= validateObjectWithGbnfSchema(object[index], item);
+            index++;
+        }
+    }
+
+    if (schema.items != null) {
+        for (; index < object.length; index++)
+            res &&= validateObjectWithGbnfSchema(object[index], schema.items);
+    }
 
     return res;
 }

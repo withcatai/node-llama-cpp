@@ -11,7 +11,7 @@ export class LlamaJsonSchemaGrammar<const T extends Readonly<GbnfJsonSchema>> ex
     /**
      * Prefer to create a new instance of this class by using `llama.createGrammarForJsonSchema(...)`.
      */
-    public constructor(llama: Llama, schema: T) {
+    public constructor(llama: Llama, schema: T & Readonly<GbnfJsonSchema>) {
         const grammar = getGbnfGrammarForGbnfJsonSchema(schema);
 
         super(llama, {

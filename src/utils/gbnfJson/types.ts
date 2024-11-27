@@ -21,7 +21,22 @@ export type GbnfJsonObjectSchema<Keys extends string = string> = {
 };
 export type GbnfJsonArraySchema = {
     type: "array",
-    items: GbnfJsonSchema
+    items?: GbnfJsonSchema,
+    prefixItems?: readonly GbnfJsonSchema[],
+
+    /**
+     * When using `minItems` and/or `maxItems`,
+     * ensure to inform the model as part of the prompt what are your expectation of the length of the array.
+     * Not doing this may lead to hallucinations.
+     */
+    minItems?: number,
+
+    /**
+     * When using `minItems` and/or `maxItems`,
+     * ensure to inform the model as part of the prompt what are your expectation of the length of the array.
+     * Not doing this may lead to hallucinations.
+     */
+    maxItems?: number
 };
 
 
@@ -46,7 +61,7 @@ export type GbnfJsonSchemaToTSType<T> =
                             : T extends GbnfJsonObjectSchema
                                 ? GbnfJsonObjectSchemaToType<T["properties"]>
                                 : T extends GbnfJsonArraySchema
-                                    ? GbnfJsonSchemaToType<T["items"]>[]
+                                    ? ArrayTypeToType<T>
                                     : undefined;
 
 type GbnfJsonBasicSchemaToType<T> =
@@ -69,10 +84,96 @@ type ImmutableTypeToType<T> =
                         ? null
                         : never;
 
-type GbnfJsonObjectSchemaToType<Props> = {
-    [P in keyof Props]: GbnfJsonSchemaToType<Props[P]>
-};
+type ArrayTypeToType<
+    T extends GbnfJsonArraySchema,
+    MinItems extends number = T["minItems"] extends number
+        ? T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+            ? keyof T["prefixItems"] extends T["minItems"]
+                ? T["prefixItems"]["length"]
+                : T["minItems"]
+            : T["minItems"]
+        : T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+            ? T["prefixItems"]["length"]
+            : 0
+> =
+    T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+        ? (
+            MinItems extends T["prefixItems"]["length"]
+                ? (
+                    T["maxItems"] extends MinItems
+                        ? [
+                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                            ...IndexRangeWithSkip<
+                                MinItems,
+                                T["prefixItems"]["length"],
+                                T["items"] extends GbnfJsonSchema
+                                    ? GbnfJsonSchemaToType<T["items"]>
+                                    : GbnfJsonAnyValue
+                            >
+                        ]
+                        : [
+                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                            ...(
+                                T["items"] extends GbnfJsonSchema
+                                    ? GbnfJsonSchemaToType<T["items"]>
+                                    : GbnfJsonAnyValue
+                            )[]
+                        ]
+                )
+                : T["maxItems"] extends MinItems
+                    ? [
+                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                        ...(
+                            T["items"] extends GbnfJsonSchema
+                                ? IndexRangeWithSkip<T["maxItems"], T["prefixItems"]["length"], GbnfJsonSchemaToType<T["items"]>>
+                                : IndexRangeWithSkip<T["maxItems"], T["prefixItems"]["length"], GbnfJsonAnyValue>
+                            )
+                    ]
+                    : [
+                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                        ...IndexRangeWithSkip<
+                            MinItems,
+                            T["prefixItems"]["length"],
+                            T["items"] extends GbnfJsonSchema
+                                ? GbnfJsonSchemaToType<T["items"]>
+                                : GbnfJsonAnyValue
+                        >,
+                        ...(
+                            T["items"] extends GbnfJsonSchema
+                                ? GbnfJsonSchemaToType<T["items"]>
+                                : GbnfJsonAnyValue
+                        )[]
+                    ]
+        )
+        : T["items"] extends GbnfJsonSchema
+            ? (
+                MinItems extends 0
+                    ? GbnfJsonSchemaToType<T["items"]>[]
+                    : T["maxItems"] extends MinItems
+                        ? IndexRange<T["maxItems"], GbnfJsonSchemaToType<T["items"]>>
+                        : [
+                            ...IndexRange<MinItems, GbnfJsonSchemaToType<T["items"]>>,
+                            ...GbnfJsonSchemaToType<T["items"]>[]
+                        ]
+            )
+            : (
+                MinItems extends 0
+                    ? GbnfJsonAnyValue[]
+                    : T["maxItems"] extends MinItems
+                        ? IndexRange<T["maxItems"], GbnfJsonAnyValue>
+                        : [
+                            ...IndexRange<MinItems, GbnfJsonAnyValue>,
+                            ...GbnfJsonAnyValue[]
+                        ]
+            );
 
+
+type GbnfJsonObjectSchemaToType<
+    Props,
+    Res = {-readonly [P in keyof Props]: GbnfJsonSchemaToType<Props[P]>}
+> = Res;
+
+type GbnfJsonAnyValue = string | number | boolean | null | GbnfJsonAnyValue[] | {[key: string]: GbnfJsonAnyValue};
 
 export function isGbnfJsonConstSchema(schema: GbnfJsonSchema): schema is GbnfJsonConstSchema {
     return (schema as GbnfJsonConstSchema).const !== undefined;
@@ -102,3 +203,35 @@ export function isGbnfJsonBasicSchemaIncludesType<T extends GbnfJsonSchemaImmuta
 
     return schema.type === type;
 }
+
+type IndexRange<
+    Length extends number,
+    FillType = number,
+    Res = _IndexRange<[], Length, FillType>
+> = Res;
+type _IndexRange<
+    Value extends FillType[],
+    MaxLength extends number,
+    FillType = number
+> = Value["length"] extends MaxLength
+    ? Value
+    : _IndexRange<[...Value, FillType], MaxLength, FillType>;
+
+type IndexRangeWithSkip<
+    Length extends number,
+    SkipFirst extends number,
+    FillType,
+    Res = _IndexRangeWithSkip<[], IndexRange<SkipFirst>, Length, FillType>
+> = Res;
+type _IndexRangeWithSkip<
+    Value extends FillType[],
+    ConditionValue extends number[],
+    MaxLength extends number,
+    FillType
+> = ConditionValue["length"] extends MaxLength
+    ? Value
+    : _IndexRangeWithSkip<[...Value, FillType], [...ConditionValue, ConditionValue["length"]], MaxLength, FillType>;
+
+type GbnfJsonOrderedArrayTypes<T extends readonly GbnfJsonSchema[]> = {
+    -readonly [P in keyof T]: GbnfJsonSchemaToType<T[P]>
+};

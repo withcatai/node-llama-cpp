@@ -12,6 +12,7 @@ import {
     GbnfJsonSchema, isGbnfJsonArraySchema, isGbnfJsonBasicSchemaIncludesType, isGbnfJsonConstSchema, isGbnfJsonEnumSchema,
     isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
 } from "../types.js";
+import {getConsoleLogPrefix} from "../../getConsoleLogPrefix.js";
 import {getGbnfJsonTerminalForLiteral} from "./getGbnfJsonTerminalForLiteral.js";
 import {GbnfJsonScopeState} from "./GbnfJsonScopeState.js";
 
@@ -40,7 +41,27 @@ export function getGbnfJsonTerminalForGbnfJsonSchema(
             scopeState
         );
     } else if (isGbnfJsonArraySchema(schema)) {
-        return new GbnfArray(getGbnfJsonTerminalForGbnfJsonSchema(schema.items, grammarGenerator, scopeState), scopeState);
+        let maxItems = schema.maxItems;
+        if (schema.prefixItems != null && maxItems != null && maxItems < schema.prefixItems.length) {
+            console.warn(
+                getConsoleLogPrefix(true, false),
+                `maxItems (${maxItems}) must be greater than or equal to prefixItems array length (${schema.prefixItems.length}). ` +
+                "Using prefixItems length as maxItems."
+            );
+            maxItems = schema.prefixItems.length;
+        }
+
+        return new GbnfArray({
+            items: schema.items == null
+                ? undefined
+                : getGbnfJsonTerminalForGbnfJsonSchema(schema.items, grammarGenerator, scopeState),
+            prefixItems: schema.prefixItems == null
+                ? undefined
+                : schema.prefixItems.map((item) => getGbnfJsonTerminalForGbnfJsonSchema(item, grammarGenerator, scopeState)),
+            minItems: schema.minItems,
+            maxItems,
+            scopeState
+        });
     }
 
     const terminals: GbnfTerminal[] = [];

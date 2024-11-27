@@ -123,6 +123,57 @@ describe("JinjaTemplateChatWrapper", () => {
                     type: "string"
                 }
             }
+        },
+        func4: {
+            description: "Some description here",
+            params: {
+                type: "array",
+                prefixItems: [
+                    {type: "string"},
+                    {type: "boolean"},
+                    {type: "number"},
+                    {type: "null"},
+                    {type: "object", properties: {message: {type: "string"}}},
+                    {type: "array", items: {type: "string"}}
+                ],
+                items: {
+                    enum: ["1", -6]
+                },
+                minItems: 8
+            }
+        },
+        func5: {
+            description: "Some description here",
+            params: {
+                type: "array",
+                prefixItems: [
+                    {type: "string"},
+                    {type: "boolean"},
+                    {type: "number"}
+                ],
+                maxItems: 3
+            }
+        },
+        func6: {
+            description: "Some description here",
+            params: {
+                type: "array",
+                items: {
+                    type: "string"
+                },
+                minItems: 2
+            }
+        },
+        func7: {
+            description: "Some description here",
+            params: {
+                type: "array",
+                items: {
+                    type: "string"
+                },
+                minItems: 2,
+                maxItems: 2
+            }
         }
     } as const;
 
@@ -543,7 +594,19 @@ describe("JinjaTemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
+
+          // Some description here
+          function func4(params: [string, boolean, number, null, {message: string}, string[], "1" | -6, "1" | -6, ...("1" | -6)[]]);
+
+          // Some description here
+          function func5(params: [string, boolean, number]);
+
+          // Some description here
+          function func6(params: [string, string, ...string[]]);
+
+          // Some description here
+          function func7(params: [string, string]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -622,7 +685,19 @@ describe("JinjaTemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
+
+          // Some description here
+          function func4(params: [string, boolean, number, null, {message: string}, string[], "1" | -6, "1" | -6, ...("1" | -6)[]]);
+
+          // Some description here
+          function func5(params: [string, boolean, number]);
+
+          // Some description here
+          function func6(params: [string, string, ...string[]]);
+
+          // Some description here
+          function func7(params: [string, string]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -700,7 +775,19 @@ describe("JinjaTemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
+
+          // Some description here
+          function func4(params: [string, boolean, number, null, {message: string}, string[], "1" | -6, "1" | -6, ...("1" | -6)[]]);
+
+          // Some description here
+          function func5(params: [string, boolean, number]);
+
+          // Some description here
+          function func6(params: [string, string, ...string[]]);
+
+          // Some description here
+          function func7(params: [string, string]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:

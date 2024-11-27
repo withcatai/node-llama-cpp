@@ -3,6 +3,8 @@ import {
     isGbnfJsonEnumSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
 } from "./gbnfJson/types.js";
 
+const maxTypeRepetition = 10;
+
 export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema): string {
     if (isGbnfJsonOneOfSchema(schema)) {
         const values = schema.oneOf
@@ -35,12 +37,54 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             "}"
         ].join("");
     } else if (isGbnfJsonArraySchema(schema)) {
-        const valuesType = getTypeScriptTypeStringForGbnfJsonSchema(schema.items);
-
-        if (valuesType === "")
+        if (schema.maxItems === 0)
             return "[]";
 
-        return "(" + valuesType + ")[]";
+        if (schema.prefixItems != null && schema.prefixItems.length > 0) {
+            const valueTypes = schema.prefixItems.map((item) => getTypeScriptTypeStringForGbnfJsonSchema(item));
+
+            const restType = schema.items != null
+                ? getTypeScriptTypeStringForGbnfJsonSchema(schema.items)
+                : "any";
+
+            if (schema.minItems != null) {
+                for (let i = schema.prefixItems.length; i < Math.min(schema.prefixItems.length + maxTypeRepetition, schema.minItems); i++)
+                    valueTypes.push(restType);
+            }
+
+            if (schema.maxItems == null || schema.maxItems > valueTypes.length)
+                valueTypes.push("..." + wrapWithParensIfNeeded(restType) + "[]");
+
+            return "[" + valueTypes.join(", ") + "]";
+        } else if (schema.items != null) {
+            const valuesType = getTypeScriptTypeStringForGbnfJsonSchema(schema.items);
+
+            if (valuesType === "")
+                return "[]";
+
+            if (schema.minItems != null) {
+                if (schema.minItems === schema.maxItems) {
+                    if (schema.minItems < maxTypeRepetition)
+                        return "[" + (valuesType + ", ").repeat(schema.minItems).slice(0, -", ".length) + "]";
+                    else
+                        return [
+                            "[",
+                            (valuesType + ", ").repeat(maxTypeRepetition),
+                            "...", wrapWithParensIfNeeded(valuesType), "[]",
+                            "]"
+                        ].join("");
+                } else if (schema.minItems <= 0)
+                    return wrapWithParensIfNeeded(valuesType) + "[]";
+                else if (schema.minItems < maxTypeRepetition)
+                    return "[" + (valuesType + ", ").repeat(schema.minItems) + "..." + wrapWithParensIfNeeded(valuesType) + "[]]";
+                else
+                    return wrapWithParensIfNeeded(valuesType) + "[]";
+            }
+
+            return wrapWithParensIfNeeded(valuesType) + "[]";
+        }
+
+        return "any[]";
     }
 
     const types: ("string" | "number" | "bigint" | "boolean" | "null")[] = [];
@@ -61,4 +105,11 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
         types.push("null");
 
     return types.join(" | ");
+}
+
+function wrapWithParensIfNeeded(text: string): string {
+    if (text.includes(" ") || text.includes("|") || text.includes("&") || text.includes("\n") || text.includes("\t"))
+        return "(" + text + ")";
+
+    return text;
 }

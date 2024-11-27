@@ -10,7 +10,7 @@ export class GbnfBoolean extends GbnfTerminal {
         return new GbnfOr([
             new GbnfGrammar('"true"'),
             new GbnfGrammar('"false"')
-        ]).getGrammar(grammarGenerator);
+        ], true).getGrammar(grammarGenerator);
     }
 
     protected override getRuleName(): string {

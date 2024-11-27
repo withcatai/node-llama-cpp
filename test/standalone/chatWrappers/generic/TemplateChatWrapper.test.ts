@@ -356,7 +356,7 @@ describe("TemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -425,7 +425,7 @@ describe("TemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -495,7 +495,7 @@ describe("TemplateChatWrapper", () => {
           function func2(params: {message: string, feeling: "good" | "bad", words: number});
 
           // Some description here
-          function func3(params: (string)[]);
+          function func3(params: string[]);
           \`\`\`
 
           Calling any of the provided functions can be done like this:

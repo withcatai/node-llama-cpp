@@ -24,5 +24,36 @@ export const reservedRuleNames = {
             "-" + scopeSpaces,
             "-rule"
         ].join("");
+    },
+    commaWhitespace({newLine, nestingScope, scopeSpaces}: {
+        newLine?: "before" | "after" | false, nestingScope: number, scopeSpaces: number
+    }) {
+        if (!newLine)
+            return "comma-whitespace-no-new-lines-rule";
+
+        return [
+            "comma-whitespace-",
+            newLine === "before"
+                ? "b"
+                : newLine === "after"
+                    ? "a"
+                    : "n",
+            "-" + nestingScope,
+            "-" + scopeSpaces,
+            "-rule"
+        ].join("");
+    },
+    anyJson({allowNewLines, nestingScope, scopeSpaces}: {
+        allowNewLines: boolean, nestingScope: number, scopeSpaces: number
+    }) {
+        return [
+            "any-json-",
+            !allowNewLines
+                ? "s-"
+                : "",
+            nestingScope,
+            "-" + scopeSpaces,
+            "-rule"
+        ].join("");
     }
 } as const;
