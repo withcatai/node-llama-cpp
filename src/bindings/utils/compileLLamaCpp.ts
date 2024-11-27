@@ -31,7 +31,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     includeBuildOptionsInBinaryFolderName?: boolean,
     ensureLlamaCppRepoIsCloned?: boolean,
     downloadCmakeIfNeeded?: boolean,
-    ignoreWorkarounds?: ("cudaArchitecture")[],
+    ignoreWorkarounds?: ("cudaArchitecture" | "reduceParallelBuildThreads" | "singleBuildThread")[],
     envVars?: typeof process.env,
     ciMode?: boolean
 }): Promise<void> {
@@ -53,6 +53,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         : buildFolderName.withoutCustomCmakeOptions;
 
     const outDirectory = path.join(llamaLocalBuildBinsDirectory, finalBuildFolderName);
+
+    let parallelBuildThreads = getParallelBuildThreadsToUse(platform);
+    if (ignoreWorkarounds.includes("singleBuildThread"))
+        parallelBuildThreads = 1;
+    else if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
+        parallelBuildThreads = reduceParallelBuildThreads(parallelBuildThreads);
 
     await fs.mkdirp(llamaLocalBuildBinsDirectory);
     try {
@@ -128,7 +134,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         "--arch=" + buildOptions.arch,
                         "--out", path.relative(llamaDirectory, outDirectory),
                         "--runtime-version=" + runtimeVersion,
-                        "--parallel=" + getParallelBuildThreadsToUse(platform),
+                        "--parallel=" + parallelBuildThreads,
                         ...cmakePathArgs,
                         ...(
                             [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
@@ -241,6 +247,38 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         if (buildOptions.progressLogs)
                             console.error(getConsoleLogPrefix(true, false), err);
                     }
+                }
+            } else if (
+                (!ignoreWorkarounds.includes("reduceParallelBuildThreads") || !ignoreWorkarounds.includes("singleBuildThread")) &&
+                (platform === "win" || platform === "linux") &&
+                err instanceof SpawnError &&
+                reduceParallelBuildThreads(parallelBuildThreads) !== parallelBuildThreads &&
+                err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
+            ) {
+                if (buildOptions.progressLogs) {
+                    if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
+                        console.info(
+                            getConsoleLogPrefix(true) + "Trying to compile again with a single build thread"
+                        );
+                    else
+                        console.info(
+                            getConsoleLogPrefix(true) + "Trying to compile again with reduced parallel build threads"
+                        );
+                }
+
+                try {
+                    return await compileLlamaCpp(buildOptions, {
+                        ...compileOptions,
+                        ignoreWorkarounds: [
+                            ...ignoreWorkarounds,
+                            ignoreWorkarounds.includes("reduceParallelBuildThreads")
+                                ? "singleBuildThread"
+                                : "reduceParallelBuildThreads"
+                        ]
+                    });
+                } catch (err) {
+                    if (buildOptions.progressLogs)
+                        console.error(getConsoleLogPrefix(true, false), err);
                 }
             }
 
@@ -474,4 +512,8 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform) {
         return cpuCount - 1;
 
     return cpuCount - 2;
+}
+
+function reduceParallelBuildThreads(originalParallelBuildThreads: number) {
+    return Math.max(1, Math.round(originalParallelBuildThreads / 2));
 }
