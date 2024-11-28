@@ -174,7 +174,26 @@ describe("JinjaTemplateChatWrapper", () => {
                 minItems: 2,
                 maxItems: 2
             }
-        }
+        },
+        func8: {
+            params: {
+                type: "object",
+                properties: {
+                    message: {
+                        description: "The main message",
+                        type: "string"
+                    },
+                    feeling: {
+                        description: "The feeling",
+                        enum: ["good", "bad"]
+                    },
+                    words: {
+                        description: "The number of words.\nFor example, 6",
+                        type: "number"
+                    }
+                }
+            }
+        },
     } as const;
 
     test("with system prompt support", () => {
@@ -607,6 +626,18 @@ describe("JinjaTemplateChatWrapper", () => {
 
           // Some description here
           function func7(params: [string, string]);
+
+          function func8(params: {
+              // The main message
+              message: string,
+              
+              // The feeling
+              feeling: "good" | "bad",
+              
+              // The number of words.
+              // For example, 6
+              words: number
+          });
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -698,6 +729,18 @@ describe("JinjaTemplateChatWrapper", () => {
 
           // Some description here
           function func7(params: [string, string]);
+
+          function func8(params: {
+              // The main message
+              message: string,
+              
+              // The feeling
+              feeling: "good" | "bad",
+              
+              // The number of words.
+              // For example, 6
+              words: number
+          });
           \`\`\`
 
           Calling any of the provided functions can be done like this:
@@ -788,6 +831,18 @@ describe("JinjaTemplateChatWrapper", () => {
 
           // Some description here
           function func7(params: [string, string]);
+
+          function func8(params: {
+              // The main message
+              message: string,
+              
+              // The feeling
+              feeling: "good" | "bad",
+              
+              // The number of words.
+              // For example, 6
+              words: number
+          });
           \`\`\`
 
           Calling any of the provided functions can be done like this:

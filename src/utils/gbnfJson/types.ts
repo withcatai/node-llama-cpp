@@ -3,21 +3,56 @@ export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJso
     GbnfJsonArraySchema;
 
 export type GbnfJsonBasicSchema = {
-    type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[]
+    type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 export type GbnfJsonConstSchema = {
-    const: string | number | boolean | null
+    const: string | number | boolean | null,
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 export type GbnfJsonEnumSchema = {
-    enum: readonly (string | number | boolean | null)[]
+    enum: readonly (string | number | boolean | null)[],
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 export type GbnfJsonOneOfSchema = {
-    oneOf: readonly GbnfJsonSchema[]
+    oneOf: readonly GbnfJsonSchema[],
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 export type GbnfJsonObjectSchema<Keys extends string = string> = {
     type: "object",
     properties: Readonly<{[key in Keys]: GbnfJsonSchema}>,
-    required?: readonly Keys[]
+    required?: readonly Keys[],
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 export type GbnfJsonArraySchema = {
     type: "array",
@@ -36,7 +71,14 @@ export type GbnfJsonArraySchema = {
      * ensure to inform the model as part of the prompt what are your expectation of the length of the array.
      * Not doing this may lead to hallucinations.
      */
-    maxItems?: number
+    maxItems?: number,
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
 };
 
 
