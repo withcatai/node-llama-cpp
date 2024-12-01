@@ -1,3 +1,6 @@
+---
+outline: deep
+---
 # Using Grammar
 Use this to enforce a model to generate response in a specific format of text, like `JSON` for example.
 
@@ -69,11 +72,11 @@ console.log(JSON.parse(a2));
 The [`llama.createGrammarForJsonSchema(...)`](../api/classes/Llama.md#creategrammarforjsonschema) creates a [`LlamaJsonSchemaGrammar`](../api/classes/LlamaJsonSchemaGrammar)
 from a GBNF grammar generated a based on the [JSON schema](https://json-schema.org/learn/getting-started-step-by-step) you provide.
 
-It only supports [a small subset of the JSON schema spec](../api/type-aliases/GbnfJsonSchema.md),
+It only supports [a subset of the JSON schema spec](../api/type-aliases/GbnfJsonSchema.md),
 but it's enough to generate useful JSON objects using a text generation model.
 
-Many features of [JSON schema spec](https://json-schema.org/learn/getting-started-step-by-step) are not supported here on purpose,
-as those features don't align well with the way models generate text and are prone to [hallucinations](https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence)).
+Some features of [JSON schema spec](https://json-schema.org/learn/getting-started-step-by-step) are not supported on purpose,
+as those features don't align well with the way models generate text, and are too prone to [hallucinations](https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence)).
 Workarounds for the missing features that you can implement with the supported set of features often lead to improved generation quality.
 
 To see what subset of the JSON schema spec is supported, see the [`GbnfJsonSchema` type](../api/type-aliases/GbnfJsonSchema.md) and follow its sub-types.
@@ -133,6 +136,41 @@ console.log(
     parsedRes.userMessagePositivityScoreFromOneToTen
 );
 ```
+
+### Reducing Hallucinations When Using JSON Schema Grammar {#reducing-json-schema-hallucinations}
+When forcing a model to follow a specific JSON schema in its response, the model isn't aware of the entire schema being enforced on it.
+To avoid hallucinations, you need to inform the model in some way what are your expectations from its response.
+
+To do that, you can:
+* Explain to the model what you expect in the prompt itself.
+  <br />
+  You can do that by giving a brief explanation of what you expect,
+  or by dumping the entire JSON schema in the prompt (which can eat up a lot of tokens, thus is not recommended).
+* Force the model to output self-explanatory keys as part of its response, so it can then generate values for those keys.
+* Use a combination of both.
+
+The technique used in [the above example](#json-schema) forces the model to output the given keys, and then lets the model generate the values for those keys:
+1. The model is forced to generate the text `{"positiveWordsInUserMessage": [`, and then we let it finish the syntax of the JSON array with only strings.
+2. When it finishes the array, we force it to <br />generate the text <span>`, "userMessagePositivityScoreFromOneToTen": `</span>, and then we let it generate a number.
+3. Finally, we force it to generate the text `, "nameOfUser": `, and then we let it generate either a string or `null`.
+
+This technique allows us to get the desired result without explaining to the model what we want in advance.
+While this method works great in this example, it may not work as well in other cases that need some explanation.
+
+For example, let's say we force the model to generate an array with at least 2 items and at most 5 items;
+if we don't provide any prior explanation for this requirement (either by using a self-explanatory key name or in the prompt),
+then the model won't be able to "plan" the entire content of the array in advance,
+which can lead it to generate inconsistent and unevenly spread items.
+It can also make the model repeat the existing value in different forms or make up wrong values,
+just so it can follow the enforced schema.
+
+The key takeaway is that to reduce hallucinations and achieve great results when using a JSON schema grammar,
+you need to ensure you inform the model of your expectations in some way.
+
+::: tip NOTE
+When using [function calling](./function-calling.md), the model is always aware of the entire schema being enforced on it,
+so there's no need to explain the schema in the prompt.
+:::
 
 ## Creating Your Own Grammar {#custom-grammar}
 To create your own grammar, read the [GBNF guide](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md) to create a GBNF grammar file.

@@ -11,8 +11,7 @@ export class GbnfWhitespace extends GbnfTerminal {
     public constructor(scopeState: GbnfJsonScopeState, {
         newLine = "before"
     }: {
-        newLine?: "before" | "after" | false,
-        space?: boolean
+        newLine?: "before" | "after" | false
     } = {}) {
         super();
         this.scopeState = scopeState;
@@ -20,6 +19,14 @@ export class GbnfWhitespace extends GbnfTerminal {
     }
 
     public getGrammar(): string {
+        return this._getGrammar();
+    }
+
+    protected override getGrammarFromResolve(): string {
+        return this._getGrammar(false);
+    }
+
+    private _getGrammar(wrap: boolean = true): string {
         if (this.scopeState.settings.allowNewLines && this.newLine !== false) {
             const values = [
                 ...(
@@ -32,12 +39,8 @@ export class GbnfWhitespace extends GbnfTerminal {
                         ? []
                         : [
                             or([
-                                new GbnfVerbatimText(
-                                    " ".repeat(this.scopeState.currentNestingScope * this.scopeState.settings.scopePadSpaces)
-                                ).getGrammar(),
-                                new GbnfVerbatimText(
-                                    "\t".repeat(this.scopeState.currentNestingScope)
-                                ).getGrammar()
+                                verbatimTextRepetition(" ", this.scopeState.currentNestingScope * this.scopeState.settings.scopePadSpaces),
+                                verbatimTextRepetition("\t", this.scopeState.currentNestingScope)
                             ])
                         ]
                 ),
@@ -51,7 +54,7 @@ export class GbnfWhitespace extends GbnfTerminal {
             return or([
                 values.join(" "),
                 "[ ]?"
-            ]);
+            ], wrap);
         }
 
         return "[ ]?";
@@ -59,13 +62,31 @@ export class GbnfWhitespace extends GbnfTerminal {
 
     protected override getRuleName(): string {
         return reservedRuleNames.whitespace({
-            newLine: this.newLine,
+            newLine: this.scopeState.settings.allowNewLines
+                ? this.newLine
+                : false,
             scopeSpaces: this.scopeState.settings.scopePadSpaces,
             nestingScope: this.scopeState.currentNestingScope
         });
     }
 }
 
-function or(definitions: string[]) {
+function or(definitions: string[], wrap: boolean = true) {
+    if (!wrap)
+        return definitions.join(" | ");
+
     return "(" + definitions.join(" | ") + ")";
+}
+
+function verbatimTextRepetition(text: string, count: number) {
+    const textRepetitionGrammar = new GbnfVerbatimText(text.repeat(count)).getGrammar();
+
+    if (count <= 1)
+        return textRepetitionGrammar;
+
+    const textRepetitionGrammarWithRepetition = new GbnfVerbatimText(text).getGrammar() + "{" + count + "}";
+    if (textRepetitionGrammarWithRepetition.length < textRepetitionGrammar.length)
+        return textRepetitionGrammarWithRepetition;
+
+    return textRepetitionGrammar;
 }

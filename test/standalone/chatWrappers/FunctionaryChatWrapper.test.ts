@@ -38,6 +38,61 @@ describe("FunctionaryChatWrapper", () => {
             async handler(params) {
                 return Math.floor(Math.random() * (params.max - params.min + 1) + params.min);
             }
+        }),
+        func1: defineChatSessionFunction({
+            description: "Some function",
+            params: {
+                type: "object",
+                properties: {
+                    message: {
+                        type: "string",
+                        description: "Some message",
+                        minLength: 3,
+                        maxLength: 10
+                    },
+                    words: {
+                        type: "array",
+                        description: "Some words",
+                        items: {
+                            type: "string"
+                        },
+                        minItems: 2,
+                        maxItems: 5
+                    },
+                    headers: {
+                        type: "object",
+                        description: "Some headers",
+                        additionalProperties: {
+                            type: "string"
+                        },
+                        minProperties: 4,
+                        maxProperties: 12
+                    },
+                    mappings: {
+                        type: "object",
+                        description: "Some mappings",
+                        properties: {
+                            a: {
+                                type: "boolean"
+                            },
+                            b: {
+                                type: "number"
+                            },
+                            c: {
+                                type: ["string", "null"]
+                            }
+                        },
+                        additionalProperties: {
+                            type: "string"
+                        },
+                        minProperties: 4,
+                        maxProperties: 12
+                    }
+                }
+            },
+            handler(params) {
+
+            }
         })
     };
     const conversationHistory2: ChatHistoryItem[] = [{
@@ -168,6 +223,25 @@ describe("FunctionaryChatWrapper", () => {
 
               // Get a random number
               type getRandomNumber = (_: {min: number, max: number}) => any;
+
+              // Some function
+              type func1 = (_: {
+                  // Some message
+                  // minimum length: 3, maximum length: 10
+                  message: string,
+                  
+                  // Some words
+                  // maximum items: 5
+                  words: [string, string, ...string[]],
+                  
+                  // Some headers
+                  // minimum number of properties: 4, maximum number of properties: 12
+                  headers: {[key: string]: string},
+                  
+                  // Some mappings
+                  // minimum number of properties: 4, maximum number of properties: 12
+                  mappings: {a: boolean, b: number, c: string | null} & {[key: string]: string}
+              }) => any;
 
               } // namespace functions",
                 {
@@ -523,6 +597,25 @@ describe("FunctionaryChatWrapper", () => {
 
               // Get a random number
               type getRandomNumber = (_: {min: number, max: number}) => any;
+
+              // Some function
+              type func1 = (_: {
+                  // Some message
+                  // minimum length: 3, maximum length: 10
+                  message: string,
+                  
+                  // Some words
+                  // maximum items: 5
+                  words: [string, string, ...string[]],
+                  
+                  // Some headers
+                  // minimum number of properties: 4, maximum number of properties: 12
+                  headers: {[key: string]: string},
+                  
+                  // Some mappings
+                  // minimum number of properties: 4, maximum number of properties: 12
+                  mappings: {a: boolean, b: number, c: string | null} & {[key: string]: string}
+              }) => any;
 
               } // namespace functions",
                 {

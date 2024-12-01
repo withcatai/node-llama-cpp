@@ -11,3 +11,5 @@ Start the project:
 ```bash
 npm start
 ```
+
+> Generated using `npm create node-llama-cpp@latest` ([learn more](https://node-llama-cpp.withcat.ai/guide/))

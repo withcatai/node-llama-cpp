@@ -140,8 +140,8 @@ export type BatchLogitIndex = number & {
     __batchLogitIndex: never
 };
 
-export type AddonGrammar = "AddonGrammar" & {
-    __brand: never
+export type AddonGrammar = {
+    isTextCompatible(testText: string): boolean
 };
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {

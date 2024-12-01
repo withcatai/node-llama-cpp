@@ -72,7 +72,7 @@ export default tseslint.config({
             after: true
         }],
         "@stylistic/comma-style": ["error", "last"],
-        "@stylistic/comma-dangle": ["error", "never"],
+        "@stylistic/comma-dangle": ["warn", "never"],
         "no-var": ["error"],
         "import/order": ["error", {
             groups: ["builtin", "external", "internal", "parent", "sibling", "index", "type", "object", "unknown"],
@@ -122,7 +122,8 @@ export default tseslint.config({
                 {blankLine: "always", prev: "*", next: "method"}
             ]
         }],
-        "@stylistic/no-trailing-spaces": ["warn"]
+        "@stylistic/no-trailing-spaces": ["warn"],
+        "@stylistic/no-multi-spaces": ["warn"]
     }
 }, {
     files: ["**/**.{,c,m}ts"],
