@@ -1733,7 +1733,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at least 2 characters but got 1]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at least 2 characters but got 1]");
                 expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
             }
 
@@ -1741,7 +1741,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue2));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at least 2 characters but got 0]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at least 2 characters but got 0]");
                 expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
             }
 
@@ -1749,7 +1749,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue3));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at least 2 characters but got 1]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at least 2 characters but got 1]");
                 expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
             }
         });
@@ -1822,7 +1822,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at most 4 characters but got 5]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at most 4 characters but got 5]");
                 expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
             }
 
@@ -1830,7 +1830,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue2));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at most 4 characters but got 5]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at most 4 characters but got 5]");
                 expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
             }
 
@@ -1838,7 +1838,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue3));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at most 4 characters but got 5]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at most 4 characters but got 5]");
                 expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
             }
         });
@@ -1912,7 +1912,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at least 2 characters but got 1]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at least 2 characters but got 1]");
                 expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
             }
 
@@ -1920,7 +1920,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue2));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at most 4 characters but got 5]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at most 4 characters but got 5]");
                 expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
             }
 
@@ -1928,7 +1928,7 @@ describe("grammar for JSON schema", () => {
                 grammar.parse(JSON.stringify(exampleInvalidValue3));
                 expect.unreachable("Parsing should have failed");
             } catch (err) {
-                expect(err).toMatchInlineSnapshot(`[Error: Expected at most 4 characters but got 6]`);
+                expect(err).toMatchInlineSnapshot("[Error: Expected at most 4 characters but got 6]");
                 expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
             }
         });
@@ -2001,7 +2001,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date string but got "2024-12-32"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date string but got "2024-12-32"]');
                     expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
                 }
 
@@ -2009,7 +2009,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue2));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date string but got "2024-13-20"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date string but got "2024-13-20"]');
                     expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
                 }
 
@@ -2017,7 +2017,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue3));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date string but got "2024-00-20"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date string but got "2024-00-20"]');
                     expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
                 }
             });
@@ -2102,7 +2102,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid time string but got "12:00:00.000"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid time string but got "12:00:00.000"]');
                     expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
                 }
 
@@ -2110,7 +2110,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue2));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid time string but got "12:00:00"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid time string but got "12:00:00"]');
                     expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
                 }
 
@@ -2118,7 +2118,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue3));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid time string but got "24:00:00Z"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid time string but got "24:00:00Z"]');
                     expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
                 }
 
@@ -2126,7 +2126,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue4));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid time string but got "22:60:00Z"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid time string but got "22:60:00Z"]');
                     expect(testGrammar(grammar, exampleInvalidValue4)).to.eql(false);
                 }
             });
@@ -2211,7 +2211,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date-time string but got "2024-12-01T12:00:00.000"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date-time string but got "2024-12-01T12:00:00.000"]');
                     expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
                 }
 
@@ -2219,7 +2219,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue2));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date-time string but got "2024-12-32T02:00:00.010Z"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date-time string but got "2024-12-32T02:00:00.010Z"]');
                     expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
                 }
 
@@ -2227,7 +2227,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue3));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date-time string but got "2000-01-01T24:00:00Z"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date-time string but got "2000-01-01T24:00:00Z"]');
                     expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
                 }
 
@@ -2235,7 +2235,7 @@ describe("grammar for JSON schema", () => {
                     grammar.parse(JSON.stringify(exampleInvalidValue4));
                     expect.unreachable("Parsing should have failed");
                 } catch (err) {
-                    expect(err).toMatchInlineSnapshot(`[Error: Expected a valid date-time string but got "2024-00-20T22:00:00+01:00"]`);
+                    expect(err).toMatchInlineSnapshot('[Error: Expected a valid date-time string but got "2024-00-20T22:00:00+01:00"]');
                     expect(testGrammar(grammar, exampleInvalidValue4)).to.eql(false);
                 }
             });
