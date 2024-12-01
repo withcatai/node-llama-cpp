@@ -1,6 +1,6 @@
 import {
-    GbnfJsonSchema, isGbnfJsonArraySchema, isGbnfJsonBasicSchemaIncludesType, isGbnfJsonConstSchema,
-    isGbnfJsonEnumSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
+    GbnfJsonSchema, isGbnfJsonArraySchema, isGbnfJsonBasicSchemaIncludesType, isGbnfJsonBasicStringSchema, isGbnfJsonConstSchema,
+    isGbnfJsonEnumSchema, isGbnfJsonFormatStringSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
 } from "./gbnfJson/types.js";
 
 const maxTypeRepetition = 10;
@@ -31,11 +31,50 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
 
                 const mapping = keyText + ": " + valueType;
 
-                if (propSchema.description != null && propSchema.description !== "") {
+                const description: string[] = (propSchema.description != null && propSchema.description !== "")
+                    ? [propSchema.description]
+                    : [];
+                const propInfo: string[] = [];
+
+                if (isGbnfJsonBasicStringSchema(propSchema)) {
+                    if (propSchema.minLength != null && propSchema.minLength > 0)
+                        propInfo.push("minimum length: " + String(Math.floor(propSchema.minLength)));
+
+                    if (propSchema.maxLength != null)
+                        propInfo.push("maximum length: " + String(Math.floor(Math.max(propSchema.maxLength, propSchema.minLength ?? 0, 0))));
+                } else if (isGbnfJsonFormatStringSchema(propSchema)) {
+                    if (propSchema.format === "date-time")
+                        propInfo.push("format: ISO 8601 date-time");
+                    else
+                        propInfo.push("format: " + String(propSchema.format));
+                } else if (isGbnfJsonArraySchema(propSchema)) {
+                    if (propSchema.minItems != null && propSchema.minItems > maxTypeRepetition)
+                        propInfo.push("minimum items: " + String(Math.floor(propSchema.minItems)));
+
+                    if (propSchema.maxItems != null)
+                        propInfo.push("maximum items: " + String(Math.floor(Math.max(propSchema.maxItems, propSchema.minItems ?? 0, 0))));
+                } else if (isGbnfJsonObjectSchema(propSchema)) {
+                    if (propSchema.minProperties != null && propSchema.minProperties > 0)
+                        propInfo.push("minimum number of properties: " + String(Math.floor(propSchema.minProperties)));
+
+                    if (propSchema.maxProperties != null)
+                        propInfo.push(
+                            "maximum number of properties: " +
+                            String(Math.floor(Math.max(propSchema.maxProperties, propSchema.minProperties ?? 0, 0)))
+                        );
+                }
+
+                if (propInfo.length > 0)
+                    description.push(propInfo.join(", "));
+
+                if (description.length > 0) {
                     addNewline = true;
                     return [
                         "\n",
-                        "// ", propSchema.description.split("\n").join("\n// "),
+                        "// ", description
+                            .join("\n")
+                            .split("\n")
+                            .join("\n// "),
                         "\n",
                         mapping
                     ].join("");
