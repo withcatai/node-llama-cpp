@@ -1,6 +1,6 @@
 export type GbnfJsonSchemaImmutableType = "string" | "number" | "integer" | "boolean" | "null";
 export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJsonEnumSchema | GbnfJsonOneOfSchema |
-    GbnfJsonBasicStringSchema | GbnfJsonFormatStringSchema | GbnfJsonObjectSchema | GbnfJsonArraySchema;
+    GbnfJsonStringSchema | GbnfJsonObjectSchema | GbnfJsonArraySchema;
 
 export type GbnfJsonBasicSchema = {
     type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
@@ -42,6 +42,7 @@ export type GbnfJsonOneOfSchema = {
      */
     description?: string
 };
+export type GbnfJsonStringSchema = GbnfJsonBasicStringSchema | GbnfJsonFormatStringSchema;
 export type GbnfJsonBasicStringSchema = {
     type: "string",
 

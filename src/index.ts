@@ -88,8 +88,8 @@ import {
     type ChatWrapperGenerateInitialHistoryOptions
 } from "./types.js";
 import {
-    type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonObjectSchema,
-    type GbnfJsonOneOfSchema, type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
+    type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
+    type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema, type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
 } from "./utils/gbnfJson/types.js";
 import {type GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
 import {
@@ -239,6 +239,7 @@ export {
     type GbnfJsonBasicSchema,
     type GbnfJsonConstSchema,
     type GbnfJsonEnumSchema,
+    type GbnfJsonStringSchema,
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,
     type GbnfJsonArraySchema,
