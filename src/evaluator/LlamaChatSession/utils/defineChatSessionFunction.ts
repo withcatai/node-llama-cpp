@@ -15,7 +15,7 @@ export function defineChatSessionFunction<const Params extends GbnfJsonSchema | 
     handler
 }: {
     description?: string,
-    params?: Params & GbnfJsonSchema,
+    params?: Readonly<Params>,
     handler: (params: GbnfJsonSchemaToType<Params>) => Promise<any> | any
 }): ChatSessionModelFunction<Params> {
     return {

@@ -1,6 +1,6 @@
 export type GbnfJsonSchemaImmutableType = "string" | "number" | "integer" | "boolean" | "null";
-export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJsonEnumSchema | GbnfJsonOneOfSchema | GbnfJsonObjectSchema |
-    GbnfJsonArraySchema;
+export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJsonEnumSchema | GbnfJsonOneOfSchema |
+    GbnfJsonBasicStringSchema | GbnfJsonFormatStringSchema | GbnfJsonObjectSchema | GbnfJsonArraySchema;
 
 export type GbnfJsonBasicSchema = {
     type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
@@ -42,9 +42,77 @@ export type GbnfJsonOneOfSchema = {
      */
     description?: string
 };
+export type GbnfJsonBasicStringSchema = {
+    type: "string",
+
+    /**
+     * When using `minLength` and/or `maxLength`,
+     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
+     * Not doing this may lead to hallucinations.
+     */
+    minLength?: number,
+
+    /**
+     * When using `minLength` and/or `maxLength`,
+     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
+     * Not doing this may lead to hallucinations.
+     */
+    maxLength?: number,
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
+};
+export type GbnfJsonFormatStringSchema = {
+    type: "string",
+    format: "date-time" | "time" | "date",
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    description?: string
+};
 export type GbnfJsonObjectSchema<Keys extends string = string> = {
     type: "object",
-    properties: Readonly<{[key in Keys]: GbnfJsonSchema}>,
+    properties?: Readonly<{[key in Keys]: GbnfJsonSchema}>,
+
+    /**
+     * Unlike the JSON Schema spec, `additionalProperties` defaults to `false` to avoid breaking existing code.
+     */
+    additionalProperties?: boolean | GbnfJsonSchema,
+
+    /**
+     * Make sure you define `additionalProperties` for this to have any effect.
+     *
+     * When using `minProperties` and/or `maxProperties`,
+     * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
+     * Not doing this may lead to hallucinations.
+     */
+    minProperties?: number,
+
+    /**
+     * Make sure you define `additionalProperties` for this to have any effect.
+     *
+     * When using `minProperties` and/or `maxProperties`,
+     * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
+     * Not doing this may lead to hallucinations.
+     */
+    maxProperties?: number,
+
+    /**
+     * `required` is always set to all keys in `properties`, and setting it has no effect.
+     *
+     * This limitation is due to how the generation works, and may be fixed in the future.
+     *
+     * This key is part of the type to avoid breaking exiting code (though it was never actually used in the past),
+     * and will be removed in the future.
+     * @deprecated
+     */
     required?: readonly Keys[],
 
     /**
@@ -61,14 +129,14 @@ export type GbnfJsonArraySchema = {
 
     /**
      * When using `minItems` and/or `maxItems`,
-     * ensure to inform the model as part of the prompt what are your expectation of the length of the array.
+     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the array.
      * Not doing this may lead to hallucinations.
      */
     minItems?: number,
 
     /**
      * When using `minItems` and/or `maxItems`,
-     * ensure to inform the model as part of the prompt what are your expectation of the length of the array.
+     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the array.
      * Not doing this may lead to hallucinations.
      */
     maxItems?: number,
@@ -88,32 +156,41 @@ export type GbnfJsonArraySchema = {
 export type GbnfJsonSchemaToType<T> = GbnfJsonSchemaToTSType<T>;
 
 export type GbnfJsonSchemaToTSType<T> =
-    GbnfJsonBasicSchema extends T
+    Readonly<GbnfJsonBasicSchema> extends T
         ? undefined
         : undefined extends T
             ? undefined
-            : T extends GbnfJsonBasicSchema
-                ? GbnfJsonBasicSchemaToType<T["type"]>
-                : T extends GbnfJsonConstSchema
-                    ? T["const"]
-                    : T extends GbnfJsonEnumSchema
-                        ? T["enum"][number]
-                        : T extends GbnfJsonOneOfSchema
-                            ? GbnfJsonSchemaToType<T["oneOf"][number]>
-                            : T extends GbnfJsonObjectSchema
-                                ? GbnfJsonObjectSchemaToType<T["properties"]>
-                                : T extends GbnfJsonArraySchema
-                                    ? ArrayTypeToType<T>
-                                    : undefined;
+        : T extends GbnfJsonBasicStringSchema
+            ? GbnfJsonBasicStringSchemaToType<T>
+            : T extends GbnfJsonFormatStringSchema
+                ? string
+                : T extends GbnfJsonBasicSchema
+                    ? GbnfJsonBasicSchemaToType<T["type"]>
+                    : T extends GbnfJsonConstSchema
+                        ? T["const"]
+                        : T extends GbnfJsonEnumSchema
+                            ? T["enum"][number]
+                            : T extends GbnfJsonOneOfSchema
+                                ? GbnfJsonSchemaToType<T["oneOf"][number]>
+                                : T extends GbnfJsonObjectSchema
+                                    ? GbnfJsonObjectSchemaToType<T>
+                                    : T extends GbnfJsonArraySchema
+                                        ? ArrayTypeToType<T>
+                                        : undefined;
 
-type GbnfJsonBasicSchemaToType<T> =
+type GbnfJsonBasicStringSchemaToType<T extends GbnfJsonBasicStringSchema> =
+    T["maxLength"] extends 0
+        ? ""
+        : string;
+
+type GbnfJsonBasicSchemaToType<T extends GbnfJsonBasicSchema["type"]> =
     T extends GbnfJsonSchemaImmutableType
         ? ImmutableTypeToType<T>
         : T extends GbnfJsonSchemaImmutableType[]
             ? ImmutableTypeToType<T[number]>
             : never;
 
-type ImmutableTypeToType<T> =
+type ImmutableTypeToType<T extends GbnfJsonSchemaImmutableType> =
     T extends "string"
         ? string
         : T extends "number"
@@ -129,16 +206,16 @@ type ImmutableTypeToType<T> =
 type ArrayTypeToType<
     T extends GbnfJsonArraySchema,
     MinItems extends number = T["minItems"] extends number
-        ? T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+        ? T["prefixItems"] extends readonly GbnfJsonSchema[]
             ? keyof T["prefixItems"] extends T["minItems"]
                 ? T["prefixItems"]["length"]
                 : T["minItems"]
             : T["minItems"]
-        : T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+        : T["prefixItems"] extends readonly GbnfJsonSchema[]
             ? T["prefixItems"]["length"]
             : 0
 > =
-    T extends {readonly prefixItems: readonly GbnfJsonSchema[]}
+    T["prefixItems"] extends readonly GbnfJsonSchema[]
         ? (
             MinItems extends T["prefixItems"]["length"]
                 ? (
@@ -211,8 +288,19 @@ type ArrayTypeToType<
 
 
 type GbnfJsonObjectSchemaToType<
-    Props,
-    Res = {-readonly [P in keyof Props]: GbnfJsonSchemaToType<Props[P]>}
+    T extends GbnfJsonObjectSchema,
+    Props extends Readonly<Record<string, GbnfJsonSchema>> | undefined = T["properties"],
+    AdditionalProps extends true | false | GbnfJsonSchema | undefined = T["additionalProperties"],
+    PropsMap = Props extends undefined
+        ? {}
+        : {-readonly [P in keyof Props]: GbnfJsonSchemaToType<Props[P]>},
+    Res = AdditionalProps extends undefined | false
+        ? PropsMap
+        : AdditionalProps extends true
+            ? PropsMap & {[key: string]: GbnfJsonAnyValue}
+            : AdditionalProps extends GbnfJsonSchema
+                ? PropsMap & {[key: string]: GbnfJsonSchemaToType<AdditionalProps>}
+                : PropsMap
 > = Res;
 
 type GbnfJsonAnyValue = string | number | boolean | null | GbnfJsonAnyValue[] | {[key: string]: GbnfJsonAnyValue};
@@ -227,6 +315,14 @@ export function isGbnfJsonEnumSchema(schema: GbnfJsonSchema): schema is GbnfJson
 
 export function isGbnfJsonOneOfSchema(schema: GbnfJsonSchema): schema is GbnfJsonOneOfSchema {
     return (schema as GbnfJsonOneOfSchema).oneOf != null;
+}
+
+export function isGbnfJsonBasicStringSchema(schema: GbnfJsonSchema): schema is GbnfJsonBasicStringSchema {
+    return (schema as GbnfJsonBasicStringSchema).type === "string" && (schema as GbnfJsonFormatStringSchema).format == null;
+}
+
+export function isGbnfJsonFormatStringSchema(schema: GbnfJsonSchema): schema is GbnfJsonFormatStringSchema {
+    return (schema as GbnfJsonFormatStringSchema).type === "string" && (schema as GbnfJsonFormatStringSchema).format != null;
 }
 
 export function isGbnfJsonObjectSchema(schema: GbnfJsonSchema): schema is GbnfJsonObjectSchema {

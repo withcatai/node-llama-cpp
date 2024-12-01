@@ -71,6 +71,14 @@ export class LlamaGrammar {
         return this._trimWhitespaceSuffix;
     }
 
+    /**
+     * Test if the given text is compatible with the grammar.
+     * @internal
+     */
+    public _testText(text: string): boolean {
+        return this._grammar.isTextCompatible(String(text));
+    }
+
     public static async getFor(llama: Llama, type: "json" | "json_arr" | "list" | "c" | "arithmetic" | "japanese" | "chess") {
         const grammarsFolder = await getGrammarsFolder(llama.buildType);
 

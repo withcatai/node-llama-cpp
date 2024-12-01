@@ -8,6 +8,7 @@ import {GbnfBoolean} from "./GbnfBoolean.js";
 import {GbnfNull} from "./GbnfNull.js";
 import {GbnfArray} from "./GbnfArray.js";
 import {reservedRuleNames} from "./gbnfConsts.js";
+import {GbnfObjectMap} from "./GbnfObjectMap.js";
 
 
 export class GbnfAnyJson extends GbnfTerminal {
@@ -37,8 +38,12 @@ export class GbnfAnyJson extends GbnfTerminal {
             new GbnfArray({
                 items: subAnyJsonScopeItem,
                 scopeState: this.scopeState
+            }),
+            new GbnfObjectMap({
+                fields: [],
+                additionalProperties: subAnyJsonScopeItem,
+                scopeState: this.scopeState
             })
-            // TODO: Add support for object maps
         ]).getGrammar(grammarGenerator);
     }
 

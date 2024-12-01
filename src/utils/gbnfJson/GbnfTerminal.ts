@@ -21,11 +21,15 @@ export abstract class GbnfTerminal {
 
     public abstract getGrammar(grammarGenerator: GbnfGrammarGenerator): string;
 
+    protected getGrammarFromResolve(grammarGenerator: GbnfGrammarGenerator): string {
+        return this.getGrammar(grammarGenerator);
+    }
+
     public resolve(grammarGenerator: GbnfGrammarGenerator): string {
         if (this._ruleName != null)
             return this._ruleName;
 
-        const grammar = this.getGrammar(grammarGenerator);
+        const grammar = this.getGrammarFromResolve(grammarGenerator);
 
         const existingRuleName = grammarGenerator.ruleContentToRuleName.get(grammar);
         if (existingRuleName != null) {

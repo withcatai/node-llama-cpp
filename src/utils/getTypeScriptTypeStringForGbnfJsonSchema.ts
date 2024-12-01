@@ -20,7 +20,7 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             .join(" | ");
     } else if (isGbnfJsonObjectSchema(schema)) {
         let addNewline = false;
-        const valueTypes = Object.entries(schema.properties)
+        const valueTypes = Object.entries(schema.properties ?? {})
             .map(([propName, propSchema]) => {
                 const escapedValue = JSON.stringify(propName) ?? "";
                 const keyText = escapedValue.slice(1, -1) === propName ? propName : escapedValue;
@@ -45,7 +45,7 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             })
             .filter((item) => item !== "");
 
-        return [
+        const knownPropertiesMapSyntax = [
             "{",
             (addNewline && valueTypes.length > 0)
                 ? [
@@ -59,6 +59,20 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
                 : valueTypes.join(", "),
             "}"
         ].join("");
+        const additionalPropertiesMapSyntax = (schema.additionalProperties == null || schema.additionalProperties == false)
+            ? undefined
+            : schema.additionalProperties === true
+                ? "{[key: string]: any}"
+                : schema.additionalProperties != null
+                    ? ["{[key: string]: ", getTypeScriptTypeStringForGbnfJsonSchema(schema.additionalProperties), "}"].join("")
+                    : undefined;
+
+        if (valueTypes.length === 0 && additionalPropertiesMapSyntax != null)
+            return additionalPropertiesMapSyntax;
+        else if (additionalPropertiesMapSyntax != null)
+            return [knownPropertiesMapSyntax, " & ", additionalPropertiesMapSyntax].join("");
+
+        return knownPropertiesMapSyntax;
     } else if (isGbnfJsonArraySchema(schema)) {
         if (schema.maxItems === 0)
             return "[]";

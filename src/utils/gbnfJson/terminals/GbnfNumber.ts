@@ -11,12 +11,13 @@ export class GbnfNumber extends GbnfTerminal {
     }
 
     public getGrammar(): string {
-        const numberGrammar = '("-"? ([0-9] | [1-9] [0-9]*))';
+        const num = '"-"? ("0" | [1-9] [0-9]{0,15})';
+        const exponent = ' ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?';
 
         if (this.allowFractional)
-            return numberGrammar + ' ("." [0-9]+)? ([eE] [-+]? [0-9]+)?';
+            return num + ' ("." [0-9]{1,16})?' + exponent;
 
-        return numberGrammar;
+        return num + exponent;
     }
 
     protected override getRuleName(): string {

@@ -6,7 +6,28 @@ export const reservedRuleNames = {
         fractional: "fractional-number-rule",
         integer: "integer-number-rule"
     },
-    string: "string-rule",
+    stringChar: "string-char-rule",
+    string({minLength, maxLength}: {minLength: number, maxLength?: number}) {
+        if (minLength === 0 && maxLength == null)
+            return "string-rule";
+        else if (maxLength == null)
+            return [
+                "string-",
+                minLength,
+                "-rule"
+            ].join("");
+
+        return [
+            "string-",
+            minLength,
+            "-",
+            maxLength,
+            "-rule"
+        ].join("");
+    },
+    formatString(format: string) {
+        return "string-format-" + format + "-rule";
+    },
     whitespace({newLine, nestingScope, scopeSpaces}: {
         newLine?: "before" | "after" | false, nestingScope: number, scopeSpaces: number
     }) {

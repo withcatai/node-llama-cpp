@@ -34,6 +34,54 @@ AddonGrammar::~AddonGrammar() {
     }
 }
 
+Napi::Value AddonGrammar::isTextCompatible(const Napi::CallbackInfo& info) {
+    const std::string testText = info[0].As<Napi::String>().Utf8Value();
+
+    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str());
+    
+    // will be empty if there are parse errors
+    if (parsed_grammar == nullptr) {
+        Napi::Error::New(info.Env(), "Failed to parse grammar").ThrowAsJavaScriptException();
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    const auto cpts = unicode_cpts_from_utf8(testText);
+    const llama_grammar_rules  & rules = llama_grammar_get_rules(parsed_grammar);
+    llama_grammar_stacks & stacks_cur = llama_grammar_get_stacks(parsed_grammar);
+
+    for (const auto & cpt : cpts) {
+        const llama_grammar_stacks stacks_prev = llama_grammar_get_stacks(parsed_grammar);
+
+        llama_grammar_accept(rules, stacks_prev, cpt, stacks_cur);
+
+        if (stacks_cur.empty()) {
+            // no stacks means that the grammar failed to match at this point
+            llama_grammar_free_impl(parsed_grammar);
+            return Napi::Boolean::New(info.Env(), false);
+        }
+    }
+
+    for (const auto & stack : stacks_cur) {
+        if (stack.empty()) {
+            // an empty stack means that the grammar has been completed
+            llama_grammar_free_impl(parsed_grammar);
+            return Napi::Boolean::New(info.Env(), true);
+        }
+    }
+
+    llama_grammar_free_impl(parsed_grammar);
+    return Napi::Boolean::New(info.Env(), false);
+}
+
 void AddonGrammar::init(Napi::Object exports) {
-    exports.Set("AddonGrammar", DefineClass(exports.Env(), "AddonGrammar", {}));
+    exports.Set(
+        "AddonGrammar",
+        DefineClass(
+            exports.Env(),
+            "AddonGrammar",
+            {
+                InstanceMethod("isTextCompatible", &AddonGrammar::isTextCompatible),
+            }
+        )
+    );
 }

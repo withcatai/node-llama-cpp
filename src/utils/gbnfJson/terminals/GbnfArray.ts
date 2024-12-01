@@ -63,25 +63,38 @@ export class GbnfArray extends GbnfTerminal {
         const arrayItemsGrammar: string[] = [];
         if (this.prefixItems != null && this.prefixItems.length > 0) {
             for (const item of this.prefixItems) {
-                if (arrayItemsGrammar.length > 0) {
+                if (arrayItemsGrammar.length > 0)
                     arrayItemsGrammar.push(getCommaWhitespaceRuleName(true, "before"));
-                }
 
                 arrayItemsGrammar.push(item.resolve(grammarGenerator));
             }
 
             if (this.minItems > this.prefixItems.length || this.maxItems == null || this.maxItems > this.prefixItems.length) {
-                arrayItemsGrammar.push(getCommaWhitespaceRuleName(true, "before"));
-                arrayItemsGrammar.push(
-                    new GbnfRepetition({
-                        value: this.items ?? new GbnfAnyJson(),
-                        separator: getCommaWhitespaceRule(true, "before"),
-                        minRepetitions: this.minItems - this.prefixItems.length,
-                        maxRepetitions: this.maxItems == null
-                            ? undefined
-                            : this.maxItems - this.prefixItems.length
-                    }).getGrammar(grammarGenerator)
-                );
+                const restMinRepetitions = this.minItems - this.prefixItems.length;
+                const restMaxRepetitions = this.maxItems == null
+                    ? undefined
+                    : this.maxItems - this.prefixItems.length;
+
+                if (arrayItemsGrammar.length > 0)
+                    arrayItemsGrammar.push(
+                        new GbnfRepetition({
+                            value: new GbnfGrammar([
+                                getCommaWhitespaceRuleName(true, "before"),
+                                (this.items ?? new GbnfAnyJson()).resolve(grammarGenerator)
+                            ], true),
+                            minRepetitions: restMinRepetitions,
+                            maxRepetitions: restMaxRepetitions
+                        }).getGrammar(grammarGenerator)
+                    );
+                else
+                    arrayItemsGrammar.push(
+                        new GbnfRepetition({
+                            value: this.items ?? new GbnfAnyJson(),
+                            separator: getCommaWhitespaceRule(true, "before"),
+                            minRepetitions: restMinRepetitions,
+                            maxRepetitions: restMaxRepetitions
+                        }).getGrammar(grammarGenerator)
+                    );
             }
         } else
             arrayItemsGrammar.push(

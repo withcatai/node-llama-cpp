@@ -19,6 +19,14 @@ export class GbnfWhitespace extends GbnfTerminal {
     }
 
     public getGrammar(): string {
+        return this._getGrammar();
+    }
+
+    protected override getGrammarFromResolve(): string {
+        return this._getGrammar(false);
+    }
+
+    private _getGrammar(wrap: boolean = true): string {
         if (this.scopeState.settings.allowNewLines && this.newLine !== false) {
             const values = [
                 ...(
@@ -46,7 +54,7 @@ export class GbnfWhitespace extends GbnfTerminal {
             return or([
                 values.join(" "),
                 "[ ]?"
-            ]);
+            ], wrap);
         }
 
         return "[ ]?";
@@ -63,7 +71,10 @@ export class GbnfWhitespace extends GbnfTerminal {
     }
 }
 
-function or(definitions: string[]) {
+function or(definitions: string[], wrap: boolean = true) {
+    if (!wrap)
+        return definitions.join(" | ");
+
     return "(" + definitions.join(" | ") + ")";
 }
 

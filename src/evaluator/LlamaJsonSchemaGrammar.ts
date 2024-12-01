@@ -5,13 +5,13 @@ import {LlamaText} from "../utils/LlamaText.js";
 import {Llama} from "../bindings/Llama.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
-export class LlamaJsonSchemaGrammar<const T extends Readonly<GbnfJsonSchema>> extends LlamaGrammar {
+export class LlamaJsonSchemaGrammar<const T extends GbnfJsonSchema> extends LlamaGrammar {
     private readonly _schema: T;
 
     /**
      * Prefer to create a new instance of this class by using `llama.createGrammarForJsonSchema(...)`.
      */
-    public constructor(llama: Llama, schema: T & Readonly<GbnfJsonSchema>) {
+    public constructor(llama: Llama, schema: Readonly<T>) {
         const grammar = getGbnfGrammarForGbnfJsonSchema(schema);
 
         super(llama, {

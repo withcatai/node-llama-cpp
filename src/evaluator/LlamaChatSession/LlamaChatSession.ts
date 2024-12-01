@@ -554,7 +554,7 @@ export class LlamaChatSession {
                                                 `The model tried to call function "${functionCall.functionName}" which is not defined`
                                             );
 
-                                        const functionCallResult = await functionDefinition.handler(functionCall.params);
+                                        const functionCallResult = await functionDefinition.handler(functionCall.params as any);
 
                                         return {
                                             functionCall,

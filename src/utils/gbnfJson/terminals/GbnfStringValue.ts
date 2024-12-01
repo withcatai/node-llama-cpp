@@ -15,10 +15,10 @@ export class GbnfStringValue extends GbnfTerminal {
             '"',
             '\\"',
             this.value
-                .replaceAll("\\", "\\\\")
-                .replaceAll("\t", "\\t")
-                .replaceAll("\r", "\\r")
-                .replaceAll("\n", "\\n")
+                .replaceAll("\\", "\\\\\\\\")
+                .replaceAll("\t", "\\\\t")
+                .replaceAll("\r", "\\\\r")
+                .replaceAll("\n", "\\\\n")
                 .replaceAll('"', "\\\\" + '\\"'),
             '\\"',
             '"'

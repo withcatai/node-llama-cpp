@@ -4,7 +4,7 @@ import {GbnfGrammarGenerator} from "./GbnfGrammarGenerator.js";
 import {GbnfJsonScopeState} from "./utils/GbnfJsonScopeState.js";
 
 
-export function getGbnfGrammarForGbnfJsonSchema(schema: GbnfJsonSchema, {
+export function getGbnfGrammarForGbnfJsonSchema(schema: Readonly<GbnfJsonSchema>, {
     allowNewLines = true,
     scopePadSpaces = 4
 }: {

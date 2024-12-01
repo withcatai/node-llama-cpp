@@ -1,7 +1,8 @@
 import {
     GbnfJsonArraySchema, GbnfJsonConstSchema, GbnfJsonEnumSchema, GbnfJsonObjectSchema, GbnfJsonOneOfSchema, GbnfJsonSchema,
-    GbnfJsonSchemaImmutableType, GbnfJsonSchemaToType, isGbnfJsonArraySchema, isGbnfJsonConstSchema, isGbnfJsonEnumSchema,
-    isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
+    GbnfJsonSchemaImmutableType, GbnfJsonSchemaToType, GbnfJsonBasicStringSchema, GbnfJsonFormatStringSchema, isGbnfJsonArraySchema,
+    isGbnfJsonConstSchema, isGbnfJsonEnumSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema, isGbnfJsonBasicStringSchema,
+    isGbnfJsonFormatStringSchema
 } from "../types.js";
 
 
@@ -43,6 +44,10 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
         return validateObject(object, schema);
     else if (isGbnfJsonOneOfSchema(schema))
         return validateOneOf(object, schema);
+    else if (isGbnfJsonBasicStringSchema(schema))
+        return validateBasicString(object, schema);
+    else if (isGbnfJsonFormatStringSchema(schema))
+        return validateFormatString(object, schema);
     else if (isGbnfJsonEnumSchema(schema))
         return validateEnum(object, schema);
     else if (isGbnfJsonConstSchema(schema))
@@ -62,7 +67,7 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
     if (validateImmutableType(object, schema.type))
         return true;
 
-    throw new TechnicalValidationError(`Expected "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
+    throw new TechnicalValidationError(`Expected type "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
 }
 
 function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
@@ -108,22 +113,48 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
     if (typeof object !== "object" || object === null)
         throw new TechnicalValidationError(`Expected an object but got "${typeof object}"`);
 
+    let res = true;
+
     const objectKeys = Object.keys(object);
     const objectKeysSet = new Set(objectKeys);
-    const schemaKeys = Object.keys(schema.properties);
+    const schemaKeys = Object.keys(schema.properties ?? {});
     const schemaKeysSet = new Set(schemaKeys);
 
+    const minProperties = Math.max(schema.minProperties ?? 0, schemaKeys.length);
+    const maxProperties = schema.maxProperties == null
+        ? undefined
+        : Math.max(schema.maxProperties, minProperties);
+
     const extraKeys = objectKeys.filter((key) => !schemaKeysSet.has(key));
-    if (extraKeys.length > 0)
-        throw new TechnicalValidationError(`Unexpected keys: ${extraKeys.map((key) => JSON.stringify(key)).join(", ")}`);
+    if (extraKeys.length > 0) {
+        if (schema.additionalProperties == null || schema.additionalProperties === false)
+            throw new TechnicalValidationError(`Unexpected keys: ${extraKeys.map((key) => JSON.stringify(key)).join(", ")}`);
+        else if (schema.additionalProperties !== true) {
+            for (const key of extraKeys)
+                res &&= validateObjectWithGbnfSchema(object[key], schema.additionalProperties);
+        }
+    }
 
     const missingKeys = schemaKeys.filter((key) => !objectKeysSet.has(key));
     if (missingKeys.length > 0)
         throw new TechnicalValidationError(`Missing keys: ${missingKeys.map((key) => JSON.stringify(key)).join(", ")}`);
 
-    let res = true;
     for (const key of schemaKeys)
-        res &&= validateObjectWithGbnfSchema(object[key], schema.properties[key]!);
+        res &&= validateObjectWithGbnfSchema(object[key], schema.properties![key]!);
+
+    if (schema.additionalProperties != null && schema.additionalProperties !== false) {
+        if (objectKeys.length < minProperties) {
+            if (maxProperties != null && minProperties === maxProperties)
+                throw new TechnicalValidationError(`Expected exactly ${minProperties} properties but got ${objectKeys.length}`);
+
+            throw new TechnicalValidationError(`Expected at least ${minProperties} properties but got ${objectKeys.length}`);
+        } else if (maxProperties != null && objectKeys.length > maxProperties) {
+            if (minProperties === maxProperties)
+                throw new TechnicalValidationError(`Expected exactly ${minProperties} properties but got ${objectKeys.length}`);
+
+            throw new TechnicalValidationError(`Expected at most ${maxProperties} properties but got ${objectKeys.length}`);
+        }
+    }
 
     return res;
 }
@@ -141,6 +172,59 @@ function validateOneOf<T extends GbnfJsonOneOfSchema>(object: any, schema: T): o
     }
 
     throw new TechnicalValidationError(`Expected one of ${schema.oneOf.length} schemas but got ${JSON.stringify(object)}`);
+}
+
+function validateBasicString<T extends GbnfJsonBasicStringSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
+    if (typeof object !== "string")
+        throw new TechnicalValidationError(`Expected type "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
+
+    const minLength = Math.max(0, schema.minLength ?? 0);
+    const maxLength = schema.maxLength == null
+        ? undefined
+        : Math.max(schema.maxLength, minLength);
+
+    if (object.length < minLength) {
+        if (minLength === maxLength)
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+
+        throw new TechnicalValidationError(`Expected at least ${minLength} characters but got ${object.length}`);
+    } else if (maxLength != null && object.length > maxLength) {
+        if (minLength === maxLength)
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+
+        throw new TechnicalValidationError(`Expected at most ${maxLength} characters but got ${object.length}`);
+    }
+
+    return true;
+}
+
+const dateRegex = /^\d{4}-(0[1-9]|1[012])-(0[1-9]|[12]\d|3[01])$/;
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3])?:[0-5][0-9])$/;
+const datetimeRegex =
+    /^\d{4}-(0[1-9]|1[012])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3])?:[0-5][0-9])$/;
+
+function validateFormatString<T extends GbnfJsonFormatStringSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
+    if (typeof object !== "string")
+        throw new TechnicalValidationError(`Expected type "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
+
+    if (schema.format === "date") {
+        if (object.match(dateRegex) != null)
+            return true;
+
+        throw new TechnicalValidationError(`Expected a valid date string but got ${JSON.stringify(object)}`);
+    } else if (schema.format === "time") {
+        if (object.match(timeRegex) != null)
+            return true;
+
+        throw new TechnicalValidationError(`Expected a valid time string but got ${JSON.stringify(object)}`);
+    } else if (schema.format === "date-time") {
+        if (object.match(datetimeRegex) != null)
+            return true;
+
+        throw new TechnicalValidationError(`Expected a valid date-time string but got ${JSON.stringify(object)}`);
+    }
+
+    throw new TechnicalValidationError(`Unknown format "${schema.format}"`);
 }
 
 function validateEnum<T extends GbnfJsonEnumSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {

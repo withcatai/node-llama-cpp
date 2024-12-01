@@ -60,14 +60,16 @@ describe("grammar for functions", () => {
 
         expect(grammar1.grammar).toMatchInlineSnapshot(
             `
-          "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? string-rule "," whitespace-b-1-4-rule "\\"feeling\\"" ":" [ ]? rule0 "," whitespace-b-1-4-rule "\\"words\\"" ":" [ ]? integer-number-rule whitespace-b-0-4-rule "}" "\\n\\n\\n\\n"
-          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
-          string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
+          "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? string-rule comma-whitespace-b-1-4-rule "\\"feeling\\"" ":" [ ]? rule0 comma-whitespace-b-1-4-rule "\\"words\\"" ":" [ ]? integer-number-rule whitespace-b-0-4-rule "}" "\\n\\n\\n\\n"
+          string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
+          string-rule ::= "\\"" string-char-rule* "\\""
+          comma-whitespace-b-1-4-rule ::= "," ([\\n] ("    " | "\\t") | [ ]?)
           val0 ::= "\\"good\\""
           val1 ::= "\\"bad\\""
           rule0 ::= ( val0 | val1 )
-          integer-number-rule ::= ("-"? ([0-9] | [1-9] [0-9]*))
-          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
+          integer-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
+          whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
+          whitespace-b-0-4-rule ::= [\\n] | [ ]?"
         `
         );
 
@@ -76,10 +78,11 @@ describe("grammar for functions", () => {
         expect(grammar2.grammar).toMatchInlineSnapshot(
             `
           "root ::= "[" whitespace-b-1-4-rule ( string-rule ( comma-whitespace-b-1-4-rule string-rule )* )? whitespace-b-0-4-rule "]" "\\n\\n\\n\\n"
-          string-rule ::= "\\"" ([^"\\\\\\x7F\\x00-\\x1F] | "\\\\" (["\\\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))* "\\""
+          string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
+          string-rule ::= "\\"" string-char-rule* "\\""
           comma-whitespace-b-1-4-rule ::= "," ([\\n] ("    " | "\\t") | [ ]?)
-          whitespace-b-1-4-rule ::= ([\\n] ("    " | "\\t") | [ ]?)
-          whitespace-b-0-4-rule ::= ([\\n] | [ ]?)"
+          whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
+          whitespace-b-0-4-rule ::= [\\n] | [ ]?"
         `
         );
     });

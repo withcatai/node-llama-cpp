@@ -193,7 +193,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     }
                 }
             }
-        },
+        }
     } as const;
 
     test("with system prompt support", () => {

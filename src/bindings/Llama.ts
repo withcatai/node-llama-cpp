@@ -331,7 +331,7 @@ export class Llama {
         });
     }
 
-    public async createGrammarForJsonSchema<const T extends Readonly<GbnfJsonSchema>>(schema: T) {
+    public async createGrammarForJsonSchema<const T extends GbnfJsonSchema>(schema: Readonly<T>) {
         return new LlamaJsonSchemaGrammar<T>(this, schema);
     }
 
