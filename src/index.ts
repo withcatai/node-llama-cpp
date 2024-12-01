@@ -89,7 +89,8 @@ import {
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
-    type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema, type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
+    type GbnfJsonBasicStringSchema, type GbnfJsonFormatStringSchema, type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema,
+    type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
 } from "./utils/gbnfJson/types.js";
 import {type GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
 import {
@@ -239,6 +240,8 @@ export {
     type GbnfJsonBasicSchema,
     type GbnfJsonConstSchema,
     type GbnfJsonEnumSchema,
+    type GbnfJsonBasicStringSchema,
+    type GbnfJsonFormatStringSchema,
     type GbnfJsonStringSchema,
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,

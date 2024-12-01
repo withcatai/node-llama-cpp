@@ -3,89 +3,89 @@ export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJso
     GbnfJsonStringSchema | GbnfJsonObjectSchema | GbnfJsonArraySchema;
 
 export type GbnfJsonBasicSchema = {
-    type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
+    readonly type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonConstSchema = {
-    const: string | number | boolean | null,
+    readonly const: string | number | boolean | null,
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonEnumSchema = {
-    enum: readonly (string | number | boolean | null)[],
+    readonly enum: readonly (string | number | boolean | null)[],
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonOneOfSchema = {
-    oneOf: readonly GbnfJsonSchema[],
+    readonly oneOf: readonly GbnfJsonSchema[],
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonStringSchema = GbnfJsonBasicStringSchema | GbnfJsonFormatStringSchema;
 export type GbnfJsonBasicStringSchema = {
-    type: "string",
+    readonly type: "string",
 
     /**
      * When using `minLength` and/or `maxLength`,
      * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
      * Not doing this may lead to hallucinations.
      */
-    minLength?: number,
+    readonly minLength?: number,
 
     /**
      * When using `minLength` and/or `maxLength`,
      * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
      * Not doing this may lead to hallucinations.
      */
-    maxLength?: number,
+    readonly maxLength?: number,
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonFormatStringSchema = {
-    type: "string",
-    format: "date-time" | "time" | "date",
+    readonly type: "string",
+    readonly format: "date-time" | "time" | "date",
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonObjectSchema<Keys extends string = string> = {
-    type: "object",
-    properties?: Readonly<{[key in Keys]: GbnfJsonSchema}>,
+    readonly type: "object",
+    readonly properties?: {readonly [key in Keys]: GbnfJsonSchema},
 
     /**
      * Unlike the JSON Schema spec, `additionalProperties` defaults to `false` to avoid breaking existing code.
      */
-    additionalProperties?: boolean | GbnfJsonSchema,
+    readonly additionalProperties?: boolean | GbnfJsonSchema,
 
     /**
      * Make sure you define `additionalProperties` for this to have any effect.
@@ -94,7 +94,7 @@ export type GbnfJsonObjectSchema<Keys extends string = string> = {
      * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
      * Not doing this may lead to hallucinations.
      */
-    minProperties?: number,
+    readonly minProperties?: number,
 
     /**
      * Make sure you define `additionalProperties` for this to have any effect.
@@ -103,7 +103,7 @@ export type GbnfJsonObjectSchema<Keys extends string = string> = {
      * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
      * Not doing this may lead to hallucinations.
      */
-    maxProperties?: number,
+    readonly maxProperties?: number,
 
     /**
      * `required` is always set to all keys in `properties`, and setting it has no effect.
@@ -114,40 +114,40 @@ export type GbnfJsonObjectSchema<Keys extends string = string> = {
      * and will be removed in the future.
      * @deprecated
      */
-    required?: readonly Keys[],
+    readonly required?: readonly Keys[],
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 export type GbnfJsonArraySchema = {
-    type: "array",
-    items?: GbnfJsonSchema,
-    prefixItems?: readonly GbnfJsonSchema[],
+    readonly type: "array",
+    readonly items?: GbnfJsonSchema,
+    readonly prefixItems?: readonly GbnfJsonSchema[],
 
     /**
      * When using `minItems` and/or `maxItems`,
      * ensure to inform the model as part of the prompt what your expectations are regarding the length of the array.
      * Not doing this may lead to hallucinations.
      */
-    minItems?: number,
+    readonly minItems?: number,
 
     /**
      * When using `minItems` and/or `maxItems`,
      * ensure to inform the model as part of the prompt what your expectations are regarding the length of the array.
      * Not doing this may lead to hallucinations.
      */
-    maxItems?: number,
+    readonly maxItems?: number,
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    description?: string
+    readonly description?: string
 };
 
 

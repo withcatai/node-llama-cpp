@@ -23,6 +23,10 @@ export class LlamaJsonSchemaGrammar<const T extends GbnfJsonSchema> extends Llam
         this._schema = schema;
     }
 
+    public get schema(): Readonly<T> {
+        return this._schema;
+    }
+
     public parse(json: string): GbnfJsonSchemaToType<T> {
         const parsedJson = JSON.parse(json);
 
