@@ -3,7 +3,7 @@ import {createRequire} from "node:module";
 import process from "process";
 import {fileURLToPath} from "url";
 import fs from "fs-extra";
-import {createContentLoader, defineConfig, HeadConfig} from "vitepress";
+import {createContentLoader, defineConfig, HeadConfig, Plugin as VitepressPlugin} from "vitepress";
 import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
 import envVar from "env-var";
@@ -308,7 +308,7 @@ export default defineConfig({
             GitChangelog({
                 repoURL: () => "https://github.com/withcatai/node-llama-cpp",
                 cwd: path.join(__dirname, "..", "docs")
-            }),
+            }) as VitepressPlugin,
             GitChangelogMarkdownSection({
                 exclude: (id) => (
                     id.includes(path.sep + "api" + path.sep) ||
@@ -318,7 +318,7 @@ export default defineConfig({
                 sections: {
                     disableContributors: true
                 }
-            }),
+            }) as VitepressPlugin,
             BlogPageInfoPlugin({
                 include: (id) => id.includes(path.sep + "blog" + path.sep) && !id.endsWith(path.sep + "blog" + path.sep + "index.md")
             })
