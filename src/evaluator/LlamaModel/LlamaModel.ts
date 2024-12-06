@@ -733,7 +733,7 @@ export class LlamaModel {
                 if (modelLoaded)
                     await model._model.dispose();
 
-                throw loadSignal.reason;
+                throw loadSignal!.reason;
             } else if (!modelLoaded)
                 throw new Error("Failed to load model");
 
@@ -757,12 +757,17 @@ export class LlamaModelTokens {
     /** @internal */ private _bosToken?: Token;
     /** @internal */ private _eosToken?: Token;
     /** @internal */ private _eotToken?: Token;
+    /** @internal */ private _clsToken?: Token;
+    /** @internal */ private _sepToken?: Token;
     /** @internal */ private _nlToken?: Token;
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
     /** @internal */ private _eotString?: string;
+    /** @internal */ private _clsString?: string;
+    /** @internal */ private _sepString?: string;
     /** @internal */ private _nlString?: string;
     /** @internal */ private _shouldPrependBosToken?: boolean;
+    /** @internal */ private _shouldAppendEosToken?: boolean;
 
     private constructor(model: AddonModel, disposedState: DisposedState) {
         this._model = model;
@@ -824,6 +829,36 @@ export class LlamaModelTokens {
             return null;
 
         return this._eotToken;
+    }
+
+    /**
+     * @returns The CLS (Classification) token.
+     */
+    public get cls(): Token | null {
+        this._ensureNotDisposed();
+
+        if (this._clsToken == null)
+            this._clsToken = this._model.clsToken();
+
+        if (this._clsToken === -1)
+            return null;
+
+        return this._clsToken;
+    }
+
+    /**
+     * @returns The SEP (Sentence Separator) token.
+     */
+    public get sep(): Token | null {
+        this._ensureNotDisposed();
+
+        if (this._sepToken == null)
+            this._sepToken = this._model.sepToken();
+
+        if (this._sepToken === -1)
+            return null;
+
+        return this._sepToken;
     }
 
     /**
@@ -893,6 +928,40 @@ export class LlamaModelTokens {
     }
 
     /**
+     * @returns The CLS (Classification) token text representation.
+     */
+    public get clsString(): string | null {
+        this._ensureNotDisposed();
+
+        const clsToken = this.cls;
+
+        if (clsToken == null)
+            return null;
+
+        if (this._clsString == null)
+            this._clsString = this._model.getTokenString(clsToken);
+
+        return this._clsString;
+    }
+
+    /**
+     * @returns The SEP (Sentence Separator) token text representation.
+     */
+    public get sepString(): string | null {
+        this._ensureNotDisposed();
+
+        const sepToken = this.sep;
+
+        if (sepToken == null)
+            return null;
+
+        if (this._sepString == null)
+            this._sepString = this._model.getTokenString(sepToken);
+
+        return this._sepString;
+    }
+
+    /**
      * @returns The NL (New Line) token text representation.
      */
     public get nlString(): string | null {
@@ -919,6 +988,18 @@ export class LlamaModelTokens {
             this._shouldPrependBosToken = this.bos != null && this._model.shouldPrependBosToken();
 
         return this._shouldPrependBosToken;
+    }
+
+    /**
+     * @returns Whether we should append an EOS (End Of Sequence) token for evaluations with this model.
+     */
+    public get shouldAppendEosToken(): boolean {
+        this._ensureNotDisposed();
+
+        if (this._shouldAppendEosToken == null)
+            this._shouldAppendEosToken = this.bos != null && this._model.shouldAppendEosToken();
+
+        return this._shouldAppendEosToken;
     }
 
     /** @internal */

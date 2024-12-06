@@ -9,7 +9,7 @@
 #include "AddonModelLora.h"
 
 static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
-    if (token < 0) {
+    if (token < 0 || token == LLAMA_TOKEN_NULL) {
         return Napi::Number::From(info.Env(), -1);
     }
 
@@ -565,6 +565,22 @@ Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
 
     return getNapiToken(info, model, llama_token_eot(model));
 }
+Napi::Value AddonModel::ClsToken(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    return getNapiToken(info, model, llama_token_cls(model));
+}
+Napi::Value AddonModel::SepToken(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    return getNapiToken(info, model, llama_token_sep(model));
+}
 Napi::Value AddonModel::GetTokenString(const Napi::CallbackInfo& info) {
     if (disposed) {
         Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
@@ -624,11 +640,14 @@ Napi::Value AddonModel::GetVocabularyType(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), int32_t(vocabularyType));
 }
 Napi::Value AddonModel::ShouldPrependBosToken(const Napi::CallbackInfo& info) {
-    const int addBos = llama_add_bos_token(model);
+    const bool addBos = llama_add_bos_token(model);
 
-    bool shouldPrependBos = addBos != -1 ? bool(addBos) : (llama_vocab_type(model) == LLAMA_VOCAB_TYPE_SPM);
+    return Napi::Boolean::New(info.Env(), addBos);
+}
+Napi::Value AddonModel::ShouldAppendEosToken(const Napi::CallbackInfo& info) {
+    const bool addEos = llama_add_eos_token(model);
 
-    return Napi::Boolean::New(info.Env(), shouldPrependBos);
+    return Napi::Boolean::New(info.Env(), addEos);
 }
 
 Napi::Value AddonModel::GetModelSize(const Napi::CallbackInfo& info) {
@@ -659,11 +678,14 @@ void AddonModel::init(Napi::Object exports) {
                 InstanceMethod("middleToken", &AddonModel::MiddleToken),
                 InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                 InstanceMethod("eotToken", &AddonModel::EotToken),
+                InstanceMethod("clsToken", &AddonModel::ClsToken),
+                InstanceMethod("sepToken", &AddonModel::SepToken),
                 InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                 InstanceMethod("getTokenAttributes", &AddonModel::GetTokenAttributes),
                 InstanceMethod("isEogToken", &AddonModel::IsEogToken),
                 InstanceMethod("getVocabularyType", &AddonModel::GetVocabularyType),
                 InstanceMethod("shouldPrependBosToken", &AddonModel::ShouldPrependBosToken),
+                InstanceMethod("shouldAppendEosToken", &AddonModel::ShouldAppendEosToken),
                 InstanceMethod("getModelSize", &AddonModel::GetModelSize),
                 InstanceMethod("dispose", &AddonModel::Dispose),
             }

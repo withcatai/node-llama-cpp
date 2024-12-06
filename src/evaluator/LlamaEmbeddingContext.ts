@@ -2,6 +2,7 @@ import {AsyncDisposeAggregator, EventRelay, withLock} from "lifecycle-utils";
 import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
+import {resolveBeginningTokenToPrepend, resolveEndTokenToAppend} from "../utils/tokenizerUtils.js";
 import {LlamaEmbedding} from "./LlamaEmbedding.js";
 import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
@@ -72,7 +73,7 @@ export class LlamaEmbeddingContext {
     }
 
     public async getEmbeddingFor(input: Token[] | string | LlamaText) {
-        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenizer);
+        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenizer, undefined, true);
 
         if (resolvedInput.length > this._llamaContext.contextSize)
             throw new Error(
@@ -83,6 +84,14 @@ export class LlamaEmbeddingContext {
             return new LlamaEmbedding({
                 vector: []
             });
+
+        const beginningToken = resolveBeginningTokenToPrepend(this.model.vocabularyType, this.model.tokens);
+        if (beginningToken != null && resolvedInput[0] !== beginningToken)
+            resolvedInput.unshift(beginningToken);
+
+        const endToken = resolveEndTokenToAppend(this.model.vocabularyType, this.model.tokens);
+        if (endToken != null && resolvedInput.at(-1) !== endToken)
+            resolvedInput.push(endToken);
 
         return await withLock(this, "evaluate", async () => {
             await this._sequence.eraseContextTokenRanges([{
@@ -118,6 +127,10 @@ export class LlamaEmbeddingContext {
         return this._llamaContext.disposed;
     }
 
+    public get model() {
+        return this._llamaContext.model;
+    }
+
     /** @internal */
     public static async _create({
         _model
@@ -130,6 +143,9 @@ export class LlamaEmbeddingContext {
         createSignal,
         ignoreMemorySafetyChecks
     }: LlamaEmbeddingContextOptions) {
+        if (_model.fileInsights.hasEncoder && _model.fileInsights.hasDecoder)
+            throw new Error("Computing embeddings is not supported for encoder-decoder models.");
+
         const llamaContext = await _model.createContext({
             contextSize,
             batchSize,

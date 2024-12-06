@@ -99,11 +99,14 @@ export type AddonModel = {
     middleToken(): Token,
     suffixToken(): Token,
     eotToken(): Token,
+    clsToken(): Token,
+    sepToken(): Token,
     getTokenString(token: number): string,
     getTokenAttributes(token: Token): number,
     isEogToken(token: Token): boolean,
     getVocabularyType(): number,
     shouldPrependBosToken(): boolean,
+    shouldAppendEosToken(): boolean,
     getModelSize(): number
 };
 

@@ -3,17 +3,17 @@ import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 import {LlamaEmbedding} from "../../../src/index.js";
 
-describe("bge", () => {
+describe("nomic embed text", () => {
     describe("embedding", () => {
         test("deterministic", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("bge-small-en-v1.5-q8_0.gguf");
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
                 modelPath
             });
             const embeddingContext = await model.createEmbeddingContext({
-                contextSize: 512
+                contextSize: 2048
             });
 
             const helloWorldEmbedding = await embeddingContext.getEmbeddingFor("Hello world");
@@ -29,14 +29,14 @@ describe("bge", () => {
         });
 
         test("deterministic between runs", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("bge-small-en-v1.5-q8_0.gguf");
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
                 modelPath
             });
             const embeddingContext = await model.createEmbeddingContext({
-                contextSize: 512
+                contextSize: 2048
             });
 
             const helloWorldEmbedding = await embeddingContext.getEmbeddingFor("Hello world");
@@ -47,7 +47,7 @@ describe("bge", () => {
             embeddingContext.dispose();
 
             const embeddingContext2 = await model.createEmbeddingContext({
-                contextSize: 512
+                contextSize: 2048
             });
 
             const helloWorldEmbedding2 = await embeddingContext2.getEmbeddingFor("Hello world");
@@ -58,14 +58,14 @@ describe("bge", () => {
         });
 
         test("similarity search", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("bge-small-en-v1.5-q8_0.gguf");
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
                 modelPath
             });
             const embeddingContext = await model.createEmbeddingContext({
-                contextSize: 512
+                contextSize: 2048
             });
 
             async function embedDocuments(documents: readonly string[]) {
@@ -122,14 +122,14 @@ describe("bge", () => {
         });
 
         test("similarity search 2", {timeout: 1000 * 60 * 60 * 2}, async () => {
-            const modelPath = await getModelFile("bge-small-en-v1.5-q8_0.gguf");
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();
 
             const model = await llama.loadModel({
                 modelPath
             });
             const embeddingContext = await model.createEmbeddingContext({
-                contextSize: 512
+                contextSize: 2048
             });
 
             async function embedDocuments(documents: readonly string[]) {

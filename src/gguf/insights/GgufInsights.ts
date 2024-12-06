@@ -104,6 +104,25 @@ export class GgufInsights {
         return true;
     }
 
+    public get hasEncoder() {
+        switch (this._ggufFileInfo.metadata?.general?.architecture) {
+            case GgufArchitectureType.t5:
+            case GgufArchitectureType.t5encoder:
+                return true;
+        }
+
+        return false;
+    }
+
+    public get hasDecoder() {
+        switch (this._ggufFileInfo.metadata?.general?.architecture) {
+            case GgufArchitectureType.t5encoder:
+                return false;
+        }
+
+        return true;
+    }
+
     public get isRecurrent() {
         switch (this._ggufFileInfo.metadata?.general?.architecture) {
             case GgufArchitectureType.mamba:

@@ -531,7 +531,8 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     }
 
     const int n_embd = llama_n_embd(model->model);
-    const auto* embeddings = llama_get_embeddings_seq(ctx, 0);
+    const enum llama_pooling_type pooling_type = llama_pooling_type(ctx);
+    const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
         embeddings = llama_get_embeddings_ith(ctx, inputTokensLength - 1);
 
