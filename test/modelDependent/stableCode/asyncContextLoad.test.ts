@@ -51,7 +51,7 @@ describe("stableCode", () => {
             }
 
             expect(loopIterationsBeforeUnload).toBeGreaterThanOrEqual(2);
-            expect(disposePromise).resolves.toBeUndefined();
+            await expect(disposePromise).resolves.toBeUndefined();
         });
     });
 });
