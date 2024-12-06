@@ -13,7 +13,7 @@ export function resolveBeginningTokenToPrepend(vocabularyType: LlamaVocabularyTy
         return tokens.cls;
 
     if (tokens.shouldPrependBosToken)
-        return tokens.eos;
+        return tokens.bos;
 
     return null;
 }
