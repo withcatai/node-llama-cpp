@@ -43,7 +43,7 @@ const __dirname = path.dirname(
 
 const llama = await getLlama();
 const model = await llama.loadModel({
-    modelPath: path.join(__dirname, "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+    modelPath: path.join(__dirname, "bge-small-en-v1.5-q8_0.gguf")
 });
 const context = await model.createEmbeddingContext();
 
@@ -110,6 +110,7 @@ console.log("Document:", topSimilarDocument);
 > query: What is the tallest mountain on Earth?
 > Document: Mount Everest is the tallest mountain in the world
 > ```
+> This example uses [bge-small-en-v1.5](https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/blob/main/bge-small-en-v1.5-q8_0.gguf)
 
 ## Getting Raw Vectors {#raw-vector}
 To get the raw embedding vectors, you can use the [`vector`](../api/classes/LlamaEmbedding.md#vector) property of the [`LlamaEmbedding`](../api/classes/LlamaEmbedding.md) object:
