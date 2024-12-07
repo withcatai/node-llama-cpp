@@ -49,12 +49,15 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         Napi::Value MiddleToken(const Napi::CallbackInfo& info);
         Napi::Value SuffixToken(const Napi::CallbackInfo& info);
         Napi::Value EotToken(const Napi::CallbackInfo& info);
+        Napi::Value ClsToken(const Napi::CallbackInfo& info);
+        Napi::Value SepToken(const Napi::CallbackInfo& info);
         Napi::Value GetTokenString(const Napi::CallbackInfo& info);
 
         Napi::Value GetTokenAttributes(const Napi::CallbackInfo& info);
         Napi::Value IsEogToken(const Napi::CallbackInfo& info);
         Napi::Value GetVocabularyType(const Napi::CallbackInfo& info);
         Napi::Value ShouldPrependBosToken(const Napi::CallbackInfo& info);
+        Napi::Value ShouldAppendEosToken(const Napi::CallbackInfo& info);
         Napi::Value GetModelSize(const Napi::CallbackInfo& info);
 
         static void init(Napi::Object exports);

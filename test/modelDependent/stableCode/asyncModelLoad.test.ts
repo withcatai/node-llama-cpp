@@ -48,7 +48,7 @@ describe("stableCode", () => {
             }
 
             expect(loopIterationsBeforeUnload).toBeGreaterThanOrEqual(2);
-            expect(disposePromise).resolves.toBeUndefined();
+            await expect(disposePromise).resolves.toBeUndefined();
         });
 
         test("load progress emitted", {timeout: 1000 * 60 * 60 * 2}, async () => {
@@ -62,7 +62,7 @@ describe("stableCode", () => {
             const modelPromise = llama.loadModel({
                 modelPath,
                 onLoadProgress(loadPercentage: number) {
-                    if (logProgresses.length === 0 || loadPercentage - logProgresses[logProgresses.length - 1] >= 0.1 || loadPercentage === 1)
+                    if (logProgresses.length === 0 || loadPercentage - logProgresses.at(-1)! >= 0.1 || loadPercentage === 1)
                         logProgresses.push(loadPercentage);
                 }
             });
@@ -106,7 +106,7 @@ describe("stableCode", () => {
                 modelPath,
                 loadSignal: loadController.signal,
                 onLoadProgress(loadPercentage: number) {
-                    if (logProgresses.length === 0 || loadPercentage - logProgresses[logProgresses.length - 1] >= 0.1 || loadPercentage === 1)
+                    if (logProgresses.length === 0 || loadPercentage - logProgresses.at(-1)! >= 0.1 || loadPercentage === 1)
                         logProgresses.push(loadPercentage);
 
                     if (loadPercentage >= 0.2 && !loadController.signal.aborted) {

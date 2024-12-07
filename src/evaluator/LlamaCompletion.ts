@@ -11,6 +11,7 @@ import {getQueuedTokensBeforeStopTrigger} from "../utils/getQueuedTokensBeforeSt
 import {safeEventCallback} from "../utils/safeEventCallback.js";
 import {pushAll} from "../utils/pushAll.js";
 import {GgufArchitectureType} from "../gguf/types/GgufMetadataTypes.js";
+import {resolveBeginningTokenToPrepend} from "../utils/tokenizerUtils.js";
 import {LlamaGrammarEvaluationState} from "./LlamaGrammarEvaluationState.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 import {EvaluationPriority} from "./LlamaContext/types.js";
@@ -262,8 +263,10 @@ export class LlamaCompletion {
         if (this._sequence == null || this.disposed)
             throw new DisposedError();
 
-        const bosToken = this._sequence.model.tokens.bos;
-        const shouldPrependBosToken = this._sequence.model.tokens.shouldPrependBosToken;
+        const beginningTokenToPrepend = resolveBeginningTokenToPrepend(
+            this._sequence.model.vocabularyType,
+            this._sequence.model.tokens
+        );
 
         const extraEosTokens = getExtraCompletionEosTokens(this._sequence.model);
 
@@ -274,8 +277,8 @@ export class LlamaCompletion {
         }): Promise<Token[]> {
             const res = [];
 
-            if (shouldPrependBosToken && bosToken != null)
-                res.push(bosToken);
+            if (beginningTokenToPrepend != null)
+                res.push(beginningTokenToPrepend);
 
             const inputTokensSize = Math.max(0, Math.min(maxTokens - res.length, tokens.length));
 
@@ -305,7 +308,7 @@ export class LlamaCompletion {
             const resolvedInput = tokenizeInput(
                 input,
                 this._sequence.model.tokenizer,
-                (shouldPrependBosToken && bosToken != null)
+                beginningTokenToPrepend != null
                     ? "trimLeadingSpace"
                     : undefined
             );
@@ -406,8 +409,10 @@ export class LlamaCompletion {
         const prefixToken = this._sequence.model.tokens.infill.prefix;
         const suffixToken = this._sequence.model.tokens.infill.suffix;
         const middleToken = this._sequence.model.tokens.infill.middle;
-        const bosToken = this._sequence.model.tokens.bos;
-        const shouldPrependBosToken = this._sequence.model.tokens.shouldPrependBosToken;
+        const beginningTokenToPrepend = resolveBeginningTokenToPrepend(
+            this._sequence.model.vocabularyType,
+            this._sequence.model.tokens
+        );
 
         if (prefixToken == null || suffixToken == null)
             throw new UnsupportedError("Infill completions are not supported by this model");
@@ -425,7 +430,7 @@ export class LlamaCompletion {
             // 2 - InfillPrefix token, InfillSuffix token
             const specialTokensInContext = 2 +
                 (middleToken != null ? 1 : 0) +
-                ((shouldPrependBosToken && bosToken != null) ? 1 : 0);
+                (beginningTokenToPrepend != null ? 1 : 0);
             const resolvedMaxTokens = maxTokens - specialTokensInContext;
             let sizeLeftToFill = resolvedMaxTokens;
 
@@ -464,8 +469,8 @@ export class LlamaCompletion {
 
             const newContextState: Token[] = [];
 
-            if (shouldPrependBosToken && bosToken != null)
-                newContextState.push(bosToken);
+            if (beginningTokenToPrepend != null)
+                newContextState.push(beginningTokenToPrepend);
 
             if (middleToken != null) {
                 newContextState.push(prefixToken);

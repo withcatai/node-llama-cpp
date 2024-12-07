@@ -389,7 +389,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-12
+    runs-on: ubuntu-24.04
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
@@ -412,10 +412,10 @@ jobs:
           name: llama.cpp
           path: llama
 
-      - name: Install dependencies on macOS
+      - name: Install dependencies on Ubuntu
         run: |
-          brew install cmake ninja
-          alias make=cmake
+          sudo apt-get update
+          sudo apt-get install ninja-build cmake
 
       - name: Install modules
         run: npm ci

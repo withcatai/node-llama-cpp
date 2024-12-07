@@ -33,6 +33,7 @@ export const enum GgufArchitectureType {
     commandR = "command-r",
     dbrx = "dbrx",
     olmo = "olmo",
+    olmo2 = "olmo2",
     olmoe = "olmoe",
     openelm = "openelm",
     arctic = "arctic",
@@ -45,6 +46,9 @@ export const enum GgufArchitectureType {
     nemotron = "nemotron",
     exaone = "exaone",
     rwkv6 = "rwkv6",
+    granite = "granite",
+    granitemoe = "granitemoe",
+    chameleon = "chameleon",
     unknown = "(unknown)"
 }
 
@@ -230,17 +234,30 @@ export type GgufMetadataTokenizer = {
         readonly merges?: readonly string[],
         readonly bos_token_id?: number,
         readonly eos_token_id?: number,
+        readonly eot_token_id?: number,
+        readonly eom_token_id?: number,
         readonly unknown_token_id?: number,
         readonly separator_token_id?: number,
         readonly padding_token_id?: number,
+        readonly cls_token_id?: number,
+        readonly mask_token_id?: number,
         readonly add_bos_token?: boolean,
         readonly add_eos_token?: boolean,
         readonly add_space_prefix?: boolean,
         readonly added_tokens?: readonly string[],
+        readonly fim_pre_token_id?: number,
+        readonly fim_suf_token_id?: number,
+        readonly fim_mid_token_id?: number,
+        readonly fim_pad_token_id?: number,
+        readonly fim_rep_token_id?: number,
+        readonly fim_sep_token_id?: number,
+
+        /** @deprecated */
         readonly prefix_token_id?: number,
+        /** @deprecated */
         readonly suffix_token_id?: number,
-        readonly middle_token_id?: number,
-        readonly eot_token_id?: number
+        /** @deprecated */
+        readonly middle_token_id?: number
     },
     readonly huggingface?: {
         readonly json?: string
@@ -253,7 +270,8 @@ export const enum GgufMetadataArchitecturePoolingType {
     none = 0,
     mean = 1,
     cls = 2,
-    last = 3
+    last = 3,
+    rank = 4
 }
 
 export type GgufMetadataDefaultArchitectureType = {
