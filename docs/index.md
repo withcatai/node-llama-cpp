@@ -117,7 +117,6 @@ const session = new LlamaChatSession({
     contextSequence: context.getSequence()
 });
 
-
 const q1 = "Hi there, how are you?";
 console.log("User: " + q1);
 
@@ -139,18 +138,17 @@ const __dirname = path.dirname(
 
 const llama = await getLlama();
 const model = await llama.loadModel({
-    modelPath: path.join(__dirname, "my-model.gguf")
+    modelPath: path.join(__dirname, "my-emb-model.gguf")
 });
+
 const context = await model.createEmbeddingContext();
 
-
-
-
-
 const text = "Hello world";
+
 console.log("Text:", text);
 
 const embedding = await context.getEmbeddingFor(text);
+
 console.log("Embedding vector:", embedding.vector);
 ```
 

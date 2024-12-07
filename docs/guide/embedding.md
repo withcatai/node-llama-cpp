@@ -122,7 +122,11 @@ const __dirname = path.dirname(
 
 const llama = await getLlama();
 const model = await llama.loadModel({
-    modelPath: path.join(__dirname, "my-model.gguf")
+    /* 
+      You can also load quantized models such as "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf", which generate embeddings 
+      using their intermediate layers. However, specialized encoders models are generally more accurate for search.
+    */
+    modelPath: path.join(__dirname, "nomic-embed-text-v1.5.f16.gguf")
 });
 const context = await model.createEmbeddingContext();
 
