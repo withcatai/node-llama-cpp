@@ -415,7 +415,7 @@ jobs:
       - name: Install dependencies on Ubuntu
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build cmake 
+          sudo apt-get install ninja-build cmake
 
       - name: Install modules
         run: npm ci
