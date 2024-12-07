@@ -198,8 +198,10 @@ export default defineConfig({
         ["style", {}]
     ],
     async transformHead({pageData, head}) {
+        let description = pageData.description;
         if (pageData.filePath === "index.md") {
             head.push(...defaultImageMetaTags);
+            description ||= defaultPageDescription;
         } else if (pageData.relativePath === "404.md")
             head.push(...defaultImageMetaTags);
 
@@ -209,7 +211,6 @@ export default defineConfig({
         ]
             .filter(Boolean)
             .join(" - ") || defaultPageTitle;
-        const description = pageData.description || defaultPageDescription;
 
         if (pageData.filePath.startsWith("blog/") && pageData.frontmatter.image != null) {
             let imageDir = pageData.filePath;
@@ -249,9 +250,12 @@ export default defineConfig({
         }
 
         head.push(["meta", {name: "og:title", content: title}]);
-        head.push(["meta", {name: "og:description", content: description}]);
+        if (description != null && description !== "")
+            head.push(["meta", {name: "og:description", content: description}]);
+
         head.push(["meta", {name: "twitter:title", content: title}]);
-        head.push(["meta", {name: "twitter:description", content: description}]);
+        if (description != null && description !== "")
+            head.push(["meta", {name: "twitter:description", content: description}]);
     },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/")) {
