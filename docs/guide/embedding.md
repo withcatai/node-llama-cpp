@@ -23,6 +23,8 @@ Instead, we can embed all the documents once and then search for the most simila
 To do that, we embed all the documents in advance and store the embeddings in a database.
 Then, when a query comes in, we embed the query and search for the most similar embeddings in the database, and return the corresponding documents.
 
+Read the [choosing a model tutorial](./choosing-a-model.md) to learn how to choose the right model for your use case.
+
 ## Finding Relevant Documents
 Let's see an example of how we can embed 10 texts and then search for the most relevant one to a given query:
 ::: warning NOTE
