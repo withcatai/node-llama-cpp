@@ -251,8 +251,9 @@ export default defineConfig({
             }
         }
 
-        if ((description == null || description === "") && pageData.filePath && !pageData.filePath.startsWith("api/")) {
-            const excerpt = await getExcerptFromMarkdownFile(await fs.readFile(path.join(docsDir, pageData.filePath), "utf8"));
+        const markdownFilePath = path.join(docsDir, pageData.filePath);
+        if ((description == null || description === "") && await fs.pathExists(markdownFilePath) && !pageData.filePath.startsWith("api/")) {
+            const excerpt = await getExcerptFromMarkdownFile(await fs.readFile(markdownFilePath, "utf8"));
             if (excerpt != null && excerpt !== "")
                 description = excerpt.replaceAll('"', "'").replaceAll("\n", " ");
         }
