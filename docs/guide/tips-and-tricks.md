@@ -1,3 +1,6 @@
+---
+description: Tips and tricks for using node-llama-cpp
+---
 # Tips and Tricks
 ## Flash Attention {#flash-attention}
 ::: warning Experimental Feature

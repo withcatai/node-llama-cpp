@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'inspect measure' command reference"
 ---
 # `inspect measure` command
 

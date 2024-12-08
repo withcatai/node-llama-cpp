@@ -1,3 +1,6 @@
+---
+description: Metal support in node-llama-cpp
+---
 # Metal Support
 > Metal is a low-level 3D graphics and compute API created by Apple for Apple platforms
 

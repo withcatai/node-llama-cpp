@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'init' command reference"
 ---
 # `init` command
 

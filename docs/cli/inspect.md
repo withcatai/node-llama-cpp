@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'inspect' command reference"
 ---
 # `inspect` command
 

@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'pull' command reference"
 ---
 # `pull` command
 

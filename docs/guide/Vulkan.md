@@ -1,5 +1,6 @@
 ---
 outline: [2, 3]
+description: Vulkan support in node-llama-cpp
 ---
 # Using Vulkan
 > Vulkan is a low-overhead, cross-platform 3D graphics and computing API

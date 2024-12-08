@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'source clear' command reference"
 ---
 # `source clear` command
 

@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: CLI commands reference
 ---
 # CLI
 

@@ -1,3 +1,6 @@
+---
+description: The basics of working with tokens in node-llama-cpp
+---
 # Using Tokens
 `node-llama-cpp` provides you with a high-level API that abstracts dealing with tokens,
 so you may not even encounter a scenario where you have to deal with tokens directly.

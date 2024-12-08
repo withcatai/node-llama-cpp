@@ -1,3 +1,6 @@
+---
+description: Chatting with a text generation model
+---
 # Using `LlamaChatSession`
 To chat with a text generation model, you can use the [`LlamaChatSession`](../api/classes/LlamaChatSession.md) class.
 
