@@ -732,7 +732,9 @@ export default defineConfig({
             });
 
             for (const {url, frontmatter, html, src, excerpt: originalExcerpt} of blogPosts) {
-                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:image");
+                const ogImageElement = findElementInHtml(html, (element) => (
+                    element.tagName === "meta" && (element.properties?.name === "og:image" || element.properties?.property === "og:image")
+                ));
                 const date = new Date(frontmatter.date);
                 if (Number.isNaN(date.getTime()))
                     throw new Error(`Invalid date for blog post: ${url}`);
