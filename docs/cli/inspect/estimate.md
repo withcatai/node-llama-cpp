@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'inspect estimate' command reference"
 ---
 # `inspect estimate` command
 

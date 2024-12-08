@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: Downloading models with node-llama-cpp
 ---
 # Downloading Models
 `node-llama-cpp` is equipped with solutions to download models to use them in your project.

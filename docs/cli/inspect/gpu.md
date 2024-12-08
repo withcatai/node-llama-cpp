@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'inspect gpu' command reference"
 ---
 # `inspect gpu` command
 

@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: Get started with node-llama-cpp
 ---
 # Getting Started
 

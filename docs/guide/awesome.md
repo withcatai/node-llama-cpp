@@ -1,3 +1,6 @@
+---
+description: Awesome projects that use node-llama-cpp
+---
 # Awesome `node-llama-cpp`
 Awesome projects that use `node-llama-cpp`.
 

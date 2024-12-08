@@ -1,5 +1,6 @@
 ---
 outline: [2, 4]
+description: Using embeddings with node-llama-cpp
 ---
 # Using Embedding
 ::: info What is an embedding?
@@ -23,6 +24,8 @@ Instead, we can embed all the documents once and then search for the most simila
 To do that, we embed all the documents in advance and store the embeddings in a database.
 Then, when a query comes in, we embed the query and search for the most similar embeddings in the database, and return the corresponding documents.
 
+Read the [choosing a model tutorial](./choosing-a-model.md) to learn how to choose the right model for your use case.
+
 ## Finding Relevant Documents
 Let's see an example of how we can embed 10 texts and then search for the most relevant one to a given query:
 ::: warning NOTE
@@ -41,7 +44,7 @@ const __dirname = path.dirname(
 
 const llama = await getLlama();
 const model = await llama.loadModel({
-    modelPath: path.join(__dirname, "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+    modelPath: path.join(__dirname, "bge-small-en-v1.5-q8_0.gguf")
 });
 const context = await model.createEmbeddingContext();
 
@@ -108,6 +111,7 @@ console.log("Document:", topSimilarDocument);
 > query: What is the tallest mountain on Earth?
 > Document: Mount Everest is the tallest mountain in the world
 > ```
+> This example uses [bge-small-en-v1.5](https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/blob/main/bge-small-en-v1.5-q8_0.gguf)
 
 ## Getting Raw Vectors {#raw-vector}
 To get the raw embedding vectors, you can use the [`vector`](../api/classes/LlamaEmbedding.md#vector) property of the [`LlamaEmbedding`](../api/classes/LlamaEmbedding.md) object:

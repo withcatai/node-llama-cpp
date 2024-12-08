@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'source download' command reference"
 ---
 # `source download` command
 

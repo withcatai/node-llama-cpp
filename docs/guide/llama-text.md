@@ -1,3 +1,6 @@
+---
+description: The basics of using LlamaText in node-llama-cpp
+---
 # Using LlamaText
 The [`LlamaText`](../api/classes/LlamaText.md) class is used to create content to be loaded into a model's context state without directly using the model's tokenizer for that.
 

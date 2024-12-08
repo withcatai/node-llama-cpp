@@ -1,3 +1,6 @@
+---
+description: Chat with a model without having to worry about any parsing or formatting
+---
 # Chat Wrapper
 ## Background
 Text generation models are trained to predict the completion of incomplete text. 

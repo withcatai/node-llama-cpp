@@ -1,5 +1,6 @@
 ---
 outline: [2, 4]
+description: Using node-llama-cpp in Docker
 ---
 # Using `node-llama-cpp` in Docker
 When using `node-llama-cpp` in a docker image to run it with [Docker](https://www.docker.com) or [Podman](https://podman.io), you will most likely want to use it together with a GPU for fast inference.

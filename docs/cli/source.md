@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'source' command reference"
 ---
 # `source` command
 

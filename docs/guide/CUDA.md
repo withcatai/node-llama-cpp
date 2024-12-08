@@ -1,5 +1,6 @@
 ---
 outline: [2, 3]
+description: CUDA support in node-llama-cpp
 ---
 # CUDA Support
 > CUDA is a parallel computing platform and API created by NVIDIA for NVIDIA GPUs

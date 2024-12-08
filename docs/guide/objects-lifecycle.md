@@ -1,5 +1,6 @@
 ---
 outline: [2, 3]
+description: Objects lifecycle in node-llama-cpp
 ---
 # Objects Lifecycle
 Every object in `node-llama-cpp` has a ` .dispose()` function you can call to free up its resources.

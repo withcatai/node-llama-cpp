@@ -1,3 +1,6 @@
+---
+description: Chat with a model and manage the chat state externally
+---
 # External Chat State
 ::: warning
 If you're not building a library around `node-llama-cpp`, you'd probably want to use the simpler [`LlamaChatSession`](../api/classes/LlamaChatSession.md); read more on the [chat session documentation](./chat-session.md).

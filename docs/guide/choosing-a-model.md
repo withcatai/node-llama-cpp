@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: Learn how to choose the right model for your use case
 ---
 # Choosing a Model
 ## About GGUF Model Files
@@ -83,7 +84,7 @@ npx --no node-llama-cpp inspect estimate <model-file-url>
 ```
 :::
 
-### What do you need this model for? (chat, code completion, analyzing data, classification, etc.) {#model-purpose}
+### What do you need this model for? (chat, code completion, analyzing data, classification, embedding, etc.) {#model-purpose}
 There are plenty of models with different areas of expertise and capabilities.
 
 When you choose a model that is more specialized in the task you need it for, it will usually perform better than a general model.
@@ -110,6 +111,18 @@ Here are a few concepts to be aware of when choosing a model:
   To distinguish between the fine-tune and the foundational model in the model name,
   you can either recognize the foundational model name and then assume that the rest is a fine-tune name,
   or you can open the model's page and read the model description.
+
+* **Embedding models** - models that are trained to convert text into [embeddings](./embedding.md) that capture the semantic meaning of the text.
+
+  Generating embeddings for similarity search using such models is preferable
+  because they are highly optimized for this task.
+  Embedding models are often significantly smaller (sometimes as small as 100MB), faster,
+  and consume less memory than general-purpose models, making them more efficient and practical.
+
+  While general-purpose models can also be used for generating embeddings,
+  they may not be as optimized or as efficient as embedding models for this task.
+  
+  Many embedding models include terms like `embed` in their name.
 
 ### How much data do you plan to feed the model at once with?
 If you plan to feed the model with a lot of data at once, you'll need a model that supports a large context size.

@@ -1,5 +1,6 @@
 ---
 outline: [2, 3]
+description: Troubleshooting common issues with node-llama-cpp
 ---
 # Troubleshooting
 ## ESM Usage

@@ -1,3 +1,6 @@
+---
+description: Using node-llama-cpp in Electron applications
+---
 # Using in Electron
 `node-llama-cpp` is fully supported in [Electron](https://www.electronjs.org), and also includes custom Electron-specific adaptations.
 

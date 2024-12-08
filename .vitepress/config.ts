@@ -16,6 +16,7 @@ import {Resvg, initWasm as initResvgWasm, type ResvgRenderOptions} from "@resvg/
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
 import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
 import {ensureLocalImage} from "./utils/ensureLocalImage.js";
+import {getExcerptFromMarkdownFile} from "./utils/getExcerptFromMarkdownFile.js";
 import type {Element as HastElement, Parent} from "hast";
 
 import type {Node as UnistNode} from "unist";
@@ -28,6 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson: typeof import("../package.json") = fs.readJsonSync(path.join(__dirname, "..", "package.json"));
 const env = envVar.from(process.env);
 
+const docsDir = path.join(__dirname, "..", "docs");
 const urlBase = env.get("DOCS_URL_BASE")
     .asString();
 const packageVersion = env.get("DOCS_PACKAGE_VERSION")
@@ -66,9 +68,9 @@ function resolveHref(href: string, withDomain: boolean = false): string {
 }
 
 const defaultImageMetaTags: HeadConfig[] = [
-    ["meta", {name: "og:image", content: socialPosterLink}],
-    ["meta", {name: "og:image:width", content: "4096"}],
-    ["meta", {name: "og:image:height", content: "2048"}],
+    ["meta", {property: "og:image", content: socialPosterLink}],
+    ["meta", {property: "og:image:width", content: "4096"}],
+    ["meta", {property: "og:image:height", content: "2048"}],
     ["meta", {name: "twitter:image", content: socialPosterLink}],
     ["meta", {name: "twitter:card", content: "summary_large_image"}]
 ];
@@ -185,9 +187,9 @@ export default defineConfig({
         ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom", true)}],
         ["meta", {name: "theme-color", content: "#cd8156"}],
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
-        ["meta", {name: "og:type", content: "website"}],
-        ["meta", {name: "og:locale", content: "en"}],
-        ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
+        ["meta", {property: "og:type", content: "website"}],
+        ["meta", {property: "og:locale", content: "en"}],
+        ["meta", {property: "og:site_name", content: "node-llama-cpp"}],
         ["script", {async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-Q2SWE5Z1ST"}],
         [
             "script",
@@ -198,8 +200,10 @@ export default defineConfig({
         ["style", {}]
     ],
     async transformHead({pageData, head}) {
+        let description = pageData.description;
         if (pageData.filePath === "index.md") {
             head.push(...defaultImageMetaTags);
+            description ||= defaultPageDescription;
         } else if (pageData.relativePath === "404.md")
             head.push(...defaultImageMetaTags);
 
@@ -209,7 +213,6 @@ export default defineConfig({
         ]
             .filter(Boolean)
             .join(" - ") || defaultPageTitle;
-        const description = pageData.description || defaultPageDescription;
 
         if (pageData.filePath.startsWith("blog/") && pageData.frontmatter.image != null) {
             let imageDir = pageData.filePath;
@@ -220,7 +223,7 @@ export default defineConfig({
                 const coverImage = await ensureLocalImage(pageData.frontmatter.image, "cover", {
                     baseDestLocation: imageDir.split("/")
                 });
-                head.push(["meta", {name: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
+                head.push(["meta", {property: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
             } else if (typeof pageData.frontmatter.image === "object") {
                 const coverImage = typeof pageData.frontmatter.image.url === "string"
                     ? await ensureLocalImage(pageData.frontmatter.image.url, "cover", {
@@ -230,28 +233,53 @@ export default defineConfig({
 
                 if (typeof pageData.frontmatter.image.url === "string")
                     head.push(["meta", {
-                        name: "og:image",
+                        property: "og:image",
                         content: resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true)
                     }]);
 
                 if (pageData.frontmatter.image.width != null)
                     head.push(["meta", {
-                        name: "og:image:width",
+                        property: "og:image:width",
                         content: String(coverImage?.width ?? pageData.frontmatter.image.width)
                     }]);
 
                 if (pageData.frontmatter.image.height != null)
                     head.push(["meta", {
-                        name: "og:image:height",
+                        property: "og:image:height",
                         content: String(coverImage?.height ?? pageData.frontmatter.image.height)
                     }]);
             }
         }
 
-        head.push(["meta", {name: "og:title", content: title}]);
-        head.push(["meta", {name: "og:description", content: description}]);
+        const markdownFilePath = path.join(docsDir, pageData.filePath);
+        if ((description == null || description === "") && await fs.pathExists(markdownFilePath) && !pageData.filePath.startsWith("api/")) {
+            const excerpt = await getExcerptFromMarkdownFile(await fs.readFile(markdownFilePath, "utf8"));
+            if (excerpt != null && excerpt !== "")
+                description = excerpt.replaceAll('"', "'").replaceAll("\n", " ");
+        }
+
+        pageData.description = description;
+
+        if (description != null && description !== "" &&
+            (pageData.frontmatter.description == null || pageData.frontmatter.description === "")
+        ) {
+            pageData.frontmatter.description = description;
+            for (let i = 0; i < head.length; i++) {
+                const header = head[i]!;
+                if (header[0] === "meta" && header[1]?.name === "description") {
+                    head[i] = ["meta", {name: "description", content: description}];
+                    break;
+                }
+            }
+        }
+
+        head.push(["meta", {property: "og:title", content: title}]);
+        if (description != null && description !== "")
+            head.push(["meta", {property: "og:description", content: description}]);
+
         head.push(["meta", {name: "twitter:title", content: title}]);
-        head.push(["meta", {name: "twitter:description", content: description}]);
+        if (description != null && description !== "")
+            head.push(["meta", {name: "twitter:description", content: description}]);
     },
     transformPageData(pageData) {
         if (pageData.filePath.startsWith("api/")) {
@@ -307,7 +335,7 @@ export default defineConfig({
         plugins: [
             GitChangelog({
                 repoURL: () => "https://github.com/withcatai/node-llama-cpp",
-                cwd: path.join(__dirname, "..", "docs")
+                cwd: docsDir
             }) as VitepressPlugin,
             GitChangelogMarkdownSection({
                 exclude: (id) => (
@@ -703,19 +731,28 @@ export default defineConfig({
                 return bDate.getTime() - aDate.getTime();
             });
 
-            for (const {url, excerpt, frontmatter, html} of blogPosts) {
-                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:imag");
+            for (const {url, frontmatter, html, src, excerpt: originalExcerpt} of blogPosts) {
+                const ogImageElement = findElementInHtml(html, (element) => (
+                    element.tagName === "meta" && (element.properties?.name === "og:image" || element.properties?.property === "og:image")
+                ));
                 const date = new Date(frontmatter.date);
                 if (Number.isNaN(date.getTime()))
                     throw new Error(`Invalid date for blog post: ${url}`);
                 else if (frontmatter.title == null || frontmatter.title === "")
                     throw new Error(`Invalid title for blog post: ${url}`);
 
+                let description: string | undefined = frontmatter.description;
+                if ((description == null || description == "") && src != null)
+                    description = await getExcerptFromMarkdownFile(src);
+
+                if ((description == null || description === "") && originalExcerpt != null && originalExcerpt !== "")
+                    description = originalExcerpt;
+
                 feed.addItem({
                     title: frontmatter.title,
                     id: resolveHref(url, true),
                     link: resolveHref(url, true),
-                    description: excerpt || frontmatter.description || undefined,
+                    description,
                     content: html,
                     author: [{
                         name: frontmatter.author?.name,

@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'inspect gguf' command reference"
 ---
 # `inspect gguf` command
 

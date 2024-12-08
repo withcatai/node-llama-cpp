@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'chat' command reference"
 ---
 # `chat` command
 
