@@ -731,7 +731,7 @@ export default defineConfig({
                 return bDate.getTime() - aDate.getTime();
             });
 
-            for (const {url, excerpt, frontmatter, html} of blogPosts) {
+            for (const {url, frontmatter, html, src, excerpt: originalExcerpt} of blogPosts) {
                 const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:image");
                 const date = new Date(frontmatter.date);
                 if (Number.isNaN(date.getTime()))
@@ -739,11 +739,18 @@ export default defineConfig({
                 else if (frontmatter.title == null || frontmatter.title === "")
                     throw new Error(`Invalid title for blog post: ${url}`);
 
+                let description: string | undefined = frontmatter.description;
+                if ((description == null || description == "") && src != null)
+                    description = await getExcerptFromMarkdownFile(src);
+
+                if ((description == null || description === "") && originalExcerpt != null && originalExcerpt !== "")
+                    description = originalExcerpt;
+
                 feed.addItem({
                     title: frontmatter.title,
                     id: resolveHref(url, true),
                     link: resolveHref(url, true),
-                    description: excerpt || frontmatter.description || undefined,
+                    description,
                     content: html,
                     author: [{
                         name: frontmatter.author?.name,
