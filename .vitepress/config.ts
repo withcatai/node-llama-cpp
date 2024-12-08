@@ -68,9 +68,9 @@ function resolveHref(href: string, withDomain: boolean = false): string {
 }
 
 const defaultImageMetaTags: HeadConfig[] = [
-    ["meta", {name: "og:image", content: socialPosterLink}],
-    ["meta", {name: "og:image:width", content: "4096"}],
-    ["meta", {name: "og:image:height", content: "2048"}],
+    ["meta", {property: "og:image", content: socialPosterLink}],
+    ["meta", {property: "og:image:width", content: "4096"}],
+    ["meta", {property: "og:image:height", content: "2048"}],
     ["meta", {name: "twitter:image", content: socialPosterLink}],
     ["meta", {name: "twitter:card", content: "summary_large_image"}]
 ];
@@ -187,9 +187,9 @@ export default defineConfig({
         ["link", {rel: "alternate", title: "Blog", type: "application/atom+xml", href: resolveHref("/blog/feed.atom", true)}],
         ["meta", {name: "theme-color", content: "#cd8156"}],
         ["meta", {name: "theme-color", content: "#dd773e", media: "(prefers-color-scheme: dark)"}],
-        ["meta", {name: "og:type", content: "website"}],
-        ["meta", {name: "og:locale", content: "en"}],
-        ["meta", {name: "og:site_name", content: "node-llama-cpp"}],
+        ["meta", {property: "og:type", content: "website"}],
+        ["meta", {property: "og:locale", content: "en"}],
+        ["meta", {property: "og:site_name", content: "node-llama-cpp"}],
         ["script", {async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-Q2SWE5Z1ST"}],
         [
             "script",
@@ -223,7 +223,7 @@ export default defineConfig({
                 const coverImage = await ensureLocalImage(pageData.frontmatter.image, "cover", {
                     baseDestLocation: imageDir.split("/")
                 });
-                head.push(["meta", {name: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
+                head.push(["meta", {property: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
             } else if (typeof pageData.frontmatter.image === "object") {
                 const coverImage = typeof pageData.frontmatter.image.url === "string"
                     ? await ensureLocalImage(pageData.frontmatter.image.url, "cover", {
@@ -233,19 +233,19 @@ export default defineConfig({
 
                 if (typeof pageData.frontmatter.image.url === "string")
                     head.push(["meta", {
-                        name: "og:image",
+                        property: "og:image",
                         content: resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true)
                     }]);
 
                 if (pageData.frontmatter.image.width != null)
                     head.push(["meta", {
-                        name: "og:image:width",
+                        property: "og:image:width",
                         content: String(coverImage?.width ?? pageData.frontmatter.image.width)
                     }]);
 
                 if (pageData.frontmatter.image.height != null)
                     head.push(["meta", {
-                        name: "og:image:height",
+                        property: "og:image:height",
                         content: String(coverImage?.height ?? pageData.frontmatter.image.height)
                     }]);
             }
@@ -273,9 +273,9 @@ export default defineConfig({
             }
         }
 
-        head.push(["meta", {name: "og:title", content: title}]);
+        head.push(["meta", {property: "og:title", content: title}]);
         if (description != null && description !== "")
-            head.push(["meta", {name: "og:description", content: description}]);
+            head.push(["meta", {property: "og:description", content: description}]);
 
         head.push(["meta", {name: "twitter:title", content: title}]);
         if (description != null && description !== "")
