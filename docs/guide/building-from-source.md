@@ -1,5 +1,5 @@
 ---
-description: Build llama.cpp from source for node-llama-cpp
+description: Building llama.cpp from source for node-llama-cpp
 ---
 # Building From Source
 `node-llama-cpp` ships with pre-built binaries for macOS, Linux and Windows.
