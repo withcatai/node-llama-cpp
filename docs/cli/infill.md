@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'infill' command reference"
 ---
 # `infill` command
 

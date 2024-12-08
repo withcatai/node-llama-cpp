@@ -1,5 +1,6 @@
 ---
 outline: [2, 4]
+description: Using embeddings with node-llama-cpp
 ---
 # Using Embedding
 ::: info What is an embedding?

@@ -1,3 +1,6 @@
+---
+description: Using token bias to adjust the probabilities of tokens in the generated response
+---
 # Using Token Bias {#title}
 ## Background {#background}
 To feed text into a language model,

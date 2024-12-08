@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'source build' command reference"
 ---
 # `source build` command
 

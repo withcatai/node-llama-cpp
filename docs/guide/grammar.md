@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: Using grammar
 ---
 # Using Grammar
 Use this to enforce a model to generate response in a specific format of text, like `JSON` for example.

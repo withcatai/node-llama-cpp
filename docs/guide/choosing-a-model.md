@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: Learn how to choose the right model for your use case
 ---
 # Choosing a Model
 ## About GGUF Model Files

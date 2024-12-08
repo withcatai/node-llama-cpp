@@ -1,5 +1,6 @@
 ---
 outline: deep
+description: "'complete' command reference"
 ---
 # `complete` command
 

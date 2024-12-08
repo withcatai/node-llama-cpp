@@ -1,3 +1,6 @@
+---
+description: Using batching in node-llama-cpp
+---
 # Using Batching
 > Batching is the process of grouping multiple input sequences together to be processed simultaneously,
 > which improves computational efficiently and reduces overall inference times.

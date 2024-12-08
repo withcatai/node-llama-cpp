@@ -1,3 +1,6 @@
+---
+description: Generating text completions with node-llama-cpp
+---
 # Text Completion {#title}
 To generate text completions, you can use the [`LlamaCompletion`](../api/classes/LlamaCompletion.md) class.
 

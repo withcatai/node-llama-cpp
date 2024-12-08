@@ -16,6 +16,7 @@ import {Resvg, initWasm as initResvgWasm, type ResvgRenderOptions} from "@resvg/
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
 import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
 import {ensureLocalImage} from "./utils/ensureLocalImage.js";
+import {getExcerptFromMarkdownFile} from "./utils/getExcerptFromMarkdownFile.js";
 import type {Element as HastElement, Parent} from "hast";
 
 import type {Node as UnistNode} from "unist";
@@ -28,6 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson: typeof import("../package.json") = fs.readJsonSync(path.join(__dirname, "..", "package.json"));
 const env = envVar.from(process.env);
 
+const docsDir = path.join(__dirname, "..", "docs");
 const urlBase = env.get("DOCS_URL_BASE")
     .asString();
 const packageVersion = env.get("DOCS_PACKAGE_VERSION")
@@ -249,6 +251,27 @@ export default defineConfig({
             }
         }
 
+        if ((description == null || description === "") && pageData.filePath && !pageData.filePath.startsWith("api/")) {
+            const excerpt = await getExcerptFromMarkdownFile(await fs.readFile(path.join(docsDir, pageData.filePath), "utf8"));
+            if (excerpt != null && excerpt !== "")
+                description = excerpt.replaceAll('"', "'").replaceAll("\n", " ");
+        }
+
+        pageData.description = description;
+
+        if (description != null && description !== "" &&
+            (pageData.frontmatter.description == null || pageData.frontmatter.description === "")
+        ) {
+            pageData.frontmatter.description = description;
+            for (let i = 0; i < head.length; i++) {
+                const header = head[i]!;
+                if (header[0] === "meta" && header[1]?.name === "description") {
+                    head[i] = ["meta", {name: "description", content: description}];
+                    break;
+                }
+            }
+        }
+
         head.push(["meta", {name: "og:title", content: title}]);
         if (description != null && description !== "")
             head.push(["meta", {name: "og:description", content: description}]);
@@ -311,7 +334,7 @@ export default defineConfig({
         plugins: [
             GitChangelog({
                 repoURL: () => "https://github.com/withcatai/node-llama-cpp",
-                cwd: path.join(__dirname, "..", "docs")
+                cwd: docsDir
             }) as VitepressPlugin,
             GitChangelogMarkdownSection({
                 exclude: (id) => (
@@ -708,7 +731,7 @@ export default defineConfig({
             });
 
             for (const {url, excerpt, frontmatter, html} of blogPosts) {
-                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:imag");
+                const ogImageElement = findElementInHtml(html, (element) => element.tagName === "meta" && element.properties?.name === "og:image");
                 const date = new Date(frontmatter.date);
                 if (Number.isNaN(date.getTime()))
                     throw new Error(`Invalid date for blog post: ${url}`);
