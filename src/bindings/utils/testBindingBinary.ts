@@ -200,7 +200,7 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 binding.loadBackends();
                 const loadedGpu = binding.getGpuType();
                 if (loadedGpu == null || (loadedGpu === false && message.gpu !== false))
-                    binding.loadBackends(true);
+                    binding.loadBackends(path.dirname(path.resolve(message.bindingBinaryPath)));
 
                 await binding.init();
                 binding.getGpuVramInfo();

@@ -24,6 +24,11 @@ execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
 
 set(LLAMA_BUILD_COMMON ON)
 
+if (NOT MINGW)
+    set(GGML_BACKEND_DL ON)
+    set(BUILD_SHARED_LIBS ON)
+endif()
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     add_compile_options(-Wno-c++17-extensions)
 endif()

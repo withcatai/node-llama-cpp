@@ -103,11 +103,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (!cmakeCustomOptions.has("GGML_OPENMP"))
                         cmakeCustomOptions.set("GGML_OPENMP", "OFF");
 
-                    if (!cmakeCustomOptions.has("GGML_AMX"))
-                        cmakeCustomOptions.set("GGML_AMX", "OFF");
-
-                    if (!cmakeCustomOptions.has("GGML_NATIVE") && buildOptions.platform !== "mac")
+                    if (!cmakeCustomOptions.has("GGML_NATIVE") && !(buildOptions.platform === "mac" && buildOptions.arch === "arm64")) {
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
+
+                        if (!cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS"))
+                            cmakeCustomOptions.set("GGML_CPU_ALL_VARIANTS", "ON");
+                    }
                 }
 
                 await fs.remove(outDirectory);

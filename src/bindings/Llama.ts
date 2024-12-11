@@ -1,4 +1,5 @@
 import os from "os";
+import path from "path";
 import chalk from "chalk";
 import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
@@ -34,7 +35,7 @@ export class Llama {
     /** @internal */ public readonly _memoryLock = {};
     /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
-    /** @internal */ public readonly _vramPadding: MemoryReservation;
+    /** @internal */ public _vramPadding: MemoryReservation;
     /** @internal */ public readonly _ramOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _ramPadding: MemoryReservation;
     /** @internal */ public readonly _swapOrchestrator: MemoryOrchestrator;
@@ -65,10 +66,11 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, gpu, maxThreads, vramOrchestrator, vramPadding,
-        ramOrchestrator, ramPadding, swapOrchestrator
+        bindings, bindingPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, buildGpu, maxThreads, vramOrchestrator,
+        vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
     }: {
         bindings: BindingModule,
+        bindingPath: string,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
         buildType: "localBuild" | "prebuilt",
@@ -78,7 +80,7 @@ export class Llama {
             release: string
         },
         debug: boolean,
-        gpu: BuildGpu,
+        buildGpu: BuildGpu,
         maxThreads?: number,
         vramOrchestrator: MemoryOrchestrator,
         vramPadding: MemoryReservation,
@@ -86,14 +88,31 @@ export class Llama {
         ramPadding: MemoryReservation,
         swapOrchestrator: MemoryOrchestrator
     }) {
+        this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
+        this._onAddonLog = this._onAddonLog.bind(this);
+
         this._bindings = bindings;
-        this._gpu = gpu;
+        this._debug = debug;
+        this._logLevel = this._debug
+            ? LlamaLogLevel.debug
+            : (logLevel ?? LlamaLogLevel.debug);
+
+        if (!this._debug) {
+            this._bindings.setLogger(this._onAddonLog);
+            this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
+        }
+
+        bindings.loadBackends();
+        const loadedGpu = bindings.getGpuType();
+        if (loadedGpu == null || (loadedGpu === false && buildGpu !== false))
+            bindings.loadBackends(path.dirname(bindingPath));
+
+        this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
         this._mathCores = bindings.getMathCores();
         this._consts = bindings.getConsts();
-        this._debug = debug;
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
         this._ramOrchestrator = ramOrchestrator;
@@ -106,10 +125,6 @@ export class Llama {
                     : 0
             )
         );
-
-        this._logLevel = this._debug
-            ? LlamaLogLevel.debug
-            : (logLevel ?? LlamaLogLevel.debug);
         this._logger = logger;
         this._buildType = buildType;
         this._cmakeOptions = Object.freeze({...cmakeOptions});
@@ -118,21 +133,7 @@ export class Llama {
             release: llamaCppRelease.release
         });
 
-        this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
-        this._onAddonLog = this._onAddonLog.bind(this);
-
-        if (!this._debug) {
-            this._bindings.setLogger(this._onAddonLog);
-            this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
-        }
-
-        this._bindings.loadBackends();
-        const loadedGpu = bindings.getGpuType();
-        if (loadedGpu == null || (loadedGpu === false && gpu !== false))
-            this._bindings.loadBackends(true);
-
         this._onExit = this._onExit.bind(this);
-
         process.on("exit", this._onExit);
     }
 
@@ -446,9 +447,11 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads, skipLlamaInit = false, debug
+        bindings, bindingPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads, skipLlamaInit = false,
+        debug
     }: {
         bindings: BindingModule,
+        bindingPath: string,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
@@ -459,7 +462,6 @@ export class Llama {
         skipLlamaInit?: boolean,
         debug: boolean
     }) {
-        const gpu = bindings.getGpuType() ?? false;
         const vramOrchestrator = new MemoryOrchestrator(() => {
             const {total, used, unifiedSize} = bindings.getGpuVramInfo();
 
@@ -497,14 +499,6 @@ export class Llama {
             };
         });
 
-        let resolvedVramPadding: MemoryReservation;
-        if (gpu === false || vramPadding === 0)
-            resolvedVramPadding = vramOrchestrator.reserveMemory(0);
-        else if (vramPadding instanceof Function)
-            resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding((await vramOrchestrator.getMemoryState()).total));
-        else
-            resolvedVramPadding = vramOrchestrator.reserveMemory(vramPadding);
-
         let resolvedRamPadding: MemoryReservation;
         if (ramPadding instanceof Function)
             resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding((await ramOrchestrator.getMemoryState()).total));
@@ -513,6 +507,7 @@ export class Llama {
 
         const llama = new Llama({
             bindings,
+            bindingPath,
             buildType,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
             llamaCppRelease: {
@@ -522,14 +517,26 @@ export class Llama {
             logLevel,
             logger,
             debug,
-            gpu,
+            buildGpu: buildMetadata.buildOptions.gpu,
             vramOrchestrator,
             maxThreads,
-            vramPadding: resolvedVramPadding,
+            vramPadding: vramOrchestrator.reserveMemory(0),
             ramOrchestrator,
             ramPadding: resolvedRamPadding,
             swapOrchestrator
         });
+
+        if (llama.gpu === false || vramPadding === 0) {
+            // do nothing since `llama._vramPadding` is already set to 0
+        } else if (vramPadding instanceof Function) {
+            const currentVramPadding = llama._vramPadding;
+            llama._vramPadding = vramOrchestrator.reserveMemory(vramPadding((await vramOrchestrator.getMemoryState()).total));
+            currentVramPadding.dispose();
+        } else {
+            const currentVramPadding = llama._vramPadding;
+            llama._vramPadding = vramOrchestrator.reserveMemory(vramPadding);
+            currentVramPadding.dispose();
+        }
 
         if (!skipLlamaInit)
             await llama._init();
@@ -611,6 +618,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
     else if (level === LlamaLogLevel.warn && message.startsWith("ggml_metal_init: skipping kernel_") && message.endsWith("(not supported)"))
         return LlamaLogLevel.log;
     else if (level === LlamaLogLevel.warn && message.startsWith("ggml_cuda_init: GGML_CUDA_FORCE_") && message.endsWith(" no"))
+        return LlamaLogLevel.log;
+    else if (level === LlamaLogLevel.info && message.startsWith("load_backend: loaded "))
         return LlamaLogLevel.log;
 
     return level;
