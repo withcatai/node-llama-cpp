@@ -334,6 +334,8 @@ export class LlamaModel {
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
                 case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
+                case "CLS": return this.tokens.cls == null ? [] : [this.tokens.cls];
+                case "SEP": return this.tokens.sep == null ? [] : [this.tokens.sep];
             }
 
             void (builtinToken satisfies never);

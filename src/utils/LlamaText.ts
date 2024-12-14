@@ -515,7 +515,7 @@ export class SpecialTokensText {
     }
 }
 
-export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL" | "EOT";
+export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL" | "EOT" | "CLS" | "SEP";
 export class SpecialToken {
     public readonly value: BuiltinSpecialTokenValue;
 
@@ -568,7 +568,7 @@ export class SpecialToken {
 
     public static getTokenToValueMap(tokenizer: Tokenizer): ReadonlyMap<Token | undefined, BuiltinSpecialTokenValue> {
         const supportedValues = [
-            "BOS", "EOS", "NL", "EOT"
+            "BOS", "EOS", "NL", "EOT", "CLS", "SEP"
         ] as const satisfies BuiltinSpecialTokenValue[];
         void (0 as any as BuiltinSpecialTokenValue satisfies typeof supportedValues[number]);
 
