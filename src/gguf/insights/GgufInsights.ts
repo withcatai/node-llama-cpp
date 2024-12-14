@@ -370,6 +370,24 @@ export class GgufInsights {
         const cpuTensors: GgufTensorInfo[] = [];
 
         for (const singleTensorInfo of tensorInfo) {
+            // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_INPUT` are always
+            // loaded with `model.dev_input`, which is always set to the CPU
+            if (isInputLayer(singleTensorInfo.name)) {
+                cpuTensors.push(singleTensorInfo);
+                continue;
+
+            // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_OUTPUT` are always
+            // loaded with `model.dev_output`, which is set to the GPU only if all the layers are on the GPU
+            } else if (isOutputLayer(singleTensorInfo.name)) {
+                if (gpuLayers === this.totalLayers) {
+                    gpuTensors.push(singleTensorInfo);
+                    continue;
+                } else {
+                    cpuTensors.push(singleTensorInfo);
+                    continue;
+                }
+            }
+
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (gpuLayers !== this.totalLayers) {
@@ -558,4 +576,53 @@ function getTensorNeAndNb(tensor: GgufTensorInfo, {
         ne,
         nb
     };
+}
+
+function isInputLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    if (firstPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart) {
+        case "token_embd":
+        case "token_embd_norm":
+        case "token_types":
+        case "position_embd":
+            return true;
+    }
+
+    return false;
+}
+
+function isOutputLayer(layerName: string) {
+    const [firstPart, secondPart] = layerName.split(".");
+
+    if (firstPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart) {
+        case "output":
+        case "output_norm":
+        case "cls":
+            return true;
+    }
+
+    if (secondPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart + "." + secondPart) {
+        case "cls.output":
+        case "dec.output_norm":
+        case "enc.output_norm":
+            return true;
+    }
+
+    return false;
 }
