@@ -10,6 +10,9 @@ export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | Llama
 export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: string};
 export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 
+/**
+ * @see [Using `LlamaText`](https://node-llama-cpp.withcat.ai/guide/llama-text) tutorial
+ */
 class LlamaText {
     public readonly values: readonly LlamaTextValue[];
 

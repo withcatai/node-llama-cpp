@@ -1,6 +1,10 @@
 import {ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {GeneralChatWrapper} from "./GeneralChatWrapper.js";
 
+/**
+ * This chat wrapper is not safe against chat syntax injection attacks
+ * ([learn more](https://node-llama-cpp.withcat.ai/guide/llama-text#input-safety-in-node-llama-cpp)).
+ */
 export class AlpacaChatWrapper extends GeneralChatWrapper {
     public override readonly wrapperName: string = "AlpacaChat";
 

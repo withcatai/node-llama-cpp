@@ -29,6 +29,7 @@
 * [Provide a model with functions it can call on demand](https://node-llama-cpp.withcat.ai/guide/chat-session#function-calling) to retrieve information of perform actions
 * [Embedding support](https://node-llama-cpp.withcat.ai/guide/embedding)
 * Great developer experience with full TypeScript support, and [complete documentation](https://node-llama-cpp.withcat.ai/guide/)
+* [Safe against special token injection attacks](https://node-llama-cpp.withcat.ai/guide/llama-text#input-safety-in-node-llama-cpp)
 * Much more
 
 ## [Documentation](https://node-llama-cpp.withcat.ai)
