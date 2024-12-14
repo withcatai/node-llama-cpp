@@ -3,6 +3,9 @@ import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
 import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 
+/**
+ * @see [Using Token Bias](https://node-llama-cpp.withcat.ai/guide/token-bias) tutorial
+ */
 export class TokenBias {
     /** @internal */ public readonly _tokenizer: Tokenizer;
     /** @internal */ public readonly _biases = new Map<Token, number>();

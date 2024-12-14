@@ -332,14 +332,23 @@ export class Llama {
         });
     }
 
+    /* eslint-disable @stylistic/max-len */
+    /**
+     * @see [Using a JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#json-schema) tutorial
+     * @see [Reducing Hallucinations When Using JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#reducing-json-schema-hallucinations) tutorial
+     */
     public async createGrammarForJsonSchema<const T extends GbnfJsonSchema>(schema: Readonly<T>) {
         return new LlamaJsonSchemaGrammar<T>(this, schema);
     }
+    /* eslint-enable @stylistic/max-len */
 
     public async getGrammarFor(type: Parameters<typeof LlamaGrammar.getFor>[1]) {
         return await LlamaGrammar.getFor(this, type);
     }
 
+    /**
+     * @see [Using Grammar](https://node-llama-cpp.withcat.ai/guide/grammar) tutorial
+     */
     public async createGrammar(options: LlamaGrammarOptions) {
         return new LlamaGrammar(this, options);
     }

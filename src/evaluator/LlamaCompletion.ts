@@ -175,6 +175,9 @@ const defaultMinPrefixKeepTokens = (
     (sequence) => Math.max(1, Math.floor(sequence.context.contextSize / 10))
 ) satisfies LlamaInfillGenerationOptions["minPrefixKeepTokens"];
 
+/**
+ * @see [Text Completion](https://node-llama-cpp.withcat.ai/guide/text-completion) tutorial
+ */
 export class LlamaCompletion {
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;

@@ -515,6 +515,9 @@ export class LlamaModel {
         });
     }
 
+    /**
+     * @see [Using Embedding](https://node-llama-cpp.withcat.ai/guide/embedding) tutorial
+     */
     public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
