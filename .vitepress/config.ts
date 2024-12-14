@@ -132,13 +132,16 @@ export default defineConfig({
                         item.lastmod = new Date(buildDate);
                         item.changefreq = "daily";
                         item.priority = 0.9;
+                    } else if (item.url === "guide/") {
+                        item.changefreq = "daily";
+                        item.priority = 0.7;
                     } else if (item.url.startsWith("api/") || item.url.startsWith("cli/")) {
                         item = {
                             ...item,
                             lastmod: new Date(buildDate),
                             changefreq: "weekly",
                             priority: item.url.startsWith("cli/")
-                                ? 0.7
+                                ? 0.6
                                 : 0.5
                         };
                     } else if (item.lastmod == null && item.url.startsWith("blog/")) {
