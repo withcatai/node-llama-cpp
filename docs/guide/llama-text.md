@@ -135,7 +135,7 @@ const content = LlamaText.fromJSON(contentJson);
 
 ## Input Safety in `node-llama-cpp` {#input-safety-in-node-llama-cpp}
 [`LlamaText`](../api/classes/LlamaText.md) is used everywhere in `node-llama-cpp` to ensure the safety of the user input.
-This ensures that user input cannot introduce special tokens injection attacks.
+This ensures that user input cannot introduce special token injection attacks.
 
 When using any of the builtin [chat wrappers](./chat-wrapper.md),
 messages are always tokenized with special tokens disabled (including the template chat wrappers, such as [`TemplateChatWrapper`](../api/classes/TemplateChatWrapper.md) and [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md)).
