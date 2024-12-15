@@ -485,6 +485,7 @@ export default defineConfig({
                     {text: "External Chat State", link: "/external-chat-state"},
                     {text: "Token Bias", link: "/token-bias"},
                     {text: "Objects Lifecycle", link: "/objects-lifecycle"},
+                    {text: "Chat Context Shift", link: "/chat-context-shift"},
                     {text: "Batching", link: "/batching"},
                     {text: "Awesome List", link: "/awesome"},
                     {text: "Troubleshooting", link: "/troubleshooting"},

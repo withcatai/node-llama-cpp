@@ -257,14 +257,27 @@ export type LLamaChatContextShiftOptions = {
 
     /**
      * The strategy to use when deleting tokens from the context window.
+     *
      * Defaults to `"eraseFirstResponseAndKeepFirstSystem"`.
      */
     strategy?: "eraseFirstResponseAndKeepFirstSystem" | (
         (options: {
-            chatHistory: ChatHistoryItem[],
+            /** Full chat history */
+            chatHistory: readonly ChatHistoryItem[],
+
+            /** Maximum number of tokens that the new chat history should fit under when tokenized */
             maxTokensCount: number,
-            tokenizer(text: string, specialTokens?: boolean): Token[],
+
+            /** Tokenizer used to tokenize the chat history */
+            tokenizer: Tokenizer,
+
+            /** Chat wrapper used to generate the context state */
             chatWrapper: ChatWrapper,
+
+            /**
+             * The metadata returned from the last context shift strategy call.
+             * Will be `null` on the first call.
+             */
             lastShiftMetadata?: object | null
         }) => {chatHistory: ChatHistoryItem[], metadata?: object | null} |
             Promise<{chatHistory: ChatHistoryItem[], metadata?: object | null}>

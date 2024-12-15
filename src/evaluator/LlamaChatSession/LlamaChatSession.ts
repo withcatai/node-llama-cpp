@@ -55,6 +55,7 @@ export type LlamaChatSessionContextShiftOptions = {
 
     /**
      * The strategy to use when deleting tokens from the context window.
+     *
      * Defaults to `"eraseFirstResponseAndKeepFirstSystem"`.
      */
     strategy?: LLamaChatContextShiftOptions["strategy"]
