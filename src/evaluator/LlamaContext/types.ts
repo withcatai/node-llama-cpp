@@ -1,3 +1,5 @@
+import type {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
+import type {TokenBias} from "../TokenBias.js";
 import type {Token} from "../../types.js";
 import type {LlamaContextSequence} from "./LlamaContext.js";
 
@@ -89,7 +91,11 @@ export type LlamaContextOptions = {
         min?: number
     },
 
-    /** control the parallel sequences processing behavior */
+    /**
+     * Control the parallel sequences processing behavior.
+     *
+     * See {@link BatchingOptions} for more information.
+     */
     batching?: BatchingOptions,
 
     /**
@@ -221,7 +227,7 @@ export type BatchingOptions = {
      * - **`"maximumParallelism"`** - process as many different sequences in parallel as possible.
      * - **`"firstInFirstOut"`** - process items in the order they were added.
      * - **Custom prioritization function** - a custom function that prioritizes the items to be processed.
-     * See the `CustomBatchingPrioritizationStrategy` type for more information.
+     * See the {@link CustomBatchingPrioritizationStrategy} type for more information.
      *
      * Defaults to `"maximumParallelism"`.
      */

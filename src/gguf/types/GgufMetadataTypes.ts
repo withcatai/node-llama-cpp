@@ -86,9 +86,9 @@ export enum GgufFileType {
     MOSTLY_F16 = 1,
     MOSTLY_Q4_0 = 2,
     MOSTLY_Q4_1 = 3,
-    MOSTLY_Q4_1_SOME_F16 = 4,
-    MOSTLY_Q4_2 = 5,
-    MOSTLY_Q4_3 = 6,
+    MOSTLY_Q4_1_SOME_F16 = 4, // deprecated
+    MOSTLY_Q4_2 = 5, // deprecated
+    MOSTLY_Q4_3 = 6, // deprecated
     MOSTLY_Q8_0 = 7,
     MOSTLY_Q5_0 = 8,
     MOSTLY_Q5_1 = 9,
@@ -115,11 +115,11 @@ export enum GgufFileType {
     MOSTLY_IQ4_XS = 30,
     MOSTLY_IQ1_M = 31,
     MOSTLY_BF16 = 32,
-    MOSTLY_Q4_0_4_4 = 33,
-    MOSTLY_Q4_0_4_8 = 34,
-    MOSTLY_Q4_0_8_8 = 35,
-    LLAMA_FTYPE_MOSTLY_TQ1_0 = 36,
-    LLAMA_FTYPE_MOSTLY_TQ2_0 = 37
+    MOSTLY_Q4_0_4_4 = 33, // deprecated
+    MOSTLY_Q4_0_4_8 = 34, // deprecated
+    MOSTLY_Q4_0_8_8 = 35, // deprecated
+    LLAMA_FTYPE_MOSTLY_TQ1_0 = 36, // deprecated
+    LLAMA_FTYPE_MOSTLY_TQ2_0 = 37 // deprecated
 }
 
 
@@ -224,7 +224,7 @@ export const enum GgufMetadataTokenizerTokenType {
 export type GgufMetadataTokenizer = {
     readonly ggml: {
         readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | string,
-        readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "mpt" |
+        readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" | "mpt" |
             "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" | "jina-v2-code" |
             "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" | "viking" |
             "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "chameleon" | "minerva-7b" | string,
