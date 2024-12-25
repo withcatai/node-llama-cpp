@@ -117,6 +117,9 @@ export const documentationPageUrls = {
             Build: documentationCliUrl + "/source/build",
             Clear: documentationCliUrl + "/source/clear"
         }
+    },
+    troubleshooting: {
+        RosettaIllegalHardwareInstruction: documentationUrl + "/guide/troubleshooting#illegal-hardware-instruction"
     }
 } as const;
 export const recommendedBaseDockerImage = "node:20";
