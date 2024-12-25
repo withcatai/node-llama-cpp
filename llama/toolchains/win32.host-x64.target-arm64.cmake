@@ -9,11 +9,6 @@ set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_C_COMPILER_TARGET ${target})
 set(CMAKE_CXX_COMPILER_TARGET ${target})
 
-set(warn_c_flags "-Wno-format -Wno-unused-variable -Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments")
-
-set(CMAKE_C_FLAGS_INIT "${warn_c_flags}")
-set(CMAKE_CXX_FLAGS_INIT "${warn_c_flags}")
-
 # Look for cl.exe in the Visual Studio installation directories
 # set(PROGRAMFILES "$ENV{ProgramFiles}")
 # set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
