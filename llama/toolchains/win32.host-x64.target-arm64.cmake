@@ -1,9 +1,18 @@
 set(CMAKE_SYSTEM_NAME Windows)
-set(CMAKE_SYSTEM_PROCESSOR ARM64)
+set(CMAKE_SYSTEM_PROCESSOR arm64)
 
 set(target arm64-pc-windows-msvc)
+
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+
 set(CMAKE_C_COMPILER_TARGET ${target})
 set(CMAKE_CXX_COMPILER_TARGET ${target})
+
+set(warn_c_flags "-Wno-format -Wno-unused-variable -Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments")
+
+set(CMAKE_C_FLAGS_INIT "${warn_c_flags}")
+set(CMAKE_CXX_FLAGS_INIT "${warn_c_flags}")
 
 # Look for cl.exe in the Visual Studio installation directories
 # set(PROGRAMFILES "$ENV{ProgramFiles}")
