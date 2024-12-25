@@ -10,7 +10,7 @@ export function resolveBeginningTokenToPrepend(vocabularyType: LlamaVocabularyTy
         return null;
 
     if (vocabularyType === LlamaVocabularyType.wpm)
-        return tokens.cls;
+        return tokens.cls ?? tokens.bos; // https://github.com/ggerganov/llama.cpp/pull/10930
 
     if (tokens.shouldPrependBosToken)
         return tokens.bos;
