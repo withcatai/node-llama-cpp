@@ -416,6 +416,9 @@ export class LlamaChat {
             } = {}
         } = options;
 
+        this.sequence.tokenPredictor?.updateInputTokens?.(
+            this.model.tokenize(findLastUserMessageInChatHistory(history)?.text ?? "")
+        );
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -586,6 +589,13 @@ export class LlamaChat {
             ? lastEvaluationContextWindowHistoryItem.text
             : "";
 
+        this.sequence.tokenPredictor?.updateInputTokens?.(
+            this.model.tokenize(
+                (findLastModelMessageInChatHistory(history)?.response ?? [])
+                    .filter((item) => typeof item === "string")
+                    .join(" ")
+            )
+        );
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -992,6 +1002,26 @@ function setLastTextInChatHistory(itemType: "user" | "model", chatHistory: ChatH
         return setLastUserTextInChatHistory(chatHistory, text);
     else
         return setLastModelTextResponseInChatHistory(chatHistory, text);
+}
+
+function findLastUserMessageInChatHistory(chatHistory: readonly ChatHistoryItem[]) {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const item = chatHistory[i]!;
+        if (item.type === "user")
+            return item;
+    }
+
+    return undefined;
+}
+
+function findLastModelMessageInChatHistory(chatHistory: readonly ChatHistoryItem[]) {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const item = chatHistory[i]!;
+        if (item.type === "model")
+            return item;
+    }
+
+    return undefined;
 }
 
 function generateContextText(

@@ -260,6 +260,61 @@ export type ContextTokensDeleteRange = {
     end: number
 };
 
+export type SequenceEvaluateOptions = {
+    temperature?: number, minP?: number, topK?: number, topP?: number,
+
+    /**
+     * Used to control the randomness of the generated text.
+     *
+     * Change the seed to get different results.
+     *
+     * Defaults to the current epoch time.
+     *
+     * Only relevant when using `temperature`.
+     */
+    seed?: number,
+    grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
+    repeatPenalty?: LlamaContextSequenceRepeatPenalty,
+
+    /**
+     * Adjust the probability of tokens being generated.
+     * Can be used to bias the model to generate tokens that you want it to lean towards,
+     * or to avoid generating tokens that you want it to avoid.
+     */
+    tokenBias?: TokenBias | (() => TokenBias),
+
+    /**
+     * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
+     * evaluated based on the strategy chosen for the context.
+     * By default, the `"maximumParallelism"` strategy is used, which will try to evaluate as many sequences in parallel as possible,
+     * but at some point, it'll have to choose which sequences to evaluate more tokens of, so it'll prioritize the sequences with the
+     * highest evaluation priority.
+     * Also, a custom strategy can be used to prioritize the sequences differently, but generally, the higher the evaluation priority
+     * is, the more likely and more tokens will be evaluated for that sequence in the next queued batch.
+     */
+    evaluationPriority?: EvaluationPriority,
+
+    /** Override the sequence context shift options for this evaluation */
+    contextShift?: ContextShiftOptions,
+
+    /**
+     * Yield an EOG (End Of Generation) token (like EOS and EOT) when it's generated.
+     * When `false` the generation will stop when an EOG token is generated and the token won't be yielded.
+     * Defaults to `false`.
+     */
+    yieldEogToken?: boolean,
+
+    /** @internal */
+    _noSampling?: boolean
+};
+
+export type ControlledEvaluateIndexOutput = {
+    next: {
+        token?: Token | null,
+        probabilities?: Map<Token, number>
+    }
+};
+
 /**
  * 1 - low
  *
@@ -269,6 +324,7 @@ export type EvaluationPriority = 1 | 2 | 3 | 4 | 5;
 
 export type BatchItem = {
     readonly tokens: readonly Token[],
+    readonly logits: readonly (true | undefined)[],
     readonly evaluationPriority: EvaluationPriority
 };
 export type PrioritizedBatchItem = {

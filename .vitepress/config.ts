@@ -361,6 +361,9 @@ export default defineConfig({
         }
     },
     markdown: {
+        languageAlias: {
+            "js-highlight": "javascript"
+        },
         codeTransformers: [
             transformerTwoslash({
                 explicitTrigger: false,
@@ -487,6 +490,7 @@ export default defineConfig({
                     {text: "Objects Lifecycle", link: "/objects-lifecycle"},
                     {text: "Chat Context Shift", link: "/chat-context-shift"},
                     {text: "Batching", link: "/batching"},
+                    {text: "Token Prediction", link: "/token-prediction"},
                     {text: "Awesome List", link: "/awesome"},
                     {text: "Troubleshooting", link: "/troubleshooting"},
                     {text: "Tips and Tricks", link: "/tips-and-tricks"}

@@ -329,6 +329,7 @@ export class LlamaCompletion {
                     ? Math.min(maxTokens, this._sequence.context.contextSize - inputTokens.length)
                     : this._sequence.context.contextSize - inputTokens.length;
 
+            this._sequence.tokenPredictor?.updateInputTokens?.(inputTokens.slice());
             return await this._generateResponse(inputTokens, {
                 onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),
@@ -527,6 +528,7 @@ export class LlamaCompletion {
                     ? Math.min(maxTokens, this._sequence.context.contextSize - inputTokens.length)
                     : this._sequence.context.contextSize - inputTokens.length;
 
+            this._sequence.tokenPredictor?.updateInputTokens?.(inputTokens.slice());
             return await this._generateResponse(inputTokens, {
                 onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),

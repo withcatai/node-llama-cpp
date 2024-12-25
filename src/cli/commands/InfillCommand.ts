@@ -4,6 +4,7 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
+import prettyMilliseconds from "pretty-ms";
 import {getLlama} from "../../bindings/getLlama.js";
 import {
     BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption
@@ -19,6 +20,7 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../config.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
+import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
 
 type InfillCommand = {
     modelPath?: string,
@@ -45,8 +47,11 @@ type InfillCommand = {
     repeatFrequencyPenalty?: number,
     repeatPresencePenalty?: number,
     maxTokens: number,
+    tokenPredictionDraftModel?: string,
+    tokenPredictionModelContextSize?: number,
     debug: boolean,
     meter: boolean,
+    timing: boolean,
     printTimings: boolean
 };
 
@@ -198,6 +203,17 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 default: 0,
                 description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size"
             })
+            .option("tokenPredictionDraftModel", {
+                alias: ["dm", "draftModel"],
+                type: "string",
+                description: "Model file to use for draft sequence token prediction (speculative decoding). Can be a path to a local file or a URI of a model file to download"
+            })
+            .option("tokenPredictionModelContextSize", {
+                alias: ["dc", "draftContextSize", "draftContext"],
+                type: "number",
+                description: "Max context size to use for the draft sequence token prediction model context",
+                default: 4096
+            })
             .option("debug", {
                 alias: "d",
                 type: "boolean",
@@ -209,26 +225,31 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 default: false,
                 description: "Log how many tokens were used as input and output for each response"
             })
+            .option("timing", {
+                type: "boolean",
+                default: false,
+                description: "Print how how long it took to generate each response"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp timings after each response"
+                description: "Print llama.cpp's internal timings after each response"
             });
     },
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
         flashAttention, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
-        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-        debug, meter, printTimings
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
+        debug, meter, timing, printTimings
     }) {
         try {
             await RunInfill({
                 modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
                 threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                debug, meter, printTimings
+                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -243,7 +264,7 @@ async function RunInfill({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
     threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    maxTokens, debug, meter, printTimings
+    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, meter, timing, printTimings
 }: InfillCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -269,6 +290,12 @@ async function RunInfill({
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention
     });
+    const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
+        ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
+            flashAttention,
+            consoleTitle: "Draft model file"
+        })
+        : undefined;
 
     if (systemInfo)
         console.log(llama.systemInfo);
@@ -335,6 +362,57 @@ async function RunInfill({
             }
         }
     });
+    const draftModel = resolvedDraftModelPath == null
+        ? undefined
+        : await withProgressLog({
+            loadingText: chalk.blue.bold("Loading draft model"),
+            successText: chalk.blue("Draft model loaded"),
+            failText: chalk.blue("Failed to load draft model"),
+            liveUpdates: !debug,
+            noProgress: debug,
+            liveCtrlCSendsAbortSignal: true
+        }, async (progressUpdater) => {
+            try {
+                return await llama.loadModel({
+                    modelPath: resolvedDraftModelPath,
+                    defaultContextFlashAttention: flashAttention,
+                    onLoadProgress(loadProgress: number) {
+                        progressUpdater.setProgress(loadProgress);
+                    },
+                    loadSignal: progressUpdater.abortSignal
+                });
+            } catch (err) {
+                if (err === progressUpdater.abortSignal?.reason)
+                    process.exit(0);
+
+                throw err;
+            } finally {
+                if (llama.logLevel === LlamaLogLevel.debug) {
+                    await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                    console.info();
+                }
+            }
+        });
+
+    const draftContext = draftModel == null
+        ? undefined
+        : await withOra({
+            loading: chalk.blue("Creating draft context"),
+            success: chalk.blue("Draft context created"),
+            fail: chalk.blue("Failed to create draft context"),
+            useStatusLogs: debug
+        }, async () => {
+            try {
+                return await draftModel.createContext({
+                    contextSize: {max: tokenPredictionModelContextSize}
+                });
+            } finally {
+                if (llama.logLevel === LlamaLogLevel.debug) {
+                    await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                    console.info();
+                }
+            }
+        });
     const context = await withOra({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
@@ -357,18 +435,24 @@ async function RunInfill({
         }
     });
 
-    const contextSequence = context.getSequence();
+    const draftContextSequence = draftContext?.getSequence();
+    const contextSequence = draftContextSequence != null
+        ? context.getSequence({
+            tokenPredictor: new DraftSequenceTokenPredictor(draftContextSequence)
+        })
+        : context.getSequence();
     const completion = new LlamaCompletion({
         contextSequence
     });
+    let lastDraftTokenMeterState = draftContextSequence?.tokenMeter.getState();
     let lastTokenMeterState = contextSequence.tokenMeter.getState();
+    let lastTokenPredictionsStats = contextSequence.tokenPredictions;
 
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
-    const padTitle = "Context".length + 1;
-    await printCommonInfoLines({
+    const padTitle = await printCommonInfoLines({
         context,
-        minTitleLength: padTitle,
+        draftContext,
         logBatchSize,
         tokenMeterEnabled: meter
     });
@@ -390,6 +474,10 @@ async function RunInfill({
             show: !penalizeRepeatingNewLine,
             title: "Penalize repeating new line",
             value: "disabled"
+        }, {
+            show: timing,
+            title: "Response timing",
+            value: "enabled"
         }]
     });
 
@@ -457,6 +545,7 @@ async function RunInfill({
             consoleInteraction.stop();
         });
 
+        const timeBeforePrompt = Date.now();
         try {
             process.stdout.write(startColor!);
             consoleInteraction.start();
@@ -496,6 +585,7 @@ async function RunInfill({
 
             console.log();
         }
+        const timeAfterPrompt = Date.now();
 
         if (printTimings) {
             if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))
@@ -507,12 +597,62 @@ async function RunInfill({
             llama.logLevel = llamaLogLevel;
         }
 
+        if (timing)
+            console.info(
+                chalk.dim("Response duration: ") +
+                prettyMilliseconds(timeAfterPrompt - timeBeforePrompt, {
+                    keepDecimalsOnWholeSeconds: true,
+                    secondsDecimalDigits: 2,
+                    separateMilliseconds: true,
+                    compact: false
+                })
+            );
+
         if (meter) {
             const newTokenMeterState = contextSequence.tokenMeter.getState();
             const tokenMeterDiff = TokenMeter.diff(newTokenMeterState, lastTokenMeterState);
             lastTokenMeterState = newTokenMeterState;
 
-            console.info(`${chalk.dim("Input tokens:")} ${String(tokenMeterDiff.usedInputTokens).padEnd(5, " ")}  ${chalk.dim("Output tokens:")} ${tokenMeterDiff.usedOutputTokens}`);
+            const showDraftTokenMeterDiff = lastDraftTokenMeterState != null && draftContextSequence != null;
+
+            const tokenPredictionsStats = contextSequence.tokenPredictions;
+            const validatedTokenPredictions = tokenPredictionsStats.validated - lastTokenPredictionsStats.validated;
+            const refutedTokenPredictions = tokenPredictionsStats.refuted - lastTokenPredictionsStats.refuted;
+            const usedTokenPredictions = tokenPredictionsStats.used - lastTokenPredictionsStats.used;
+            const unusedTokenPredictions = tokenPredictionsStats.unused - lastTokenPredictionsStats.unused;
+            lastTokenPredictionsStats = tokenPredictionsStats;
+
+            console.info([
+                showDraftTokenMeterDiff && (
+                    chalk.yellow("Main".padEnd("Drafter".length))
+                ),
+                chalk.dim("Input tokens:") + " " + String(tokenMeterDiff.usedInputTokens).padEnd(5, " "),
+                chalk.dim("Output tokens:") + " " + String(tokenMeterDiff.usedOutputTokens).padEnd(5, " "),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Validated predictions:") + " " + String(validatedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Refuted predictions:") + " " + String(refutedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Used predictions:") + " " + String(usedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Unused predictions:") + " " + String(unusedTokenPredictions).padEnd(5, " ")
+                )
+            ].filter(Boolean).join("  "));
+
+            if (lastDraftTokenMeterState != null && draftContextSequence != null) {
+                const newDraftTokenMeterState = draftContextSequence.tokenMeter.getState();
+                const draftTokenMeterDiff = TokenMeter.diff(newDraftTokenMeterState, lastDraftTokenMeterState);
+                lastDraftTokenMeterState = newDraftTokenMeterState;
+
+                console.info([
+                    chalk.yellow("Drafter"),
+                    chalk.dim("Input tokens:") + " " + String(draftTokenMeterDiff.usedInputTokens).padEnd(5, " "),
+                    chalk.dim("Output tokens:") + " " + String(draftTokenMeterDiff.usedOutputTokens).padEnd(5, " ")
+                ].join("  "));
+            }
         }
     }
 }

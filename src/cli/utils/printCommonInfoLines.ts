@@ -6,6 +6,7 @@ import {printInfoLine} from "./printInfoLine.js";
 
 export async function printCommonInfoLines({
     context,
+    draftContext,
     minTitleLength = 0,
     logBatchSize = false,
     tokenMeterEnabled = false,
@@ -13,6 +14,7 @@ export async function printCommonInfoLines({
     printEos = false
 }: {
     context: LlamaContext,
+    draftContext?: LlamaContext,
     minTitleLength?: number,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
@@ -21,7 +23,13 @@ export async function printCommonInfoLines({
 }) {
     const llama = context._llama;
     const model = context.model;
-    const padTitle = Math.max(minTitleLength, "Context".length + 1);
+    const padTitle = Math.max(
+        minTitleLength,
+        "Context".length + 1,
+        draftContext != null
+            ? ("Draft context".length + 1)
+            : 0
+    );
 
     if (llama.gpu !== false) {
         const [
@@ -98,6 +106,64 @@ export async function printCommonInfoLines({
             value: "enabled"
         }]
     });
+
+    if (draftContext != null) {
+        const draftModel = draftContext.model;
+
+        printInfoLine({
+            title: "Draft model",
+            padTitle: padTitle,
+            info: [{
+                title: "Type",
+                value: toOneLine(draftModel.typeDescription)
+            }, {
+                title: "Size",
+                value: bytes(draftModel.size)
+            }, {
+                show: llama.gpu !== false,
+                title: "GPU layers",
+                value: `${draftModel.gpuLayers}/${draftModel.fileInsights.totalLayers} offloaded ${
+                    chalk.dim(`(${Math.floor((draftModel.gpuLayers / draftModel.fileInsights.totalLayers) * 100)}%)`)
+                }`
+            }, {
+                show: printBos,
+                title: "BOS",
+                value: () => toOneLine(String(draftModel.tokens.bosString))
+            }, {
+                show: printEos,
+                title: "EOS",
+                value: () => toOneLine(String(draftModel.tokens.eosString))
+            }, {
+                title: "Train context size",
+                value: draftModel.trainContextSize.toLocaleString("en-US")
+            }]
+        });
+        printInfoLine({
+            title: "Draft context",
+            padTitle: padTitle,
+            info: [{
+                title: "Size",
+                value: draftContext.contextSize.toLocaleString("en-US")
+            }, {
+                title: "Threads",
+                value: draftContext.currentThreads.toLocaleString("en-US")
+            }, {
+                show: logBatchSize,
+                title: "Batch size",
+                value: draftContext.batchSize.toLocaleString("en-US")
+            }, {
+                show: draftContext.flashAttention,
+                title: "Flash attention",
+                value: "enabled"
+            }, {
+                show: tokenMeterEnabled,
+                title: "Token meter",
+                value: "enabled"
+            }]
+        });
+    }
+
+    return padTitle;
 }
 
 function toOneLine(text: string) {
