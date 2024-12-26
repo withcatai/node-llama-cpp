@@ -23,8 +23,8 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
-        # pinned to `b4333` temporarily until the Windows on Arm64 build is fixed
-        run: node ./dist/cli/cli.js source download --release b4333 --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
+        # pinned to `b4291` temporarily until the Windows on Arm64 build is fixed
+        run: node ./dist/cli/cli.js source download --release b4291 --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
