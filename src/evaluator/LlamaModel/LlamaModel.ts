@@ -517,14 +517,7 @@ export class LlamaModel {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
 
-        return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
-            const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
-            try {
-                return await LlamaEmbeddingContext._create({_model: this}, options);
-            } finally {
-                preventDisposalHandle.dispose();
-            }
-        });
+        return await LlamaEmbeddingContext._create({_model: this}, options);
     }
 
     /**
