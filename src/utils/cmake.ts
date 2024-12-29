@@ -9,7 +9,7 @@ import {
 } from "../config.js";
 import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
 import {getPlatform} from "../bindings/utils/getPlatform.js";
-import {getWindowsProgramFilesPaths} from "../bindings/utils/detectAvailableComputeLayers.js";
+import {getWindowsVisualStudioEditionPaths} from "../bindings/utils/detectBuildTools.js";
 import {spawnCommand} from "./spawnCommand.js";
 import withStatusLogs from "./withStatusLogs.js";
 import {withLockfile} from "./withLockfile.js";
@@ -111,41 +111,7 @@ async function findExistingCmake() {
     const platform = getPlatform();
 
     if (platform === "win") {
-        const programFilesPaths = await getWindowsProgramFilesPaths();
-        const potentialVisualStudioPaths = programFilesPaths
-            .map((programFilesPath) => `${programFilesPath}/Microsoft Visual Studio`);
-
-        const versionPaths = (await Promise.all(
-            potentialVisualStudioPaths.map(async (vsPath) => {
-                if (await fs.pathExists(vsPath)) {
-                    const versions = await fs.readdir(vsPath);
-                    return versions
-                        .sort((a, b) => {
-                            const aNumber = parseInt(a);
-                            const bNumber = parseInt(b);
-
-                            if (Number.isFinite(aNumber) && Number.isFinite(bNumber))
-                                return bNumber - aNumber;
-                            else if (Number.isFinite(aNumber))
-                                return -1;
-                            else if (Number.isFinite(bNumber))
-                                return 1;
-
-                            return 0;
-                        })
-                        .map((version) => path.join(vsPath, version));
-                }
-
-                return [];
-            })
-        )).flat();
-
-        const editionPaths = (await Promise.all(
-            versionPaths.map(async (versionPath) => {
-                const editions = await fs.readdir(versionPath);
-                return editions.map((edition) => path.join(versionPath, edition));
-            })
-        )).flat();
+        const editionPaths = await getWindowsVisualStudioEditionPaths();
 
         const potentialCmakePaths = editionPaths.map((editionPath) => (
             path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin", "cmake.exe")

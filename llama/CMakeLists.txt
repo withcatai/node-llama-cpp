@@ -8,6 +8,9 @@ if (NLC_TARGET_PLATFORM STREQUAL "win-arm64" AND (CMAKE_GENERATOR STREQUAL "Ninj
         get_filename_component(INCLUDE_PROFILE_ABS "./profiles/llvm.win32.host-arm64.target-arm64.cmake" ABSOLUTE)
         include("${INCLUDE_PROFILE_ABS}")
     endif()
+elseif (NLC_CURRENT_PLATFORM STREQUAL "win-x64" AND NLC_TARGET_PLATFORM STREQUAL "win-x64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
+    get_filename_component(INCLUDE_PROFILE_ABS "./profiles/llvm.win32.host-x64.target-x64.cmake" ABSOLUTE)
+    include("${INCLUDE_PROFILE_ABS}")
 endif()
 
 project("llama-addon" C CXX)

@@ -22,6 +22,7 @@ import {BinaryPlatform, getPlatform} from "./getPlatform.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
 import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
+import {detectWindowsBuildTools} from "./detectBuildTools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
@@ -32,7 +33,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     includeBuildOptionsInBinaryFolderName?: boolean,
     ensureLlamaCppRepoIsCloned?: boolean,
     downloadCmakeIfNeeded?: boolean,
-    ignoreWorkarounds?: ("cudaArchitecture" | "reduceParallelBuildThreads" | "singleBuildThread")[],
+    ignoreWorkarounds?: ("cudaArchitecture" | "reduceParallelBuildThreads" | "singleBuildThread" | "avoidWindowsLlvm")[],
     envVars?: typeof process.env,
     ciMode?: boolean
 }): Promise<void> {
@@ -52,6 +53,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     const finalBuildFolderName = includeBuildOptionsInBinaryFolderName
         ? buildFolderName.withCustomCmakeOptions
         : buildFolderName.withoutCustomCmakeOptions;
+    const useWindowsLlvm = (platform === "win" && !ignoreWorkarounds.includes("avoidWindowsLlvm"))
+        ? areWindowsBuildToolsCapableForLlvmBuild(await detectWindowsBuildTools())
+        : false;
 
     const outDirectory = path.join(llamaLocalBuildBinsDirectory, finalBuildFolderName);
 
@@ -76,8 +80,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     await downloadCmakeIfNeeded(buildOptions.progressLogs);
 
                 const cmakePathArgs = await getCmakePathArgs();
-                const cmakeGeneratorArgs = getCmakeGeneratorArgs(buildOptions.platform, buildOptions.arch);
-                const toolchainFile = await getToolchainFileForArch(buildOptions.arch);
+                const cmakeGeneratorArgs = getCmakeGeneratorArgs(buildOptions.platform, buildOptions.arch, useWindowsLlvm);
+                const toolchainFile = await getToolchainFileForArch(buildOptions.arch, useWindowsLlvm);
                 const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
 
@@ -306,6 +310,20 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 chalk.yellow("To resolve errors related to Vulkan compilation, see the Vulkan guide: ") +
                 documentationPageUrls.Vulkan
             );
+        else if (useWindowsLlvm) {
+            if (buildOptions.progressLogs)
+                console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
+
+            try {
+                return await compileLlamaCpp(buildOptions, {
+                    ...compileOptions,
+                    ignoreWorkarounds: [...ignoreWorkarounds, "avoidWindowsLlvm"]
+                });
+            } catch (err) {
+                if (buildOptions.progressLogs)
+                    console.error(getConsoleLogPrefix(true, false), err);
+            }
+        }
 
         throw err;
     }
@@ -498,14 +516,20 @@ async function getCmakePathArgs() {
     return ["--cmake-path", cmakePath];
 }
 
-async function getToolchainFileForArch(targetArch: string) {
-    if (process.arch === targetArch || (process.platform === "win32" && process.arch === "arm64"))
+async function getToolchainFileForArch(targetArch: string, windowsLlvmSupport: boolean = false) {
+    let toolchainPrefix = "";
+
+    if (process.platform === "win32" && process.arch === "arm64") {
+        // a toolchain is needed to cross-compile to arm64 on Windows, and to compile on arm64 on Windows
+    } else if (process.platform === "win32" && process.arch === "x64" && targetArch === "x64" && windowsLlvmSupport) {
+        toolchainPrefix = "llvm.";
+    } else if (process.arch === targetArch)
         return null;
 
     const platform = process.platform;
     const hostArch = process.arch;
 
-    const toolchainFilename = `${platform}.host-${hostArch}.target-${targetArch}.cmake`;
+    const toolchainFilename = `${toolchainPrefix}${platform}.host-${hostArch}.target-${targetArch}.cmake`;
 
     const filePath = path.join(llamaToolchainsDirectory, toolchainFilename);
 
@@ -515,8 +539,10 @@ async function getToolchainFileForArch(targetArch: string) {
     return null;
 }
 
-function getCmakeGeneratorArgs(targetPlatform: BinaryPlatform, targetArch: string) {
+function getCmakeGeneratorArgs(targetPlatform: BinaryPlatform, targetArch: string, windowsLlvmSupport: boolean) {
     if (targetPlatform === "win" && targetArch === "arm64")
+        return ["--generator", "Ninja Multi-Config"];
+    else if (windowsLlvmSupport && targetPlatform === "win" && process.arch === "x64" && targetArch === "x64")
         return ["--generator", "Ninja Multi-Config"];
 
     return [];
@@ -543,4 +569,8 @@ function reduceParallelBuildThreads(originalParallelBuildThreads: number) {
 
 function isCmakeValueOff(value?: string) {
     return value === "OFF" || value === "0";
+}
+
+function areWindowsBuildToolsCapableForLlvmBuild(detectedBuildTools: Awaited<ReturnType<typeof detectWindowsBuildTools>>) {
+    return detectedBuildTools.hasLlvm && detectedBuildTools.hasNinja && detectedBuildTools.hasLibExe;
 }
