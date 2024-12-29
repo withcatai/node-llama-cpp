@@ -215,12 +215,12 @@ export type LlamaContextSequenceRepeatPenalty = {
 export type BatchingOptions = {
     /**
      * The strategy used to dispatch items to be processed when there are items pending to be processed.
-     * - **`"nextTick"`** - dispatch the items on the next event loop tick.
+     * - **`"nextCycle"`** - dispatch the items on the next event loop cycle.
      * You can provide a custom function to define a custom dispatch schedule.
      *
-     * Defaults to `"nextTick"`.
+     * Defaults to `"nextCycle"`.
      */
-    dispatchSchedule?: "nextTick" | CustomBatchingDispatchSchedule,
+    dispatchSchedule?: "nextCycle" | CustomBatchingDispatchSchedule,
 
     /**
      * The strategy used to prioritize pending items to be processed.

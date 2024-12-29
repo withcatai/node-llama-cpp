@@ -74,7 +74,7 @@ export class LlamaContext {
         flashAttention = _model.defaultContextFlashAttention,
         threads,
         batching: {
-            dispatchSchedule: batchingDispatchSchedule = "nextTick",
+            dispatchSchedule: batchingDispatchSchedule = "nextCycle",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
         performanceTracking = false,
@@ -675,10 +675,19 @@ export class LlamaContext {
 
         if (this._queuedDecodeSequenceIds.size === this._totalSequences)
             dispatch();
-        if (dispatchSchedule === "nextTick")
-            setTimeout(dispatch, 0);
-        else
+        if (dispatchSchedule === "nextCycle") {
+            if (typeof setImmediate === "function")
+                setImmediate(dispatch);
+            else
+                setTimeout(dispatch, 0);
+        } else if (typeof dispatchSchedule === "function")
             dispatchSchedule(dispatch);
+        else {
+            if (typeof setImmediate === "function")
+                setImmediate(dispatch);
+            else
+                setTimeout(dispatch, 0);
+        }
     }
 
     /** @internal */
