@@ -24,6 +24,7 @@ import {testCmakeBinary} from "./testCmakeBinary.js";
 import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
 
 export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions: {
     nodeTarget?: string,
@@ -75,17 +76,19 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     await downloadCmakeIfNeeded(buildOptions.progressLogs);
 
                 const cmakePathArgs = await getCmakePathArgs();
+                const cmakeGeneratorArgs = getCmakeGeneratorArgs(buildOptions.platform, buildOptions.arch);
                 const toolchainFile = await getToolchainFileForArch(buildOptions.arch);
                 const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
+
+                cmakeCustomOptions.set("CMAKE_CONFIGURATION_TYPES", buildConfigType);
+                cmakeCustomOptions.set("NLC_CURRENT_PLATFORM", platform + "-" + process.arch);
+                cmakeCustomOptions.set("NLC_TARGET_PLATFORM", buildOptions.platform + "-" + buildOptions.arch);
 
                 if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "1");
                 else if (!cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "OFF");
-
-                // if (cmakeCustomOptions.get("GGML_METAL") === "1" && !cmakeCustomOptions.has("GGML_METAL_EMBED_LIBRARY"))
-                //     cmakeCustomOptions.set("GGML_METAL_EMBED_LIBRARY", "1");
 
                 if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("GGML_CUDA"))
                     cmakeCustomOptions.set("GGML_CUDA", "1");
@@ -99,15 +102,21 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                     cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
+                if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))
+                    cmakeCustomOptions.set("GGML_OPENMP", "OFF");
+
                 if (ciMode) {
                     if (!cmakeCustomOptions.has("GGML_OPENMP"))
                         cmakeCustomOptions.set("GGML_OPENMP", "OFF");
 
-                    if (!cmakeCustomOptions.has("GGML_NATIVE") && !(buildOptions.platform === "mac" && buildOptions.arch === "arm64")) {
+                    if (!cmakeCustomOptions.has("GGML_NATIVE") || isCmakeValueOff(cmakeCustomOptions.get("GGML_NATIVE"))) {
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
 
-                        if (!cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS"))
+                        if (buildOptions.arch === "x64" && !cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS")) {
                             cmakeCustomOptions.set("GGML_CPU_ALL_VARIANTS", "ON");
+                            cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
+                        } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
+                            cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                     }
                 }
 
@@ -131,11 +140,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     [
                         "run", "-s", "cmake-js-llama", "--", "compile",
                         "--log-level", "warn",
-                        "--config", "Release",
+                        "--config", buildConfigType,
                         "--arch=" + buildOptions.arch,
                         "--out", path.relative(llamaDirectory, outDirectory),
                         "--runtime-version=" + runtimeVersion,
                         "--parallel=" + parallelBuildThreads,
+                        ...cmakeGeneratorArgs,
                         ...cmakePathArgs,
                         ...(
                             [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
@@ -150,10 +160,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     path.join(outDirectory, "bin"),
                     path.join(outDirectory, "llama.cpp", "bin")
                 ];
-                const compiledResultDirPath = path.join(outDirectory, "Release");
+                const compiledResultDirPath = path.join(outDirectory, buildConfigType);
 
                 if (!await fs.pathExists(compiledResultDirPath))
-                    throw new Error("Could not find Release directory");
+                    throw new Error(`Could not find ${buildConfigType} directory`);
 
                 for (const binFilesDirPath of binFilesDirPaths) {
                     if (await fs.pathExists(binFilesDirPath)) {
@@ -302,8 +312,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 }
 
 export async function getLocalBuildBinaryPath(folderName: string) {
-    const binaryPath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", "llama-addon.node");
-    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", buildMetadataFileName);
+    const binaryPath = path.join(llamaLocalBuildBinsDirectory, folderName, buildConfigType, "llama-addon.node");
+    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, buildConfigType, buildMetadataFileName);
     const buildDoneStatusPath = path.join(llamaLocalBuildBinsDirectory, folderName, "buildDone.status");
 
     const [
@@ -323,7 +333,7 @@ export async function getLocalBuildBinaryPath(folderName: string) {
 }
 
 export async function getLocalBuildBinaryBuildMetadata(folderName: string) {
-    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, "Release", buildMetadataFileName);
+    const buildMetadataFilePath = path.join(llamaLocalBuildBinsDirectory, folderName, buildConfigType, buildMetadataFileName);
 
     if (!(await fs.pathExists(buildMetadataFilePath)))
         throw new Error(`Could not find build metadata file for local build "${folderName}"`);
@@ -372,7 +382,7 @@ export async function getPrebuiltBinaryBuildMetadata(folderPath: string, folderN
 }
 
 async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
-    const releaseDirPath = path.join(resultDirPath, "Release");
+    const releaseDirPath = path.join(resultDirPath, buildConfigType);
 
     if (await fs.pathExists(releaseDirPath)) {
         await fs.remove(tempDirPath);
@@ -489,7 +499,7 @@ async function getCmakePathArgs() {
 }
 
 async function getToolchainFileForArch(targetArch: string) {
-    if (process.arch === targetArch)
+    if (process.arch === targetArch || (process.platform === "win32" && process.arch === "arm64"))
         return null;
 
     const platform = process.platform;
@@ -500,9 +510,16 @@ async function getToolchainFileForArch(targetArch: string) {
     const filePath = path.join(llamaToolchainsDirectory, toolchainFilename);
 
     if (await fs.pathExists(filePath))
-        return filePath;
+        return path.resolve(filePath);
 
     return null;
+}
+
+function getCmakeGeneratorArgs(targetPlatform: BinaryPlatform, targetArch: string) {
+    if (targetPlatform === "win" && targetArch === "arm64")
+        return ["--generator", "Ninja Multi-Config"];
+
+    return [];
 }
 
 function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, ciMode: boolean = false) {
@@ -522,4 +539,8 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, 
 
 function reduceParallelBuildThreads(originalParallelBuildThreads: number) {
     return Math.max(1, Math.round(originalParallelBuildThreads / 2));
+}
+
+function isCmakeValueOff(value?: string) {
+    return value === "OFF" || value === "0";
 }

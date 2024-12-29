@@ -11,11 +11,14 @@ set(CMAKE_RC_COMPILER llvm-rc)
 
 set(LLVM_INSTALLATION_URL "https://github.com/llvm/llvm-project/releases/tag/llvmorg-19.1.5")
 
+set(PROGRAMFILES_ARM64 "$ENV{ProgramFiles\(Arm\)}")
 set(PROGRAMFILES "$ENV{ProgramFiles}")
 set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
 set(PROGRAMFILES_PATHS
+    "${PROGRAMFILES_ARM64}"
     "${PROGRAMFILES}"
     "${PROGRAMFILES_X86}"
+    "C:/Program Files (Arm)"
     "C:/Program Files"
     "C:/Program Files (x86)"
 )
@@ -25,8 +28,8 @@ foreach(PATH IN LISTS PROGRAMFILES_PATHS)
     list(APPEND LLVM_INSTALL_PATHS "${PATH}/LLVM")
 
     file(GLOB_RECURSE FOUND_LLVM_ROOT
-        "${PATH}/Microsoft Visual Studio/*/VC/Tools/Llvm/x64"
-        "${PATH}/Microsoft Visual Studio/**/*/VC/Tools/Llvm/x64")
+        "${PATH}/Microsoft Visual Studio/*/VC/Tools/Llvm/ARM64"
+        "${PATH}/Microsoft Visual Studio/**/*/VC/Tools/Llvm/ARM64")
 
     if(FOUND_LLVM_ROOT)
         list(APPEND LLVM_INSTALL_PATHS ${FOUND_LLVM_ROOT})
@@ -46,7 +49,7 @@ foreach(PATH IN LISTS LLVM_INSTALL_PATHS)
 endforeach()
 
 if(LLVM_ROOT STREQUAL "")
-    message(FATAL_ERROR "LLVM installation was not found. Please install LLVM: ${LLVM_INSTALLATION_URL}")
+    message(FATAL_ERROR "LLVM installation was not found. Please install LLVM for WoA (Windows on Arm): ${LLVM_INSTALLATION_URL}")
 endif()
 
 if (NOT EXISTS "${CMAKE_C_COMPILER}" OR NOT EXISTS "${CMAKE_CXX_COMPILER}" OR NOT EXISTS "${CMAKE_RC_COMPILER}")
@@ -56,13 +59,13 @@ if (NOT EXISTS "${CMAKE_C_COMPILER}" OR NOT EXISTS "${CMAKE_CXX_COMPILER}" OR NO
 endif()
 
 if (NOT EXISTS "${CMAKE_C_COMPILER}")
-    message(FATAL_ERROR "Clang compiler not found at ${CMAKE_C_COMPILER}. Please reinstall LLVM: ${LLVM_INSTALLATION_URL}")
+    message(FATAL_ERROR "Clang compiler not found at ${CMAKE_C_COMPILER}. Please reinstall LLVM for WoA (Windows on Arm): ${LLVM_INSTALLATION_URL}")
 endif()
 if (NOT EXISTS "${CMAKE_CXX_COMPILER}")
-    message(FATAL_ERROR "Clang++ compiler not found at ${CMAKE_CXX_COMPILER}. Please reinstall LLVM: ${LLVM_INSTALLATION_URL}")
+    message(FATAL_ERROR "Clang++ compiler not found at ${CMAKE_CXX_COMPILER}. Please reinstall LLVM for WoA (Windows on Arm): ${LLVM_INSTALLATION_URL}")
 endif()
 if (NOT EXISTS "${CMAKE_RC_COMPILER}")
-    message(FATAL_ERROR "LLVM Resource Compiler not found at ${CMAKE_RC_COMPILER}. Please reinstall LLVM: ${LLVM_INSTALLATION_URL}")
+    message(FATAL_ERROR "LLVM Resource Compiler not found at ${CMAKE_RC_COMPILER}. Please reinstall LLVM for WoA (Windows on Arm): ${LLVM_INSTALLATION_URL}")
 endif()
 
 set(arch_c_flags "-march=armv8.7-a -fvectorize -ffp-model=fast -fno-finite-math-only")

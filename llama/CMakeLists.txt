@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.14)
 
+if (NLC_TARGET_PLATFORM STREQUAL "win-arm64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
+    if(NLC_CURRENT_PLATFORM STREQUAL "win-x64")
+        get_filename_component(INCLUDE_PROFILE_ABS "./profiles/llvm.win32.host-x64.target-arm64.cmake" ABSOLUTE)
+        include("${INCLUDE_PROFILE_ABS}")
+    elseif(NLC_CURRENT_PLATFORM STREQUAL "win-arm64")
+        get_filename_component(INCLUDE_PROFILE_ABS "./profiles/llvm.win32.host-arm64.target-arm64.cmake" ABSOLUTE)
+        include("${INCLUDE_PROFILE_ABS}")
+    endif()
+endif()
+
 project("llama-addon" C CXX)
 
 if (MSVC)
@@ -24,8 +34,8 @@ execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
 
 set(LLAMA_BUILD_COMMON ON)
 
-if (NOT MINGW)
-    set(GGML_BACKEND_DL ON)
+if (MINGW)
+    set(GGML_BACKEND_DL OFF)
     set(BUILD_SHARED_LIBS ON)
 endif()
 
@@ -46,7 +56,6 @@ endif()
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
-include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 

@@ -377,15 +377,15 @@ function getWindir() {
 }
 
 
-async function getWindowsProgramFilesPaths() {
+export async function getWindowsProgramFilesPaths() {
     const potentialPaths = await Promise.all(
         [
+            process.env["ProgramFiles(Arm)"],
             process.env.ProgramFiles,
             process.env["ProgramFiles(x86)"],
-            process.env["ProgramFiles(Arm)"],
+            `${process.env.SystemDrive ?? "C:"}\\Program Files (Arm)`,
             `${process.env.SystemDrive ?? "C:"}\\Program Files`,
-            `${process.env.SystemDrive ?? "C:"}\\Program Files (x86)`,
-            `${process.env.SystemDrive ?? "C:"}\\Program Files (Arm)`
+            `${process.env.SystemDrive ?? "C:"}\\Program Files (x86)`
         ]
             .map(async (programFilesPath) => {
                 if (programFilesPath == null)

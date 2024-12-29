@@ -34,6 +34,51 @@ If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile
 
 :::
 
+::: details Dependencies for Windows x64
+If the build fails on your machine, ensure you have all the necessary build tools installed.
+
+You can install all the dependencies via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/) using these commands:
+```shell
+winget install --id Microsoft.VisualStudio.2022.BuildTools --force --override "--add Microsoft.VisualStudio.Component.VC.CMake.Project Microsoft.VisualStudio.Component.VC.CoreBuildTools Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.ATL Microsoft.VisualStudio.Component.VC.ATLMFC Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset Microsoft.VisualStudio.Component.VC.Llvm.Clang Microsoft.VisualStudio.Component.VC.Redist.14.Latest Microsoft.Component.VC.Runtime.UCRTSDK Microsoft.VisualStudio.Component.Windows10SDK Microsoft.VisualStudio.Component.Windows10SDK.20348"
+```
+> WinGet is built-in on Windows 11 and modern Windows 10 versions
+
+---
+
+You can also install all the dependencies manually using the [Visual C++ Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/):
+* **`Workloads` tab:** select `Desktop development with C++`
+* **`Individual components` tab**: select the following:
+  * C++ ATL for latest v143 build tools (x86 & x64)
+  * C++ MFC for latest v143 build tools (x86 & x64)
+  * C++ CMake tools for Windows
+  * C++ Clang Compiler for Windows
+  * MSBuild support for LLVM (clang-cl) toolset
+  * Windows Universal CRT SDK
+:::
+
+::: details Dependencies for Windows on Arm
+On Windows on Arm you need to install additional build tools to build `llama.cpp` from source.
+
+You can install all the dependencies via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/) using these commands:
+```shell
+winget install --id Microsoft.VisualStudio.2022.BuildTools --force --override "--add Microsoft.VisualStudio.Component.VC.CMake.Project Microsoft.VisualStudio.Component.VC.CoreBuildTools Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64 Microsoft.VisualStudio.Component.VC.ATL Microsoft.VisualStudio.Component.VC.ATL.ARM64 Microsoft.VisualStudio.Component.VC.ATLMFC Microsoft.VisualStudio.Component.VC.MFC.ARM64 Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset Microsoft.VisualStudio.Component.VC.Llvm.Clang Microsoft.VisualStudio.Component.VC.Redist.14.Latest Microsoft.Component.VC.Runtime.UCRTSDK Microsoft.VisualStudio.Component.Windows10SDK Microsoft.VisualStudio.Component.Windows10SDK.20348"
+```
+> WinGet is built-in on Windows 11 and modern Windows 10 versions
+
+---
+
+You can also install all the dependencies manually using the [Visual C++ Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/):
+* **`Workloads` tab:** select `Desktop development with C++`
+* **`Individual components` tab**: select the following:
+  * MSVC v143 - VS 2022 C++ ARM64 build tools (latest)
+  * C++ ATL for latest v143 build tools (ARM64/ARM64EC)
+  * C++ MFC for latest v143 build tools (ARM64/ARM64EC)
+  * C++ CMake tools for Windows
+  * C++ Clang Compiler for Windows
+  * MSBuild support for LLVM (clang-cl) toolset
+  * Windows Universal CRT SDK
+:::
+
 ## `source download` and `source build` Commands
 The difference between the [`source download`](../cli/source/download.md) and [`source build`](../cli/source/build.md) commands
 is that the `source download` command downloads a release of `llama.cpp` and builds it,
