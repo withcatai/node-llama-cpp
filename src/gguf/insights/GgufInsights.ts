@@ -355,6 +355,7 @@ export class GgufInsights {
         gpu: GgufTensorInfo[]
     } {
         const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
+        const architecture = this._ggufFileInfo.metadata?.general?.architecture;
 
         if (gpuLayers === 0) {
             return {
@@ -369,7 +370,15 @@ export class GgufInsights {
         const gpuTensors: GgufTensorInfo[] = [];
         const cpuTensors: GgufTensorInfo[] = [];
 
+        let tokenEmbedLayer: GgufTensorInfo | undefined;
+        let mainOutputLayer: GgufTensorInfo | undefined;
+
         for (const singleTensorInfo of tensorInfo) {
+            if (isMainOutputLayer(singleTensorInfo.name))
+                mainOutputLayer = singleTensorInfo;
+            else if (isTokenEmbedLayer(singleTensorInfo.name))
+                tokenEmbedLayer = singleTensorInfo;
+
             // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_INPUT` are always
             // loaded with `model.dev_input`, which is always set to the CPU
             if (isInputLayer(singleTensorInfo.name)) {
@@ -391,8 +400,6 @@ export class GgufInsights {
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (gpuLayers !== this.totalLayers) {
-                const architecture = this._ggufFileInfo.metadata?.general?.architecture;
-
                 if (architecture === GgufArchitectureType.qwen2 || architecture === GgufArchitectureType.gemma) {
                     if (layerNumber != null && layerNumber >= startGpuLayer)
                         gpuTensors.push(singleTensorInfo);
@@ -408,6 +415,9 @@ export class GgufInsights {
             else
                 cpuTensors.push(singleTensorInfo);
         }
+
+        if (mainOutputLayer == null && tokenEmbedLayer != null && gpuLayers === this.totalLayers && !gpuTensors.includes(tokenEmbedLayer))
+            gpuTensors.push(tokenEmbedLayer);
 
         return {
             cpu: cpuTensors,
@@ -625,4 +635,16 @@ function isOutputLayer(layerName: string) {
     }
 
     return false;
+}
+
+function isMainOutputLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    return firstPart === "output";
+}
+
+function isTokenEmbedLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    return firstPart === "token_embd";
 }
