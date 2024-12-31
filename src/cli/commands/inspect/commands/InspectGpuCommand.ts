@@ -13,6 +13,7 @@ import {documentationPageUrls} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {getLinuxDistroInfo} from "../../../../bindings/utils/getLinuxDistroInfo.js";
+import {isRunningUnderRosetta} from "../../../utils/isRunningUnderRosetta.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -91,6 +92,17 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
                 gpusToLogVramUsageOf.push("metal");
             }
         } else if (platform === "mac") {
+            if (await isRunningUnderRosetta()) {
+                console.error(
+                    chalk.red(
+                        "llama.cpp is not supported under Rosetta on Apple Silicone Macs. " +
+                        "Ensure that you're using a native arm64 node.js installation."
+                    )
+                );
+                console.error("process.platform: " + process.platform + ", process.arch: " + process.arch);
+                console.error("troubleshooting: " + documentationPageUrls.troubleshooting.RosettaIllegalHardwareInstruction);
+            }
+
             console.info(`${chalk.yellow("Metal:")} ${chalk.red("not supported by llama.cpp on Intel Macs")}`);
 
             const llama = await loadLlamaForGpu(false);

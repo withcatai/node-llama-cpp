@@ -21,8 +21,9 @@ export const OnPostInstallCommand: CommandModule<object, OnPostInstallCommand> =
             console.error(
                 getConsoleLogPrefix(false, false),
                 chalk.red(
-                    "llama.cpp is not supported on Rosetta on Apple Silicone Macs. " +
-                    "Ensure that you're using a native arm64 node.js installation.")
+                    "llama.cpp is not supported under Rosetta on Apple Silicone Macs. " +
+                    "Ensure that you're using a native arm64 node.js installation."
+                )
             );
             console.error(
                 getConsoleLogPrefix(false, false),
