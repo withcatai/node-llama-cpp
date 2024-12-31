@@ -46,6 +46,7 @@ export class Llama {
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
     /** @internal */ private readonly _supportsMmap: boolean;
+    /** @internal */ private readonly _gpuSupportsMmap: boolean;
     /** @internal */ private readonly _supportsMlock: boolean;
     /** @internal */ private readonly _mathCores: number;
     /** @internal */ private readonly _llamaCppRelease: {
@@ -110,6 +111,7 @@ export class Llama {
         this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
+        this._gpuSupportsMmap = bindings.getGpuSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
         this._mathCores = bindings.getMathCores();
         this._consts = bindings.getConsts();
@@ -173,6 +175,10 @@ export class Llama {
 
     public get supportsMmap() {
         return this._supportsMmap;
+    }
+
+    public get gpuSupportsMmap() {
+        return this._gpuSupportsMmap;
     }
 
     public get supportsMlock() {

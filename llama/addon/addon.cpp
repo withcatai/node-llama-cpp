@@ -9,6 +9,7 @@
 #include "globals/addonProgress.h"
 #include "globals/getGpuInfo.h"
 #include "globals/getSwapInfo.h"
+#include "globals/getMemoryInfo.h"
 
 bool backendInitialized = false;
 bool backendDisposed = false;
@@ -23,6 +24,21 @@ Napi::Value addonGetSupportsGpuOffloading(const Napi::CallbackInfo& info) {
 
 Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(info.Env(), llama_supports_mmap());
+}
+
+Napi::Value addonGetGpuSupportsMmap(const Napi::CallbackInfo& info) {
+    const auto llamaSupportsMmap = llama_supports_mmap();
+    const auto gpuDevice = getGpuDevice().first;
+
+    if (gpuDevice == nullptr) {
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    ggml_backend_dev_props props;
+    ggml_backend_dev_get_props(gpuDevice, &props);
+
+    const bool gpuSupportsMmap = llama_supports_mmap() && props.caps.buffer_from_host_ptr;
+    return Napi::Boolean::New(info.Env(), gpuSupportsMmap);
 }
 
 Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
@@ -210,6 +226,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
         Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
+        Napi::PropertyDescriptor::Function("getGpuSupportsMmap", addonGetGpuSupportsMmap),
         Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
         Napi::PropertyDescriptor::Function("getMathCores", addonGetMathCores),
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
@@ -221,6 +238,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
+        Napi::PropertyDescriptor::Function("getMemoryInfo", getMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),

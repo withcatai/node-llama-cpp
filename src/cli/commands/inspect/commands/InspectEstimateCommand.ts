@@ -27,7 +27,8 @@ type InspectEstimateCommand = {
     gpu?: BuildGpu | "auto",
     gpuLayers?: number | "max",
     contextSize?: number | "train",
-    embedding?: boolean
+    embedding?: boolean,
+    noMmap?: boolean
 };
 
 export const InspectEstimateCommand: CommandModule<object, InspectEstimateCommand> = {
@@ -105,10 +106,15 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 description: "Whether to estimate for creating an embedding context",
                 default: false,
                 group: "Optional:"
+            })
+            .option("noMmap", {
+                type: "boolean",
+                default: false,
+                description: "Disable mmap (memory-mapped file) usage"
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
         if (gpuLayers === -2) gpuLayers = "max";
@@ -131,6 +137,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 logLevel: LlamaLogLevel.error
             });
 
+        const useMmap = !noMmap && llama.supportsMmap;
         printModelDestination(resolvedModelDestination);
 
         if (embedding)
@@ -159,7 +166,8 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 flashAttention,
                 targetContextSize: contextSize,
                 targetGpuLayers: gpuLayers,
-                embeddingContext: embedding
+                embeddingContext: embedding,
+                useMmap
             });
         }
 

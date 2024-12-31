@@ -142,7 +142,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
      * writers may not write the alignment. If the alignment is not specified,
      * assume it is `32`.
      */
-    readonly alignment?: string,
+    readonly alignment?: number,
 
     /**
      * The name of the model. This should be a human-readable name that can be

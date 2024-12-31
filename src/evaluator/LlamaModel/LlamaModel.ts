@@ -292,7 +292,9 @@ export class LlamaModel {
     }
 
     /**
-     * Total model size in memory in bytes
+     * Total model size in memory in bytes.
+     *
+     * When using mmap, actual memory usage may be higher than this value due to `llama.cpp`'s performance optimizations.
      */
     public get size() {
         this._ensureNotDisposed();
@@ -666,7 +668,7 @@ export class LlamaModel {
         _llama: Llama
     }) {
         const {loadSignal, defaultContextFlashAttention} = modelOptions;
-        const useMmap = modelOptions.useMmap ?? defaultUseMmap;
+        const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
@@ -680,9 +682,13 @@ export class LlamaModel {
             : false;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
-            defaultContextFlashAttention: resolvedDefaultContextFlashAttention
+            defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
+            useMmap
         });
-        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers});
+        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({
+            gpuLayers: gpuLayers,
+            useMmap
+        });
 
         const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
             _fileInfo: fileInfo,

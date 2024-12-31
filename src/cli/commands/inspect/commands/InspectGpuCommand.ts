@@ -144,8 +144,10 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         console.info();
         await logRamUsage(lastLlama?.cpuMathCores);
 
-        if (lastLlama != null)
+        if (lastLlama != null) {
             await logSwapUsage(lastLlama);
+            console.info(`${chalk.yellow("mmap:")} ${lastLlama.supportsMmap ? "supported" : "unsupported"}`);
+        }
     }
 };
 

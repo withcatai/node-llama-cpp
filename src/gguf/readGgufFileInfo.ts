@@ -2,6 +2,7 @@ import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
 import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
 import {isModelUri, parseModelUri} from "../utils/parseModelUri.js";
+import {Writable} from "../utils/utilTypes.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -9,6 +10,7 @@ import {ggufDefaultFetchRetryOptions} from "./consts.js";
 import {normalizeGgufDownloadUrl} from "./utils/normalizeGgufDownloadUrl.js";
 import {resolveSplitGgufParts} from "./utils/resolveSplitGgufParts.js";
 import {GgufFileInfo} from "./types/GgufFileInfoTypes.js";
+import {GgufTensorInfo} from "./types/GgufTensorInfoTypes.js";
 
 
 /**
@@ -94,14 +96,21 @@ export async function readGgufFileInfo(pathOrUri: string, {
         throw new Error(`Unsupported sourceType: ${sourceType}`);
     }
 
-    async function readSingleFile(pathOrUri: string) {
+    async function readSingleFile(pathOrUri: string, splitPartNumber: number = 1) {
         const fileReader = createFileReader(pathOrUri);
-        return await parseGguf({
+        const res = await parseGguf({
             fileReader,
             ignoreKeys,
             readTensorInfo,
             logWarnings
         });
+
+        if (splitPartNumber > 1) {
+            for (const tensor of res.tensorInfo ?? [])
+                (tensor as Writable<GgufTensorInfo>).filePart = splitPartNumber;
+        }
+
+        return res;
     }
 
     if (!spliceSplitFiles)
@@ -113,7 +122,7 @@ export async function readGgufFileInfo(pathOrUri: string, {
         return await readSingleFile(allSplitPartPaths[0]!);
 
     const [first, ...rest] = await Promise.all(
-        allSplitPartPaths.map((partPath) => readSingleFile(partPath))
+        allSplitPartPaths.map((partPath, index) => readSingleFile(partPath, index + 1))
     );
 
     if (first == null)

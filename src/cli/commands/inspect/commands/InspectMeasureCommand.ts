@@ -2,6 +2,7 @@ import path from "path";
 import process from "process";
 import {fileURLToPath} from "url";
 import {fork} from "node:child_process";
+import os from "os";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import bytes from "bytes";
@@ -19,6 +20,7 @@ import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
+import {Llama} from "../../../../bindings/Llama.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -30,6 +32,8 @@ type InspectMeasureCommand = {
     maxContextSize?: number,
     flashAttention?: boolean,
     measures: number,
+    memory: "vram" | "ram" | "all",
+    noMmap: boolean,
     printHeaderBeforeEachLayer?: boolean,
     evaluateText?: string,
     repeatEvaluateText?: number
@@ -106,6 +110,17 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: 10,
                 description: "Number of context size measures to take for each gpu layers count"
             })
+            .option("memory", {
+                type: "string",
+                choices: ["vram", "ram", "all"] as const,
+                default: "vram" as const,
+                description: "Type of memory to measure"
+            })
+            .option("noMmap", {
+                type: "boolean",
+                default: false,
+                description: "Disable mmap (memory-mapped file) usage"
+            })
             .option("printHeaderBeforeEachLayer", {
                 alias: "ph",
                 type: "boolean",
@@ -126,12 +141,13 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     },
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, measures = 10,
-        printHeaderBeforeEachLayer = true, evaluateText, repeatEvaluateText
+        memory: measureMemoryType, noMmap, printHeaderBeforeEachLayer = true, evaluateText, repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
         if (maxContextSize === -1) maxContextSize = undefined;
         if (minLayers < 1) minLayers = 1;
 
+        const exitAfterEachMeasurement = measureMemoryType === "ram" || measureMemoryType === "all";
         const headers = resolveHeaderFlag(headerArg);
 
         // ensure a llama build is available
@@ -144,10 +160,23 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 logLevel: LlamaLogLevel.error
             });
 
-        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers);
+        const useMmap = !noMmap && llama.supportsMmap;
+        const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers, {
+            flashAttention, useMmap
+        });
 
         console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
         console.info(`${chalk.yellow("GPU:")} ${getPrettyBuildGpuName(llama.gpu)}${gpu == null ? chalk.gray(" (last build)") : ""}`);
+        console.info(chalk.yellow("mmap:") + " " + (
+            !llama.supportsMmap
+                ? "unsupported"
+                : useMmap
+                    ? "enabled"
+                    : "disabled"
+        ));
+        if (measureMemoryType === "ram" || measureMemoryType === "all")
+            console.warn(chalk.yellow("RAM measurements are greatly inaccurate due to OS optimizations that prevent released memory from being immediately available"));
+
         console.info();
 
         const ggufMetadata = await readGgufFileInfo(resolvedGgufPath, {
@@ -155,9 +184,12 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         });
         const ggufInsights = await GgufInsights.from(ggufMetadata, llama);
         const totalVram = (await llama.getVramState()).total;
+        const totalRam = os.totalmem();
 
         let lastGpuLayers = maxLayers ?? ggufInsights.totalLayers;
         let previousContextSizeCheck: undefined | number = undefined;
+
+        const measureTable = getMeasureTable(measureMemoryType);
 
         measureTable.logHeader({drawRowSeparator: !printHeaderBeforeEachLayer});
 
@@ -174,6 +206,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
             const done = await measureModel({
                 modelPath: resolvedGgufPath,
+                useMmap,
                 gpu: gpu == null
                     ? undefined
                     : llama.gpu,
@@ -187,6 +220,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 evaluateText: evaluateText == null
                     ? undefined
                     : evaluateText.repeat(repeatEvaluateText ?? 1),
+                exitAfterMeasurement: exitAfterEachMeasurement,
                 onInfo({gpuLayers, result}) {
                     if (lastGpuLayers !== gpuLayers) {
                         lastGpuLayers = gpuLayers;
@@ -231,19 +265,31 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                         previousContextSizeCheck = result.contextSize;
                         hadSuccessInThisProcess = true;
 
-                        const modelVramEstimation = ggufInsights.estimateModelResourceRequirements({gpuLayers: lastGpuLayers}).gpuVram;
+                        const modelResourceEstimation = ggufInsights.estimateModelResourceRequirements({
+                            gpuLayers: lastGpuLayers,
+                            useMmap
+                        });
+                        const modelVramEstimation = modelResourceEstimation.gpuVram;
                         const modelVramEstimationDiffBytes = (modelVramEstimation < result.modelVramUsage ? "-" : "") +
                             bytes(Math.abs(result.modelVramUsage - modelVramEstimation));
                         const modelVramEstimationDiffText = modelVramEstimationDiffBytes.padEnd(9, " ") + " " +
                             padStartAnsi("(" + renderDiffPercentageWithColors(((modelVramEstimation / result.modelVramUsage) - 1) * 100) + ")", 9);
 
-                        const contextVramEstimation = previousContextSizeCheck == null
+                        const modelRamEstimation = modelResourceEstimation.cpuRam;
+                        const modelRamEstimationDiffBytes = (modelRamEstimation < result.modelRamUsage ? "-" : "") +
+                            bytes(Math.abs(result.modelRamUsage - modelRamEstimation));
+                        const modelRamEstimationDiffText = modelRamEstimationDiffBytes.padEnd(9, " ") + " " +
+                            padStartAnsi("(" + renderDiffPercentageWithColors(((modelRamEstimation / result.modelRamUsage) - 1) * 100) + ")", 9);
+
+                        const contextResourceEstimation = previousContextSizeCheck == null
                             ? undefined
                             : ggufInsights.estimateContextResourceRequirements({
                                 contextSize: previousContextSizeCheck,
                                 modelGpuLayers: lastGpuLayers,
                                 flashAttention
-                            }).gpuVram;
+                            });
+
+                        const contextVramEstimation = contextResourceEstimation?.gpuVram;
                         const contextVramEstimationDiffBytes = (result.contextVramUsage == null || contextVramEstimation == null)
                             ? undefined
                             : (
@@ -259,6 +305,22 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                                 padStartAnsi("(" + renderDiffPercentageWithColors(((contextVramEstimation / result.contextVramUsage) - 1) * 100) + ")", 9)
                             );
 
+                        const contextRamEstimation = contextResourceEstimation?.cpuRam;
+                        const contextRamEstimationDiffBytes = (result.contextRamUsage == null || contextRamEstimation == null)
+                            ? undefined
+                            : (
+                                (contextRamEstimation < result.contextRamUsage ? "-" : "") +
+                                bytes(Math.abs(result.contextRamUsage - contextRamEstimation))
+                            );
+                        const contextRamEstimationDiffText = (
+                            contextRamEstimation == null || contextRamEstimationDiffBytes == null || result.contextRamUsage == null
+                        )
+                            ? undefined
+                            : (
+                                contextRamEstimationDiffBytes.padEnd(9, " ") + " " +
+                                padStartAnsi("(" + renderDiffPercentageWithColors(((contextRamEstimation / result.contextRamUsage) - 1) * 100) + ")", 9)
+                            );
+
                         measureTable.logLine({
                             newProcess: getNewProccessValue(),
                             type: previousContextSizeCheck == null
@@ -271,7 +333,11 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
                             estimatedModelVram: bytes(modelVramEstimation),
                             actualModelVram: bytes(result.modelVramUsage),
-                            modelEstimationDiff: modelVramEstimationDiffText,
+                            modelVramEstimationDiff: modelVramEstimationDiffText,
+
+                            estimatedModelRam: bytes(modelRamEstimation),
+                            actualModelRam: bytes(result.modelRamUsage),
+                            modelRamEstimationDiff: modelRamEstimationDiffText,
 
                             estimatedContextVram: contextVramEstimation == null
                                 ? undefined
@@ -279,9 +345,19 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                             actualContextVram: result.contextVramUsage == null
                                 ? undefined
                                 : bytes(result.contextVramUsage),
-                            contextEstimationDiff: contextVramEstimationDiffText,
+                            contextVramEstimationDiff: contextVramEstimationDiffText,
                             totalVramUsage: ((result.totalVramUsage / totalVram) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.gray("(" + bytes(result.totalVramUsage) + "/" + bytes(totalVram) + ")")
+                                chalk.gray("(" + bytes(result.totalVramUsage) + "/" + bytes(totalVram) + ")"),
+
+                            estimatedContextRam: contextRamEstimation == null
+                                ? undefined
+                                : bytes(contextRamEstimation),
+                            actualContextRam: result.contextRamUsage == null
+                                ? undefined
+                                : bytes(result.contextRamUsage),
+                            contextRamEstimationDiff: contextRamEstimationDiffText,
+                            totalRamUsage: ((result.totalRamUsage / totalRam) * 100).toFixed(2).padStart(5, "0") + "% " +
+                                chalk.gray("(" + bytes(result.totalRamUsage) + "/" + bytes(totalRam) + ")")
                         });
                     }
                 }
@@ -293,55 +369,100 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     }
 };
 
-const measureTable = new ConsoleTable([{
-    key: "newProcess",
-    title: " ",
-    width: 1
-}, {
-    key: "type",
-    title: "Type",
-    width: Math.max("Type".length, "Model".length, "Context".length),
-    canSpanOverEmptyColumns: true
-}, {
-    key: "gpuLayers",
-    title: "Layers",
-    width: "Layers".length,
-    canSpanOverEmptyColumns: true
-}, {
-    key: "contextSize",
-    title: "Context size",
-    width: "Context size".length,
-    canSpanOverEmptyColumns: true
-}, {
-    key: "estimatedModelVram",
-    title: "Estimated model VRAM",
-    width: "Estimated model VRAM".length,
-    canSpanOverEmptyColumns: true
-}, {
-    key: "actualModelVram",
-    title: "Model VRAM",
-    width: "Model VRAM".length
-}, {
-    key: "modelEstimationDiff",
-    title: "Diff",
-    width: Math.max("Diff".length, 9 + 1 + 9)
-}, {
-    key: "estimatedContextVram",
-    title: "Estimated context VRAM",
-    width: "Estimated context VRAM".length
-}, {
-    key: "actualContextVram",
-    title: "Context VRAM",
-    width: "Context VRAM".length
-}, {
-    key: "contextEstimationDiff",
-    title: "Diff",
-    width: Math.max("Diff".length, 9 + 1 + 9)
-}, {
-    key: "totalVramUsage",
-    title: "VRAM usage",
-    width: Math.max("VRAM usage".length, 8 + 1 + 8 + 1 + 8)
-}] as const satisfies readonly ConsoleTableColumn[]);
+function getMeasureTable(memoryType: InspectMeasureCommand["memory"]) {
+    return new ConsoleTable([{
+        key: "newProcess",
+        title: " ",
+        width: 1
+    }, {
+        key: "type",
+        title: "Type",
+        width: Math.max("Type".length, "Model".length, "Context".length),
+        canSpanOverEmptyColumns: true
+    }, {
+        key: "gpuLayers",
+        title: "Layers",
+        width: "Layers".length,
+        canSpanOverEmptyColumns: true
+    }, {
+        key: "contextSize",
+        title: "Context size",
+        width: "Context size".length,
+        canSpanOverEmptyColumns: true
+    }, {
+        key: "estimatedModelVram",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Estimated model VRAM",
+        width: "Estimated model VRAM".length,
+        canSpanOverEmptyColumns: true
+    }, {
+        key: "actualModelVram",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Model VRAM",
+        width: "Model VRAM".length
+    }, {
+        key: "modelVramEstimationDiff",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Diff",
+        width: Math.max("Diff".length, 9 + 1 + 9)
+    }, {
+        key: "estimatedModelRam",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Estimated model RAM",
+        width: "Estimated model RAM".length,
+        canSpanOverEmptyColumns: true
+    }, {
+        key: "actualModelRam",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Model RAM",
+        width: "Model RAM".length
+    }, {
+        key: "modelRamEstimationDiff",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Diff",
+        width: Math.max("Diff".length, 9 + 1 + 9)
+    }, {
+        key: "estimatedContextVram",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Estimated context VRAM",
+        width: "Estimated context VRAM".length
+    }, {
+        key: "actualContextVram",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Context VRAM",
+        width: "Context VRAM".length
+    }, {
+        key: "contextVramEstimationDiff",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "Diff",
+        width: Math.max("Diff".length, 9 + 1 + 9)
+    }, {
+        key: "totalVramUsage",
+        visible: memoryType === "vram" || memoryType === "all",
+        title: "VRAM usage",
+        width: Math.max("VRAM usage".length, 8 + 1 + 8 + 1 + 8)
+    }, {
+        key: "estimatedContextRam",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Estimated context RAM",
+        width: "Estimated context RAM".length
+    }, {
+        key: "actualContextRam",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Context RAM",
+        width: "Context RAM".length
+    }, {
+        key: "contextRamEstimationDiff",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "Diff",
+        width: Math.max("Diff".length, 9 + 1 + 9)
+    }, {
+        key: "totalRamUsage",
+        visible: memoryType === "ram" || memoryType === "all",
+        title: "RAM usage",
+        width: Math.max("RAM usage".length, 8 + 1 + 8 + 1 + 8)
+    }] as const satisfies readonly ConsoleTableColumn[]);
+}
 
 function renderDiffPercentageWithColors(percentage: number, {
     greenBright = 2,
@@ -374,10 +495,11 @@ const detectedFileName = path.basename(__filename);
 const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
-    modelPath, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers, flashAttention, evaluateText,
-    onInfo
+    modelPath, useMmap, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers, flashAttention,
+    evaluateText, exitAfterMeasurement = false, onInfo
 }: {
     modelPath: string,
+    useMmap?: boolean,
     gpu?: BuildGpu | "auto",
     tests: number,
     initialMaxContextSize?: number,
@@ -387,6 +509,7 @@ async function measureModel({
     minGpuLayers?: number,
     flashAttention?: boolean,
     evaluateText?: string,
+    exitAfterMeasurement?: boolean,
     onInfo(data: {
         gpuLayers: number,
         result: {
@@ -399,10 +522,13 @@ async function measureModel({
         } | {
             type: "success",
             modelVramUsage: number,
+            modelRamUsage: number,
             contextSize?: number,
             contextVramUsage?: number,
+            contextRamUsage?: number,
             contextStateSize?: number,
-            totalVramUsage: number
+            totalVramUsage: number,
+            totalRamUsage: number
         }
     }): void
 }) {
@@ -429,6 +555,7 @@ async function measureModel({
         }
     });
     let isPlannedExit = false;
+    let isDone = false;
     let forkSucceeded = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     const processCreationTimeout = 1000 * 60 * 5;
@@ -464,12 +591,12 @@ async function measureModel({
                 }
             }, processCreationTimeout);
         }),
-        new Promise<boolean>((resolve, reject) => {
+        new Promise<boolean | undefined>((resolve, reject) => {
             function done() {
                 if (!forkSucceeded)
                     reject(new Error(`Measuring a model failed to run a sub-process via file "${__filename}"`));
-                else
-                    resolve(isPlannedExit);
+                else if (isPlannedExit)
+                    resolve(isPlannedExit && isDone);
 
                 cleanup();
             }
@@ -480,6 +607,7 @@ async function measureModel({
                     subProcess.send({
                         type: "start",
                         modelPath,
+                        useMmap,
                         tests,
                         initialMaxContextSize,
                         maxContextSize,
@@ -487,7 +615,8 @@ async function measureModel({
                         maxGpuLayers,
                         minGpuLayers,
                         flashAttention,
-                        evaluateText
+                        evaluateText,
+                        exitAfterMeasurement
                     } satisfies ParentToChildMessage);
 
                     if (timeoutHandle != null) {
@@ -495,6 +624,10 @@ async function measureModel({
                         timeoutHandle = null;
                     }
                 } else if (message.type === "done") {
+                    isPlannedExit = true;
+                    isDone = true;
+                    subProcess.send({type: "exit"} satisfies ParentToChildMessage);
+                } else if (message.type === "exit") {
                     isPlannedExit = true;
                     subProcess.send({type: "exit"} satisfies ParentToChildMessage);
                 } else if (message.type === "error") {
@@ -516,10 +649,13 @@ async function measureModel({
                         result: {
                             type: "success",
                             modelVramUsage: message.modelVramUsage,
+                            modelRamUsage: message.modelRamUsage,
                             contextSize: message.contextSize,
                             contextVramUsage: message.contextVramUsage,
+                            contextRamUsage: message.contextRamUsage,
                             contextStateSize: message.contextStateSize,
-                            totalVramUsage: message.totalVramUsage
+                            totalVramUsage: message.totalVramUsage,
+                            totalRamUsage: message.totalRamUsage
                         }
                     });
                 }
@@ -580,11 +716,13 @@ async function runTestWorkerLogic() {
     }
 
     async function testContextSizes({
-        model, modelVramUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention, evaluateText
+        model, modelVramUsage, modelRamUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention, evaluateText,
+        exitAfterMeasurement = false
     }: {
-        model: LlamaModel, modelVramUsage: number, startContextSize?: number, maxContextSize?: number, minContextSize?: number,
-        tests: number, flashAttention?: boolean, evaluateText?: string
+        model: LlamaModel, modelVramUsage: number, modelRamUsage: number, startContextSize?: number, maxContextSize?: number,
+        minContextSize?: number, tests: number, flashAttention?: boolean, evaluateText?: string, exitAfterMeasurement?: boolean
     }) {
+        let measurementsDone: number = 0;
         const contextSizeCheckPlan = getContextSizesCheckPlan(
             maxContextSize != null
                 ? Math.min(model.trainContextSize, maxContextSize)
@@ -603,6 +741,7 @@ async function runTestWorkerLogic() {
 
             try {
                 const preContextVramUsage = (await llama.getVramState()).used;
+                const preContextRamUsage = getMemoryUsage(llama);
                 const context = await model.createContext({
                     contextSize: currentContextSizeCheck ?? (
                         maxContextSize != null
@@ -620,15 +759,20 @@ async function runTestWorkerLogic() {
                 }
 
                 const postContextVramUsage = (await llama.getVramState()).used;
+                const postContextRamUsage = getMemoryUsage(llama);
+                measurementsDone++;
 
                 sendInfoBack({
                     type: "stats",
                     gpuLayers: model.gpuLayers,
                     modelVramUsage,
+                    modelRamUsage,
                     contextSize: context.contextSize,
                     contextVramUsage: postContextVramUsage - preContextVramUsage,
+                    contextRamUsage: postContextRamUsage - preContextRamUsage,
                     contextStateSize: context.stateSize,
-                    totalVramUsage: postContextVramUsage
+                    totalVramUsage: postContextVramUsage,
+                    totalRamUsage: postContextRamUsage
                 });
                 currentContextSizeCheck = context.contextSize;
 
@@ -650,44 +794,59 @@ async function runTestWorkerLogic() {
             }
 
             currentContextSizeCheck = getNextItemInCheckContextSizesPlan(contextSizeCheckPlan, currentContextSizeCheck);
+
+            if (exitAfterMeasurement)
+                return measurementsDone;
         }
+
+        return measurementsDone;
     }
 
     async function testWithGpuLayers({
-        modelPath, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, evaluateText
+        modelPath, useMmap, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, evaluateText,
+        exitAfterMeasurement = false
     }: {
-        modelPath: string, gpuLayers: number, tests: number, startContextSize?: number, maxContextSize?: number, minContextSize?: number,
-        flashAttention?: boolean, evaluateText?: string
+        modelPath: string, useMmap?: boolean, gpuLayers: number, tests: number, startContextSize?: number, maxContextSize?: number,
+        minContextSize?: number, flashAttention?: boolean, evaluateText?: string, exitAfterMeasurement?: boolean
     }) {
         try {
             const preModelVramUsage = (await llama.getVramState()).used;
+            const preModelRamUsage = getMemoryUsage(llama);
             const model = await llama.loadModel({
                 modelPath,
+                useMmap,
                 gpuLayers,
                 defaultContextFlashAttention: flashAttention,
                 ignoreMemorySafetyChecks: true
             });
             const postModelVramUsage = (await llama.getVramState()).used;
+            const postModelRamUsage = getMemoryUsage(llama);
 
             sendInfoBack({
                 type: "stats",
                 gpuLayers: model.gpuLayers,
                 modelVramUsage: postModelVramUsage - preModelVramUsage,
-                totalVramUsage: postModelVramUsage
+                modelRamUsage: postModelRamUsage - preModelRamUsage,
+                totalVramUsage: postModelVramUsage,
+                totalRamUsage: postModelRamUsage
             });
 
-            await testContextSizes({
+            const measurementsDone = await testContextSizes({
                 model,
                 modelVramUsage: postModelVramUsage - preModelVramUsage,
+                modelRamUsage: postModelRamUsage - preModelRamUsage,
                 startContextSize,
                 maxContextSize,
                 minContextSize,
                 flashAttention,
                 tests,
-                evaluateText
+                evaluateText,
+                exitAfterMeasurement
             });
 
             await model.dispose();
+
+            return measurementsDone;
         } catch (err) {
             sendInfoBack({
                 type: "error",
@@ -695,13 +854,31 @@ async function runTestWorkerLogic() {
                 gpuLayers: gpuLayers
             });
         }
+
+        return 0;
     }
 
     process.on("message", async (message: ParentToChildMessage) => {
         if (message.type === "start") {
             for (let gpuLayers = message.maxGpuLayers; gpuLayers >= (message.minGpuLayers ?? 0); gpuLayers--) {
-                await testWithGpuLayers({
+                if (gpuLayers == message.maxGpuLayers && message.initialMaxContextSize != null) {
+                    const ggufInsights = await GgufInsights.from(await readGgufFileInfo(message.modelPath), llama);
+                    const contextSizeCheckPlan = getContextSizesCheckPlan(
+                        message.maxContextSize != null
+                            ? Math.min(ggufInsights.trainContextSize ?? 4096, message.maxContextSize)
+                            : ggufInsights.trainContextSize ?? 4096,
+                        message.tests,
+                        message.minContextSize
+                    );
+
+                    const firstContextSizeCheck = getNextItemInCheckContextSizesPlan(contextSizeCheckPlan, message.initialMaxContextSize);
+                    if (firstContextSizeCheck == null)
+                        continue;
+                }
+
+                const measurementsDone = await testWithGpuLayers({
                     modelPath: message.modelPath,
+                    useMmap: message.useMmap,
                     gpuLayers,
                     tests: message.tests,
                     startContextSize: gpuLayers == message.maxGpuLayers
@@ -710,8 +887,14 @@ async function runTestWorkerLogic() {
                     maxContextSize: message.maxContextSize,
                     minContextSize: message.minContextSize,
                     flashAttention: message.flashAttention,
-                    evaluateText: message.evaluateText
+                    evaluateText: message.evaluateText,
+                    exitAfterMeasurement: message.exitAfterMeasurement
                 });
+
+                if (measurementsDone > 0 && message.exitAfterMeasurement) {
+                    sendInfoBack({type: "exit"});
+                    return;
+                }
             }
 
             sendInfoBack({type: "done"});
@@ -788,6 +971,7 @@ function getNextItemInCheckContextSizesPlan(plan: number[], currentSize: number)
 type ParentToChildMessage = {
     type: "start",
     modelPath: string,
+    useMmap?: boolean,
     tests: number,
     maxGpuLayers: number,
     minGpuLayers?: number,
@@ -795,21 +979,25 @@ type ParentToChildMessage = {
     initialMaxContextSize?: number,
     maxContextSize?: number,
     minContextSize?: number,
-    evaluateText?: string
+    evaluateText?: string,
+    exitAfterMeasurement?: boolean
 } | {
     type: "exit"
 };
 
 type ChildToParentMessage = {
-    type: "ready" | "done"
+    type: "ready" | "done" | "exit"
 } | {
     type: "stats",
     gpuLayers: number,
     modelVramUsage: number,
+    modelRamUsage: number,
     contextSize?: number,
     contextVramUsage?: number,
+    contextRamUsage?: number,
     contextStateSize?: number,
-    totalVramUsage: number
+    totalVramUsage: number,
+    totalRamUsage: number
 } | {
     type: "error",
     error: string,
@@ -821,4 +1009,17 @@ function padStartAnsi(text: string, length: number, padChar: string = " ") {
     const textWithoutAnsi = stripAnsi(text);
 
     return padChar.repeat(Math.max(0, length - textWithoutAnsi.length)) + text;
+}
+
+function getMemoryUsage(llama: Llama) {
+    const totalMemoryUsage = llama._bindings.getMemoryInfo().total;
+    const vramUsage = llama._bindings.getGpuVramInfo();
+
+    let memoryUsage = totalMemoryUsage;
+
+    const unifiedMemoryVramUsage = Math.min(vramUsage.unifiedSize, vramUsage.used);
+    if (unifiedMemoryVramUsage <= memoryUsage)
+        memoryUsage -= unifiedMemoryVramUsage;
+
+    return memoryUsage;
 }

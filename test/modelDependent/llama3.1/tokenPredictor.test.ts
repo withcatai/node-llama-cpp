@@ -213,17 +213,36 @@ describe("llama 3.1", () => {
                 const sequence = context.getSequence({
                     tokenPredictor: predictor
                 });
+
+                // // script to find the right maxTokens value for this test
+                // {
+                //     for (let maxTokens = 0; maxTokens < 80; maxTokens++) {
+                //         const chatSession = new LlamaChatSession({
+                //             contextSequence: sequence
+                //         });
+                //
+                //         await chatSession.prompt("Summarize this text:\n\n" + exampleParagraph, {
+                //             maxTokens
+                //         });
+                //         const actualContextTokensLength = sequence._contextTokens.length;
+                //         const exposedContextTokensLength = sequence.contextTokens.length;
+                //
+                //         if (actualContextTokensLength !== exposedContextTokensLength)
+                //             console.log("max tokens with validated predictions:", maxTokens);
+                //     }
+                // }
+
                 const chatSession = new LlamaChatSession({
                     contextSequence: sequence
                 });
 
                 await chatSession.prompt("Summarize this text:\n\n" + exampleParagraph, {
-                    maxTokens: 80
+                    maxTokens: 23
                 });
 
-                expect(sequence.tokenPredictions.validated).toMatchInlineSnapshot("8");
-                expect(sequence.tokenPredictions.refuted).toMatchInlineSnapshot("47");
-                expect(sequence.tokenPredictions.used).toMatchInlineSnapshot("7");
+                expect(sequence.tokenPredictions.validated).toMatchInlineSnapshot("2");
+                expect(sequence.tokenPredictions.refuted).toMatchInlineSnapshot("8");
+                expect(sequence.tokenPredictions.used).toMatchInlineSnapshot("1");
                 expect(sequence.tokenPredictions.unused).toMatchInlineSnapshot("1");
 
                 const exposedNextTokenIndex = sequence.nextTokenIndex;
@@ -232,9 +251,9 @@ describe("llama 3.1", () => {
                     const actualContextTokensLength = sequence._contextTokens.length;
                     const exposedContextTokensLength = sequence.contextTokens.length;
 
-                    expect(exposedContextTokensLength).toMatchInlineSnapshot("598");
-                    expect(actualContextTokensLength).toMatchInlineSnapshot("599");
-                    expect(exposedNextTokenIndex).toMatchInlineSnapshot("598");
+                    expect(exposedContextTokensLength).toMatchInlineSnapshot("541");
+                    expect(actualContextTokensLength).toMatchInlineSnapshot("542");
+                    expect(exposedNextTokenIndex).toMatchInlineSnapshot("541");
                     expect(exposedContextTokensLength).to.not.be.eql(actualContextTokensLength);
                 }
 
@@ -252,7 +271,7 @@ describe("llama 3.1", () => {
 
                 expect(addedTokens).toMatchInlineSnapshot(`
                   [
-                    10318,
+                    315,
                   ]
                 `);
 
@@ -262,9 +281,9 @@ describe("llama 3.1", () => {
                     const actualContextTokensLength = sequence._contextTokens.length;
                     const exposedContextTokensLength = sequence.contextTokens.length;
 
-                    expect(exposedContextTokensLength).toMatchInlineSnapshot("598");
-                    expect(actualContextTokensLength).toMatchInlineSnapshot("598");
-                    expect(exposedNextTokenIndex).toMatchInlineSnapshot("598");
+                    expect(exposedContextTokensLength).toMatchInlineSnapshot("541");
+                    expect(actualContextTokensLength).toMatchInlineSnapshot("541");
+                    expect(exposedNextTokenIndex).toMatchInlineSnapshot("541");
                     expect(exposedNextTokenIndex).to.be.eql(sequence.nextTokenIndex);
                     expect(exposedContextTokensLength).to.be.eql(actualContextTokensLength);
                     expect(sequence.contextTokens.at(-1)).to.not.be.eql(exampleToken);

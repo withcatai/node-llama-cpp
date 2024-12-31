@@ -23,7 +23,7 @@ export async function parseGguf({
 }): Promise<GgufFileInfo> {
     const readOffset = new GgufReadOffset(0);
     const magicAndVersion = await parseMagicAndVersion(fileReader, readOffset);
-    const gguifInfo = await parseGgufUsingASpecificVersionParser({
+    const ggufInfo = await parseGgufUsingASpecificVersionParser({
         fileReader,
         readTensorInfo,
         ignoreKeys,
@@ -32,21 +32,21 @@ export async function parseGguf({
         readOffset,
         logWarnings
     });
-    const architectureMetadata = getGgufMetadataArchitectureData(gguifInfo.metadata);
+    const architectureMetadata = getGgufMetadataArchitectureData(ggufInfo.metadata);
 
     return {
         version: magicAndVersion.version,
-        tensorCount: gguifInfo.tensorCount,
-        metadata: gguifInfo.metadata,
+        tensorCount: ggufInfo.tensorCount,
+        metadata: ggufInfo.metadata,
         architectureMetadata: architectureMetadata,
-        tensorInfo: gguifInfo.tensorInfo,
-        metadataSize: gguifInfo.metadataSize,
+        tensorInfo: ggufInfo.tensorInfo,
+        metadataSize: ggufInfo.metadataSize,
         splicedParts: 1,
-        totalTensorInfoSize: gguifInfo.tensorInfoSize,
-        totalTensorCount: gguifInfo.tensorCount,
-        totalMetadataSize: gguifInfo.metadataSize,
-        fullTensorInfo: gguifInfo.tensorInfo,
-        tensorInfoSize: gguifInfo.tensorInfoSize
+        totalTensorInfoSize: ggufInfo.tensorInfoSize,
+        totalTensorCount: ggufInfo.tensorCount,
+        totalMetadataSize: ggufInfo.metadataSize,
+        fullTensorInfo: ggufInfo.tensorInfo,
+        tensorInfoSize: ggufInfo.tensorInfoSize
     };
 }
 

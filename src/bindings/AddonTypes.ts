@@ -48,6 +48,7 @@ export type BindingModule = {
     systemInfo(): string,
     getSupportsGpuOffloading(): boolean,
     getSupportsMmap(): boolean,
+    getGpuSupportsMmap(): boolean,
     getSupportsMlock(): boolean,
     getMathCores(): number,
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
@@ -75,6 +76,9 @@ export type BindingModule = {
         total: number,
         maxSize: number,
         free: number
+    },
+    getMemoryInfo(): {
+        total: number
     },
     init(): Promise<void>,
     loadBackends(forceLoadLibrariesSearchPath?: string): void,

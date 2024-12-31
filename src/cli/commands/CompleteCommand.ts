@@ -50,6 +50,7 @@ type CompleteCommand = {
     debug: boolean,
     meter: boolean,
     timing: boolean,
+    noMmap: boolean,
     printTimings: boolean
 };
 
@@ -220,6 +221,11 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 default: false,
                 description: "Print how how long it took to generate each response"
             })
+            .option("noMmap", {
+                type: "boolean",
+                default: false,
+                description: "Disable mmap (memory-mapped file) usage"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -232,14 +238,14 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
         flashAttention, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-        debug, meter, timing, printTimings
+        debug, meter, timing, noMmap, printTimings
     }) {
         try {
             await RunCompletion({
                 modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
                 threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, printTimings
+                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -254,7 +260,7 @@ async function RunCompletion({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
     threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, meter, timing, printTimings
+    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, meter, timing, noMmap, printTimings
 }: CompleteCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -276,13 +282,16 @@ async function RunCompletion({
             logLevel: llamaLogLevel
         });
     const logBatchSize = batchSize != null;
+    const useMmap = !noMmap && llama.supportsMmap;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
-        flashAttention
+        flashAttention,
+        useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
+            useMmap,
             consoleTitle: "Draft model file"
         })
         : undefined;
@@ -320,6 +329,7 @@ async function RunCompletion({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -352,6 +362,7 @@ async function RunCompletion({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    useMmap,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
                     },
@@ -429,6 +440,7 @@ async function RunCompletion({
     const padTitle = await printCommonInfoLines({
         context,
         draftContext,
+        useMmap,
         minTitleLength: "Complete".length + 1,
         logBatchSize,
         tokenMeterEnabled: meter

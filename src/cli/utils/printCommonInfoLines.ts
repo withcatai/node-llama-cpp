@@ -8,6 +8,7 @@ export async function printCommonInfoLines({
     context,
     draftContext,
     minTitleLength = 0,
+    useMmap,
     logBatchSize = false,
     tokenMeterEnabled = false,
     printBos = false,
@@ -16,6 +17,7 @@ export async function printCommonInfoLines({
     context: LlamaContext,
     draftContext?: LlamaContext,
     minTitleLength?: number,
+    useMmap?: boolean,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
     printBos?: boolean,
@@ -70,6 +72,13 @@ export async function printCommonInfoLines({
             value: `${model.gpuLayers}/${model.fileInsights.totalLayers} offloaded ${
                 chalk.dim(`(${Math.floor((model.gpuLayers / model.fileInsights.totalLayers) * 100)}%)`)
             }`
+        }, {
+            title: "mmap",
+            value: !model._llama.supportsMmap
+                ? "unsupported"
+                : (useMmap || useMmap == null)
+                    ? "enabled"
+                    : "disabled"
         }, {
             show: printBos,
             title: "BOS",

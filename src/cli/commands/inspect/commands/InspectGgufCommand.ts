@@ -14,6 +14,7 @@ import withOra from "../../../../utils/withOra.js";
 import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
+import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -121,6 +122,8 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 });
             });
 
+        removeAdditionalTensorInfoFields(parsedMetadata.fullTensorInfo);
+
         const fileTypeName = getGgufFileTypeName(parsedMetadata.metadata.general?.file_type);
 
         if (plainJson || outputToJsonFile != null) {
@@ -211,3 +214,14 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
         }
     }
 };
+
+// these fields are added by the parser for ease of use and are not found in the gguf file itself
+function removeAdditionalTensorInfoFields(tensorInfo?: GgufTensorInfo[]) {
+    if (tensorInfo == null)
+        return;
+
+    for (const tensor of tensorInfo) {
+        delete (tensor as {fileOffset?: GgufTensorInfo["fileOffset"]}).fileOffset;
+        delete (tensor as {filePart?: GgufTensorInfo["filePart"]}).filePart;
+    }
+}

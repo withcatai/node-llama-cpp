@@ -68,6 +68,7 @@ type ChatCommand = {
     debug: boolean,
     meter: boolean,
     timing: boolean,
+    noMmap: boolean,
     printTimings: boolean
 };
 
@@ -293,6 +294,11 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Print how how long it took to generate each response"
             })
+            .option("noMmap", {
+                type: "boolean",
+                default: false,
+                description: "Disable mmap (memory-mapped file) usage"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -306,7 +312,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
-        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, printTimings
+        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
     }) {
         try {
             await RunChat({
@@ -314,7 +320,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter,
-                timing, printTimings
+                timing, noMmap, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -330,7 +336,7 @@ async function RunChat({
     contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel,
-    tokenPredictionModelContextSize, debug, meter, timing, printTimings
+    tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -353,13 +359,16 @@ async function RunChat({
             logLevel: llamaLogLevel
         });
     const logBatchSize = batchSize != null;
+    const useMmap = !noMmap && llama.supportsMmap;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
-        flashAttention
+        flashAttention,
+        useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
+            useMmap,
             consoleTitle: "Draft model file"
         })
         : undefined;
@@ -404,6 +413,7 @@ async function RunChat({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -436,6 +446,7 @@ async function RunChat({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    useMmap,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
                     },
@@ -541,6 +552,7 @@ async function RunChat({
     const padTitle = await printCommonInfoLines({
         context,
         draftContext,
+        useMmap,
         printBos: true,
         printEos: true,
         logBatchSize,

@@ -89,17 +89,17 @@ Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
     return result;
 }
 
-Napi::Value getGpuType(const Napi::CallbackInfo& info) {
+std::pair<ggml_backend_dev_t, std::string> getGpuDevice() {
     for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
         ggml_backend_dev_t device = ggml_backend_dev_get(i);
         const auto deviceName = std::string(ggml_backend_dev_name(device));
         
         if (deviceName == "Metal") {
-            return Napi::String::New(info.Env(), "metal");
+            return std::pair<ggml_backend_dev_t, std::string>(device, "metal");
         } else if (std::string(deviceName).find("Vulkan") == 0) {
-            return Napi::String::New(info.Env(), "vulkan");
+            return std::pair<ggml_backend_dev_t, std::string>(device, "vulkan");
         } else if (std::string(deviceName).find("CUDA") == 0 || std::string(deviceName).find("ROCm") == 0 || std::string(deviceName).find("MUSA") == 0) {
-            return Napi::String::New(info.Env(), "cuda");
+            return std::pair<ggml_backend_dev_t, std::string>(device, "cuda");
         }
     }
 
@@ -108,8 +108,22 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
         const auto deviceName = std::string(ggml_backend_dev_name(device));
         
         if (deviceName == "CPU") {
-            return Napi::Boolean::New(info.Env(), false);
+            return std::pair<ggml_backend_dev_t, std::string>(device, "cpu");
         }
+    }
+
+    return std::pair<ggml_backend_dev_t, std::string>(nullptr, "");
+}
+
+Napi::Value getGpuType(const Napi::CallbackInfo& info) {
+    const auto gpuDeviceRes = getGpuDevice();
+    const auto device = gpuDeviceRes.first;
+    const auto deviceType = gpuDeviceRes.second;
+    
+    if (deviceType == "cpu") {
+        return Napi::Boolean::New(info.Env(), false);
+    } else if (device != nullptr && deviceType != "") {
+        return Napi::String::New(info.Env(), deviceType);
     }
 
     return info.Env().Undefined();
