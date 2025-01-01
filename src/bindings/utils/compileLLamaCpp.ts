@@ -24,6 +24,7 @@ import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {testCmakeBinary} from "./testCmakeBinary.js";
 import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
 import {detectWindowsBuildTools} from "./detectBuildTools.js";
+import {asyncSome} from "./asyncSome.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
@@ -451,11 +452,15 @@ async function moveBuildFilesToResultDir(outDirectory: string, canCreateReleaseD
     ];
     const compiledResultDirPath = path.join(outDirectory, buildConfigType);
 
-    if (canCreateReleaseDir)
-        await fs.ensureDir(compiledResultDirPath);
-
-    if (!await fs.pathExists(compiledResultDirPath))
-        throw new Error(`Could not find ${buildConfigType} directory`);
+    if (!await fs.pathExists(compiledResultDirPath)) {
+        if (canCreateReleaseDir) {
+            if (await asyncSome(binFilesDirPaths.map((dirPath) => fs.pathExists(dirPath))))
+                await fs.ensureDir(compiledResultDirPath);
+            else
+                throw new Error(`Could not find ${buildConfigType} directory or any other output directory`);
+        } else
+            throw new Error(`Could not find ${buildConfigType} directory`);
+    }
 
     for (const binFilesDirPath of binFilesDirPaths) {
         if (await fs.pathExists(binFilesDirPath)) {
