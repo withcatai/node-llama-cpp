@@ -1,4 +1,4 @@
-function(setProgramFilesPaths CURRENT_ARCH PROGRAMFILES_PATHS)
+function(setProgramFilesPaths CURRENT_ARCH)
     set(PROGRAMFILES "$ENV{ProgramFiles}")
     set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
     file(TO_CMAKE_PATH "${PROGRAMFILES}" PROGRAMFILES)

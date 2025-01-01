@@ -5,14 +5,14 @@ set(target x86_64-pc-windows-msvc)
 set(CMAKE_C_COMPILER_TARGET ${target})
 set(CMAKE_CXX_COMPILER_TARGET ${target})
 
-include(../cmake/win32.programFilesPaths.cmake)
-setProgramFilesPaths("x64" PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.programFilesPaths.cmake")
+setProgramFilesPaths("x64")
 
-include(../cmake/win32.llvmUseGnuModeCompilers.cmake)
-llvmUseGnuModeCompilers("x64" PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.llvmUseGnuModeCompilers.cmake")
+llvmUseGnuModeCompilers("x64")
 
-include(../cmake/win32.ensureNinjaPath.cmake)
-ensureNinjaPath(PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.ensureNinjaPath.cmake")
+ensureNinjaPath()
 
 set(arch_c_flags "-march=native")
 

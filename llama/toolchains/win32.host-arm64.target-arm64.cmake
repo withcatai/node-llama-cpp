@@ -5,14 +5,14 @@ set(target arm64-pc-windows-msvc)
 set(CMAKE_C_COMPILER_TARGET ${target})
 set(CMAKE_CXX_COMPILER_TARGET ${target})
 
-include(../cmake/win32.programFilesPaths.cmake)
-setProgramFilesPaths("arm64" PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.programFilesPaths.cmake")
+setProgramFilesPaths("arm64")
 
-include(../cmake/win32.llvmUseGnuModeCompilers.cmake)
-llvmUseGnuModeCompilers("arm64" PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.llvmUseGnuModeCompilers.cmake")
+llvmUseGnuModeCompilers("arm64")
 
-include(../cmake/win32.ensureNinjaPath.cmake)
-ensureNinjaPath(PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.ensureNinjaPath.cmake")
+ensureNinjaPath()
 
 set(arch_c_flags "-march=armv8.7-a -fvectorize -ffp-model=fast -fno-finite-math-only")
 set(warn_c_flags "-Wno-format -Wno-unused-variable -Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments")

@@ -1,11 +1,11 @@
-include(../cmake/win32.programFilesPaths.cmake)
-setProgramFilesPaths("x64" PROGRAMFILES_PATHS)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.programFilesPaths.cmake")
+setProgramFilesPaths("x64")
 
-include(../cmake/win32.ensureNodeLib.cmake)
-ensureNodeLib(PROGRAMFILES_PATHS "x64" "arm64")
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.ensureNodeLib.cmake")
+ensureNodeLib("x64" "arm64")
 
-include(../cmake/win32.llvmApplyGnuModeAdaptations.cmake)
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.llvmApplyGnuModeAdaptations.cmake")
 llvmApplyGnuModeAdaptations()
 
-include(../cmake/win32.llvmEnsureCmakeAr.cmake)
-llvmEnsureCmakeAr(PROGRAMFILES_PATHS "x64")
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.llvmEnsureCmakeAr.cmake")
+llvmEnsureCmakeAr("x64")

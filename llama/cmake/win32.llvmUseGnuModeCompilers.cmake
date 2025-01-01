@@ -1,4 +1,4 @@
-function(llvmUseGnuModeCompilers CURRENT_ARCH PROGRAMFILES_PATHS)
+function(llvmUseGnuModeCompilers CURRENT_ARCH)
     set(LLVM_INSTALLATION_URL "https://github.com/llvm/llvm-project/releases/tag/llvmorg-19.1.5")
 
     set(CMAKE_C_COMPILER clang)

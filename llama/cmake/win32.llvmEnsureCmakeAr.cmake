@@ -1,4 +1,4 @@
-function(llvmEnsureCmakeAr PROGRAMFILES_PATHS CURRENT_ARCH)
+function(llvmEnsureCmakeAr CURRENT_ARCH)
     set (LLVM_DIR_ARCH_NAME "")
     if (CURRENT_ARCH STREQUAL "x64")
         set (LLVM_DIR_ARCH_NAME "x64")
