@@ -216,7 +216,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                                 ...(
                                     [
                                         ...cmakeCustomOptions,
-                                        [targetFlag, targetValue]
+                                        [targetFlag, targetValue],
+                                        ["NLC_SINGLE_LLAMA_CPP_TARGET", "1"]
                                     ].map(([key, value]) => "--CD" + key + "=" + value)
                                 )
                             ],
