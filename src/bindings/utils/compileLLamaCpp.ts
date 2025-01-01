@@ -5,7 +5,6 @@ import os from "os";
 import fs from "fs-extra";
 import chalk from "chalk";
 import which from "which";
-import filenamify from "filenamify";
 import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
@@ -29,10 +28,8 @@ import {asyncSome} from "./asyncSome.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
 
-const windowsMsvcOnlyBuildFlagsToTargets = new Map(
-    ["blas", "cann", "cuda", "hip", "kompute", "metal", "musa", "sycl", "vulkan", "opencl"]
-        .map((backend) => ["GGML_" + backend.toUpperCase(), "ggml-" + backend.toLowerCase()])
-);
+const requiresMsvcOnWindowsFlags = ["blas", "cann", "cuda", "hip", "kompute", "metal", "musa", "sycl", "vulkan", "opencl"]
+    .map((backend) => ("GGML_" + backend.toUpperCase()));
 
 export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions: {
     nodeTarget?: string,
@@ -62,8 +59,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         : buildFolderName.withoutCustomCmakeOptions;
     const useWindowsLlvm = (
         platform === "win" &&
+        buildOptions.gpu === false &&
         !ignoreWorkarounds.includes("avoidWindowsLlvm") &&
-        !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE")
+        !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE") &&
+        !requiresMsvcOnWindowsFlags.some((flag) => buildOptions.customCmakeOptions.has(flag))
     )
         ? areWindowsBuildToolsCapableForLlvmBuild(await detectWindowsBuildTools())
         : false;
@@ -96,11 +95,13 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
                 const cmakeToolchainOptions = new Map<string, string>();
-                const windowsSeparateMsvcCmakeOptions = new Map<string, string>();
 
                 cmakeCustomOptions.set("CMAKE_CONFIGURATION_TYPES", buildConfigType);
                 cmakeCustomOptions.set("NLC_CURRENT_PLATFORM", platform + "-" + process.arch);
                 cmakeCustomOptions.set("NLC_TARGET_PLATFORM", buildOptions.platform + "-" + buildOptions.arch);
+
+                if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
+                    cmakeToolchainOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
                 if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "1");
@@ -116,10 +117,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
-                if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
-                    cmakeToolchainOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
-
                 if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))
+                    cmakeCustomOptions.set("GGML_OPENMP", "OFF");
+
+                if (useWindowsLlvm)
                     cmakeCustomOptions.set("GGML_OPENMP", "OFF");
 
                 if (ciMode) {
@@ -134,18 +135,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
-                    }
-                }
-
-                if (useWindowsLlvm) {
-                    cmakeCustomOptions.set("GGML_OPENMP", "OFF");
-
-                    for (const [customFlag, customFlagValue] of [...cmakeCustomOptions.entries()]) {
-                        if (!windowsMsvcOnlyBuildFlagsToTargets.has(customFlag) || isCmakeValueOff(customFlagValue))
-                            continue;
-
-                        windowsSeparateMsvcCmakeOptions.set(customFlag, customFlagValue);
-                        cmakeCustomOptions.delete(customFlag);
                     }
                 }
 
@@ -189,47 +178,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 );
 
                 const compiledResultDirPath = await moveBuildFilesToResultDir(outDirectory);
-
-                // perform a separate MSVC build and combine the compiled backends into the final build
-                if (useWindowsLlvm && windowsSeparateMsvcCmakeOptions.size > 0) {
-                    for (const [targetFlag, targetValue] of windowsSeparateMsvcCmakeOptions) {
-                        const targetName = windowsMsvcOnlyBuildFlagsToTargets.get(targetFlag);
-                        if (targetName == null)
-                            continue;
-
-                        console.info();
-                        console.info(getConsoleLogPrefix(true, false), "Building specialized GPU backend using MSVC: " + targetName);
-
-                        const targetOutDir = path.join(outDirectory, "target-" + filenamify(targetName));
-
-                        await fs.remove(targetOutDir);
-                        await spawnCommand(
-                            "npm",
-                            [
-                                "run", "-s", "cmake-js-llama", "--", "compile",
-                                "--log-level", "warn",
-                                "--config", buildConfigType,
-                                "--arch=" + buildOptions.arch,
-                                "--out", path.relative(llamaDirectory, targetOutDir),
-                                "--runtime-version=" + runtimeVersion,
-                                "--parallel=" + parallelBuildThreads,
-                                "--target", targetName,
-                                ...cmakePathArgs,
-                                ...(
-                                    [
-                                        ...cmakeCustomOptions,
-                                        [targetFlag, targetValue]
-                                    ].map(([key, value]) => "--CD" + key + "=" + value)
-                                )
-                            ],
-                            __dirname,
-                            envVars,
-                            buildOptions.progressLogs
-                        );
-                        const targetCompileResultDir = await moveBuildFilesToResultDir(targetOutDir, true);
-                        await mergeDirWithoutOverrides(targetCompileResultDir, compiledResultDirPath);
-                    }
-                }
 
                 await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
                     buildOptions: convertBuildOptionsToBuildOptionsJSON(buildOptions)
@@ -500,33 +448,6 @@ async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
 
         await fs.remove(tempDirPath);
     }
-}
-
-async function mergeDirWithoutOverrides(sourceDirPath: string, targetDirPath: string) {
-    const itemNames = await fs.readdir(sourceDirPath, {withFileTypes: true});
-
-    await Promise.all(
-        itemNames.map(async (item) => {
-            const targetItemPath = path.join(targetDirPath, item.name);
-
-            if (item.isDirectory()) {
-                if (await fs.pathExists(targetItemPath)) {
-                    if ((await fs.stat(targetItemPath)).isDirectory())
-                        await mergeDirWithoutOverrides(path.join(sourceDirPath, item.name), targetItemPath);
-                } else {
-                    await fs.ensureDir(targetItemPath);
-                    await mergeDirWithoutOverrides(path.join(sourceDirPath, item.name), targetItemPath);
-                }
-            } else {
-                if (await fs.pathExists(targetItemPath))
-                    return;
-
-                await fs.move(path.join(sourceDirPath, item.name), targetItemPath, {
-                    overwrite: false
-                });
-            }
-        })
-    );
 }
 
 async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
