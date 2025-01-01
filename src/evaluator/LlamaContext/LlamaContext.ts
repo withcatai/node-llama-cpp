@@ -13,8 +13,8 @@ import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {
-    BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, EvaluationPriority,
-    LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateOptions
+    BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
+    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateOptions
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import {LlamaSampler} from "./LlamaSampler.js";
@@ -988,10 +988,17 @@ export class LlamaContextSequence {
         return this._context.model;
     }
 
+    /** The maximum number of tokens that the sequence state can hold */
+    public get contextSize() {
+        return this._context.contextSize;
+    }
+
+    /** The index where the next evaluated token will be placed in the context */
     public get nextTokenIndex() {
         return this._nextTokenIndex - this._loadedTokenPredictions.length;
     }
 
+    /** The current context state tokens */
     public get contextTokens() {
         if (this._loadedTokenPredictions.length === 0)
             return this._contextTokens.slice();
@@ -1255,7 +1262,7 @@ export class LlamaContextSequence {
      *
      * This method uses the token predictor (when provided) to generate new tokens faster.
      */
-    public evaluate(tokens: Token[], options: SequenceEvaluateOptions = {}): AsyncGenerator<Token, void | Token> {
+    public evaluate(tokens: Token[], options: SequenceEvaluateOptions = {}): AsyncGenerator<Token, void, void | Token | Token[]> {
         const {
             temperature = 0,
             minP = 0,
@@ -1397,48 +1404,7 @@ export class LlamaContextSequence {
      *
      * It's recommended to iterate from `0` up to the length of the input array to check the results in the output array.
      */
-    public async controlledEvaluate(input: Array<Token | [Token, {
-        generateNext?: {
-            /**
-             * Get the full probabilities list of tokens from the vocabulary to be the next token, after applying the given options.
-             *
-             * Only enable when needed, since it impacts the performance.
-             *
-             * Defaults to `false`.
-             */
-            probabilitiesList?: boolean,
-
-            /**
-             * Generate the next token with the provided options using sampling.
-             *
-             * Setting this to `true` will generate probabilities for the next token and sample it.
-             */
-            singleToken?: boolean,
-
-            options?: {
-                temperature?: number, minP?: number, topK?: number, topP?: number,
-
-                /**
-                 * Used to control the randomness of the generated text.
-                 *
-                 * Change the seed to get different results.
-                 *
-                 * Defaults to the current epoch time.
-                 *
-                 * Only relevant when using `temperature`.
-                 */
-                seed?: number,
-                repeatPenalty?: LlamaContextSequenceRepeatPenalty,
-
-                /**
-                 * Adjust the probability of tokens being generated.
-                 * Can be used to bias the model to generate tokens that you want it to lean towards,
-                 * or to avoid generating tokens that you want it to avoid.
-                 */
-                tokenBias?: TokenBias | (() => TokenBias)
-            }
-        }
-    }]>, options?: {
+    public async controlledEvaluate(input: ControlledEvaluateInputItem[], options?: {
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
          * evaluated based on the strategy chosen for the context.
@@ -1582,7 +1548,7 @@ export class LlamaContextSequence {
         yieldEogToken?: boolean,
         _noSampling?: boolean,
         _skipLock?: boolean
-    }): AsyncGenerator<Token, void | Token> {
+    }): AsyncGenerator<Token, void, void | Token | Token[]> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens;
@@ -1654,10 +1620,12 @@ export class LlamaContextSequence {
                     evaluatorLock?.dispose();
                 }
 
-                const replacementToken = (yield nextToken) as undefined | Token;
+                const replacementToken = yield nextToken;
 
                 // set the tokens for the next evaluation
-                if (replacementToken != null)
+                if (replacementToken instanceof Array)
+                    evalTokens = replacementToken.slice();
+                else if (replacementToken != null)
                     evalTokens = [replacementToken];
                 else
                     evalTokens = [nextToken];
@@ -1687,7 +1655,7 @@ export class LlamaContextSequence {
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, contextShiftOptions: Required<ContextShiftOptions>,
         yieldEogToken?: boolean, tokenPredictor: TokenPredictor
-    }): AsyncGenerator<Token, void | Token> {
+    }): AsyncGenerator<Token, void, void | Token | Token[]> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens.slice();
@@ -1879,10 +1847,12 @@ export class LlamaContextSequence {
                     evaluatorLock.dispose();
                 }
 
-                const replacementToken = (yield nextToken) as undefined | Token;
+                const replacementToken = yield nextToken;
 
                 // set the tokens for the next evaluation
-                if (replacementToken != null)
+                if (replacementToken instanceof Array)
+                    evalTokens = replacementToken.slice();
+                else if (replacementToken != null)
                     evalTokens = [replacementToken];
                 else
                     evalTokens = [nextToken];
@@ -2166,12 +2136,27 @@ function reviveTokenProbabilities(probabilitiesList?: (Token | number)[]) {
         return undefined;
 
     const res = new Map<Token, number>();
+    let maxLogit: number | undefined = undefined;
 
-    for (let i = 1; i < probabilitiesList.length; i++) {
+    for (let i = 1; i < probabilitiesList.length; i += 2) {
         const token = probabilitiesList[i - 1]! as Token;
         const probability = probabilitiesList[i]! as number;
 
+        if (maxLogit == null || probability > maxLogit)
+            maxLogit = probability;
+
         res.set(token, probability);
+    }
+
+    if (maxLogit != null) {
+        for (const [token, logit] of res)
+            res.set(token, Math.exp(logit - maxLogit));
+
+        const sum = Array.from(res.values()).reduce((a, b) => a + b, 0);
+
+        // normalize the probabilities
+        for (const [token, logit] of res)
+            res.set(token, logit / sum);
     }
 
     return res;

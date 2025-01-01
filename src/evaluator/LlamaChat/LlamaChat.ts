@@ -330,14 +330,7 @@ export class LlamaChat {
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
 
         this._chatWrapper = chatWrapper === "auto"
-            ? (
-                resolveChatWrapper({
-                    bosString: contextSequence.model.tokens.bosString,
-                    filename: contextSequence.model.filename,
-                    fileInfo: contextSequence.model.fileInfo,
-                    tokenizer: contextSequence.model.tokenizer
-                }) ?? new GeneralChatWrapper()
-            )
+            ? resolveChatWrapper(contextSequence.model)
             : chatWrapper;
     }
 

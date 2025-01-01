@@ -491,6 +491,7 @@ export default defineConfig({
                     {text: "Chat Context Shift", link: "/chat-context-shift"},
                     {text: "Batching", link: "/batching"},
                     {text: "Token Prediction", link: "/token-prediction"},
+                    {text: "Low Level API", link: "/low-level-api"},
                     {text: "Awesome List", link: "/awesome"},
                     {text: "Troubleshooting", link: "/troubleshooting"},
                     {text: "Tips and Tricks", link: "/tips-and-tricks"}

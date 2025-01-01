@@ -314,9 +314,63 @@ export type SequenceEvaluateOptions = {
     _noSampling?: boolean
 };
 
+export type ControlledEvaluateInputItem = Token | [token: Token, options: {
+    generateNext?: {
+        /**
+         * Get the full probabilities list of tokens from the vocabulary to be the next token, after applying the given options.
+         *
+         * Only enable when needed, since it impacts the performance.
+         *
+         * Defaults to `false`.
+         */
+        probabilitiesList?: boolean,
+
+        /**
+         * Generate the next token with the provided options using sampling.
+         *
+         * Setting this to `true` will generate probabilities for the next token and sample it.
+         */
+        singleToken?: boolean,
+
+        options?: {
+            temperature?: number, minP?: number, topK?: number, topP?: number,
+
+            /**
+             * Used to control the randomness of the generated text.
+             *
+             * Change the seed to get different results.
+             *
+             * Defaults to the current epoch time.
+             *
+             * Only relevant when using `temperature`.
+             */
+            seed?: number,
+            repeatPenalty?: LlamaContextSequenceRepeatPenalty,
+
+            /**
+             * Adjust the probability of tokens being generated.
+             * Can be used to bias the model to generate tokens that you want it to lean towards,
+             * or to avoid generating tokens that you want it to avoid.
+             */
+            tokenBias?: TokenBias | (() => TokenBias)
+        }
+    }
+}];
+
 export type ControlledEvaluateIndexOutput = {
     next: {
         token?: Token | null,
+
+        /**
+         * The probabilities of the tokens from the vocabulary to be the next token.
+         *
+         * A probability is a number from `0` to `1`.
+         *
+         * The map is sorted by the probability of the tokens from the highest to the lowest,
+         * and is reflected in the order of the entries when iterating over the map.
+         * Use `.entries().next().value` to get the top probability pair
+         * ([learn more](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/entries)).
+         */
         probabilities?: Map<Token, number>
     }
 };

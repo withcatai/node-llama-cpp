@@ -18,7 +18,8 @@ import {LlamaEmbedding, type LlamaEmbeddingOptions, type LlamaEmbeddingJSON} fro
 import {
     type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
     type CustomBatchingDispatchSchedule, type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem,
-    type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type ControlledEvaluateIndexOutput
+    type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type ControlledEvaluateInputItem,
+    type ControlledEvaluateIndexOutput
 } from "./evaluator/LlamaContext/types.js";
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
@@ -82,6 +83,7 @@ import {
     type CombinedModelDownloaderOptions
 } from "./utils/createModelDownloader.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
+import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -143,6 +145,7 @@ export {
     type ContextTokensDeleteRange,
     type EvaluationPriority,
     type LlamaContextSequenceRepeatPenalty,
+    type ControlledEvaluateInputItem,
     type ControlledEvaluateIndexOutput,
     TokenBias,
     LlamaEmbeddingContext,
@@ -290,5 +293,6 @@ export {
     CombinedModelDownloader,
     type CombinedModelDownloaderOptions,
     jsonDumps,
-    type OverridesObject
+    type OverridesObject,
+    experimentalChunkDocument
 };

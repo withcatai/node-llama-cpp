@@ -192,8 +192,10 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         AddonSampler* sampler;
         bool arrayResult = false;
         bool returnLogprobs = false;
-        Napi::Array logprobs;
         bool has_logprobs = false;
+        size_t logprobs_size;
+        llama_token * logprobs_tokens;
+        float * logprobs_probs;
         int32_t batchLogitIndex;
         llama_token result;
         bool no_output = false;
@@ -213,6 +215,11 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         ~AddonContextSampleTokenWorker() {
             ctx->Unref();
             sampler->Unref();
+
+            if (has_logprobs) {
+                delete[] logprobs_tokens;
+                delete[] logprobs_probs;
+            }
         }
 
         Napi::Promise GetPromise() {
@@ -245,7 +252,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             auto & candidates = sampler->tokenCandidates;
             for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};;
+                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
             }
 
             llama_token_data_array cur_p = {
@@ -265,10 +272,13 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                     cur_p.sorted = true;
                 }
 
-                logprobs = Napi::Array::New(Env(), cur_p.size * 2);
+                logprobs_size = cur_p.size;
+                logprobs_tokens = new llama_token[logprobs_size];
+                logprobs_probs = new float[logprobs_size];
+
                 for (size_t i = 0; i < cur_p.size; i++) {
-                    logprobs.Set(i * 2, Napi::Number::New(Env(), cur_p.data[i].id));
-                    logprobs.Set(i * 2 + 1, Napi::Number::New(Env(), cur_p.data[i].logit));
+                    logprobs_tokens[i] = cur_p.data[i].id;
+                    logprobs_probs[i] = cur_p.data[i].logit;
                 }
 
                 has_logprobs = true;
@@ -300,6 +310,11 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             resultArray.Set(Napi::Number::New(Env(), 0), resultToken);
             
             if (has_logprobs) {
+                Napi::Array logprobs = Napi::Array::New(Env(), logprobs_size * 2);
+                for (size_t i = 0; i < logprobs_size; i++) {
+                    logprobs.Set(i * 2, Napi::Number::New(Env(), logprobs_tokens[i]));
+                    logprobs.Set(i * 2 + 1, Napi::Number::New(Env(), logprobs_probs[i]));
+                }
                 resultArray.Set(1, logprobs);
             }
 

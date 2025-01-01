@@ -55,7 +55,8 @@ export default tseslint.config({
             exemptDestructuredRootsFromChecks: true,
 
             tagNamePreference: {
-                hidden: "hidden"
+                hidden: "hidden",
+                experimental: "experimental"
             }
         }
     },
