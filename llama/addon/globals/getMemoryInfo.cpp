@@ -6,8 +6,9 @@
 #include <mach/mach.h>
 #include <sys/sysctl.h>
 #elif __linux__
-#include <iostream>
-#include <sys/sysinfo.h>
+#include <fstream>
+#include <sstream>
+#include <string>
 #elif _WIN32
 #include <iostream>
 #include <windows.h>
