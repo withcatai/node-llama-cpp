@@ -18,3 +18,7 @@ set(arch_c_flags "-march=native")
 
 set(CMAKE_C_FLAGS_INIT "${arch_c_flags}")
 set(CMAKE_CXX_FLAGS_INIT "${arch_c_flags}")
+
+# Set the CUDA flags to use the same compiler as the C compiler
+get_filename_component(C_COMPILER_DIR "${CMAKE_C_COMPILER}" DIRECTORY)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --compiler-bindir=${C_COMPILER_DIR}")
