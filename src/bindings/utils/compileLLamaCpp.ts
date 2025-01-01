@@ -216,8 +216,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                                 ...(
                                     [
                                         ...cmakeCustomOptions,
-                                        [targetFlag, targetValue],
-                                        ["NLC_SINGLE_LLAMA_CPP_TARGET", "1"]
+                                        [targetFlag, targetValue]
                                     ].map(([key, value]) => "--CD" + key + "=" + value)
                                 )
                             ],
@@ -225,7 +224,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             envVars,
                             buildOptions.progressLogs
                         );
-                        const targetCompileResultDir = await moveBuildFilesToResultDir(targetOutDir);
+                        const targetCompileResultDir = await moveBuildFilesToResultDir(targetOutDir, true);
                         await mergeDirWithoutOverrides(targetCompileResultDir, compiledResultDirPath);
                     }
                 }
@@ -444,12 +443,15 @@ export async function getPrebuiltBinaryBuildMetadata(folderPath: string, folderN
     return buildMetadata;
 }
 
-async function moveBuildFilesToResultDir(outDirectory: string) {
+async function moveBuildFilesToResultDir(outDirectory: string, canCreateReleaseDir: boolean = false) {
     const binFilesDirPaths = [
         path.join(outDirectory, "bin"),
         path.join(outDirectory, "llama.cpp", "bin")
     ];
     const compiledResultDirPath = path.join(outDirectory, buildConfigType);
+
+    if (canCreateReleaseDir)
+        await fs.ensureDir(compiledResultDirPath);
 
     if (!await fs.pathExists(compiledResultDirPath))
         throw new Error(`Could not find ${buildConfigType} directory`);
