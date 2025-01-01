@@ -136,6 +136,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 }
 
                 if (useWindowsLlvm) {
+                    cmakeCustomOptions.set("GGML_OPENMP", "OFF");
+
                     for (const [customFlag, customFlagValue] of [...cmakeCustomOptions.entries()]) {
                         if (!windowsMsvcOnlyBuildFlagsToTargets.has(customFlag) || isCmakeValueOff(customFlagValue))
                             continue;
