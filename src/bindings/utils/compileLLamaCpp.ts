@@ -5,6 +5,7 @@ import os from "os";
 import fs from "fs-extra";
 import chalk from "chalk";
 import which from "which";
+import filenamify from "filenamify";
 import {
     buildMetadataFileName, documentationPageUrls, llamaCppDirectory, llamaDirectory, llamaLocalBuildBinsDirectory,
     llamaPrebuiltBinsDirectory, llamaToolchainsDirectory
@@ -190,17 +191,16 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                 // perform a separate MSVC build and combine the compiled backends into the final build
                 if (useWindowsLlvm && windowsSeparateMsvcCmakeOptions.size > 0) {
-                    const llvmResultDir = path.join(outDirectory, "_llvm" + buildConfigType);
-                    await fs.move(compiledResultDirPath, llvmResultDir);
-
                     for (const [targetFlag, targetValue] of windowsSeparateMsvcCmakeOptions) {
                         const targetName = windowsMsvcOnlyBuildFlagsToTargets.get(targetFlag);
                         if (targetName == null)
                             continue;
 
-                        console.info(getConsoleLogPrefix(true, false), "Building specialized GPU backends using MSVC: " + targetName);
+                        console.info(getConsoleLogPrefix(true, false), "Building specialized GPU backend using MSVC: " + targetName);
 
-                        await fs.remove(compiledResultDirPath);
+                        const targetOutDir = path.join(outDirectory, "target-" + filenamify(targetName));
+
+                        await fs.remove(targetOutDir);
                         await spawnCommand(
                             "npm",
                             [
@@ -208,7 +208,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                                 "--log-level", "warn",
                                 "--config", buildConfigType,
                                 "--arch=" + buildOptions.arch,
-                                "--out", path.relative(llamaDirectory, outDirectory),
+                                "--out", path.relative(llamaDirectory, targetOutDir),
                                 "--runtime-version=" + runtimeVersion,
                                 "--parallel=" + parallelBuildThreads,
                                 "--target", targetName,
@@ -224,12 +224,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             envVars,
                             buildOptions.progressLogs
                         );
-                        const targetCompileResultDir = await moveBuildFilesToResultDir(outDirectory);
+                        const targetCompileResultDir = await moveBuildFilesToResultDir(targetOutDir);
                         await mergeDirWithoutOverrides(targetCompileResultDir, compiledResultDirPath);
                     }
-
-                    await fs.remove(compiledResultDirPath);
-                    await fs.move(llvmResultDir, compiledResultDirPath);
                 }
 
                 await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
