@@ -28,7 +28,7 @@ import {asyncSome} from "./asyncSome.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
 
-const requiresMsvcOnWindowsFlags = ["blas", "cann", "cuda", "hip", "kompute", "metal", "musa", "sycl", "vulkan", "opencl"]
+const requiresMsvcOnWindowsFlags = ["blas", "cann", "cuda", "hip", "kompute", "musa", "sycl", "opencl"]
     .map((backend) => ("GGML_" + backend.toUpperCase()));
 
 export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions: {
@@ -59,7 +59,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         : buildFolderName.withoutCustomCmakeOptions;
     const useWindowsLlvm = (
         platform === "win" &&
-        buildOptions.gpu === false &&
+        (buildOptions.gpu === false || buildOptions.gpu === "vulkan") &&
         !ignoreWorkarounds.includes("avoidWindowsLlvm") &&
         !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE") &&
         !requiresMsvcOnWindowsFlags.some((flag) => buildOptions.customCmakeOptions.has(flag))
