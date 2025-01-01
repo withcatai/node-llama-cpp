@@ -310,7 +310,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 chalk.yellow("To resolve errors related to Vulkan compilation, see the Vulkan guide: ") +
                 documentationPageUrls.Vulkan
             );
-        else if (useWindowsLlvm) {
+        else if (useWindowsLlvm && !ciMode) {
             if (buildOptions.progressLogs)
                 console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
 
