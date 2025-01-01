@@ -350,15 +350,10 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
 
         if (shouldCreateSampler) {
             repeatPenaltySampler = llama_sampler_init_penalties(
-                llama_n_vocab(model->model),
-                llama_token_eos(model->model),
-                llama_token_nl(model->model),
                 repeatPenaltyMaxTokens,
                 repeatPenalty,
                 repeatPenaltyFrequencyPenalty,
                 repeatPenaltyPresencePenalty,
-                true,
-                false
             );
             repeatPenalty_lastTokens = RingBuffer<llama_token>(repeatPenaltyMaxTokens);
 
