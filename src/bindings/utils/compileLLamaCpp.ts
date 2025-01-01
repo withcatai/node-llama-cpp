@@ -196,6 +196,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         if (targetName == null)
                             continue;
 
+                        console.info();
                         console.info(getConsoleLogPrefix(true, false), "Building specialized GPU backend using MSVC: " + targetName);
 
                         const targetOutDir = path.join(outDirectory, "target-" + filenamify(targetName));
