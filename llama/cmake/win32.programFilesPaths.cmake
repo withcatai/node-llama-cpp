@@ -8,22 +8,24 @@ function(setProgramFilesPaths CURRENT_ARCH)
         set(PROGRAMFILES_ARM64 "$ENV{ProgramFiles\(Arm\)}")
         file(TO_CMAKE_PATH "${PROGRAMFILES_ARM64}" PROGRAMFILES_ARM64)
 
-        set(PROGRAMFILES_PATHS
+        set(PROGRAMFILES_PATHS_LIST
             "${PROGRAMFILES_ARM64}"
             "${PROGRAMFILES}"
             "${PROGRAMFILES_X86}"
             "C:/Program Files (Arm)"
             "C:/Program Files"
             "C:/Program Files (x86)"
-            PARENT_SCOPE
         )
+        list(REMOVE_DUPLICATES PROGRAMFILES_PATHS_LIST)
+        set(PROGRAMFILES_PATHS ${PROGRAMFILES_PATHS_LIST} PARENT_SCOPE)
     else()
-        set(PROGRAMFILES_PATHS
+        set(PROGRAMFILES_PATHS_LIST
             "${PROGRAMFILES}"
             "${PROGRAMFILES_X86}"
             "C:/Program Files"
             "C:/Program Files (x86)"
-            PARENT_SCOPE
         )
+        list(REMOVE_DUPLICATES PROGRAMFILES_PATHS_LIST)
+        set(PROGRAMFILES_PATHS ${PROGRAMFILES_PATHS_LIST} PARENT_SCOPE)
     endif()
 endfunction()

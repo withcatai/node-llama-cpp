@@ -11,9 +11,10 @@ function(llvmEnsureCmakeAr CURRENT_ARCH)
         foreach(PATH IN LISTS PROGRAMFILES_PATHS)
             list(APPEND LLVM_INSTALL_PATHS "${PATH}/LLVM")
 
-            file(GLOB_RECURSE FOUND_LLVM_ROOT
-                "${PATH}/Microsoft Visual Studio/*/VC/Tools/Llvm/${CURRENT_ARCH}"
-                "${PATH}/Microsoft Visual Studio/**/*/VC/Tools/Llvm/${CURRENT_ARCH}")
+            file(GLOB_RECURSE FOUND_LLVM_ROOT LIST_DIRECTORIES true
+                "${PATH}/Microsoft Visual Studio/*/VC/Tools/Llvm/${LLVM_DIR_ARCH_NAME}"
+                "${PATH}/Microsoft Visual Studio/**/*/VC/Tools/Llvm/${LLVM_DIR_ARCH_NAME}")
+            list(FILTER FOUND_LLVM_ROOT INCLUDE REGEX "VC/Tools/Llvm/${LLVM_DIR_ARCH_NAME}$")
 
             if(FOUND_LLVM_ROOT)
                 list(APPEND LLVM_INSTALL_PATHS ${FOUND_LLVM_ROOT})
@@ -24,9 +25,11 @@ function(llvmEnsureCmakeAr CURRENT_ARCH)
             list(INSERT LLVM_INSTALL_PATHS 0 "${LLVM_ROOT}")
         endif()
 
+        list(REMOVE_DUPLICATES LLVM_INSTALL_PATHS)
+
         foreach(PATH IN LISTS LLVM_INSTALL_PATHS)
             if(EXISTS "${PATH}/bin/llvm-ar.exe" AND EXISTS "${PATH}/bin/llvm-ar.exe")
-                set(CMAKE_AR "${PATH}/bin/llvm-ar.exe")
+                set(CMAKE_AR "${PATH}/bin/llvm-ar.exe" PARENT_SCOPE)
                 break()
             endif()
         endforeach()
