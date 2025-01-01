@@ -1,8 +1,11 @@
 function(llvmUseGnuModeCompilers CURRENT_ARCH)
     set(LLVM_INSTALLATION_URL "https://github.com/llvm/llvm-project/releases/tag/llvmorg-19.1.5")
 
+    set(CMAKE_C_COMPILER clang)
     set(CMAKE_C_COMPILER clang PARENT_SCOPE)
+    set(CMAKE_CXX_COMPILER clang++)
     set(CMAKE_CXX_COMPILER clang++ PARENT_SCOPE)
+    set(CMAKE_RC_COMPILER llvm-rc)
     set(CMAKE_RC_COMPILER llvm-rc PARENT_SCOPE)
 
 
@@ -33,9 +36,11 @@ function(llvmUseGnuModeCompilers CURRENT_ARCH)
 
     list(REMOVE_DUPLICATES LLVM_INSTALL_PATHS)
 
+    set(LLVM_ROOT "")
     set(LLVM_ROOT "" PARENT_SCOPE)
     foreach(PATH IN LISTS LLVM_INSTALL_PATHS)
         if(EXISTS "${PATH}/bin/clang.exe" AND EXISTS "${PATH}/bin/clang++.exe" AND EXISTS "${PATH}/bin/llvm-rc.exe")
+            set(LLVM_ROOT "${PATH}")
             set(LLVM_ROOT "${PATH}" PARENT_SCOPE)
             break()
         endif()
@@ -50,8 +55,11 @@ function(llvmUseGnuModeCompilers CURRENT_ARCH)
     endif()
 
     if (NOT EXISTS "${CMAKE_C_COMPILER}" OR NOT EXISTS "${CMAKE_CXX_COMPILER}" OR NOT EXISTS "${CMAKE_RC_COMPILER}")
+        set(CMAKE_C_COMPILER "${LLVM_ROOT}/bin/clang.exe")
         set(CMAKE_C_COMPILER "${LLVM_ROOT}/bin/clang.exe" PARENT_SCOPE)
+        set(CMAKE_CXX_COMPILER "${LLVM_ROOT}/bin/clang++.exe")
         set(CMAKE_CXX_COMPILER "${LLVM_ROOT}/bin/clang++.exe" PARENT_SCOPE)
+        set(CMAKE_RC_COMPILER "${LLVM_ROOT}/bin/llvm-rc.exe")
         set(CMAKE_RC_COMPILER "${LLVM_ROOT}/bin/llvm-rc.exe" PARENT_SCOPE)
     endif()
 
