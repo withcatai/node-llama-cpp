@@ -27,6 +27,11 @@ import {detectWindowsBuildTools} from "./detectBuildTools.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
 
+const windowsMsvcOnlyBuildFlagsToTargets = new Map(
+    ["blas", "cann", "cuda", "hip", "kompute", "metal", "musa", "sycl", "vulkan", "opencl"]
+        .map((backend) => ["GGML_" + backend.toUpperCase(), "ggml-" + backend.toLowerCase()])
+);
+
 export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions: {
     nodeTarget?: string,
     updateLastBuildInfo?: boolean,
@@ -53,7 +58,11 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     const finalBuildFolderName = includeBuildOptionsInBinaryFolderName
         ? buildFolderName.withCustomCmakeOptions
         : buildFolderName.withoutCustomCmakeOptions;
-    const useWindowsLlvm = (platform === "win" && !ignoreWorkarounds.includes("avoidWindowsLlvm"))
+    const useWindowsLlvm = (
+        platform === "win" &&
+        !ignoreWorkarounds.includes("avoidWindowsLlvm") &&
+        !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE")
+    )
         ? areWindowsBuildToolsCapableForLlvmBuild(await detectWindowsBuildTools())
         : false;
 
@@ -84,6 +93,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 const toolchainFile = await getToolchainFileForArch(buildOptions.arch, useWindowsLlvm);
                 const runtimeVersion = nodeTarget.startsWith("v") ? nodeTarget.slice("v".length) : nodeTarget;
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
+                const cmakeToolchainOptions = new Map<string, string>();
+                const windowsSeparateMsvcCmakeOptions = new Map<string, string>();
 
                 cmakeCustomOptions.set("CMAKE_CONFIGURATION_TYPES", buildConfigType);
                 cmakeCustomOptions.set("NLC_CURRENT_PLATFORM", platform + "-" + process.arch);
@@ -104,7 +115,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
-                    cmakeCustomOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
+                    cmakeToolchainOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
                 if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))
                     cmakeCustomOptions.set("GGML_OPENMP", "OFF");
@@ -121,6 +132,16 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
+                    }
+                }
+
+                if (useWindowsLlvm) {
+                    for (const [customFlag, customFlagValue] of [...cmakeCustomOptions.entries()]) {
+                        if (!windowsMsvcOnlyBuildFlagsToTargets.has(customFlag) || isCmakeValueOff(customFlagValue))
+                            continue;
+
+                        windowsSeparateMsvcCmakeOptions.set(customFlag, customFlagValue);
+                        cmakeCustomOptions.delete(customFlag);
                     }
                 }
 
@@ -152,7 +173,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         ...cmakeGeneratorArgs,
                         ...cmakePathArgs,
                         ...(
-                            [...cmakeCustomOptions].map(([key, value]) => "--CD" + key + "=" + value)
+                            [
+                                ...cmakeCustomOptions,
+                                ...cmakeToolchainOptions
+                            ].map(([key, value]) => "--CD" + key + "=" + value)
                         )
                     ],
                     __dirname,
@@ -160,30 +184,51 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     buildOptions.progressLogs
                 );
 
-                const binFilesDirPaths = [
-                    path.join(outDirectory, "bin"),
-                    path.join(outDirectory, "llama.cpp", "bin")
-                ];
-                const compiledResultDirPath = path.join(outDirectory, buildConfigType);
+                const compiledResultDirPath = await moveBuildFilesToResultDir(outDirectory);
 
-                if (!await fs.pathExists(compiledResultDirPath))
-                    throw new Error(`Could not find ${buildConfigType} directory`);
+                // perform a separate MSVC build and combine the compiled backends into the final build
+                if (useWindowsLlvm && windowsSeparateMsvcCmakeOptions.size > 0) {
+                    const llvmResultDir = path.join(outDirectory, "_llvm" + buildConfigType);
+                    await fs.move(compiledResultDirPath, llvmResultDir);
 
-                for (const binFilesDirPath of binFilesDirPaths) {
-                    if (await fs.pathExists(binFilesDirPath)) {
-                        const itemNames = await fs.readdir(binFilesDirPath);
+                    for (const [targetFlag, targetValue] of windowsSeparateMsvcCmakeOptions) {
+                        const targetName = windowsMsvcOnlyBuildFlagsToTargets.get(targetFlag);
+                        if (targetName == null)
+                            continue;
 
-                        await Promise.all(
-                            itemNames.map((itemName) => (
-                                fs.copy(path.join(binFilesDirPath, itemName), path.join(compiledResultDirPath, itemName), {
-                                    overwrite: false
-                                })
-                            ))
+                        console.info(getConsoleLogPrefix(true, false), "Building specialized GPU backends using MSVC: " + targetName);
+
+                        await fs.remove(compiledResultDirPath);
+                        await spawnCommand(
+                            "npm",
+                            [
+                                "run", "-s", "cmake-js-llama", "--", "compile",
+                                "--log-level", "warn",
+                                "--config", buildConfigType,
+                                "--arch=" + buildOptions.arch,
+                                "--out", path.relative(llamaDirectory, outDirectory),
+                                "--runtime-version=" + runtimeVersion,
+                                "--parallel=" + parallelBuildThreads,
+                                "--target", targetName,
+                                ...cmakePathArgs,
+                                ...(
+                                    [
+                                        ...cmakeCustomOptions,
+                                        [targetFlag, targetValue]
+                                    ].map(([key, value]) => "--CD" + key + "=" + value)
+                                )
+                            ],
+                            __dirname,
+                            envVars,
+                            buildOptions.progressLogs
                         );
+                        const targetCompileResultDir = await moveBuildFilesToResultDir(outDirectory);
+                        await mergeDirWithoutOverrides(targetCompileResultDir, compiledResultDirPath);
                     }
-                }
 
-                await applyResultDirFixes(compiledResultDirPath, path.join(outDirectory, "_temp"));
+                    await fs.remove(compiledResultDirPath);
+                    await fs.move(llvmResultDir, compiledResultDirPath);
+                }
 
                 await fs.writeFile(path.join(compiledResultDirPath, buildMetadataFileName), JSON.stringify({
                     buildOptions: convertBuildOptionsToBuildOptionsJSON(buildOptions)
@@ -399,6 +444,35 @@ export async function getPrebuiltBinaryBuildMetadata(folderPath: string, folderN
     return buildMetadata;
 }
 
+async function moveBuildFilesToResultDir(outDirectory: string) {
+    const binFilesDirPaths = [
+        path.join(outDirectory, "bin"),
+        path.join(outDirectory, "llama.cpp", "bin")
+    ];
+    const compiledResultDirPath = path.join(outDirectory, buildConfigType);
+
+    if (!await fs.pathExists(compiledResultDirPath))
+        throw new Error(`Could not find ${buildConfigType} directory`);
+
+    for (const binFilesDirPath of binFilesDirPaths) {
+        if (await fs.pathExists(binFilesDirPath)) {
+            const itemNames = await fs.readdir(binFilesDirPath);
+
+            await Promise.all(
+                itemNames.map((itemName) => (
+                    fs.copy(path.join(binFilesDirPath, itemName), path.join(compiledResultDirPath, itemName), {
+                        overwrite: false
+                    })
+                ))
+            );
+        }
+    }
+
+    await applyResultDirFixes(compiledResultDirPath, path.join(outDirectory, "_temp"));
+
+    return compiledResultDirPath;
+}
+
 async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
     const releaseDirPath = path.join(resultDirPath, buildConfigType);
 
@@ -418,6 +492,18 @@ async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
 
         await fs.remove(tempDirPath);
     }
+}
+
+async function mergeDirWithoutOverrides(sourceDirPath: string, targetDirPath: string) {
+    const itemNames = await fs.readdir(sourceDirPath);
+
+    await Promise.all(
+        itemNames.map((itemName) => (
+            fs.move(path.join(sourceDirPath, itemName), path.join(targetDirPath, itemName), {
+                overwrite: false
+            })
+        ))
+    );
 }
 
 async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
