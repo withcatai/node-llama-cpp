@@ -111,9 +111,9 @@ async function findExistingCmake() {
     const platform = getPlatform();
 
     if (platform === "win") {
-        const editionPaths = await getWindowsVisualStudioEditionPaths();
+        const {vsEditionPaths} = await getWindowsVisualStudioEditionPaths();
 
-        const potentialCmakePaths = editionPaths.map((editionPath) => (
+        const potentialCmakePaths = vsEditionPaths.map((editionPath) => (
             path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin", "cmake.exe")
         ));
 

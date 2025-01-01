@@ -13,7 +13,10 @@ export async function getWindowsVisualStudioEditionPaths() {
     const platform = getPlatform();
 
     if (platform !== "win")
-        return [];
+        return {
+            vsEditionPaths: [],
+            programFilesPaths: []
+        };
 
     const programFilesPaths = await getWindowsProgramFilesPaths();
     const potentialVisualStudioPaths = programFilesPaths
@@ -22,8 +25,10 @@ export async function getWindowsVisualStudioEditionPaths() {
     const versionPaths = (await Promise.all(
         potentialVisualStudioPaths.map(async (vsPath) => {
             if (await fs.pathExists(vsPath)) {
-                const versions = await fs.readdir(vsPath);
+                const versions = await fs.readdir(vsPath, {withFileTypes: true});
                 return versions
+                    .filter((dirent) => dirent.isDirectory())
+                    .map((dirent) => dirent.name)
                     .sort((a, b) => {
                         const aNumber = parseInt(a);
                         const bNumber = parseInt(b);
@@ -44,22 +49,27 @@ export async function getWindowsVisualStudioEditionPaths() {
         })
     )).flat();
 
-    const editionPaths = (await Promise.all(
+    const vsEditionPaths = (await Promise.all(
         versionPaths.map(async (versionPath) => {
-            const editions = await fs.readdir(versionPath);
-            return editions.map((edition) => path.join(versionPath, edition));
+            const editions = await fs.readdir(versionPath, {withFileTypes: true});
+            return editions
+                .filter((dirent) => dirent.isDirectory())
+                .map((edition) => path.join(versionPath, edition.name));
         })
     )).flat();
 
-    return editionPaths;
+    return {
+        vsEditionPaths,
+        programFilesPaths
+    };
 }
 
 export async function detectWindowsBuildTools(targetArch: typeof process.arch = process.arch) {
     try {
         const currentArch = process.arch;
-        const editionPaths = await getWindowsVisualStudioEditionPaths();
+        const {vsEditionPaths, programFilesPaths} = await getWindowsVisualStudioEditionPaths();
 
-        if (editionPaths.length === 0)
+        if (vsEditionPaths.length === 0 && programFilesPaths.length === 0)
             return {
                 hasCmake: false,
                 hasNinja: false,
@@ -67,8 +77,12 @@ export async function detectWindowsBuildTools(targetArch: typeof process.arch = 
                 hasLibExe: false
             };
 
+        const programDataPaths: string[] = [
+            process.env["ProgramData"]
+        ].filter((programDataPath) => programDataPath != null);
+
         const msvcPaths = (await Promise.all(
-            editionPaths.map(async (editionPath) => {
+            vsEditionPaths.map(async (editionPath) => {
                 const msvcVersionsPath = path.join(editionPath, "VC", "Tools", "MSVC");
 
                 if (await fs.pathExists(msvcVersionsPath)) {
@@ -94,20 +108,29 @@ export async function detectWindowsBuildTools(targetArch: typeof process.arch = 
             })
         )).flat();
 
-        const potentialCmakePaths = editionPaths.map((editionPath) => (
-            path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin", "cmake.exe")
-        ));
-        const potentialNinjaPaths = editionPaths.map((editionPath) => (
-            path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "Ninja", "ninja.exe")
-        ));
-        const potentialLlvmPaths = editionPaths.map((editionPath) => {
-            if (currentArch === "x64")
-                return path.join(editionPath, "VC", "Tools", "Llvm", "x64", "bin");
-            else if (currentArch === "arm64")
-                return path.join(editionPath, "VC", "Tools", "Llvm", "ARM64", "bin");
+        const potentialCmakePaths = [
+            ...programFilesPaths.map((programFilesPath) => path.join(programFilesPath, "CMake", "bin", "cmake.exe")),
+            ...vsEditionPaths.map((editionPath) => (
+                path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin", "cmake.exe")
+            ))
+        ];
+        const potentialNinjaPaths = [
+            ...programDataPaths.map((programDataPath) => path.join(programDataPath, "chocolatey", "bin", "ninja.exe")),
+            ...vsEditionPaths.map((editionPath) => (
+                path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "Ninja", "ninja.exe")
+            ))
+        ];
+        const potentialLlvmPaths = [
+            ...programFilesPaths.map((programFilesPath) => path.join(programFilesPath, "LLVM", "bin")),
+            ...vsEditionPaths.map((editionPath) => {
+                if (currentArch === "x64")
+                    return path.join(editionPath, "VC", "Tools", "Llvm", "x64", "bin");
+                else if (currentArch === "arm64")
+                    return path.join(editionPath, "VC", "Tools", "Llvm", "ARM64", "bin");
 
-            return path.join(editionPath, "VC", "Tools", "Llvm", "bin");
-        });
+                return path.join(editionPath, "VC", "Tools", "Llvm", "bin");
+            })
+        ];
         const potentialLibExePaths = msvcPaths.map((msvcPath) => {
             const hostArchDirName = currentArch === "x64"
                 ? "Hostx64"
