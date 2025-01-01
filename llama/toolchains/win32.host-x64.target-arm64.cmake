@@ -13,6 +13,8 @@ set(LLVM_INSTALLATION_URL "https://github.com/llvm/llvm-project/releases/tag/llv
 
 set(PROGRAMFILES "$ENV{ProgramFiles}")
 set(PROGRAMFILES_X86 "$ENV{ProgramFiles\(x86\)}")
+file(TO_CMAKE_PATH "${PROGRAMFILES}" PROGRAMFILES)
+file(TO_CMAKE_PATH "${PROGRAMFILES_X86}" PROGRAMFILES_X86)
 set(PROGRAMFILES_PATHS
     "${PROGRAMFILES}"
     "${PROGRAMFILES_X86}"
