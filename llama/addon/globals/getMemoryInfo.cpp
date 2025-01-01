@@ -48,9 +48,9 @@ Napi::Value getMemoryInfo(const Napi::CallbackInfo& info) {
         addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, std::string("Failed to get memory usage info").c_str(), nullptr);
     }
 #elif _WIN32
-    PROCESS_MEMORY_COUNTERS memCounters;
-    
-    if (GetProcessMemoryInfo(GetCurrentProcess(), &memCounters, sizeof(memCounters))) {
+    PROCESS_MEMORY_COUNTERS_EX memCounters;
+
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&memCounters, sizeof(memCounters))) {
         totalMemoryUsage = memCounters.PrivateUsage;
     } else {
         addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, std::string("Failed to get memory usage info").c_str(), nullptr);
