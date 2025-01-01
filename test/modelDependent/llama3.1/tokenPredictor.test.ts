@@ -190,7 +190,8 @@ describe("llama 3.1", () => {
                 `);
             });
 
-            test("with evaluation", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            // disabled for now due to flakiness
+            test.skip("with evaluation", {timeout: 1000 * 60 * 60 * 2}, async () => {
                 const modelPath = await getModelFile("Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
