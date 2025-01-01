@@ -9,3 +9,6 @@ llvmApplyGnuModeAdaptations()
 
 include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.llvmEnsureCmakeAr.cmake")
 llvmEnsureCmakeAr("arm64")
+
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.ensureNinjaPath.cmake")
+ensureNinjaPath()
