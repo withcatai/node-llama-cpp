@@ -503,14 +503,29 @@ async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
 }
 
 async function mergeDirWithoutOverrides(sourceDirPath: string, targetDirPath: string) {
-    const itemNames = await fs.readdir(sourceDirPath);
+    const itemNames = await fs.readdir(sourceDirPath, {withFileTypes: true});
 
     await Promise.all(
-        itemNames.map((itemName) => (
-            fs.move(path.join(sourceDirPath, itemName), path.join(targetDirPath, itemName), {
-                overwrite: false
-            })
-        ))
+        itemNames.map(async (item) => {
+            const targetItemPath = path.join(targetDirPath, item.name);
+
+            if (item.isDirectory()) {
+                if (await fs.pathExists(targetItemPath)) {
+                    if ((await fs.stat(targetItemPath)).isDirectory())
+                        await mergeDirWithoutOverrides(path.join(sourceDirPath, item.name), targetItemPath);
+                } else {
+                    await fs.ensureDir(targetItemPath);
+                    await mergeDirWithoutOverrides(path.join(sourceDirPath, item.name), targetItemPath);
+                }
+            } else {
+                if (await fs.pathExists(targetItemPath))
+                    return;
+
+                await fs.move(path.join(sourceDirPath, item.name), targetItemPath, {
+                    overwrite: false
+                });
+            }
+        })
     );
 }
 
