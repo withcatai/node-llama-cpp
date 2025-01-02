@@ -1,5 +1,7 @@
 const maxLinesSpan = 10;
 
+const cmakeOptionRegex =
+    /^\s*option\([\s\t\n\r]*(?<key>\S+)[\s\t\n\r]+"(?<description>(?:\\"|[^"])*)"[\s\t\n\r]+(?<defaultValue>\S+)[\s\t\n\r]*\)/;
 export function parseCmakeListsTxtOptions(cmakeListsTxtString: string) {
     const lines = cmakeListsTxtString.split("\n");
 
@@ -8,9 +10,7 @@ export function parseCmakeListsTxtOptions(cmakeListsTxtString: string) {
             const match = lines
                 .slice(index, index + maxLinesSpan)
                 .join("\n")
-                .match(
-                    /^option\([\s\t\n\r]*(?<key>\S+)[\s\t\n\r]+"(?<description>(?:\\"|[^"])*)"[\s\t\n\r]+(?<defaultValue>\S+)[\s\t\n\r]*\)/
-                );
+                .match(cmakeOptionRegex);
             if (match == null || match.groups == null || match?.index !== 0)
                 return null;
 

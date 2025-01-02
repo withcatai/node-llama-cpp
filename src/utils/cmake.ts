@@ -8,6 +8,8 @@ import {
     xpackDirectory, xpmVersion
 } from "../config.js";
 import {logDistroInstallInstruction} from "../bindings/utils/logDistroInstallInstruction.js";
+import {getPlatform} from "../bindings/utils/getPlatform.js";
+import {getWindowsVisualStudioEditionPaths} from "../bindings/utils/detectBuildTools.js";
 import {spawnCommand} from "./spawnCommand.js";
 import withStatusLogs from "./withStatusLogs.js";
 import {withLockfile} from "./withLockfile.js";
@@ -30,6 +32,12 @@ export async function getCmakePath() {
 
         if (resolvedPath !== "" && resolvedPath != null)
             return resolvedPath;
+    } catch (err) {}
+
+    try {
+        const existingCmake = await findExistingCmake();
+        if (existingCmake != null)
+            return existingCmake;
     } catch (err) {}
 
     try {
@@ -97,6 +105,32 @@ export async function fixXpackPermissions() {
         await chmodr(localXpacksCacheDirectory, 0o777);
         await chmodr(path.join(xpackDirectory, "xpacks"), 0o777);
     } catch (err) {}
+}
+
+async function findExistingCmake() {
+    const platform = getPlatform();
+
+    if (platform === "win") {
+        const {vsEditionPaths} = await getWindowsVisualStudioEditionPaths();
+
+        const potentialCmakePaths = vsEditionPaths.map((editionPath) => (
+            path.join(editionPath, "Common7", "IDE", "CommonExtensions", "Microsoft", "CMake", "CMake", "bin", "cmake.exe")
+        ));
+
+        const cmakePaths = (await Promise.all(
+            potentialCmakePaths.map(async (cmakePath) => {
+                if (await fs.pathExists(cmakePath))
+                    return cmakePath;
+
+                return null;
+            })
+        ))
+            .filter((cmakePath) => cmakePath != null);
+
+        return cmakePaths[0];
+    }
+
+    return undefined;
 }
 
 async function downloadCmake({progressLogs = true}: {progressLogs?: boolean} = {}) {

@@ -200,7 +200,7 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 binding.loadBackends();
                 const loadedGpu = binding.getGpuType();
                 if (loadedGpu == null || (loadedGpu === false && message.gpu !== false))
-                    binding.loadBackends(true);
+                    binding.loadBackends(path.dirname(path.resolve(message.bindingBinaryPath)));
 
                 await binding.init();
                 binding.getGpuVramInfo();
@@ -210,6 +210,8 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 void (gpuType as BuildGpu satisfies typeof gpuType);
                 if (gpuType !== message.gpu)
                     throw new Error(`Binary GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
+
+                binding.ensureGpuDeviceIsSupported();
 
                 sendMessage({type: "done"});
             } catch (err) {

@@ -187,12 +187,9 @@ describe("llama 3", () => {
                 }
             } as const;
 
-            const res = await chatSession.prompt("Is an apple more expensive than a banana?", promptOptions);
+            const res = await chatSession.prompt("Is an apple more expensive than a banana? Answer in Yes/No", promptOptions);
 
-            expect(res).to.be.satisfy((text: string) => [
-                "According to the information I have, an apple is more expensive than a banana.",
-                "Let me check the prices for you.  According to the prices I checked, an apple is more expensive than a banana. The apple costs $6, while the banana costs $4."
-            ].includes(text));
+            expect(res).to.toMatchInlineSnapshot('"Yes"');
         });
 
         test("Compare fruit prices with currency", {timeout: 1000 * 60 * 60 * 2}, async () => {

@@ -96,5 +96,6 @@ export type GgufVersionParserResult = {
     metadata: GgufMetadata,
     tensorInfo?: GgufTensorInfo[],
     metadataSize: number,
-    tensorInfoSize?: number
+    tensorInfoSize?: number,
+    tensorDataOffset?: number
 };

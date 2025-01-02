@@ -264,6 +264,10 @@ console.log("AI: " + a1);
 ```
 
 ### Raw
+::: tip NOTE
+To learn more about using low level APIs, read the [low level API guide](./low-level-api.md).
+:::
+
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";

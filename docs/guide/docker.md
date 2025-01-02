@@ -34,7 +34,7 @@ FROM node:22
 
 # Replace `x86_64` with `sbsa` for ARM64
 ENV NVARCH=x86_64
-ENV INSTALL_CUDA_VERSION=12.6
+ENV INSTALL_CUDA_VERSION=12.5
 
 SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
@@ -172,3 +172,9 @@ docker run --rm -it --runtime=nvidia --gpus=all my-image:tag
 podman run --rm -it --device nvidia.com/gpu=all --security-opt=label=disable --gpus=all my-image:tag
 ```
 :::
+
+### Getting an `system has unsupported display driver / cuda driver combination` Error
+Ensure that the `INSTALL_CUDA_VERSION` in the Dockerfile matches
+or is older than the CUDA version installed on the host machine.
+
+> You can check what is the installed CUDA version using `nvidia-smi --version`.

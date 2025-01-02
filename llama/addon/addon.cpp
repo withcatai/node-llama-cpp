@@ -9,6 +9,7 @@
 #include "globals/addonProgress.h"
 #include "globals/getGpuInfo.h"
 #include "globals/getSwapInfo.h"
+#include "globals/getMemoryInfo.h"
 
 bool backendInitialized = false;
 bool backendDisposed = false;
@@ -23,6 +24,21 @@ Napi::Value addonGetSupportsGpuOffloading(const Napi::CallbackInfo& info) {
 
 Napi::Value addonGetSupportsMmap(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(info.Env(), llama_supports_mmap());
+}
+
+Napi::Value addonGetGpuSupportsMmap(const Napi::CallbackInfo& info) {
+    const auto llamaSupportsMmap = llama_supports_mmap();
+    const auto gpuDevice = getGpuDevice().first;
+
+    if (gpuDevice == nullptr) {
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    ggml_backend_dev_props props;
+    ggml_backend_dev_get_props(gpuDevice, &props);
+
+    const bool gpuSupportsMmap = llama_supports_mmap() && props.caps.buffer_from_host_ptr;
+    return Napi::Boolean::New(info.Env(), gpuSupportsMmap);
 }
 
 Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
@@ -152,16 +168,16 @@ class AddonBackendUnloadWorker : public Napi::AsyncWorker {
 };
 
 Napi::Value addonLoadBackends(const Napi::CallbackInfo& info) {
-    const bool forceLoadLibraries = info.Length() == 0
-        ? false
-        : info[0].IsBoolean()
-            ? info[0].As<Napi::Boolean>().Value()
-            : false;
+    const std::string forceLoadLibrariesSearchPath = info.Length() == 0
+        ? ""
+        : info[0].IsString()
+            ? info[0].As<Napi::String>().Utf8Value()
+            : "";
 
     ggml_backend_reg_count();
 
-    if (forceLoadLibraries) {
-        ggml_backend_load_all();
+    if (forceLoadLibrariesSearchPath.length() > 0) {
+        ggml_backend_load_all_from_path(forceLoadLibrariesSearchPath.c_str());
     }
 
     return info.Env().Undefined();
@@ -210,6 +226,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
         Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),
+        Napi::PropertyDescriptor::Function("getGpuSupportsMmap", addonGetGpuSupportsMmap),
         Napi::PropertyDescriptor::Function("getSupportsMlock", addonGetSupportsMlock),
         Napi::PropertyDescriptor::Function("getMathCores", addonGetMathCores),
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
@@ -220,7 +237,9 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
         Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
+        Napi::PropertyDescriptor::Function("ensureGpuDeviceIsSupported", ensureGpuDeviceIsSupported),
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
+        Napi::PropertyDescriptor::Function("getMemoryInfo", getMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),

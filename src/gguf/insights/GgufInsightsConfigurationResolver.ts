@@ -38,12 +38,14 @@ export class GgufInsightsConfigurationResolver {
         targetGpuLayers,
         targetContextSize,
         embeddingContext = false,
-        flashAttention = false
+        flashAttention = false,
+        useMmap = this._ggufInsights._llama.supportsMmap
     }: {
         targetGpuLayers?: number | "max",
         targetContextSize?: number,
         embeddingContext?: boolean,
-        flashAttention?: boolean
+        flashAttention?: boolean,
+        useMmap?: boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
@@ -64,7 +66,8 @@ export class GgufInsightsConfigurationResolver {
             contextSize: targetContextSize,
             embeddingContext,
             forceGpuLayers: targetGpuLayers,
-            forceStrictContextSize: targetContextSize != null
+            forceStrictContextSize: targetContextSize != null,
+            useMmap
         }, {
             getVramState,
             getRamState,
@@ -105,7 +108,8 @@ export class GgufInsightsConfigurationResolver {
         maximumFittedContextSizeMultiplier = 100,
         maximumUnfitConfigurationResourceMultiplier = 100,
         forceStrictContextSize = false,
-        forceGpuLayers
+        forceGpuLayers,
+        useMmap = this._ggufInsights._llama.supportsMmap
     }: {
         contextSize?: number,
         embeddingContext?: boolean,
@@ -120,7 +124,8 @@ export class GgufInsightsConfigurationResolver {
          */
         forceStrictContextSize?: boolean,
 
-        forceGpuLayers?: number | "max"
+        forceGpuLayers?: number | "max",
+        useMmap?: boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
@@ -204,7 +209,8 @@ export class GgufInsightsConfigurationResolver {
                     llamaGpu,
                     llamaSupportsGpuOffloading,
                     defaultContextFlashAttention: flashAttention,
-                    ignoreMemorySafetyChecks: forceGpuLayers != null
+                    ignoreMemorySafetyChecks: forceGpuLayers != null,
+                    useMmap
                 }
             );
             gpuLayersFitMemory = true;
@@ -215,7 +221,8 @@ export class GgufInsightsConfigurationResolver {
 
         const canUseGpu = llamaSupportsGpuOffloading && llamaGpu !== false;
         const estimatedModelResourceUsage = this._ggufInsights.estimateModelResourceRequirements({
-            gpuLayers: resolvedGpuLayers
+            gpuLayers: resolvedGpuLayers,
+            useMmap
         });
 
         let resolvedContextSize = Math.min(
@@ -363,10 +370,12 @@ export class GgufInsightsConfigurationResolver {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize, llamaGpu = this._ggufInsights._llama.gpu,
         llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading,
-        defaultContextFlashAttention = false
+        defaultContextFlashAttention = false,
+        useMmap = this._ggufInsights._llama.supportsMmap
     }: {
         ignoreMemorySafetyChecks?: boolean, getVramState?(): Promise<{total: number, free: number}>,
-        llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: boolean
+        llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: boolean,
+        useMmap?: boolean
     } = {}) {
         return resolveModelGpuLayersOption(gpuLayers, {
             ggufInsights: this._ggufInsights,
@@ -375,7 +384,8 @@ export class GgufInsightsConfigurationResolver {
             llamaVramPaddingSize,
             llamaGpu,
             llamaSupportsGpuOffloading,
-            defaultContextFlashAttention
+            defaultContextFlashAttention,
+            useMmap
         });
     }
 

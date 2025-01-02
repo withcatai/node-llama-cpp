@@ -45,6 +45,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value SetThreads(const Napi::CallbackInfo& info);
 
         Napi::Value PrintTimings(const Napi::CallbackInfo& info);
+        Napi::Value EnsureDraftContextIsCompatibleForSpeculative(const Napi::CallbackInfo& info);
 
         Napi::Value SetLora(const Napi::CallbackInfo& info);
 

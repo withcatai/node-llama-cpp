@@ -67,7 +67,7 @@ pkg install vulkan-tools vulkan-loader-android vulkan-headers vulkan-extension-l
 > If that happens, disable Vulkan in your code or uninstall the Vulkan packages.
 
 
-## Crashes With an `illegal hardware instruction` Error or a `SIGILL` Signal
+## Crashes With an `illegal hardware instruction` Error or a `SIGILL` Signal {#illegal-hardware-instruction}
 A common cause for this issue is when the installed nodejs architecture is different from the host machine CPU architecture.
 
 For example, having an x64 nodejs installed on an arm64 machine (such as Apple Silicon Macs).

@@ -25,6 +25,9 @@ export type LlamaGrammarOptions = {
     rootRuleName?: string
 };
 
+/**
+ * @see [Using Grammar](https://node-llama-cpp.withcat.ai/guide/grammar) tutorial
+ */
 export class LlamaGrammar {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _grammar: AddonGrammar;
@@ -38,6 +41,9 @@ export class LlamaGrammar {
      * > More info here: [
      * github:ggerganov/llama.cpp:grammars/README.md
      * ](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
+     *
+     * Prefer to create a new instance of this class by using `llama.createGrammar(...)`.
+     * @deprecated Use `llama.createGrammar(...)` instead.
      * @param llama
      * @param options
      */
@@ -79,7 +85,7 @@ export class LlamaGrammar {
         return this._grammar.isTextCompatible(String(text));
     }
 
-    public static async getFor(llama: Llama, type: "json" | "json_arr" | "list" | "c" | "arithmetic" | "japanese" | "chess") {
+    public static async getFor(llama: Llama, type: "json" | "json_arr" | "english" | "list" | "c" | "arithmetic" | "japanese" | "chess") {
         const grammarsFolder = await getGrammarsFolder(llama.buildType);
 
         const grammarFile = path.join(grammarsFolder, type + ".gbnf");

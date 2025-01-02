@@ -23,7 +23,7 @@ export class GgufInsights {
         this._llama = llama;
         this._ggufFileInfo = ggufFileInfo;
 
-        this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama);
+        this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama, true, true);
         this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
     }
 
@@ -133,12 +133,16 @@ export class GgufInsights {
         return false;
     }
 
-    public estimateModelResourceRequirements({gpuLayers}: {gpuLayers: number}): GgufInsightsResourceRequirements {
+    public estimateModelResourceRequirements({
+        gpuLayers, useMmap = this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
+    }: {
+        gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean
+    }): GgufInsightsResourceRequirements {
         const {cpu, gpu} = this._getTensorResourceSplit(gpuLayers);
 
         return {
-            cpuRam: calculateTensorsSize(cpu, this._llama),
-            gpuVram: calculateTensorsSize(gpu, this._llama)
+            cpuRam: calculateTensorsSize(cpu, this._llama, false),
+            gpuVram: calculateTensorsSize(gpu, this._llama, useMmap && gpuSupportsMmap)
         };
     }
 
@@ -355,6 +359,7 @@ export class GgufInsights {
         gpu: GgufTensorInfo[]
     } {
         const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
+        const architecture = this._ggufFileInfo.metadata?.general?.architecture;
 
         if (gpuLayers === 0) {
             return {
@@ -369,12 +374,36 @@ export class GgufInsights {
         const gpuTensors: GgufTensorInfo[] = [];
         const cpuTensors: GgufTensorInfo[] = [];
 
+        let tokenEmbedLayer: GgufTensorInfo | undefined;
+        let mainOutputLayer: GgufTensorInfo | undefined;
+
         for (const singleTensorInfo of tensorInfo) {
+            if (isMainOutputLayer(singleTensorInfo.name))
+                mainOutputLayer = singleTensorInfo;
+            else if (isTokenEmbedLayer(singleTensorInfo.name))
+                tokenEmbedLayer = singleTensorInfo;
+
+            // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_INPUT` are always
+            // loaded with `model.dev_input`, which is always set to the CPU
+            if (isInputLayer(singleTensorInfo.name)) {
+                cpuTensors.push(singleTensorInfo);
+                continue;
+
+            // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_OUTPUT` are always
+            // loaded with `model.dev_output`, which is set to the GPU only if all the layers are on the GPU
+            } else if (isOutputLayer(singleTensorInfo.name)) {
+                if (gpuLayers === this.totalLayers) {
+                    gpuTensors.push(singleTensorInfo);
+                    continue;
+                } else {
+                    cpuTensors.push(singleTensorInfo);
+                    continue;
+                }
+            }
+
             const {layerNumber} = parseTensorName(singleTensorInfo.name);
 
             if (gpuLayers !== this.totalLayers) {
-                const architecture = this._ggufFileInfo.metadata?.general?.architecture;
-
                 if (architecture === GgufArchitectureType.qwen2 || architecture === GgufArchitectureType.gemma) {
                     if (layerNumber != null && layerNumber >= startGpuLayer)
                         gpuTensors.push(singleTensorInfo);
@@ -390,6 +419,9 @@ export class GgufInsights {
             else
                 cpuTensors.push(singleTensorInfo);
         }
+
+        if (mainOutputLayer == null && tokenEmbedLayer != null && gpuLayers === this.totalLayers && !gpuTensors.includes(tokenEmbedLayer))
+            gpuTensors.push(tokenEmbedLayer);
 
         return {
             cpu: cpuTensors,
@@ -496,10 +528,59 @@ function parseTensorName(tensorName?: string): {
     return {layerNumber: undefined};
 }
 
-function calculateTensorsSize(tensorsInfo: GgufTensorInfo[], llama: Llama) {
+function calculateTensorsSize(
+    tensorsInfo: GgufTensorInfo[],
+    llama: Llama,
+    useMmap: boolean,
+    startFromTensorDataOffset: boolean = false
+) {
+    if (!useMmap) {
+        let size = 0;
+        for (const tensorInfo of tensorsInfo)
+            size += calculateTensorSize(tensorInfo, llama);
+
+        return size;
+    }
+
+    const fileStats = new Map<number, {
+        tensorsSize: number,
+        startOffset?: number | bigint,
+        endOffset?: number | bigint
+    }>();
+    for (const tensorInfo of tensorsInfo) {
+        let stats = fileStats.get(tensorInfo.filePart);
+        if (stats == null) {
+            stats = {
+                tensorsSize: 0
+            };
+            fileStats.set(tensorInfo.filePart, stats);
+        }
+
+        const tensorSize = calculateTensorSize(tensorInfo, llama);
+        stats.tensorsSize += tensorSize;
+        const startOffset = tensorInfo.offset;
+        const endOffset = typeof startOffset === "number"
+            ? startOffset + tensorSize
+            : startOffset + BigInt(tensorSize);
+
+        if (startFromTensorDataOffset)
+            stats.startOffset = Number(BigInt(tensorInfo.fileOffset) - BigInt(tensorInfo.offset));
+        else if (stats.startOffset == null || startOffset < stats.startOffset)
+            stats.startOffset = startOffset;
+
+        if (stats.endOffset == null || endOffset > stats.endOffset)
+            stats.endOffset = endOffset;
+    }
+
     let size = 0;
-    for (const tensorInfo of tensorsInfo)
-        size += calculateTensorSize(tensorInfo, llama);
+    for (const [, stats] of fileStats) {
+        const offsetSize = (stats.endOffset == null || stats.startOffset == null)
+            ? 0
+            : Number(BigInt(stats.endOffset) - BigInt(stats.startOffset));
+        const tensorsSize = stats.tensorsSize;
+
+        size += Math.max(offsetSize, tensorsSize);
+    }
 
     return size;
 }
@@ -558,4 +639,65 @@ function getTensorNeAndNb(tensor: GgufTensorInfo, {
         ne,
         nb
     };
+}
+
+function isInputLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    if (firstPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart) {
+        case "token_embd":
+        case "token_embd_norm":
+        case "token_types":
+        case "position_embd":
+            return true;
+    }
+
+    return false;
+}
+
+function isOutputLayer(layerName: string) {
+    const [firstPart, secondPart] = layerName.split(".");
+
+    if (firstPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart) {
+        case "output":
+        case "output_norm":
+        case "cls":
+            return true;
+    }
+
+    if (secondPart == null)
+        return false;
+
+    // source: in `llama.cpp`, all tensor names from `LLM_TENSOR_NAMES` where
+    // in `llm_tensor_info_mapping` have a mapping to `LLM_TENSOR_LAYER_INPUT`
+    switch (firstPart + "." + secondPart) {
+        case "cls.output":
+        case "dec.output_norm":
+        case "enc.output_norm":
+            return true;
+    }
+
+    return false;
+}
+
+function isMainOutputLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    return firstPart === "output";
+}
+
+function isTokenEmbedLayer(layerName: string) {
+    const [firstPart] = layerName.split(".");
+
+    return firstPart === "token_embd";
 }

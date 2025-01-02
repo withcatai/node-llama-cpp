@@ -15,6 +15,7 @@ import {Llama3_2LightweightChatWrapper} from "../Llama3_2LightweightChatWrapper.
 import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {includesText} from "../../utils/includesText.js";
+import {LlamaModel} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
@@ -123,7 +124,17 @@ export type ResolveChatWrapperOptions = {
  * }) ?? new GeneralChatWrapper()
  * ```
  */
-export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInChatWrapperType | null {
+export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInChatWrapperType | null;
+export function resolveChatWrapper(options: LlamaModel): BuiltInChatWrapperType;
+export function resolveChatWrapper(options: ResolveChatWrapperOptions | LlamaModel): BuiltInChatWrapperType | null {
+    if (options instanceof LlamaModel)
+        return resolveChatWrapper({
+            bosString: options.tokens.bosString,
+            filename: options.filename,
+            fileInfo: options.fileInfo,
+            tokenizer: options.tokenizer
+        }) ?? new GeneralChatWrapper();
+
     const {
         type = "auto",
         bosString,

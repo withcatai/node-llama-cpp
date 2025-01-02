@@ -257,14 +257,27 @@ export type LLamaChatContextShiftOptions = {
 
     /**
      * The strategy to use when deleting tokens from the context window.
+     *
      * Defaults to `"eraseFirstResponseAndKeepFirstSystem"`.
      */
     strategy?: "eraseFirstResponseAndKeepFirstSystem" | (
         (options: {
-            chatHistory: ChatHistoryItem[],
+            /** Full chat history */
+            chatHistory: readonly ChatHistoryItem[],
+
+            /** Maximum number of tokens that the new chat history should fit under when tokenized */
             maxTokensCount: number,
-            tokenizer(text: string, specialTokens?: boolean): Token[],
+
+            /** Tokenizer used to tokenize the chat history */
+            tokenizer: Tokenizer,
+
+            /** Chat wrapper used to generate the context state */
             chatWrapper: ChatWrapper,
+
+            /**
+             * The metadata returned from the last context shift strategy call.
+             * Will be `null` on the first call.
+             */
             lastShiftMetadata?: object | null
         }) => {chatHistory: ChatHistoryItem[], metadata?: object | null} |
             Promise<{chatHistory: ChatHistoryItem[], metadata?: object | null}>
@@ -317,14 +330,7 @@ export class LlamaChat {
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
 
         this._chatWrapper = chatWrapper === "auto"
-            ? (
-                resolveChatWrapper({
-                    bosString: contextSequence.model.tokens.bosString,
-                    filename: contextSequence.model.filename,
-                    fileInfo: contextSequence.model.fileInfo,
-                    tokenizer: contextSequence.model.tokenizer
-                }) ?? new GeneralChatWrapper()
-            )
+            ? resolveChatWrapper(contextSequence.model)
             : chatWrapper;
     }
 
@@ -403,6 +409,9 @@ export class LlamaChat {
             } = {}
         } = options;
 
+        this.sequence.tokenPredictor?.updateInputTokens?.(
+            this.model.tokenize(findLastUserMessageInChatHistory(history)?.text ?? "")
+        );
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -573,6 +582,13 @@ export class LlamaChat {
             ? lastEvaluationContextWindowHistoryItem.text
             : "";
 
+        this.sequence.tokenPredictor?.updateInputTokens?.(
+            this.model.tokenize(
+                (findLastModelMessageInChatHistory(history)?.response ?? [])
+                    .filter((item) => typeof item === "string")
+                    .join(" ")
+            )
+        );
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
@@ -979,6 +995,26 @@ function setLastTextInChatHistory(itemType: "user" | "model", chatHistory: ChatH
         return setLastUserTextInChatHistory(chatHistory, text);
     else
         return setLastModelTextResponseInChatHistory(chatHistory, text);
+}
+
+function findLastUserMessageInChatHistory(chatHistory: readonly ChatHistoryItem[]) {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const item = chatHistory[i]!;
+        if (item.type === "user")
+            return item;
+    }
+
+    return undefined;
+}
+
+function findLastModelMessageInChatHistory(chatHistory: readonly ChatHistoryItem[]) {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const item = chatHistory[i]!;
+        if (item.type === "model")
+            return item;
+    }
+
+    return undefined;
 }
 
 function generateContextText(

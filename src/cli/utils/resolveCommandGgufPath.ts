@@ -10,9 +10,9 @@ import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
-    targetDirectory = cliModelsDirectory, flashAttention = false
+    targetDirectory = cliModelsDirectory, flashAttention = false, useMmap, consoleTitle = "File"
 }: {
-    targetDirectory?: string, flashAttention?: boolean
+    targetDirectory?: string, flashAttention?: boolean, useMmap?: boolean, consoleTitle?: string
 } = {}) {
     if (ggufPath == null)
         ggufPath = await interactivelyAskForModel({
@@ -20,7 +20,8 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             modelsDirectory: targetDirectory,
             allowLocalModels: true,
             downloadIntent: true,
-            flashAttention
+            flashAttention,
+            useMmap
         });
 
     const resolvedModelDestination = resolveModelDestination(ggufPath);
@@ -50,7 +51,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         const fileStats = await fs.stat(downloader.entrypointFilePath);
 
         if (downloader.totalSize === fileStats.size) {
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
+            console.info(`${chalk.yellow(consoleTitle + ":")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
             return downloader.entrypointFilePath;
         }
@@ -62,7 +63,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
 
         if (!res) {
             console.info("Loading the existing file");
-            console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
+            console.info(`${chalk.yellow(consoleTitle + ":")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
             return downloader.entrypointFilePath;
         }
@@ -86,7 +87,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
     await downloader.download();
     consoleInteraction.stop();
 
-    console.info(`${chalk.yellow("File:")} ${getReadablePath(downloader.entrypointFilePath)}`);
+    console.info(`${chalk.yellow(consoleTitle + ":")} ${getReadablePath(downloader.entrypointFilePath)}`);
 
     return downloader.entrypointFilePath;
 }

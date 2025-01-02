@@ -354,7 +354,8 @@ div.search-keyboard-shortcuts[class] kbd:last-of-type {
 }
 
 .language-ts > .lang,
-.language-shell > .lang {
+.language-shell > .lang,
+.language-js-highlight > .lang {
     display: none;
 }
 

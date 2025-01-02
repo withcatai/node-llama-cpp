@@ -5,7 +5,7 @@
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback, bool * checkSupported) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
@@ -56,6 +56,22 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
                     if (size > 0 && addDeviceNames) {
                         (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
                     }
+
+                    if (checkSupported != nullptr && checkSupported) {
+                        VkPhysicalDeviceFeatures2 features2 = {};
+                        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+                        VkPhysicalDeviceVulkan11Features vk11Features = {};
+                        vk11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+                        features2.pNext = &vk11Features;
+
+                        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+                        VkPhysicalDeviceFeatures2 device_features2;
+
+                        if (!vk11Features.storageBuffer16BitAccess) {
+                            *checkSupported = false;
+                        }
+                    }
                 }
             }
         } else {
@@ -78,5 +94,16 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
 }
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback);
+    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback, nullptr);
+}
+
+bool checkIsVulkanEnvSupported(gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    size_t total = 0;
+    size_t used = 0;
+    size_t unifiedMemorySize = 0;
+
+    bool isSupported = true;
+    enumerateVulkanDevices(&total, &used, &unifiedMemorySize, false, nullptr, warningLogCallback, &isSupported);
+
+    return isSupported;
 }

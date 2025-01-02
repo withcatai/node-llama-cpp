@@ -95,6 +95,8 @@ npx -y node-llama-cpp inspect gpu
 * [TypeScript type-safety](./api/functions/getLlama.md)
 * [LoRA](./api/type-aliases/LlamaContextOptions.md#lora)
 * [Remote GGUF reader](./api/functions/readGgufFileInfo.md)
+* [User input safety](./guide/llama-text.md#input-safety-in-node-llama-cpp)
+* [Token prediction](./guide/token-prediction.md)
 
 </template>
 <template v-slot:simple-code>

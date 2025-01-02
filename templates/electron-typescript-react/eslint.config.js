@@ -45,7 +45,11 @@ export default tseslint.config({
             SwitchCase: 1,
             FunctionDeclaration: {
                 parameters: "first"
-            }
+            },
+            ignoredNodes: [
+                // fix for indent warnings on function object return types when the function has no parameters
+                'FunctionExpression[params.length=0][returnType.type="TSTypeAnnotation"]'
+            ]
         }],
         "@stylistic/indent-binary-ops": ["off"],
         "@stylistic/eqeqeq": ["off"],
@@ -119,7 +123,7 @@ export default tseslint.config({
                 {blankLine: "always", prev: "*", next: "method"}
             ]
         }],
-        "@stylistic/no-trailing-spaces": ["warn"],
+        "@stylistic/no-trailing-spaces": ["off"],
         "@stylistic/no-multi-spaces": ["warn"]
     }
 }, {

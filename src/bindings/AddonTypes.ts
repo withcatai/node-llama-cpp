@@ -37,7 +37,8 @@ export type BindingModule = {
         }): AddonGrammar
     },
     AddonGrammarEvaluationState: {
-        new (model: AddonModel, grammar: AddonGrammar): AddonGrammarEvaluationState
+        new (model: AddonModel, grammar: AddonGrammar): AddonGrammarEvaluationState,
+        new (existingState: AddonGrammarEvaluationState): AddonGrammarEvaluationState
     },
     AddonSampler: {
         new (model: AddonModel): AddonSampler,
@@ -47,6 +48,7 @@ export type BindingModule = {
     systemInfo(): string,
     getSupportsGpuOffloading(): boolean,
     getSupportsMmap(): boolean,
+    getGpuSupportsMmap(): boolean,
     getSupportsMlock(): boolean,
     getMathCores(): number,
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
@@ -70,13 +72,17 @@ export type BindingModule = {
         deviceNames: string[]
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | false | undefined,
+    ensureGpuDeviceIsSupported(): void,
     getSwapInfo(): {
         total: number,
         maxSize: number,
         free: number
     },
+    getMemoryInfo(): {
+        total: number
+    },
     init(): Promise<void>,
-    loadBackends(forceLoadLibraries?: boolean): void,
+    loadBackends(forceLoadLibrariesSearchPath?: string): void,
     dispose(): Promise<void>
 };
 
@@ -119,10 +125,15 @@ export type AddonContext = {
         sequenceId: number,
         firstTokenSequenceIndex: number,
         tokens: Uint32Array,
-        generateLogitAtTheEnd: boolean
-    ): BatchLogitIndex | undefined, // returns batchLogitIndex if `generateLogitAtTheEnd` is true
+        logitIndexes: Uint32Array,
+    ): Uint32Array, // returns an array with batchLogitIndex for each item in the logitIndexes array
     decodeBatch(): Promise<void>,
-    sampleToken(batchLogitIndex: BatchLogitIndex, sampler: AddonSampler): Promise<Token>,
+    sampleToken(batchLogitIndex: BatchLogitIndex, sampler: AddonSampler): Promise<Token | -1>,
+    sampleToken(
+        batchLogitIndex: BatchLogitIndex,
+        sampler: AddonSampler,
+        logprobs: boolean
+    ): Promise<[Token | -1, (Token | number)[] | undefined]>,
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive
@@ -136,6 +147,7 @@ export type AddonContext = {
     getThreads(): number,
     setThreads(threads: number): void,
     printTimings(): void,
+    ensureDraftContextIsCompatibleForSpeculative(draftContext: AddonContext): void,
     setLora(lora: AddonModelLora, scale: number): void
 };
 

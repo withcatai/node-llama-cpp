@@ -5,6 +5,9 @@ import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
  * Note that this function will not throw on error and instead will log the error to the console.
  */
 export async function asyncSome(promises: Promise<boolean>[]): Promise<boolean> {
+    if (promises.length === 0)
+        return Promise.resolve(false);
+
     return new Promise((resolve) => {
         let fulfilled = 0;
 

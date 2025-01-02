@@ -20,15 +20,25 @@ export class LlamaGrammarEvaluationState {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _state: AddonGrammarEvaluationState;
 
-    /**
-     * @param options
-     */
-    public constructor({model, grammar}: LlamaGrammarEvaluationStateOptions) {
-        this._llama = model._llama;
+    public constructor(options: LlamaGrammarEvaluationStateOptions);
+    public constructor(existingState: LlamaGrammarEvaluationState);
+    public constructor(existingStateOrOptions: LlamaGrammarEvaluationStateOptions | LlamaGrammarEvaluationState) {
+        if (existingStateOrOptions instanceof LlamaGrammarEvaluationState) {
+            this._llama = existingStateOrOptions._llama;
+            this._state = new this._llama._bindings.AddonGrammarEvaluationState(existingStateOrOptions._state);
+        } else {
+            const {model, grammar} = existingStateOrOptions;
+            this._llama = model._llama;
 
-        if (model._llama !== grammar._llama)
-            throw new Error("The given LlamaModel and LlamaGrammar must be from the same Llama instance");
+            if (model._llama !== grammar._llama)
+                throw new Error("The given LlamaModel and LlamaGrammar must be from the same Llama instance");
 
-        this._state = new model._llama._bindings.AddonGrammarEvaluationState(model._model, grammar._grammar);
+            this._state = new model._llama._bindings.AddonGrammarEvaluationState(model._model, grammar._grammar);
+        }
+    }
+
+    /** Clone the grammar evaluation state */
+    public clone(): LlamaGrammarEvaluationState {
+        return new LlamaGrammarEvaluationState(this);
     }
 }

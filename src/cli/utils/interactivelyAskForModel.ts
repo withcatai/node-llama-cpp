@@ -59,13 +59,15 @@ export async function interactivelyAskForModel({
     modelsDirectory,
     allowLocalModels = true,
     downloadIntent = true,
-    flashAttention = false
+    flashAttention = false,
+    useMmap
 }: {
     llama: Llama,
     modelsDirectory?: string,
     allowLocalModels?: boolean,
     downloadIntent?: boolean,
-    flashAttention?: boolean
+    flashAttention?: boolean,
+    useMmap?: boolean
 }): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
     const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
@@ -117,7 +119,8 @@ export async function interactivelyAskForModel({
                         progressUpdater.setProgress(readItems / ggufFileNames.length, renderProgress());
 
                         const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
-                            flashAttention: flashAttention && ggufInsights?.flashAttentionSupported
+                            flashAttention: flashAttention && ggufInsights?.flashAttentionSupported,
+                            useMmap
                         });
 
                         return {
@@ -289,7 +292,7 @@ export async function interactivelyAskForModel({
                 },
                 items: options,
                 renderItem(item, focused, rerender) {
-                    return renderSelectionItem(item, focused, rerender, activeInteractionController.signal, llama, flashAttention);
+                    return renderSelectionItem(item, focused, rerender, activeInteractionController.signal, llama, flashAttention, useMmap);
                 },
                 canFocusItem(item) {
                     return item.type === "recommendedModel" || item.type === "localModel" || item.type === "action";
@@ -404,7 +407,8 @@ async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string |
 }
 
 function renderSelectionItem(
-    item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean
+    item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean,
+    useMmap?: boolean
 ) {
     if (item.type === "localModel") {
         let modelText = item.title instanceof Function
@@ -430,7 +434,8 @@ function renderSelectionItem(
                     abortSignal,
                     rerenderOption: rerender,
                     llama,
-                    flashAttention
+                    flashAttention,
+                    useMmap
                 });
             }
 
@@ -552,13 +557,14 @@ function renderRecommendedModelTechnicalInfo(
 }
 
 async function selectFileForModelRecommendation({
-    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention
+    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention, useMmap
 }: {
     recommendedModelOption: ModelOption & {type: "recommendedModel"},
     llama: Llama,
     abortSignal: AbortSignal,
     rerenderOption(): void,
-    flashAttention: boolean
+    flashAttention: boolean,
+    useMmap?: boolean
 }) {
     try {
         let bestScore: number | undefined = undefined;
@@ -579,7 +585,8 @@ async function selectFileForModelRecommendation({
                     return;
 
                 const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
-                    flashAttention
+                    flashAttention,
+                    useMmap
                 });
 
                 if (bestScore == null || compatibilityScore.compatibilityScore > bestScore) {

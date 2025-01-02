@@ -14,7 +14,7 @@ export class ConsoleTable<const T extends readonly ConsoleTableColumn[]> {
         columnSeparator?: string,
         drawHeaderRowSeparator?: boolean
     } = {}) {
-        this._columns = columns;
+        this._columns = filterHiddenColumns(columns);
         this._columnSeparator = columnSeparator;
         this._drawHeaderRowSeparator = drawHeaderRowSeparator;
     }
@@ -120,7 +120,8 @@ export type ConsoleTableColumn<K extends string = string> = {
     readonly titleFormatter?: (value: string) => string,
     readonly width?: number,
     readonly valueFormatter?: (value: string) => string,
-    readonly canSpanOverEmptyColumns?: boolean
+    readonly canSpanOverEmptyColumns?: boolean,
+    readonly visible?: boolean
 };
 
 function getColumnWidth(column: ConsoleTableColumn) {
@@ -129,4 +130,9 @@ function getColumnWidth(column: ConsoleTableColumn) {
 
 function toOneLine(text: string) {
     return text.replaceAll("\n", chalk.gray("\\n"));
+}
+
+function filterHiddenColumns<const T extends readonly ConsoleTableColumn[]>(columns: T): T {
+    return columns
+        .filter((column) => column.visible !== false) as readonly ConsoleTableColumn[] as T;
 }

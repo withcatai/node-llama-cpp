@@ -292,7 +292,9 @@ export class LlamaModel {
     }
 
     /**
-     * Total model size in memory in bytes
+     * Total model size in memory in bytes.
+     *
+     * When using mmap, actual memory usage may be higher than this value due to `llama.cpp`'s performance optimizations.
      */
     public get size() {
         this._ensureNotDisposed();
@@ -334,6 +336,8 @@ export class LlamaModel {
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
                 case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
+                case "CLS": return this.tokens.cls == null ? [] : [this.tokens.cls];
+                case "SEP": return this.tokens.sep == null ? [] : [this.tokens.sep];
             }
 
             void (builtinToken satisfies never);
@@ -513,6 +517,9 @@ export class LlamaModel {
         });
     }
 
+    /**
+     * @see [Using Embedding](https://node-llama-cpp.withcat.ai/guide/embedding) tutorial
+     */
     public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
@@ -661,7 +668,7 @@ export class LlamaModel {
         _llama: Llama
     }) {
         const {loadSignal, defaultContextFlashAttention} = modelOptions;
-        const useMmap = modelOptions.useMmap ?? defaultUseMmap;
+        const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
@@ -675,9 +682,13 @@ export class LlamaModel {
             : false;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
-            defaultContextFlashAttention: resolvedDefaultContextFlashAttention
+            defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
+            useMmap
         });
-        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers});
+        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({
+            gpuLayers: gpuLayers,
+            useMmap
+        });
 
         const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
             _fileInfo: fileInfo,

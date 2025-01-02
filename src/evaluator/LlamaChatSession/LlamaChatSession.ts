@@ -55,6 +55,7 @@ export type LlamaChatSessionContextShiftOptions = {
 
     /**
      * The strategy to use when deleting tokens from the context window.
+     *
      * Defaults to `"eraseFirstResponseAndKeepFirstSystem"`.
      */
     strategy?: LLamaChatContextShiftOptions["strategy"]
@@ -195,8 +196,8 @@ export type LLamaChatCompletePromptOptions = {
     maxTokens?: LLamaChatPromptOptions["maxTokens"],
 
     /**
-     * When a completion already started being generated and then the signal is aborted,
-     * the generation will stop and the completion will be returned as is instead of throwing an error.
+     * When a completion already started being generated and then the given `signal` is aborted,
+     * the generation will stop and the completion will be returned as-is instead of throwing an error.
      *
      * Defaults to `false`.
      */
@@ -293,6 +294,9 @@ export type LlamaChatSessionRepeatPenalty = {
     presencePenalty?: number
 };
 
+/**
+ * @see [Using `LlamaChatSession`](https://node-llama-cpp.withcat.ai/guide/chat-session) tutorial
+ */
 export class LlamaChatSession {
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _autoDisposeSequence: boolean;

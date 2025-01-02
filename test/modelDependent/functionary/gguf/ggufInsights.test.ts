@@ -38,38 +38,38 @@ describe("gguf", async () => {
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 1}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "3.54GB",
-                "gpuVram": "809.84MB",
+                "cpuRam": "4.22GB",
+                "gpuVram": "528.01MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 8}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "2.74GB",
-                "gpuVram": "1.59GB",
+                "cpuRam": "3.42GB",
+                "gpuVram": "1.32GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 16}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1.83GB",
-                "gpuVram": "2.51GB",
+                "cpuRam": "2.51GB",
+                "gpuVram": "2.34GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 24}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "936.25MB",
-                "gpuVram": "3.42GB",
+                "cpuRam": "1.59GB",
+                "gpuVram": "3.14GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 32}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "0B",
-                "gpuVram": "4.33GB",
+                "cpuRam": "692.8MB",
+                "gpuVram": "4.06GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 33}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "0B",
-                "gpuVram": "4.33GB",
+                "cpuRam": "281.81MB",
+                "gpuVram": "4.06GB",
               }
             `);
         });
@@ -95,11 +95,14 @@ describe("gguf", async () => {
             const s300MB = 300 * Math.pow(1024, 2);
             const s5MB = 5 * Math.pow(1024, 2);
 
-            const estimatedModelVramUsage = ggufInsights.estimateModelResourceRequirements({gpuLayers: ggufInsights.totalLayers}).gpuVram;
-            expect(bytes(estimatedModelVramUsage)).toMatchInlineSnapshot('"4.33GB"');
-            expect(Math.abs(modelVramUsageDiff - estimatedModelVramUsage)).to.be.lte(s300MB);
+            const estimatedModelResourceUsage = ggufInsights.estimateModelResourceRequirements({
+                gpuLayers: ggufInsights.totalLayers
+            });
+            expect(bytes(estimatedModelResourceUsage.gpuVram)).toMatchInlineSnapshot('"4.06GB"');
+            expect(bytes(estimatedModelResourceUsage.cpuRam)).toMatchInlineSnapshot('"281.81MB"');
+            expect(Math.abs(modelVramUsageDiff - estimatedModelResourceUsage.gpuVram)).to.be.lte(s300MB);
 
-            const modelEstimationDiffWithActual = estimatedModelVramUsage - model.size;
+            const modelEstimationDiffWithActual = estimatedModelResourceUsage.gpuVram + estimatedModelResourceUsage.cpuRam - model.size;
             expect(Math.abs(modelEstimationDiffWithActual)).to.be.lte(s5MB); // tolerate such a small difference
 
             if (modelEstimationDiffWithActual !== 0)

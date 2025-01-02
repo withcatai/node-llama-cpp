@@ -16,9 +16,10 @@ import {LlamaContext, LlamaContextSequence} from "./evaluator/LlamaContext/Llama
 import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions} from "./evaluator/LlamaEmbeddingContext.js";
 import {LlamaEmbedding, type LlamaEmbeddingOptions, type LlamaEmbeddingJSON} from "./evaluator/LlamaEmbedding.js";
 import {
-    type LlamaContextOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty, type CustomBatchingDispatchSchedule,
-    type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem, type ContextShiftOptions,
-    type ContextTokensDeleteRange, type EvaluationPriority
+    type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
+    type CustomBatchingDispatchSchedule, type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem,
+    type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type ControlledEvaluateInputItem,
+    type ControlledEvaluateIndexOutput
 } from "./evaluator/LlamaContext/types.js";
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
@@ -70,6 +71,9 @@ import {
     type BuiltinSpecialTokenValue
 } from "./utils/LlamaText.js";
 import {appendUserMessageToChatHistory} from "./utils/appendUserMessageToChatHistory.js";
+import {TokenPredictor} from "./evaluator/LlamaContext/TokenPredictor.js";
+import {DraftSequenceTokenPredictor} from "./evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
+import {InputLookupTokenPredictor} from "./evaluator/LlamaContext/tokenPredictors/InputLookupTokenPredictor.js";
 import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
@@ -79,6 +83,7 @@ import {
     type CombinedModelDownloaderOptions
 } from "./utils/createModelDownloader.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
+import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
@@ -130,6 +135,7 @@ export {
     LlamaContext,
     LlamaContextSequence,
     type LlamaContextOptions,
+    type SequenceEvaluateOptions,
     type BatchingOptions,
     type CustomBatchingDispatchSchedule,
     type CustomBatchingPrioritizationStrategy,
@@ -139,6 +145,8 @@ export {
     type ContextTokensDeleteRange,
     type EvaluationPriority,
     type LlamaContextSequenceRepeatPenalty,
+    type ControlledEvaluateInputItem,
+    type ControlledEvaluateIndexOutput,
     TokenBias,
     LlamaEmbeddingContext,
     type LlamaEmbeddingContextOptions,
@@ -220,6 +228,9 @@ export {
     type LlamaTextSpecialTokensTextJSON,
     type LlamaTextSpecialTokenJSON,
     type BuiltinSpecialTokenValue,
+    TokenPredictor,
+    DraftSequenceTokenPredictor,
+    InputLookupTokenPredictor,
     appendUserMessageToChatHistory,
     getModuleVersion,
     type ChatHistoryItem,
@@ -282,5 +293,6 @@ export {
     CombinedModelDownloader,
     type CombinedModelDownloaderOptions,
     jsonDumps,
-    type OverridesObject
+    type OverridesObject,
+    experimentalChunkDocument
 };
