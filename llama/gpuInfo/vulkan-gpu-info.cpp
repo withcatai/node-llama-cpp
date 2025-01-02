@@ -58,19 +58,17 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
                     }
 
                     if (checkSupported != nullptr && checkSupported) {
+                        VkPhysicalDeviceFeatures2 features2 = {};
+                        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+                        VkPhysicalDeviceVulkan11Features vk11Features = {};
+                        vk11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+                        features2.pNext = &vk11Features;
+
+                        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
                         VkPhysicalDeviceFeatures2 device_features2;
-                        device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-                        device_features2.pNext = nullptr;
-                        device_features2.features = (VkPhysicalDeviceFeatures)physicalDevice.getFeatures();
 
-                        VkPhysicalDeviceVulkan11Features vk11_features;
-                        vk11_features.pNext = nullptr;
-                        vk11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-                        device_features2.pNext = &vk11_features;
-
-                        vkGetPhysicalDeviceFeatures2(physicalDevice, &device_features2);
-
-                        if (!vk11_features.storageBuffer16BitAccess) {
+                        if (!vk11Features.storageBuffer16BitAccess) {
                             *checkSupported = false;
                         }
                     }
