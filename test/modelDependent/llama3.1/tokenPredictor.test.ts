@@ -72,14 +72,14 @@ describe("llama 3.1", () => {
               ]
             `);
 
-            const text2Tokens = model.tokenize("can the");
+            const text2Tokens = model.tokenize("can be");
             predictor.pushTokens(text2Tokens);
 
             const predictedTokens4 = await predictor.predictTokens();
             expect(predictedTokens4.map((token) => model.detokenize([token], true))).toMatchInlineSnapshot(`
               [
-                " average",
-                " person",
+                " done",
+                " to",
               ]
             `);
         });
