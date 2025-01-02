@@ -72,6 +72,7 @@ export type BindingModule = {
         deviceNames: string[]
     },
     getGpuType(): "cuda" | "vulkan" | "metal" | false | undefined,
+    ensureGpuDeviceIsSupported(): void,
     getSwapInfo(): {
         total: number,
         maxSize: number,

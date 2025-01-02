@@ -211,6 +211,8 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 if (gpuType !== message.gpu)
                     throw new Error(`Binary GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
 
+                binding.ensureGpuDeviceIsSupported();
+
                 sendMessage({type: "done"});
             } catch (err) {
                 console.error(err);

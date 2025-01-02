@@ -80,3 +80,13 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback);
 }
+
+bool checkIsVulkanEnvSupported() {
+    VkPhysicalDeviceVulkan11Features vk11_features;
+
+    if (!vk11_features.storageBuffer16BitAccess) {
+        return false;
+    }
+
+    return true;
+}

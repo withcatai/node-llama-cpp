@@ -128,3 +128,14 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
 
     return info.Env().Undefined();
 }
+
+Napi::Value ensureGpuDeviceIsSupported(const Napi::CallbackInfo& info) {
+#ifdef GPU_INFO_USE_VULKAN
+    if (!checkIsVulkanEnvSupported()) {
+        Napi::Error::New(info.Env(), "Vulkan device is not supported").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+#endif
+
+    return info.Env().Undefined();
+}

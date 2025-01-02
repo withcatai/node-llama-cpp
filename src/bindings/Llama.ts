@@ -108,6 +108,8 @@ export class Llama {
         if (loadedGpu == null || (loadedGpu === false && buildGpu !== false))
             bindings.loadBackends(path.dirname(bindingPath));
 
+        bindings.ensureGpuDeviceIsSupported();
+
         this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();

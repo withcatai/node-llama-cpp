@@ -237,6 +237,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuVramInfo", getGpuVramInfo),
         Napi::PropertyDescriptor::Function("getGpuDeviceInfo", getGpuDeviceInfo),
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
+        Napi::PropertyDescriptor::Function("ensureGpuDeviceIsSupported", ensureGpuDeviceIsSupported),
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
         Napi::PropertyDescriptor::Function("getMemoryInfo", getMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
