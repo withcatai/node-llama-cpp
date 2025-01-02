@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
 
+if (NLC_CURRENT_PLATFORM STREQUAL "win-x64")
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 if (NLC_TARGET_PLATFORM STREQUAL "win-arm64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
     if(NLC_CURRENT_PLATFORM STREQUAL "win-x64")
         include("./profiles/llvm.win32.host-x64.target-arm64.cmake")

@@ -7,7 +7,6 @@ function(llvmApplyGnuModeAdaptations)
         set(CMAKE_SHARED_LINKER_FLAGS "${UPDATED_CMAKE_SHARED_LINKER_FLAGS}" PARENT_SCOPE)
     endif()
 
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON PARENT_SCOPE)
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Xclang --dependent-lib=msvcrt" PARENT_SCOPE)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Xclang --dependent-lib=msvcrt" PARENT_SCOPE)
 endfunction()
