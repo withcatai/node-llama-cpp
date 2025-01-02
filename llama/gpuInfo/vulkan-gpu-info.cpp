@@ -5,7 +5,7 @@
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback, bool * checkSupported) {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
     vk::Instance instance = vk::createInstance(createInfo);
@@ -56,6 +56,24 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
                     if (size > 0 && addDeviceNames) {
                         (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
                     }
+
+                    if (checkSupported != nullptr && checkSupported) {
+                        VkPhysicalDeviceFeatures2 device_features2;
+                        device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+                        device_features2.pNext = nullptr;
+                        device_features2.features = (VkPhysicalDeviceFeatures)physicalDevice.getFeatures();
+
+                        VkPhysicalDeviceVulkan11Features vk11_features;
+                        vk11_features.pNext = nullptr;
+                        vk11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+                        device_features2.pNext = &vk11_features;
+
+                        vkGetPhysicalDeviceFeatures2(physicalDevice, &device_features2);
+
+                        if (!vk11_features.storageBuffer16BitAccess) {
+                            checkSupported = false;
+                        }
+                    }
                 }
             }
         } else {
@@ -78,15 +96,16 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
 }
 
 bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback);
+    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback, nullptr);
 }
 
-bool checkIsVulkanEnvSupported() {
-    VkPhysicalDeviceVulkan11Features vk11_features;
+bool checkIsVulkanEnvSupported(gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    size_t total = 0;
+    size_t used = 0;
+    size_t unifiedMemorySize = 0;
 
-    if (!vk11_features.storageBuffer16BitAccess) {
-        return false;
-    }
+    bool isSupported = true;
+    enumerateVulkanDevices(&total, &used, &unifiedMemorySize, false, nullptr, warningLogCallback, &isSupported);
 
-    return true;
+    return isSupported;
 }
