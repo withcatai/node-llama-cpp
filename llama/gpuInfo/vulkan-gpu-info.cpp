@@ -71,7 +71,7 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
                         vkGetPhysicalDeviceFeatures2(physicalDevice, &device_features2);
 
                         if (!vk11_features.storageBuffer16BitAccess) {
-                            checkSupported = false;
+                            *checkSupported = false;
                         }
                     }
                 }
