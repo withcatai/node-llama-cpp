@@ -18,8 +18,8 @@ import {LlamaEmbedding, type LlamaEmbeddingOptions, type LlamaEmbeddingJSON} fro
 import {
     type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
     type CustomBatchingDispatchSchedule, type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem,
-    type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type ControlledEvaluateInputItem,
-    type ControlledEvaluateIndexOutput
+    type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type SequenceEvaluateMetadataOptions,
+    type SequenceEvaluateOutput, type ControlledEvaluateInputItem, type ControlledEvaluateIndexOutput
 } from "./evaluator/LlamaContext/types.js";
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
@@ -144,6 +144,8 @@ export {
     type ContextShiftOptions,
     type ContextTokensDeleteRange,
     type EvaluationPriority,
+    type SequenceEvaluateMetadataOptions,
+    type SequenceEvaluateOutput,
     type LlamaContextSequenceRepeatPenalty,
     type ControlledEvaluateInputItem,
     type ControlledEvaluateIndexOutput,

@@ -20,7 +20,8 @@ describe("llama 3.1", () => {
             const draftSequence = context.getSequence();
             const predictor = new DraftSequenceTokenPredictor(draftSequence, {
                 minTokens: 2,
-                maxTokens: 2
+                maxTokens: 2,
+                minConfidence: 0.2
             });
 
             const mainSequence = context.getSequence();
@@ -44,19 +45,19 @@ describe("llama 3.1", () => {
               ]
             `);
 
-            const textTokens = model.tokenize("! The");
+            const textTokens = model.tokenize("! How are");
             predictor.pushTokens(textTokens);
 
             const predictedTokens2 = await predictor.predictTokens();
             expect(predictedTokens2.map((token) => model.detokenize([token], true))).toMatchInlineSnapshot(`
               [
-                " weather",
-                " in",
+                " you",
+                " today",
               ]
             `);
 
 
-            await chatSession.preloadPrompt("What");
+            await chatSession.preloadPrompt("What ");
 
             await predictor.reset({
                 targetSequence: mainSequence,
@@ -82,6 +83,22 @@ describe("llama 3.1", () => {
                 " to",
               ]
             `);
+
+
+            await chatSession.preloadPrompt("If all");
+
+            await predictor.reset({
+                targetSequence: mainSequence,
+                stateTokens: mainSequence.contextTokens,
+                evaluateOptions: {}
+            });
+
+            const text3Tokens = model.tokenize("exquisite");
+            predictor.pushTokens(text3Tokens);
+
+            // no prediction with the given minimum confidence
+            const predictedTokens5 = await predictor.predictTokens();
+            expect(predictedTokens5.map((token) => model.detokenize([token], true))).to.eql([]);
         });
 
         describe("InputLookupTokenPredictor", () => {

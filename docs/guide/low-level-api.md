@@ -38,13 +38,25 @@ and you can pass no sampling options to avoid making any adjustments to the prob
 It's best to avoid getting the full probabilities list unless you really need it,
 as passing it to the JavaScript side can be slow.
 
+### Context Shift {#context-shift}
+When the context sequence is full and you want to evaluate more tokens onto it,
+some tokens will have to be removed to make room for new ones to be added.
+
+Ideally, you'd want to do that on your logic level, so you can control which content to keep and which to remove.
+> All the high-level APIs of `node-llama-cpp` [automatically do that](./chat-context-shift.md).
+
+If you don't do that, `node-llama-cpp` will automatically remove the oldest tokens from the context sequence state to make room for new ones.
+
+You can customize the context shift strategy `node-llama-cpp` uses for the context sequence by configuring the [`contextShift`](../api/classes/LlamaContext.md#parameters) option when calling [`.getSequence(...)`](../api/classes/LlamaContext.md#getsequence),
+or by passing a customized the [`contextShift`](../api/type-aliases/SequenceEvaluateOptions#contextshift) option to the evaluation method you use.
+
 ## Simple Evaluation {#simple-evaluation}
-You can evaluate the given input tokens onto a context sequence using [`.evaluate`](../api/classes/LlamaContextSequence.md#evaluate)
+You can evaluate the given input tokens onto a context sequence using [`.evaluate(...)`](../api/classes/LlamaContextSequence.md#evaluate)
 and generate the next token for the last input token.
 
 On each iteration of the returned iterator, the generated token is then added to the context sequence state and the next token is generated for it, and so on.
 
-When using [`.evaluate`](../api/classes/LlamaContextSequence.md#evaluate), the configured [token predictor](./token-prediction.md) is used to speed up the generation process.
+When using [`.evaluate(...)`](../api/classes/LlamaContextSequence.md#evaluate), the configured [token predictor](./token-prediction.md) is used to speed up the generation process.
 
 ```typescript
 import {fileURLToPath} from "url";
@@ -130,9 +142,67 @@ console.log("Result: " + resText);
 ```
 > If you want to adjust the token probabilities when generating output, consider using [token bias](./token-bias.md) instead
 
+### With Metadata {#evaluation-with-metadata}
+You can use [`.evaluateWithMetadata(...)`](../api/classes/LlamaContextSequence.md#evaluatewithmetadata) to evaluate tokens onto the context sequence state like [`.evaluate(...)`](#simple-evaluation), but with metadata emitted for each token.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, Token, SequenceEvaluateOptions} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const sequence = context.getSequence();
+
+const input = "The best way to";
+const tokens = model.tokenize(input);
+const maxTokens = 10;
+const res: Array<{
+    token: Token,
+    confidence: number,
+    probabilities: Map<Token, number>
+}> = [];
+const metadataOptions = {
+    // configure which metadata should be returned
+    confidence: true,
+    probabilities: true
+} as const;
+const options: SequenceEvaluateOptions = {
+    temperature: 0.8
+};
+
+const iterator = sequence.evaluateWithMetadata(
+    tokens,
+    metadataOptions,
+    options
+);
+for await (const item of iterator) {
+    res.push({
+        token: item.token,
+        confidence: item.confidence,
+        probabilities: new Map(
+            // only keep the top 5 probabilities
+            [...item.probabilities.entries()].slice(0, 5)
+        )
+    });
+
+    if (res.length >= maxTokens)
+        break;
+}
+
+const resText = model.detokenize(res.map(({token}) => token));
+console.log("Result: " + resText);
+console.log("With metadata:", res);
+```
+
 ### No Generation {#evaluation-without-generation}
 To evaluate the input tokens onto a context sequence without generating new tokens,
-you can use [`.evaluateWithoutGeneratingNewTokens`](../api/classes/LlamaContextSequence.md#evaluatewithoutgeneratingnewtokens).
+you can use [`.evaluateWithoutGeneratingNewTokens(...)`](../api/classes/LlamaContextSequence.md#evaluatewithoutgeneratingnewtokens).
 
 ```typescript
 import {fileURLToPath} from "url";
@@ -154,7 +224,8 @@ await sequence.evaluateWithoutGeneratingNewTokens(tokens);
 ```
 
 ## Controlled Evaluation {#controlled-evaluation}
-To manually control for which of the input tokens to generate output, you can use [`.controlledEvaluate`](../api/classes/LlamaContextSequence.md#controlledevaluate).
+To manually control for which of the input tokens to generate output,
+you can use [`.controlledEvaluate(...)`](../api/classes/LlamaContextSequence.md#controlledevaluate).
 
 ```typescript
 import {fileURLToPath} from "url";
@@ -179,8 +250,8 @@ const lastToken = evaluateInput.pop() as Token;
 if (lastToken != null)
     evaluateInput.push([lastToken, {
         generateNext: {
-            singleToken: true,
-            probabilitiesList: true,
+            token: true,
+            probabilities: true,
             options: {
                 temperature: 0.8
             }
@@ -222,7 +293,7 @@ as it may lead to unexpected results.
 
 ### Erase State Ranges {#erase-state-ranges}
 To erase a range of tokens from the context sequence state,
-you can use [`.eraseContextTokenRanges`](../api/classes/LlamaContextSequence.md#erasecontexttokenranges).
+you can use [`.eraseContextTokenRanges(...)`](../api/classes/LlamaContextSequence.md#erasecontexttokenranges).
 
 ```typescript
 import {fileURLToPath} from "url";

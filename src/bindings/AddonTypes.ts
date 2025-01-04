@@ -131,8 +131,9 @@ export type AddonContext = {
     sampleToken(
         batchLogitIndex: BatchLogitIndex,
         sampler: AddonSampler,
-        logprobs: boolean
-    ): Promise<[Token | -1, (Token | number)[] | undefined]>,
+        probabilities: boolean,
+        confidence?: boolean
+    ): Promise<[token: Token | -1, probabilities: (Token | number)[] | undefined, confidence: number | undefined]>,
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive

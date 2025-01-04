@@ -191,11 +191,13 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         AddonContext* ctx;
         AddonSampler* sampler;
         bool arrayResult = false;
-        bool returnLogprobs = false;
-        bool has_logprobs = false;
-        size_t logprobs_size;
-        llama_token * logprobs_tokens;
-        float * logprobs_probs;
+        bool returnProbabilities = false;
+        bool returnConfidence = false;
+        float tokenConfidence = -1;
+        bool has_probabilities = false;
+        size_t probabilities_size;
+        llama_token * probabilities_tokens;
+        float * probabilities_probs;
         int32_t batchLogitIndex;
         llama_token result;
         bool no_output = false;
@@ -209,16 +211,17 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             batchLogitIndex = info[0].As<Napi::Number>().Int32Value();
             sampler = Napi::ObjectWrap<AddonSampler>::Unwrap(info[1].As<Napi::Object>());
             arrayResult = info.Length() > 2 && info[2].IsBoolean();
-            returnLogprobs = arrayResult ? info[2].As<Napi::Boolean>().Value() : false;
+            returnProbabilities = arrayResult ? info[2].As<Napi::Boolean>().Value() : false;
+            returnConfidence = arrayResult && info.Length() > 3 && info[3].IsBoolean() ? info[3].As<Napi::Boolean>().Value() : false;
             sampler->Ref();
         }
         ~AddonContextSampleTokenWorker() {
             ctx->Unref();
             sampler->Unref();
 
-            if (has_logprobs) {
-                delete[] logprobs_tokens;
-                delete[] logprobs_probs;
+            if (has_probabilities) {
+                delete[] probabilities_tokens;
+                delete[] probabilities_probs;
             }
         }
 
@@ -264,32 +267,84 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             llama_sampler_apply(sampler->chain, &cur_p);
 
-            if (returnLogprobs) {
-                if (!cur_p.sorted) {
-                    std::sort(cur_p.data, cur_p.data + cur_p.size, [](const llama_token_data & a, const llama_token_data & b) {
-                        return a.logit > b.logit;
-                    });
-                    cur_p.sorted = true;
-                }
-
-                logprobs_size = cur_p.size;
-                logprobs_tokens = new llama_token[logprobs_size];
-                logprobs_probs = new float[logprobs_size];
-
-                for (size_t i = 0; i < cur_p.size; i++) {
-                    logprobs_tokens[i] = cur_p.data[i].id;
-                    logprobs_probs[i] = cur_p.data[i].logit;
-                }
-
-                has_logprobs = true;
-            }
-
             if (!(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;
                 return;
             }
 
             auto new_token_id = cur_p.data[cur_p.selected].id;
+
+            if (returnProbabilities || returnConfidence) {
+                if (!cur_p.sorted) {
+                    std::sort(cur_p.data, cur_p.data + cur_p.size, [](const llama_token_data & a, const llama_token_data & b) {
+                        return a.logit > b.logit;
+                    });
+                    cur_p.sorted = true;
+
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        if (cur_p.data[i].id == new_token_id) {
+                            cur_p.selected = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (returnProbabilities) {
+                probabilities_size = cur_p.size;
+                probabilities_tokens = new llama_token[probabilities_size];
+                probabilities_probs = new float[probabilities_size];
+                float maxLogit = cur_p.size > 0 ? cur_p.data[0].logit : -INFINITY;
+
+                for (size_t i = 0; i < cur_p.size; i++) {
+                    auto logit = cur_p.data[i].logit;
+
+                    probabilities_tokens[i] = cur_p.data[i].id;
+                    probabilities_probs[i] = logit;
+
+                    if (logit > maxLogit) {
+                        maxLogit = logit;
+                    }
+                }
+
+                if (probabilities_size > 0 && maxLogit != -INFINITY) {
+                    float sum = 0.0f;
+                    for (size_t i = 0; i < probabilities_size; i++) {
+                        float prob = expf(probabilities_probs[i] - maxLogit);
+                        probabilities_probs[i] = prob;
+                        sum += prob;
+                    }
+
+                    for (size_t i = 0; i < probabilities_size; i++) {
+                        probabilities_probs[i] /= sum;
+                    }
+                }
+
+                has_probabilities = true;
+            }
+
+            if (returnConfidence) {
+                if (has_probabilities && cur_p.selected < probabilities_size) {
+                    tokenConfidence = probabilities_probs[cur_p.selected];
+                } else {
+                    float maxLogit = cur_p.data[0].logit;
+                    float sum = 0.0f;
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        auto logit = cur_p.data[i].logit;
+
+                        if (logit > maxLogit) {
+                            maxLogit = logit;
+                        }
+                    }
+
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        sum += expf(cur_p.data[i].logit - maxLogit);
+                    }
+
+                    tokenConfidence = expf(cur_p.data[cur_p.selected].logit - maxLogit) / sum;
+                }
+            }
+
             sampler->acceptToken(new_token_id);
             result = new_token_id;
         }
@@ -308,14 +363,18 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             Napi::Array resultArray = Napi::Array::New(Env(), 2);
             resultArray.Set(Napi::Number::New(Env(), 0), resultToken);
-            
-            if (has_logprobs) {
-                Napi::Array logprobs = Napi::Array::New(Env(), logprobs_size * 2);
-                for (size_t i = 0; i < logprobs_size; i++) {
-                    logprobs.Set(i * 2, Napi::Number::New(Env(), logprobs_tokens[i]));
-                    logprobs.Set(i * 2 + 1, Napi::Number::New(Env(), logprobs_probs[i]));
+
+            if (has_probabilities) {
+                Napi::Array probabilities = Napi::Array::New(Env(), probabilities_size * 2);
+                for (size_t i = 0; i < probabilities_size; i++) {
+                    probabilities.Set(i * 2, Napi::Number::New(Env(), probabilities_tokens[i]));
+                    probabilities.Set(i * 2 + 1, Napi::Number::New(Env(), probabilities_probs[i]));
                 }
-                resultArray.Set(1, logprobs);
+                resultArray.Set(1, probabilities);
+            }
+
+            if (returnConfidence && tokenConfidence != -1) {
+                resultArray.Set(2, Napi::Number::New(Env(), tokenConfidence));
             }
 
             deferred.Resolve(resultArray);

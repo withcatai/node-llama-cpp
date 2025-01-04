@@ -3,13 +3,14 @@ import {Token} from "../../../types.js";
 import {LlamaGrammarEvaluationState} from "../../LlamaGrammarEvaluationState.js";
 import {pushAll} from "../../../utils/pushAll.js";
 import {getConsoleLogPrefix} from "../../../utils/getConsoleLogPrefix.js";
-import {SequenceEvaluateOptions} from "../types.js";
+import {SequenceEvaluateOptions, SequenceEvaluateOutput} from "../types.js";
 import {LlamaSampler} from "../LlamaSampler.js";
 import {LlamaContextSequence} from "../LlamaContext.js";
 import {TokenPredictor} from "../TokenPredictor.js";
 
 const defaultPredictionMinTokens = 0;
 const defaultPredictionMaxTokens = 16;
+const defaultPredictionMinConfidence = 0.6;
 
 /**
  * Predicts the next tokens by evaluating the current state of the target sequence
@@ -20,6 +21,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
     /** @internal */ private readonly _draftSequence: LlamaContextSequence;
     /** @internal */ private readonly _minTokens: number;
     /** @internal */ private readonly _maxTokens: number;
+    /** @internal */ private readonly _minConfidence?: number;
     /** @internal */ private _stateTokens: Token[] = [];
     /** @internal */ private _pendingEvalTokens: Token[] = [];
     /** @internal */ private _predictedTokens: Token[] = [];
@@ -32,7 +34,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
     /** @internal */ private _waitForPredictionExhaustion: boolean = false;
     /** @internal */ private _minTokensCallbacks: Array<() => void> = [];
     /** @internal */ private _resetPredictions: boolean = false;
-    /** @internal */ private _iterator?: AsyncGenerator<Token, void | Token>;
+    /** @internal */ private _iterator?: AsyncGenerator<SequenceEvaluateOutput<{readonly confidence: true}>, void | Token>;
     /** @internal */ private _active: boolean = false;
     /** @internal */ private _disposed: boolean = false;
 
@@ -56,7 +58,20 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
          *
          * You can override any of the options for the prediction here.
          */
-        evaluateOptions?: Pick<SequenceEvaluateOptions, "temperature" | "minP" | "topK" | "topP" | "seed" | "repeatPenalty" | "tokenBias" | "evaluationPriority" | "contextShift">
+        evaluateOptions?: Pick<SequenceEvaluateOptions, "temperature" | "minP" | "topK" | "topP" | "seed" | "repeatPenalty" | "tokenBias" | "evaluationPriority" | "contextShift">,
+
+        /**
+         * Minimum token confidence (probability of the token to be generated, assigned by the model) to consider the token as a prediction.
+         * When the generated token confidence is lower than this value, the prediction process will stop until all the predicted tokens
+         * are exhausted (either by a token that was not predicted being pushed, or all the generated predictions are consumed).
+         *
+         * A number between `0` and `1` representing the minimum probability of the token to be generated.
+         *
+         * Set to `0` to disable.
+         *
+         * Defaults to `0.6`.
+         */
+        minConfidence?: number
     } = {}) {
         super();
 
@@ -64,6 +79,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         this._minTokens = Math.floor(Math.max(0, options?.minTokens ?? defaultPredictionMinTokens));
         this._maxTokens = Math.floor(Math.max(this._minTokens, options?.maxTokens ?? defaultPredictionMaxTokens));
         this._overrideEvaluateOptions = options.evaluateOptions ?? {};
+        this._minConfidence = Math.min(1, Math.max(0, options?.minConfidence ?? defaultPredictionMinConfidence));
 
         if (draftSequence.disposed)
             throw new Error("The draft sequence is disposed");
@@ -79,6 +95,10 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
 
     public get maxTokens() {
         return this._maxTokens;
+    }
+
+    public get minConfidence() {
+        return this._minConfidence;
     }
 
     public async reset({targetSequence, stateTokens, evaluateOptions}: {
@@ -202,6 +222,10 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         this._stopped = true;
         this._currentEvaluationAbortController.abort();
         this._currentEvaluationAbortController = new AbortController();
+
+        if (untilPredictionsExhausted)
+            this._waitForPredictionExhaustion = true;
+
         void withLock(this, "evaluate", async () => {
             this._iterator?.return();
             this._iterator = undefined;
@@ -254,7 +278,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
                 const createIterator = () => {
                     const tokens = this._pendingEvalTokens;
                     this._pendingEvalTokens = [];
-                    return this.draftSequence.evaluate(tokens, {
+                    return this.draftSequence.evaluateWithMetadata(tokens, {confidence: true}, {
                         ...this._evaluateOptions,
                         ...this._overrideEvaluateOptions,
                         grammarEvaluationState: this._getGrammarEvaluationStateWithTokens(tokens)
@@ -271,8 +295,20 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
                 this._iterator = iterator;
                 while (this._canIterate() && !abortSignal.aborted) {
                     const {value, done} = await iterator.next();
-                    if (value != null)
-                        this._predictedTokens.push(value);
+                    let shouldBreak = done;
+                    if (value != null) {
+                        const {token, confidence} = value;
+
+                        if (this._minConfidence != null && this._minConfidence !== 0 && this._minConfidence !== 1 &&
+                            confidence < this._minConfidence
+                        ) {
+                            this._iterator = undefined;
+                            await iterator.return();
+                            this._waitForPredictionExhaustion = true;
+                            shouldBreak = true;
+                        } else
+                            this._predictedTokens.push(token);
+                    }
 
                     if (this._resetPredictions && !abortSignal.aborted) {
                         await resetPredications();
@@ -286,7 +322,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
                             this._minTokensCallbacks.shift()?.();
                     }
 
-                    if (done) {
+                    if (shouldBreak) {
                         this._iterator = undefined;
                         await iterator.return();
                         this._waitForPredictionExhaustion = true;

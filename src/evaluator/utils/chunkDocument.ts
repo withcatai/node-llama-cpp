@@ -146,7 +146,7 @@ export async function experimentalChunkDocument(options: {
         const token = documentTokens[i]!;
         evaluateInput.push([token, {
             generateNext: {
-                probabilitiesList: true
+                probabilities: true
             }
         }]);
     }

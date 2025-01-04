@@ -15,7 +15,8 @@ import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
-    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateOptions
+    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateMetadataOptions,
+    SequenceEvaluateOptions, SequenceEvaluateOutput
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import {LlamaSampler} from "./LlamaSampler.js";
@@ -918,7 +919,10 @@ export class LlamaContextSequence {
     /** @internal */ private _tokenPredictorOwner: {} = {};
     /** @internal */ public _contextTokens: Token[] = [];
     /** @internal */ private _nextTokenIndex: number = 0;
-    /** @internal */ private _loadedTokenPredictions: [input: Token, output: Token][] = [];
+    /** @internal */ private _loadedTokenPredictions: Array<[
+        input: Token,
+        output: [token: Token, probabilities: (Token | number)[] | undefined, confidence: number | undefined]
+    ]> = [];
     /** @internal */ private _usedTokenPredictions: number = 0;
     /** @internal */ private _unusedTokenPredictions: number = 0;
     /** @internal */ private _validatedTokenPredictions: number = 0;
@@ -1266,7 +1270,33 @@ export class LlamaContextSequence {
      *
      * This method uses the token predictor (when provided) to generate new tokens faster.
      */
-    public evaluate(tokens: Token[], options: SequenceEvaluateOptions = {}): AsyncGenerator<Token, void, void | Token | Token[]> {
+    public async *evaluate(tokens: Token[], options: SequenceEvaluateOptions = {}): AsyncGenerator<Token, void, void | Token | Token[]> {
+        const iterator = this.evaluateWithMetadata(tokens, {}, options);
+        let iterateInput: void | Token | Token[] = undefined;
+
+        try {
+            while (true) {
+                const {value, done} = await iterator.next(iterateInput);
+                if (done)
+                    return;
+
+                iterateInput = yield value.token;
+            }
+        } finally {
+            await iterator.return();
+        }
+    }
+
+    /**
+     * Like {@link evaluate `.evaluate(...)`}, but with additional metadata for each generated token.
+     *
+     * Configure the additional metadata options to choose which metadata to include.
+     */
+    public evaluateWithMetadata<const Metadata extends SequenceEvaluateMetadataOptions>(
+        tokens: Token[],
+        metadata: Metadata,
+        options: SequenceEvaluateOptions = {}
+    ): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
         const {
             temperature = 0,
             minP = 0,
@@ -1287,7 +1317,7 @@ export class LlamaContextSequence {
         } = options;
 
         if (this._tokenPredictor != null && !_noSampling && tokens.length > 0)
-            return this._speculativeEvaluate(tokens, {
+            return this._speculativeEvaluate(tokens, metadata, {
                 temperature,
                 minP,
                 topK,
@@ -1305,7 +1335,7 @@ export class LlamaContextSequence {
                 tokenPredictor: this._tokenPredictor
             });
 
-        return this._evaluate(tokens, {
+        return this._evaluate(tokens, metadata, {
             temperature,
             minP,
             topK,
@@ -1355,7 +1385,7 @@ export class LlamaContextSequence {
             _skipLock = false
         } = options;
 
-        const iterator = this._evaluate(tokens, {
+        const iterator = this._evaluate(tokens, {}, {
             generateNewTokens: false,
             evaluationPriority,
             contextShiftOptions: {
@@ -1386,6 +1416,8 @@ export class LlamaContextSequence {
         for await (const token of iterator) {
             // Array.from doesn't work with async generators, so we have to iterate over the generator
         }
+
+        await iterator.return();
 
         if (predictorAlignmentPromise != null)
             await predictorAlignmentPromise;
@@ -1453,7 +1485,7 @@ export class LlamaContextSequence {
             if (item instanceof Array) {
                 const [token, options] = item;
                 const generateNext = options?.generateNext ?? {};
-                if (generateNext.probabilitiesList || generateNext.singleToken === true || generateNext.singleToken != null)
+                if (generateNext.probabilities === true || generateNext.confidence === true || generateNext.token === true)
                     logitsArray[index] = true;
 
                 return token;
@@ -1478,8 +1510,9 @@ export class LlamaContextSequence {
                     const generateNext = inputOptions.generateNext;
 
                     if (generateNext == null || (
-                        (generateNext.probabilitiesList == null || !generateNext.probabilitiesList) &&
-                        (generateNext.singleToken == null || !generateNext.singleToken)
+                        (generateNext.probabilities == null || !generateNext.probabilities) &&
+                        (generateNext.token == null || !generateNext.token) &&
+                        (generateNext.confidence == null || !generateNext.confidence)
                     ))
                         return undefined;
 
@@ -1499,22 +1532,28 @@ export class LlamaContextSequence {
                             return undefined;
 
                         sampler.applyConfig(samplerConfig);
-                        const [token, probabilitiesList] = await this._context._ctx.sampleToken(
+                        const [token, probabilities, confidence] = await this._context._ctx.sampleToken(
                             batchLogitIndex,
                             sampler._sampler,
-                            !!generateNext.probabilitiesList
+                            !!generateNext.probabilities,
+                            !!generateNext.confidence
                         );
 
                         const output: ControlledEvaluateIndexOutput = {
-                            next: {
-                                token: generateNext.singleToken
-                                    ? token === -1
-                                        ? null
-                                        : (token ?? null)
-                                    : undefined,
-                                probabilities: reviveTokenProbabilities(probabilitiesList)
-                            }
+                            next: {}
                         };
+
+                        if (generateNext.token)
+                            output.next.token = token === -1
+                                ? null
+                                : (token ?? null);
+
+                        if (confidence != null)
+                            output.next.confidence = confidence;
+
+                        if (probabilities != null)
+                            output.next.probabilities = reviveTokenProbabilities(probabilities);
+
                         onTokenResult?.(tokenIndex, output);
 
                         return output;
@@ -1528,7 +1567,7 @@ export class LlamaContextSequence {
     }
 
     /** @internal */
-    private async *_evaluate(tokens: Token[], {
+    private async *_evaluate<const Metadata extends SequenceEvaluateMetadataOptions>(tokens: Token[], metadata: Metadata, {
         temperature,
         minP,
         topK,
@@ -1552,7 +1591,7 @@ export class LlamaContextSequence {
         yieldEogToken?: boolean,
         _noSampling?: boolean,
         _skipLock?: boolean
-    }): AsyncGenerator<Token, void, void | Token | Token[]> {
+    }): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens;
@@ -1562,6 +1601,9 @@ export class LlamaContextSequence {
 
         await this._abortTokenPredictor(false, true);
 
+        const sampleProbabilities = metadata.probabilities === true;
+        const sampleConfidence = metadata.confidence === true;
+
         const sampler = new LlamaSampler(this.model);
         try {
             while (true) {
@@ -1570,6 +1612,7 @@ export class LlamaContextSequence {
                     ? undefined
                     : await acquireLock(this._lock, "evaluate");
                 let nextToken: Token | -1 | null | undefined;
+                const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
 
                 try {
                     const logitsArray: (true | undefined)[] = [];
@@ -1604,12 +1647,32 @@ export class LlamaContextSequence {
                                     return null;
 
                                 sampler.applyConfig(samplerConfig);
-                                return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                                if (sampleProbabilities || sampleConfidence)
+                                    return this._context._ctx.sampleToken(
+                                        batchLogitIndex,
+                                        sampler._sampler,
+                                        sampleProbabilities,
+                                        sampleConfidence
+                                    );
+                                else
+                                    return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
                             });
                         }
                     );
 
-                    nextToken = decodeResult[evalTokens.length - 1];
+                    const lastDecodeResult = decodeResult[evalTokens.length - 1];
+
+                    if (lastDecodeResult instanceof Array) {
+                        const [token, probabilities, confidence] = lastDecodeResult;
+                        nextToken = token;
+
+                        if (probabilities != null)
+                            yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                        if (confidence != null)
+                            yieldRes.confidence = confidence;
+                    } else
+                        nextToken = lastDecodeResult;
 
                     if (nextToken === -1)
                         throw new Error("Failed to sample next token");
@@ -1624,7 +1687,9 @@ export class LlamaContextSequence {
                     evaluatorLock?.dispose();
                 }
 
-                const replacementToken = yield nextToken;
+                yieldRes.token = nextToken;
+
+                const replacementToken = yield yieldRes as SequenceEvaluateOutput<Metadata>;
 
                 // set the tokens for the next evaluation
                 if (replacementToken instanceof Array)
@@ -1640,7 +1705,7 @@ export class LlamaContextSequence {
     }
 
     /** @internal */
-    private async *_speculativeEvaluate(tokens: Token[], {
+    private async *_speculativeEvaluate<const Metadata extends SequenceEvaluateMetadataOptions>(tokens: Token[], metadata: Metadata, {
         temperature,
         minP,
         topK,
@@ -1659,7 +1724,7 @@ export class LlamaContextSequence {
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, contextShiftOptions: Required<ContextShiftOptions>,
         yieldEogToken?: boolean, tokenPredictor: TokenPredictor
-    }): AsyncGenerator<Token, void, void | Token | Token[]> {
+    }): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens.slice();
@@ -1670,6 +1735,9 @@ export class LlamaContextSequence {
         const tokenPredictorOwner: {} = {};
         this._tokenPredictorOwner = tokenPredictorOwner;
         await this._abortTokenPredictor();
+
+        const sampleProbabilities = metadata.probabilities === true;
+        const sampleConfidence = metadata.confidence === true;
 
         let logitsArray: (true | undefined)[] = [];
         let logitsStartIndex = evalTokens.length - 1;
@@ -1682,6 +1750,7 @@ export class LlamaContextSequence {
                 this._ensureNotDisposed();
                 const evaluatorLock = await acquireLock(this._lock, "evaluate");
                 let nextToken: Token | undefined;
+                const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
 
                 try {
                     if (this._tokenPredictorOwner === tokenPredictorOwner &&
@@ -1689,7 +1758,16 @@ export class LlamaContextSequence {
                         evalTokens.length === 1 &&
                         evalTokens[0] === this._loadedTokenPredictions[0]?.[0]
                     ) {
-                        nextToken = this._loadedTokenPredictions.shift()![1];
+                        const [token, probabilities, confidence] = this._loadedTokenPredictions.shift()![1];
+                        nextToken = token;
+                        yieldRes.token = nextToken;
+
+                        if (probabilities != null)
+                            yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                        if (confidence != null)
+                            yieldRes.confidence = confidence;
+
                         const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
                             ? grammarEvaluationState()
                             : grammarEvaluationState;
@@ -1799,13 +1877,24 @@ export class LlamaContextSequence {
                                         return null;
 
                                     sampler.applyConfig(samplerConfig);
-                                    return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                                    if (sampleProbabilities || sampleConfidence)
+                                        return this._context._ctx.sampleToken(
+                                            batchLogitIndex,
+                                            sampler._sampler,
+                                            sampleProbabilities,
+                                            sampleConfidence
+                                        );
+                                    else
+                                        return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
                                 });
                             }
                         );
 
                         for (let i = logitsStartIndex; i < evalTokens.length; i++) {
-                            const resultToken = decodeResult[i];
+                            const item = decodeResult[i];
+                            const [resultToken, probabilities, confidence] = item instanceof Array
+                                ? item
+                                : [item];
 
                             if (i === logitsStartIndex) {
                                 if (resultToken === -1)
@@ -1815,6 +1904,13 @@ export class LlamaContextSequence {
                                     return;
 
                                 nextToken = resultToken;
+                                yieldRes.token = nextToken;
+
+                                if (probabilities != null)
+                                    yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                                if (confidence != null)
+                                    yieldRes.confidence = confidence;
                             } else {
                                 if (resultToken === -1 || resultToken == null)
                                     break;
@@ -1823,7 +1919,7 @@ export class LlamaContextSequence {
                                     ? nextToken
                                     : validatedTokens.at(-1)?.[1];
                                 if (lastValidatedTokenOutput != null && lastValidatedTokenOutput === evalTokens[i]) {
-                                    this._loadedTokenPredictions.push([evalTokens[i]!, resultToken]);
+                                    this._loadedTokenPredictions.push([evalTokens[i]!, [resultToken, probabilities, confidence]]);
                                     this._validatedTokenPredictions++;
                                     this._unusedTokenPredictions++;
                                 } else {
@@ -1851,7 +1947,7 @@ export class LlamaContextSequence {
                     evaluatorLock.dispose();
                 }
 
-                const replacementToken = yield nextToken;
+                const replacementToken = yield yieldRes as SequenceEvaluateOutput<Metadata>;
 
                 // set the tokens for the next evaluation
                 if (replacementToken instanceof Array)
@@ -2135,32 +2231,17 @@ function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenB
     };
 }
 
-function reviveTokenProbabilities(probabilitiesList?: (Token | number)[]) {
-    if (probabilitiesList == null)
+function reviveTokenProbabilities(probabilities?: (Token | number)[]) {
+    if (probabilities == null)
         return undefined;
 
     const res = new Map<Token, number>();
-    let maxLogit: number | undefined = undefined;
 
-    for (let i = 1; i < probabilitiesList.length; i += 2) {
-        const token = probabilitiesList[i - 1]! as Token;
-        const probability = probabilitiesList[i]! as number;
-
-        if (maxLogit == null || probability > maxLogit)
-            maxLogit = probability;
+    for (let i = 1; i < probabilities.length; i += 2) {
+        const token = probabilities[i - 1]! as Token;
+        const probability = probabilities[i]! as number;
 
         res.set(token, probability);
-    }
-
-    if (maxLogit != null) {
-        for (const [token, logit] of res)
-            res.set(token, Math.exp(logit - maxLogit));
-
-        const sum = Array.from(res.values()).reduce((a, b) => a + b, 0);
-
-        // normalize the probabilities
-        for (const [token, logit] of res)
-            res.set(token, logit / sum);
     }
 
     return res;
