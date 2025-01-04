@@ -515,7 +515,12 @@ Napi::Value AddonModel::TokenBos(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_bos(model));
+    auto token = llama_token_bos(model);
+    if (token == LLAMA_TOKEN_NULL) {
+        token = llama_token_cls(model);
+    }
+
+    return getNapiControlToken(info, model, token);
 }
 Napi::Value AddonModel::TokenEos(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -564,14 +569,6 @@ Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
     }
 
     return getNapiToken(info, model, llama_token_eot(model));
-}
-Napi::Value AddonModel::ClsToken(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
-        return info.Env().Undefined();
-    }
-
-    return getNapiToken(info, model, llama_token_cls(model));
 }
 Napi::Value AddonModel::SepToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -678,7 +675,6 @@ void AddonModel::init(Napi::Object exports) {
                 InstanceMethod("middleToken", &AddonModel::MiddleToken),
                 InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                 InstanceMethod("eotToken", &AddonModel::EotToken),
-                InstanceMethod("clsToken", &AddonModel::ClsToken),
                 InstanceMethod("sepToken", &AddonModel::SepToken),
                 InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                 InstanceMethod("getTokenAttributes", &AddonModel::GetTokenAttributes),

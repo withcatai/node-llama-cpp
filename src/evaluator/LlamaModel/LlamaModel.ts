@@ -336,7 +336,6 @@ export class LlamaModel {
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
                 case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
-                case "CLS": return this.tokens.cls == null ? [] : [this.tokens.cls];
                 case "SEP": return this.tokens.sep == null ? [] : [this.tokens.sep];
             }
 
@@ -761,13 +760,11 @@ export class LlamaModelTokens {
     /** @internal */ private _bosToken?: Token;
     /** @internal */ private _eosToken?: Token;
     /** @internal */ private _eotToken?: Token;
-    /** @internal */ private _clsToken?: Token;
     /** @internal */ private _sepToken?: Token;
     /** @internal */ private _nlToken?: Token;
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
     /** @internal */ private _eotString?: string;
-    /** @internal */ private _clsString?: string;
     /** @internal */ private _sepString?: string;
     /** @internal */ private _nlString?: string;
     /** @internal */ private _shouldPrependBosToken?: boolean;
@@ -833,21 +830,6 @@ export class LlamaModelTokens {
             return null;
 
         return this._eotToken;
-    }
-
-    /**
-     * @returns The CLS (Classification) token.
-     */
-    public get cls(): Token | null {
-        this._ensureNotDisposed();
-
-        if (this._clsToken == null)
-            this._clsToken = this._model.clsToken();
-
-        if (this._clsToken === -1)
-            return null;
-
-        return this._clsToken;
     }
 
     /**
@@ -929,23 +911,6 @@ export class LlamaModelTokens {
             this._eotString = this._model.getTokenString(eotToken);
 
         return this._eotString;
-    }
-
-    /**
-     * @returns The CLS (Classification) token text representation.
-     */
-    public get clsString(): string | null {
-        this._ensureNotDisposed();
-
-        const clsToken = this.cls;
-
-        if (clsToken == null)
-            return null;
-
-        if (this._clsString == null)
-            this._clsString = this._model.getTokenString(clsToken);
-
-        return this._clsString;
     }
 
     /**
