@@ -12,6 +12,7 @@ import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
+import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
     EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateOptions
@@ -1079,7 +1080,10 @@ export class LlamaContextSequence {
      * which incurs token evaluation of the shifted tokens.
      */
     public async adaptStateToTokens(tokens: Token[], allowShift: boolean = true) {
-        if (this.model.fileInsights.isRecurrent || !allowShift) {
+        const modelSupportsShifting = !this.model.fileInsights.isRecurrent &&
+            this.model.fileInfo.metadata?.general?.architecture !== GgufArchitectureType.deepseek2;
+
+        if (!modelSupportsShifting || !allowShift) {
             const {firstDifferentIndex} = this.compareContextTokens(tokens);
             if (firstDifferentIndex < this.nextTokenIndex)
                 await this._eraseContextTokenRanges([{
