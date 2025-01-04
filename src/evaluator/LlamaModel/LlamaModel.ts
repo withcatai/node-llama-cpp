@@ -63,9 +63,15 @@ export type LlamaModelOptions = {
     vocabOnly?: boolean,
 
     /**
-     * Use mmap if possible.
+     * Use mmap (memory-mapped file) to load the model.
      *
-     * Defaults to `true`.
+     * Using mmap allows the OS to load the model tensors directly from the file on the filesystem,
+     * and makes it easier for the system to manage memory.
+     *
+     * When using mmap, you might notice a delay the first time you actually use the model,
+     * which is caused by the OS itself loading the model into memory.
+     *
+     * Defaults to `true` if the current system supports it.
      */
     useMmap?: boolean,
 
