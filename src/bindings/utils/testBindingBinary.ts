@@ -4,7 +4,8 @@ import {createRequire} from "module";
 import path from "path";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {runningInElectron} from "../../utils/runtime.js";
-import {BuildGpu} from "../types.js";
+import {BuildGpu, LlamaLogLevel} from "../types.js";
+import {LlamaLogLevelToAddonLogLevel} from "../Llama.js";
 import type {BindingModule} from "../AddonTypes.js";
 
 const require = createRequire(import.meta.url);
@@ -12,7 +13,12 @@ const __filename = fileURLToPath(import.meta.url);
 const detectedFileName = path.basename(__filename);
 const expectedFileName = "testBindingBinary";
 
-export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu, testTimeout: number = 1000 * 60 * 5): Promise<boolean> {
+export async function testBindingBinary(
+    bindingBinaryPath: string,
+    gpu: BuildGpu,
+    testTimeout: number = 1000 * 60 * 5,
+    pipeOutputOnNode: boolean = false
+): Promise<boolean> {
     if (!detectedFileName.startsWith(expectedFileName)) {
         console.warn(
             getConsoleLogPrefix() +
@@ -57,7 +63,8 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
         onExit(code: number): void
     }): {
         sendMessage(message: ParentToChildMessage): void,
-        killProcess(): void
+        killProcess(): void,
+        pipeMessages(): void
     } {
         if (forkFunction.type === "electron") {
             let exited = false;
@@ -88,13 +95,18 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
 
             return {
                 sendMessage: (message: ParentToChildMessage) => subProcess.postMessage(message),
-                killProcess: cleanupElectronFork
+                killProcess: cleanupElectronFork,
+                pipeMessages: () => void 0
             };
         }
 
+        let pipeSet = false;
         const subProcess = forkFunction.fork(__filename, [], {
             detached: false,
             silent: true,
+            stdio: pipeOutputOnNode
+                ? ["ignore", "pipe", "pipe", "ipc"]
+                : ["ignore", "ignore", "ignore", "ipc"],
             env: {
                 ...process.env,
                 TEST_BINDING_CP: "true"
@@ -102,6 +114,9 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
         });
 
         function cleanupNodeFork() {
+            subProcess.stdout?.off("data", onStdout);
+            subProcess.stderr?.off("data", onStderr);
+
             if (subProcess.exitCode == null)
                 subProcess.kill("SIGKILL");
 
@@ -121,9 +136,36 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
             onExit(subProcess.exitCode ?? -1);
         }
 
+        function onStdout(data: string) {
+            if (!pipeSet)
+                return;
+
+            process.stdout.write(data);
+        }
+
+        function onStderr(data: string) {
+            if (!pipeSet)
+                return;
+
+            process.stderr.write(data);
+        }
+
+        if (pipeOutputOnNode) {
+            subProcess.stdout?.on("data", onStdout);
+            subProcess.stderr?.on("data", onStderr);
+        }
+
+        function pipeMessages() {
+            if (!pipeOutputOnNode || pipeSet)
+                return;
+
+            pipeSet = true;
+        }
+
         return {
             sendMessage: (message: ParentToChildMessage) => subProcess.send(message),
-            killProcess: cleanupNodeFork
+            killProcess: cleanupNodeFork,
+            pipeMessages
         };
     }
 
@@ -169,6 +211,13 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
                             bindingBinaryPath,
                             gpu
                         });
+                    } else if (message.type === "loaded") {
+                        subProcess!.pipeMessages(); // only start piping error logs if the binary loaded successfully
+                        subProcess!.sendMessage({
+                            type: "test",
+                            bindingBinaryPath,
+                            gpu
+                        });
                     } else if (message.type === "done") {
                         testPassed = true;
                         subProcess!.sendMessage({type: "exit"});
@@ -189,13 +238,28 @@ export async function testBindingBinary(bindingBinaryPath: string, gpu: BuildGpu
 }
 
 if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || process.send != null)) {
+    let binding: BindingModule;
     const sendMessage = process.parentPort != null
         ? (message: ChildToParentMessage) => process.parentPort.postMessage(message)
         : (message: ChildToParentMessage) => process.send!(message);
     const onMessage = async (message: ParentToChildMessage) => {
         if (message.type === "start") {
             try {
-                const binding: BindingModule = require(message.bindingBinaryPath);
+                binding = require(message.bindingBinaryPath);
+
+                const errorLogLevel = LlamaLogLevelToAddonLogLevel.get(LlamaLogLevel.error);
+                if (errorLogLevel != null)
+                    binding.setLoggerLogLevel(errorLogLevel);
+
+                sendMessage({type: "loaded"});
+            } catch (err) {
+                console.error(err);
+                process.exit(1);
+            }
+        } else if (message.type === "test") {
+            try {
+                if (binding == null)
+                    throw new Error("Binding binary is not loaded");
 
                 binding.loadBackends();
                 const loadedGpu = binding.getGpuType();
@@ -236,8 +300,12 @@ type ParentToChildMessage = {
     bindingBinaryPath: string,
     gpu: BuildGpu
 } | {
+    type: "test",
+    bindingBinaryPath: string,
+    gpu: BuildGpu
+} | {
     type: "exit"
 };
 type ChildToParentMessage = {
-    type: "ready" | "done"
+    type: "ready" | "loaded" | "done"
 };

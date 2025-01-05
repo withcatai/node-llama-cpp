@@ -14,7 +14,7 @@ import {BindingModule} from "./AddonTypes.js";
 import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel, LlamaLogLevelGreaterThanOrEqual} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
-const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
+export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
     [LlamaLogLevel.fatal, 1],
     [LlamaLogLevel.error, 2],

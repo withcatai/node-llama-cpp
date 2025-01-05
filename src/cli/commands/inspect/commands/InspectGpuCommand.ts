@@ -172,7 +172,8 @@ async function getLlamaForGpu(gpu: BuildGpu) {
             logLevel: LlamaLogLevel.warn,
             vramPadding: 0
         }, {
-            skipLlamaInit: true
+            skipLlamaInit: true,
+            pipeBinaryTestErrorLogs: true
         });
     } catch (err) {
         return undefined;

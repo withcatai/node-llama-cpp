@@ -342,10 +342,12 @@ export async function getLlamaForOptions({
     debug = defaultLlamaCppDebugMode
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
-    skipLlamaInit = false
+    skipLlamaInit = false,
+    pipeBinaryTestErrorLogs = false
 }: {
     updateLastBuildInfoOnCompile?: boolean,
-    skipLlamaInit?: boolean
+    skipLlamaInit?: boolean,
+    pipeBinaryTestErrorLogs?: boolean
 } = {}): Promise<Llama> {
     const platform = getPlatform();
     const arch = process.arch;
@@ -463,7 +465,8 @@ export async function getLlamaForOptions({
                             ? "falling back to building from source"
                             : null
                     ),
-                debug
+                debug,
+                pipeBinaryTestErrorLogs
             });
 
             if (llama != null)
@@ -556,7 +559,8 @@ async function loadExistingLlamaBinary({
     vramPadding,
     ramPadding,
     fallbackMessage,
-    debug
+    debug,
+    pipeBinaryTestErrorLogs
 }: {
     buildOptions: BuildOptions,
     canUsePrebuiltBinaries: boolean,
@@ -571,7 +575,8 @@ async function loadExistingLlamaBinary({
     vramPadding: Required<LlamaOptions>["vramPadding"],
     ramPadding: Required<LlamaOptions>["ramPadding"],
     fallbackMessage: string | null,
-    debug: boolean
+    debug: boolean,
+    pipeBinaryTestErrorLogs: boolean
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -590,7 +595,7 @@ async function loadExistingLlamaBinary({
             });
             const resolvedBindingPath = await resolveActualBindingBinaryPath(localBuildBinPath);
             const binaryCompatible = shouldTestBinaryBeforeLoading
-                ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu)
+                ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
                 : true;
 
             if (binaryCompatible) {
@@ -649,7 +654,7 @@ async function loadExistingLlamaBinary({
                 });
                 const resolvedBindingPath = await resolveActualBindingBinaryPath(prebuiltBinDetails.binaryPath);
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu)
+                    ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
                     : true;
 
                 if (binaryCompatible) {
