@@ -119,7 +119,10 @@ const contextSequence = context.getSequence({
     tokenPredictor: new DraftSequenceTokenPredictor(draftContextSequence, {
         // try to change this value to `1` or more
         // and see the difference in response times
-        minTokens: 0
+        minTokens: 0,
+        
+        // the minimum probability of a toke prediction to be considered
+        minConfidence: 0.6
     })
 });
 
