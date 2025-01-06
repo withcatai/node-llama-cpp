@@ -38,9 +38,9 @@ describe("bgeReranker", () => {
             const highestRankIndex = ranks.indexOf(highestRank);
 
             const highestRankDocument = documents[highestRankIndex];
-            expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world",);
+            expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`-4`);
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("-4");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 -11,
@@ -89,9 +89,9 @@ describe("bgeReranker", () => {
             const highestRankIndex = ranks.indexOf(highestRank);
 
             const highestRankDocument = documents[highestRankIndex];
-            expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world",);
+            expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`-4`);
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("-4");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 -11,
@@ -137,7 +137,7 @@ describe("bgeReranker", () => {
 
             const topDocument = rankedDocuments[0]!;
 
-            expect(topDocument.document).to.eql("Mount Everest is the tallest mountain in the world",);
+            expect(topDocument.document).to.eql("Mount Everest is the tallest mountain in the world");
 
             expect(simplifySortedRanks([topDocument])[0]).toMatchInlineSnapshot(`
               {

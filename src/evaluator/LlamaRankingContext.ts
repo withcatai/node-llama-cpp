@@ -97,7 +97,7 @@ export class LlamaRankingContext {
     /**
      * Get the ranking scores for all the given documents for a query.
      */
-    public async rankAll(query: Token[] | string | LlamaText, documents: Array<Token[] | string | LlamaText>): Promise<number[]> {{}
+    public async rankAll(query: Token[] | string | LlamaText, documents: Array<Token[] | string | LlamaText>): Promise<number[]> {
         const resolvedTokens = documents.map((document) => this._getEvaluationInput(query, document));
 
         if (resolvedTokens.some((tokens) => tokens.length > this._llamaContext.contextSize))

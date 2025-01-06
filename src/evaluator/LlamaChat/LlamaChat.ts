@@ -15,7 +15,6 @@ import {EvaluationPriority} from "../LlamaContext/types.js";
 import {maxRecentDetokenizerTokens, UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
-import {GeneralChatWrapper} from "../../chatWrappers/GeneralChatWrapper.js";
 import {TokenBias} from "../TokenBias.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {pushAll} from "../../utils/pushAll.js";
