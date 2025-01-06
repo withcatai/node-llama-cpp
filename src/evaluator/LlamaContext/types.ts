@@ -326,6 +326,8 @@ export type SequenceEvaluateMetadataOptions = {
      * Same as `probabilities.get(token)` from the output.
      *
      * If you need only this value, you can skip getting the full probabilities list to improve performance.
+     *
+     * This value might be slightly different when evaluated on different GPUs and configurations.
      */
     readonly confidence?: boolean,
 
@@ -359,6 +361,8 @@ export type SequenceEvaluateOutput<
      * Same as `probabilities.get(token)`.
      *
      * If you need only this value, you can skip getting the full probabilities list to improve performance.
+     *
+     * This value might be slightly different when evaluated on different GPUs and configurations.
      */
     confidence: number,
 
@@ -366,6 +370,8 @@ export type SequenceEvaluateOutput<
      * The probabilities of the tokens from the vocabulary to be the next token.
      *
      * A probability is a number from `0` to `1`.
+     *
+     * The probabilities might be slightly different when evaluated on different GPUs and configurations.
      *
      * The map is sorted by the probability of the tokens from the highest to the lowest,
      * and is reflected in the order of the entries when iterating over the map.
@@ -392,6 +398,8 @@ export type ControlledEvaluateInputItem = Token | [token: Token, options: {
          * Same as `next.probabilities.get(next.token)` from the output.
          *
          * If you need only this value, you can skip getting the full probabilities list to improve performance.
+         *
+         * This value might be slightly different when evaluated on different GPUs and configurations.
          */
         confidence?: boolean,
 
@@ -437,6 +445,8 @@ export type ControlledEvaluateIndexOutput = {
          * Same as `next.probabilities.get(next.token)`.
          *
          * If you need only this value, you can skip getting the full probabilities list to improve performance.
+         *
+         * This value might be slightly different when evaluated on different GPUs and configurations.
          */
         confidence?: number,
 
@@ -444,6 +454,8 @@ export type ControlledEvaluateIndexOutput = {
          * The probabilities of the tokens from the vocabulary to be the next token.
          *
          * A probability is a number from `0` to `1`.
+         *
+         * The probabilities might be slightly different when evaluated on different GPUs and configurations.
          *
          * The map is sorted by the probability of the tokens from the highest to the lowest,
          * and is reflected in the order of the entries when iterating over the map.

@@ -5,9 +5,13 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("llama 3.1", () => {
     describe("controlled evaluate", () => {
-        test("get probabilities for 3 tokens", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        test("get probabilities for 3 tokens", {timeout: 1000 * 60 * 60 * 2}, async (testContext) => {
             const modelPath = await getModelFile("Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf");
             const llama = await getTestLlama();
+
+            // the precise values are different for each GPU type, so we skip the test for GPUs other than metal
+            if (llama.gpu !== "metal")
+                testContext.skip();
 
             const model = await llama.loadModel({
                 modelPath
