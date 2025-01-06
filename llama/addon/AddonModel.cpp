@@ -92,13 +92,13 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                model->model = llama_load_model_from_file(model->modelPath.c_str(), model->model_params);
+                model->model = llama_model_load_from_file(model->modelPath.c_str(), model->model_params);
 
                 model->modelLoaded = model->model != nullptr && model->model != NULL;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_load_model_from_file\"");
+                SetError("Unknown error when calling \"llama_model_load_from_file\"");
             }
         }
         void OnOK() {
@@ -141,14 +141,14 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                llama_free_model(model->model);
+                llama_model_free(model->model);
                 model->modelLoaded = false;
 
                 model->dispose();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_free_model\"");
+                SetError("Unknown error when calling \"llama_model_free\"");
             }
         }
         void OnOK() {
@@ -359,7 +359,7 @@ void AddonModel::dispose() {
     disposed = true;
     if (modelLoaded) {
         modelLoaded = false;
-        llama_free_model(model);
+        llama_model_free(model);
 
         adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
         loadedModelSize = 0;
