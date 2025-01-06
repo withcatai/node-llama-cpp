@@ -124,6 +124,20 @@ Here are a few concepts to be aware of when choosing a model:
   
   Many embedding models include terms like `embed` in their name.
 
+* **Reranking models** - models that are trained to rerank (sort) a list of documents
+  based on their relevance to a given query.
+  These models are usually smaller and faster than general-purpose models,
+  making them more efficient and practical for reranking tasks.
+  
+  Reranking models are often significantly smaller (sometimes as small as 500MB), faster,
+  and consume less memory than general-purpose models, making them more efficient and practical.
+
+  While general-purpose models can also be used for reranking,
+  doing this requires prompting the model, which is more cumbersome and inefficient than
+  using a specialized model with a [ranking context](./embedding.md#reranking) for this task.
+  
+  Many reranking models include terms like `rerank` or `reranker` in their name.
+
 ### How much data do you plan to feed the model at once with?
 If you plan to feed the model with a lot of data at once, you'll need a model that supports a large context size.
 The larger the context size is, the more data the model can process at once.
