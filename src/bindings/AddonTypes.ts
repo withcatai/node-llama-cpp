@@ -26,6 +26,7 @@ export type BindingModule = {
             flashAttention?: boolean,
             logitsAll?: boolean,
             embeddings?: boolean,
+            ranking?: boolean,
             threads?: number,
             performanceTracking?: boolean
         }): AddonContext

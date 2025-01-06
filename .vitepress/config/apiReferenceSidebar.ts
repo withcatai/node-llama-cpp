@@ -1,6 +1,6 @@
 import {DefaultTheme} from "vitepress";
 /* eslint import/no-unresolved: "off" */
-import typedocSidebar from "../../docs/api/typedoc-sidebar.json"; // if this import fails, run `npm run docs:generateTypedoc`
+import typedocSidebar from "../../docs/api/typedoc-sidebar.json";
 
 const categoryOrder = [
     "Functions",
@@ -28,6 +28,7 @@ const classesOrder = [
     "LlamaCompletion",
     "LlamaEmbeddingContext",
     "LlamaEmbedding",
+    "LlamaRankingContext",
     "LlamaGrammar",
     "LlamaJsonSchemaGrammar",
     "LlamaText",

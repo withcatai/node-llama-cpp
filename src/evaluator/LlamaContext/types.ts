@@ -171,7 +171,13 @@ export type LlamaContextOptions = {
      * embedding mode only
      * @internal
      */
-    _embeddings?: boolean
+    _embeddings?: boolean,
+
+    /**
+     * ranking mode
+     * @internal
+     */
+    _ranking?: boolean
 };
 export type LlamaContextSequenceRepeatPenalty = {
     /** Tokens to lower the predication probability of to be the next predicted token */

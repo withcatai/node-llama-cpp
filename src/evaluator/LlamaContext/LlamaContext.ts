@@ -80,7 +80,8 @@ export class LlamaContext {
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
         performanceTracking = false,
-        _embeddings
+        _embeddings,
+        _ranking
     }: LlamaContextOptions & {
         sequences: number,
         contextSize: number,
@@ -121,6 +122,7 @@ export class LlamaContext {
             flashAttention: this._flashAttention,
             threads: this._idealThreads,
             embeddings: _embeddings,
+            ranking: _ranking,
             performanceTracking: this._performanceTracking
         }));
         this._batchingOptions = {

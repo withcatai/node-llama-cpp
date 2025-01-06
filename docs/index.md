@@ -97,6 +97,7 @@ npx -y node-llama-cpp inspect gpu
 * [Remote GGUF reader](./api/functions/readGgufFileInfo.md)
 * [User input safety](./guide/llama-text.md#input-safety-in-node-llama-cpp)
 * [Token prediction](./guide/token-prediction.md)
+* [Reranking](./guide/embedding.md#reranking)
 
 </template>
 <template v-slot:simple-code>

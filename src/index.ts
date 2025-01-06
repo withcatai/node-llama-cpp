@@ -15,6 +15,7 @@ import {LlamaGrammarEvaluationState, LlamaGrammarEvaluationStateOptions} from ".
 import {LlamaContext, LlamaContextSequence} from "./evaluator/LlamaContext/LlamaContext.js";
 import {LlamaEmbeddingContext, type LlamaEmbeddingContextOptions} from "./evaluator/LlamaEmbeddingContext.js";
 import {LlamaEmbedding, type LlamaEmbeddingOptions, type LlamaEmbeddingJSON} from "./evaluator/LlamaEmbedding.js";
+import {LlamaRankingContext, type LlamaRankingContextOptions} from "./evaluator/LlamaRankingContext.js";
 import {
     type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
     type CustomBatchingDispatchSchedule, type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem,
@@ -155,6 +156,8 @@ export {
     LlamaEmbedding,
     type LlamaEmbeddingOptions,
     type LlamaEmbeddingJSON,
+    LlamaRankingContext,
+    type LlamaRankingContextOptions,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,
