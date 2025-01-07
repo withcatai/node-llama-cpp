@@ -1,6 +1,5 @@
 import {CommandModule} from "yargs";
 import chalk from "chalk";
-import bytes from "bytes";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
@@ -20,6 +19,7 @@ import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import withOra from "../../../../utils/withOra.js";
 import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
+import {toBytes} from "../../../utils/toBytes.js";
 
 type InspectEstimateCommand = {
     modelPath: string,
@@ -198,7 +198,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                     value: getPrettyBuildGpuName(llama.gpu)
                 }, {
                     title: "VRAM",
-                    value: bytes(vramState.total)
+                    value: toBytes(vramState.total)
                 }, {
                     title: "Name",
                     value: toOneLine(deviceNames.join(", "))
@@ -219,7 +219,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 )
             }, {
                 title: "Size",
-                value: bytes(ggufInsights.modelSize)
+                value: toBytes(ggufInsights.modelSize)
             }, {
                 show: ggufInsights.trainContextSize != null,
                 title: "Train context size",
@@ -262,10 +262,10 @@ function logCompatibilityScore(
         }, {
             show: llama.gpu !== false,
             title: "VRAM usage",
-            value: () => bytes(compatibilityScore.resolvedValues.totalVramUsage)
+            value: () => toBytes(compatibilityScore.resolvedValues.totalVramUsage)
         }, {
             title: "RAM usage",
-            value: () => bytes(compatibilityScore.resolvedValues.totalRamUsage)
+            value: () => toBytes(compatibilityScore.resolvedValues.totalRamUsage)
         }, {
             show: flashAttention,
             title: "Flash attention",

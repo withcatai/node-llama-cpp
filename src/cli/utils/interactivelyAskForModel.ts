@@ -1,7 +1,6 @@
 import path from "path";
 import process from "process";
 import chalk from "chalk";
-import bytes from "bytes";
 import fs from "fs-extra";
 import stripAnsi from "strip-ansi";
 import logSymbols from "log-symbols";
@@ -23,6 +22,7 @@ import {splitAnsiToLines} from "./splitAnsiToLines.js";
 import {consolePromptQuestion} from "./consolePromptQuestion.js";
 import {renderInfoLine} from "./printInfoLine.js";
 import {renderModelCompatibilityPercentageWithColors} from "./renderModelCompatibilityPercentageWithColors.js";
+import {toBytes} from "./toBytes.js";
 
 type ModelOption = {
     type: "localModel",
@@ -241,7 +241,7 @@ export async function interactivelyAskForModel({
                                 " " +
                                 chalk.yellow("VRAM usage:") + " " +
                                 (String(Math.floor((vramState.used / vramState.total) * 100 * 100) / 100) + "%") + " " +
-                                chalk.dim("(" + bytes(vramState.used) + "/" + bytes(vramState.total) + ")") +
+                                chalk.dim("(" + toBytes(vramState.used) + "/" + toBytes(vramState.total) + ")") +
                                 " "
                             ) + (
                                 !flashAttention
@@ -491,7 +491,7 @@ function renderModelCompatibility(
             )
         );
 
-    info.push(chalk.yellow("Size:") + " " + chalk.whiteBright(bytes(ggufInsights.modelSize)));
+    info.push(chalk.yellow("Size:") + " " + chalk.whiteBright(toBytes(ggufInsights.modelSize)));
 
     return info
         .map((item) => chalk.bgGray(" " + item + " "))
@@ -518,7 +518,7 @@ function renderRecommendedModelTechnicalInfo(
             maxWidth,
             info: [{
                 title: "Size",
-                value: bytes(ggufInsights.modelSize)
+                value: toBytes(ggufInsights.modelSize)
             }, {
                 show: ggufInsights.trainContextSize != null,
                 title: "Train context size",
@@ -547,10 +547,10 @@ function renderRecommendedModelTechnicalInfo(
             }, {
                 show: canUseGpu,
                 title: "VRAM usage",
-                value: () => bytes(compatibilityScore.resolvedValues.totalVramUsage)
+                value: () => toBytes(compatibilityScore.resolvedValues.totalVramUsage)
             }, {
                 title: "RAM usage",
-                value: () => bytes(compatibilityScore.resolvedValues.totalRamUsage)
+                value: () => toBytes(compatibilityScore.resolvedValues.totalRamUsage)
             }]
         })
     ].join("\n");

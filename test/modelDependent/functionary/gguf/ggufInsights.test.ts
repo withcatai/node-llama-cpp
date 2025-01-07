@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import bytes from "bytes";
 import {getModelFile} from "../../../utils/modelFiles.js";
 import {GgufInsights, GgufInsightsResourceRequirements} from "../../../../src/gguf/insights/GgufInsights.js";
 import {getTestLlama} from "../../../utils/getTestLlama.js";
 import {readGgufFileInfo} from "../../../../src/gguf/readGgufFileInfo.js";
+import {toBytes} from "../../../../src/cli/utils/toBytes.js";
 
 describe("gguf", async () => {
     describe("insights", async () => {
@@ -98,8 +98,8 @@ describe("gguf", async () => {
             const estimatedModelResourceUsage = ggufInsights.estimateModelResourceRequirements({
                 gpuLayers: ggufInsights.totalLayers
             });
-            expect(bytes(estimatedModelResourceUsage.gpuVram)).toMatchInlineSnapshot('"4.06GB"');
-            expect(bytes(estimatedModelResourceUsage.cpuRam)).toMatchInlineSnapshot('"281.81MB"');
+            expect(toBytes(estimatedModelResourceUsage.gpuVram)).toMatchInlineSnapshot('"4.06GB"');
+            expect(toBytes(estimatedModelResourceUsage.cpuRam)).toMatchInlineSnapshot('"281.81MB"');
             expect(Math.abs(modelVramUsageDiff - estimatedModelResourceUsage.gpuVram)).to.be.lte(s300MB);
 
             const modelEstimationDiffWithActual = estimatedModelResourceUsage.gpuVram + estimatedModelResourceUsage.cpuRam - model.size;
@@ -124,7 +124,7 @@ describe("gguf", async () => {
                 sequences: context.totalSequences,
                 modelGpuLayers: ggufInsights.totalLayers
             }).gpuVram;
-            expect(bytes(estimatedContextVramUsage)).toMatchInlineSnapshot('"1.02GB"');
+            expect(toBytes(estimatedContextVramUsage)).toMatchInlineSnapshot('"1.02GB"');
             expect(Math.abs(contextVramUsageDiff - estimatedContextVramUsage)).to.be.lte(s300MB);
 
             await model.dispose();
@@ -391,7 +391,7 @@ describe("gguf", async () => {
 
 function makeEstimationReadable(resourceRequirements: GgufInsightsResourceRequirements) {
     return {
-        cpuRam: bytes(resourceRequirements.cpuRam),
-        gpuVram: bytes(resourceRequirements.gpuVram)
+        cpuRam: toBytes(resourceRequirements.cpuRam),
+        gpuVram: toBytes(resourceRequirements.gpuVram)
     };
 }

@@ -5,7 +5,6 @@ import {fork} from "node:child_process";
 import os from "os";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
-import bytes from "bytes";
 import stripAnsi from "strip-ansi";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveCommandGgufPath} from "../../../utils/resolveCommandGgufPath.js";
@@ -21,6 +20,7 @@ import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
+import {toBytes} from "../../../utils/toBytes.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -271,13 +271,13 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                         });
                         const modelVramEstimation = modelResourceEstimation.gpuVram;
                         const modelVramEstimationDiffBytes = (modelVramEstimation < result.modelVramUsage ? "-" : "") +
-                            bytes(Math.abs(result.modelVramUsage - modelVramEstimation));
+                            toBytes(Math.abs(result.modelVramUsage - modelVramEstimation));
                         const modelVramEstimationDiffText = modelVramEstimationDiffBytes.padEnd(9, " ") + " " +
                             padStartAnsi("(" + renderDiffPercentageWithColors(((modelVramEstimation / result.modelVramUsage) - 1) * 100) + ")", 9);
 
                         const modelRamEstimation = modelResourceEstimation.cpuRam;
                         const modelRamEstimationDiffBytes = (modelRamEstimation < result.modelRamUsage ? "-" : "") +
-                            bytes(Math.abs(result.modelRamUsage - modelRamEstimation));
+                            toBytes(Math.abs(result.modelRamUsage - modelRamEstimation));
                         const modelRamEstimationDiffText = modelRamEstimationDiffBytes.padEnd(9, " ") + " " +
                             padStartAnsi("(" + renderDiffPercentageWithColors(((modelRamEstimation / result.modelRamUsage) - 1) * 100) + ")", 9);
 
@@ -294,7 +294,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                             ? undefined
                             : (
                                 (contextVramEstimation < result.contextVramUsage ? "-" : "") +
-                                bytes(Math.abs(result.contextVramUsage - contextVramEstimation))
+                                toBytes(Math.abs(result.contextVramUsage - contextVramEstimation))
                             );
                         const contextVramEstimationDiffText = (
                             contextVramEstimation == null || contextVramEstimationDiffBytes == null || result.contextVramUsage == null
@@ -310,7 +310,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                             ? undefined
                             : (
                                 (contextRamEstimation < result.contextRamUsage ? "-" : "") +
-                                bytes(Math.abs(result.contextRamUsage - contextRamEstimation))
+                                toBytes(Math.abs(result.contextRamUsage - contextRamEstimation))
                             );
                         const contextRamEstimationDiffText = (
                             contextRamEstimation == null || contextRamEstimationDiffBytes == null || result.contextRamUsage == null
@@ -331,33 +331,33 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                                 ? String(previousContextSizeCheck)
                                 : undefined,
 
-                            estimatedModelVram: bytes(modelVramEstimation),
-                            actualModelVram: bytes(result.modelVramUsage),
+                            estimatedModelVram: toBytes(modelVramEstimation),
+                            actualModelVram: toBytes(result.modelVramUsage),
                             modelVramEstimationDiff: modelVramEstimationDiffText,
 
-                            estimatedModelRam: bytes(modelRamEstimation),
-                            actualModelRam: bytes(result.modelRamUsage),
+                            estimatedModelRam: toBytes(modelRamEstimation),
+                            actualModelRam: toBytes(result.modelRamUsage),
                             modelRamEstimationDiff: modelRamEstimationDiffText,
 
                             estimatedContextVram: contextVramEstimation == null
                                 ? undefined
-                                : bytes(contextVramEstimation),
+                                : toBytes(contextVramEstimation),
                             actualContextVram: result.contextVramUsage == null
                                 ? undefined
-                                : bytes(result.contextVramUsage),
+                                : toBytes(result.contextVramUsage),
                             contextVramEstimationDiff: contextVramEstimationDiffText,
                             totalVramUsage: ((result.totalVramUsage / totalVram) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.gray("(" + bytes(result.totalVramUsage) + "/" + bytes(totalVram) + ")"),
+                                chalk.gray("(" + toBytes(result.totalVramUsage) + "/" + toBytes(totalVram) + ")"),
 
                             estimatedContextRam: contextRamEstimation == null
                                 ? undefined
-                                : bytes(contextRamEstimation),
+                                : toBytes(contextRamEstimation),
                             actualContextRam: result.contextRamUsage == null
                                 ? undefined
-                                : bytes(result.contextRamUsage),
+                                : toBytes(result.contextRamUsage),
                             contextRamEstimationDiff: contextRamEstimationDiffText,
                             totalRamUsage: ((result.totalRamUsage / totalRam) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.gray("(" + bytes(result.totalRamUsage) + "/" + bytes(totalRam) + ")")
+                                chalk.gray("(" + toBytes(result.totalRamUsage) + "/" + toBytes(totalRam) + ")")
                         });
                     }
                 }

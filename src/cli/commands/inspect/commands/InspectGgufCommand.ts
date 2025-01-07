@@ -2,7 +2,6 @@ import path from "path";
 import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
-import bytes from "bytes";
 import fs from "fs-extra";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
@@ -15,6 +14,7 @@ import {resolveModelDestination} from "../../../../utils/resolveModelDestination
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
 import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
+import {toBytes} from "../../../utils/toBytes.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -206,8 +206,8 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
 
             console.info(`${chalk.yellow("GGUF version:")} ${parsedMetadata.version}`);
             console.info(`${chalk.yellow("Tensor count:")} ${parsedMetadata.totalTensorCount.toLocaleString("en-US", numberLocaleFormattingOptions)}`);
-            console.info(`${chalk.yellow("Metadata size:")} ${bytes(parsedMetadata.totalMetadataSize)}`);
-            console.info(`${chalk.yellow("Tensor info size:")} ${bytes(parsedMetadata.totalTensorInfoSize!)}`);
+            console.info(`${chalk.yellow("Metadata size:")} ${toBytes(parsedMetadata.totalMetadataSize)}`);
+            console.info(`${chalk.yellow("Tensor info size:")} ${toBytes(parsedMetadata.totalTensorInfoSize!)}`);
             console.info(`${chalk.yellow("File type:")} ${fileTypeName ?? ""} ${chalk.white(`(${parsedMetadata.metadata.general?.file_type})`)}`);
             console.info(`${chalk.yellow("Metadata:")} ${prettyPrintObject(parsedMetadata.metadata, undefined, metadataPrettyPrintOptions)}`);
             console.info(`${chalk.yellow("Tensor info:")} ${prettyPrintObject(parsedMetadata.fullTensorInfo, undefined, tensorInfoPrettyPrintOptions)}`);

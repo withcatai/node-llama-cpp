@@ -1,6 +1,5 @@
 import os from "os";
 import {CommandModule} from "yargs";
-import bytes from "bytes";
 import chalk from "chalk";
 import {getLlamaForOptions} from "../../../../bindings/getLlama.js";
 import {detectAvailableComputeLayers} from "../../../../bindings/utils/detectAvailableComputeLayers.js";
@@ -14,6 +13,7 @@ import {Llama} from "../../../../bindings/Llama.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {getLinuxDistroInfo} from "../../../../bindings/utils/getLinuxDistroInfo.js";
 import {isRunningUnderRosetta} from "../../../utils/isRunningUnderRosetta.js";
+import {toBytes} from "../../../utils/toBytes.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -189,11 +189,11 @@ async function logGpuVramUsage(gpu: BuildGpu, llama: Llama) {
         if (gpuDeviceNames.length > 0)
             console.info(`${chalk.yellow(`${gpuName} device${gpuDeviceNames.length > 1 ? "s" : ""}:`)} ${gpuDeviceNames.join(", ")}`);
 
-        console.info(`${chalk.yellow(`${gpuName} used VRAM:`)} ${getPercentageString(vramState.used, vramState.total)}% ${chalk.gray("(" + bytes(vramState.used) + "/" + bytes(vramState.total) + ")")}`);
-        console.info(`${chalk.yellow(`${gpuName} free VRAM:`)} ${getPercentageString(vramState.free, vramState.total)}% ${chalk.gray("(" + bytes(vramState.free) + "/" + bytes(vramState.total) + ")")}`);
+        console.info(`${chalk.yellow(`${gpuName} used VRAM:`)} ${getPercentageString(vramState.used, vramState.total)}% ${chalk.gray("(" + toBytes(vramState.used) + "/" + toBytes(vramState.total) + ")")}`);
+        console.info(`${chalk.yellow(`${gpuName} free VRAM:`)} ${getPercentageString(vramState.free, vramState.total)}% ${chalk.gray("(" + toBytes(vramState.free) + "/" + toBytes(vramState.total) + ")")}`);
 
         if (vramState.unifiedSize > 0)
-            console.info(`${chalk.yellow(`${gpuName} unified memory:`)} ${bytes(vramState.unifiedSize)} ${chalk.gray("(" + getPercentageString(vramState.unifiedSize, vramState.total) + "%)")}`);
+            console.info(`${chalk.yellow(`${gpuName} unified memory:`)} ${toBytes(vramState.unifiedSize)} ${chalk.gray("(" + getPercentageString(vramState.unifiedSize, vramState.total) + "%)")}`);
     } catch (err) {}
 }
 
@@ -215,15 +215,15 @@ async function logRamUsage(cpuMathCores?: number) {
     if (cpuMathCores != null)
         console.info(`${chalk.yellow("Math cores:")} ${cpuMathCores}`);
 
-    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
-    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + toBytes(freeMemory) + "/" + toBytes(totalMemory) + ")")}`);
 }
 
 async function logSwapUsage(llama: Llama) {
     const swapState = await llama.getSwapState();
 
-    console.info(`${chalk.yellow("Used swap:")} ${getPercentageString(swapState.used, swapState.allocated)}% ${chalk.gray("(" + bytes(swapState.used) + "/" + bytes(swapState.allocated) + ")")}`);
-    console.info(`${chalk.yellow("Max swap size:")} ${swapState.maxSize === Infinity ? "dynamic" : bytes(swapState.maxSize)}`);
+    console.info(`${chalk.yellow("Used swap:")} ${getPercentageString(swapState.used, swapState.allocated)}% ${chalk.gray("(" + toBytes(swapState.used) + "/" + toBytes(swapState.allocated) + ")")}`);
+    console.info(`${chalk.yellow("Max swap size:")} ${swapState.maxSize === Infinity ? "dynamic" : toBytes(swapState.maxSize)}`);
 }
 
 function getPercentageString(amount: number, total: number) {
