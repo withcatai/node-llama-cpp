@@ -1,10 +1,10 @@
 import os from "os";
 import {CommandModule} from "yargs";
-import bytes from "bytes";
 import chalk from "chalk";
 import {getLlama} from "../../bindings/getLlama.js";
 import {prettyPrintObject} from "../../utils/prettyPrintObject.js";
 import {logUsedGpuTypeOption} from "../utils/logUsedGpuTypeOption.js";
+import {toBytes} from "../utils/toBytes.js";
 
 const debugFunctions = ["vram", "cmakeOptions"] as const;
 type DebugCommand = {
@@ -51,11 +51,11 @@ async function DebugVramFunction() {
     logUsedGpuTypeOption(llama.gpu);
     console.info();
 
-    console.info(`${chalk.yellow("Used VRAM:")} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.used) + "/" + bytes(vramStatus.total) + ")")}`);
-    console.info(`${chalk.yellow("Free VRAM:")} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.gray("(" + bytes(vramStatus.free) + "/" + bytes(vramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Used VRAM:")} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.gray("(" + toBytes(vramStatus.used) + "/" + toBytes(vramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Free VRAM:")} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.gray("(" + toBytes(vramStatus.free) + "/" + toBytes(vramStatus.total) + ")")}`);
     console.info();
-    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + bytes(usedMemory) + "/" + bytes(totalMemory) + ")")}`);
-    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + bytes(freeMemory) + "/" + bytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + toBytes(freeMemory) + "/" + toBytes(totalMemory) + ")")}`);
 }
 
 async function DebugCmakeOptionsFunction() {

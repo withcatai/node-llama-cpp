@@ -1,8 +1,8 @@
-import bytes from "bytes";
 import chalk from "chalk";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {printInfoLine} from "./printInfoLine.js";
+import {toBytes} from "./toBytes.js";
 
 export async function printCommonInfoLines({
     context,
@@ -50,7 +50,7 @@ export async function printCommonInfoLines({
                 value: getPrettyBuildGpuName(llama.gpu)
             }, {
                 title: "VRAM",
-                value: bytes(vramState.total)
+                value: toBytes(vramState.total)
             }, {
                 title: "Name",
                 value: toOneLine(deviceNames.join(", "))
@@ -65,7 +65,7 @@ export async function printCommonInfoLines({
             value: toOneLine(model.typeDescription)
         }, {
             title: "Size",
-            value: bytes(model.size)
+            value: toBytes(model.size)
         }, {
             show: llama.gpu !== false,
             title: "GPU layers",
@@ -127,7 +127,7 @@ export async function printCommonInfoLines({
                 value: toOneLine(draftModel.typeDescription)
             }, {
                 title: "Size",
-                value: bytes(draftModel.size)
+                value: toBytes(draftModel.size)
             }, {
                 show: llama.gpu !== false,
                 title: "GPU layers",
