@@ -76,6 +76,9 @@ export class LlamaRankingContext {
 
     /**
      * Get the ranking score for a document for a query.
+     *
+     * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
+     * @returns a ranking score between 0 and 1 representing the probability that the document is relevant to the query.
      */
     public async rank(query: Token[] | string | LlamaText, document: Token[] | string | LlamaText) {
         if (this.model.tokens.bos == null || this.model.tokens.eos == null || this.model.tokens.sep == null)
@@ -96,6 +99,9 @@ export class LlamaRankingContext {
 
     /**
      * Get the ranking scores for all the given documents for a query.
+     *
+     * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
+     * @returns an array of ranking scores between 0 and 1 representing the probability that the document is relevant to the query.
      */
     public async rankAll(query: Token[] | string | LlamaText, documents: Array<Token[] | string | LlamaText>): Promise<number[]> {
         const resolvedTokens = documents.map((document) => this._getEvaluationInput(query, document));
@@ -120,9 +126,15 @@ export class LlamaRankingContext {
 
     /**
      * Get the ranking scores for all the given documents for a query and sort them by score from highest to lowest.
+     *
+     * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
      */
     public async rankAndSort<const T extends string>(query: Token[] | string | LlamaText, documents: T[]): Promise<Array<{
         document: T,
+
+        /**
+         * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
+         */
         score: number
     }>> {
         const scores = await this.rankAll(query, documents);
@@ -190,7 +202,10 @@ export class LlamaRankingContext {
             if (embedding.length === 0)
                 return 0;
 
-            return embedding[0]!;
+            const logit = embedding[0]!;
+            const probability = logitToSigmoid(logit);
+
+            return probability;
         });
     }
 
@@ -248,4 +263,8 @@ function findLayer(tensorInfo: GgufTensorInfo[] | undefined, name: string, suffi
     }
 
     return undefined;
+}
+
+function logitToSigmoid(logit: number) {
+    return 1 / (1 + Math.exp(-logit));
 }
