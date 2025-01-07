@@ -18,6 +18,7 @@ import {LlamaEmbeddingContext, LlamaEmbeddingContextOptions} from "../LlamaEmbed
 import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataTypes.js";
 import {OverridesObject} from "../../utils/OverridesObject.js";
 import {maxRecentDetokenizerTokens} from "../../consts.js";
+import {LlamaRankingContext, LlamaRankingContextOptions} from "../LlamaRankingContext.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
@@ -63,9 +64,15 @@ export type LlamaModelOptions = {
     vocabOnly?: boolean,
 
     /**
-     * Use mmap if possible.
+     * Use mmap (memory-mapped file) to load the model.
      *
-     * Defaults to `true`.
+     * Using mmap allows the OS to load the model tensors directly from the file on the filesystem,
+     * and makes it easier for the system to manage memory.
+     *
+     * When using mmap, you might notice a delay the first time you actually use the model,
+     * which is caused by the OS itself loading the model into memory.
+     *
+     * Defaults to `true` if the current system supports it.
      */
     useMmap?: boolean,
 
@@ -292,7 +299,9 @@ export class LlamaModel {
     }
 
     /**
-     * Total model size in memory in bytes
+     * Total model size in memory in bytes.
+     *
+     * When using mmap, actual memory usage may be higher than this value due to `llama.cpp`'s performance optimizations.
      */
     public get size() {
         this._ensureNotDisposed();
@@ -334,6 +343,7 @@ export class LlamaModel {
                 case "EOS": return this.tokens.eos == null ? [] : [this.tokens.eos];
                 case "NL": return this.tokens.nl == null ? [] : [this.tokens.nl];
                 case "EOT": return this.tokens.eot == null ? [] : [this.tokens.eot];
+                case "SEP": return this.tokens.sep == null ? [] : [this.tokens.sep];
             }
 
             void (builtinToken satisfies never);
@@ -513,11 +523,24 @@ export class LlamaModel {
         });
     }
 
+    /**
+     * @see [Using Embedding](https://node-llama-cpp.withcat.ai/guide/embedding) tutorial
+     */
     public async createEmbeddingContext(options: LlamaEmbeddingContextOptions = {}) {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
 
         return await LlamaEmbeddingContext._create({_model: this}, options);
+    }
+
+    /**
+     * @see [Reranking Documents](https://node-llama-cpp.withcat.ai/guide/embedding#reranking) tutorial
+     */
+    public async createRankingContext(options: LlamaRankingContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
+        return await LlamaRankingContext._create({_model: this}, options);
     }
 
     /**
@@ -661,7 +684,7 @@ export class LlamaModel {
         _llama: Llama
     }) {
         const {loadSignal, defaultContextFlashAttention} = modelOptions;
-        const useMmap = modelOptions.useMmap ?? defaultUseMmap;
+        const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
@@ -675,9 +698,13 @@ export class LlamaModel {
             : false;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
-            defaultContextFlashAttention: resolvedDefaultContextFlashAttention
+            defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
+            useMmap
         });
-        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({gpuLayers: gpuLayers});
+        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({
+            gpuLayers: gpuLayers,
+            useMmap
+        });
 
         const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
             _fileInfo: fileInfo,
@@ -750,13 +777,11 @@ export class LlamaModelTokens {
     /** @internal */ private _bosToken?: Token;
     /** @internal */ private _eosToken?: Token;
     /** @internal */ private _eotToken?: Token;
-    /** @internal */ private _clsToken?: Token;
     /** @internal */ private _sepToken?: Token;
     /** @internal */ private _nlToken?: Token;
     /** @internal */ private _bosString?: string;
     /** @internal */ private _eosString?: string;
     /** @internal */ private _eotString?: string;
-    /** @internal */ private _clsString?: string;
     /** @internal */ private _sepString?: string;
     /** @internal */ private _nlString?: string;
     /** @internal */ private _shouldPrependBosToken?: boolean;
@@ -822,21 +847,6 @@ export class LlamaModelTokens {
             return null;
 
         return this._eotToken;
-    }
-
-    /**
-     * @returns The CLS (Classification) token.
-     */
-    public get cls(): Token | null {
-        this._ensureNotDisposed();
-
-        if (this._clsToken == null)
-            this._clsToken = this._model.clsToken();
-
-        if (this._clsToken === -1)
-            return null;
-
-        return this._clsToken;
     }
 
     /**
@@ -918,23 +928,6 @@ export class LlamaModelTokens {
             this._eotString = this._model.getTokenString(eotToken);
 
         return this._eotString;
-    }
-
-    /**
-     * @returns The CLS (Classification) token text representation.
-     */
-    public get clsString(): string | null {
-        this._ensureNotDisposed();
-
-        const clsToken = this.cls;
-
-        if (clsToken == null)
-            return null;
-
-        if (this._clsString == null)
-            this._clsString = this._model.getTokenString(clsToken);
-
-        return this._clsString;
     }
 
     /**

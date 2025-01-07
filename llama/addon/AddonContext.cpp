@@ -1,5 +1,6 @@
 #include <thread>
 #include <algorithm>
+#include <cmath>
 #include "common/common.h"
 #include "llama-grammar.h"
 #include "llama.h"
@@ -190,6 +191,14 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
     public:
         AddonContext* ctx;
         AddonSampler* sampler;
+        bool arrayResult = false;
+        bool returnProbabilities = false;
+        bool returnConfidence = false;
+        float tokenConfidence = -1;
+        bool has_probabilities = false;
+        size_t probabilities_size;
+        llama_token * probabilities_tokens;
+        float * probabilities_probs;
         int32_t batchLogitIndex;
         llama_token result;
         bool no_output = false;
@@ -202,11 +211,19 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             batchLogitIndex = info[0].As<Napi::Number>().Int32Value();
             sampler = Napi::ObjectWrap<AddonSampler>::Unwrap(info[1].As<Napi::Object>());
+            arrayResult = info.Length() > 2 && info[2].IsBoolean();
+            returnProbabilities = arrayResult ? info[2].As<Napi::Boolean>().Value() : false;
+            returnConfidence = arrayResult && info.Length() > 3 && info[3].IsBoolean() ? info[3].As<Napi::Boolean>().Value() : false;
             sampler->Ref();
         }
         ~AddonContextSampleTokenWorker() {
             ctx->Unref();
             sampler->Unref();
+
+            if (has_probabilities) {
+                delete[] probabilities_tokens;
+                delete[] probabilities_probs;
+            }
         }
 
         Napi::Promise GetPromise() {
@@ -239,7 +256,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             auto & candidates = sampler->tokenCandidates;
             for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};;
+                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
             }
 
             llama_token_data_array cur_p = {
@@ -257,18 +274,111 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             }
 
             auto new_token_id = cur_p.data[cur_p.selected].id;
+
+            if (returnProbabilities || returnConfidence) {
+                if (!cur_p.sorted) {
+                    std::sort(cur_p.data, cur_p.data + cur_p.size, [](const llama_token_data & a, const llama_token_data & b) {
+                        return a.logit > b.logit;
+                    });
+                    cur_p.sorted = true;
+
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        if (cur_p.data[i].id == new_token_id) {
+                            cur_p.selected = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (returnProbabilities) {
+                probabilities_size = cur_p.size;
+                probabilities_tokens = new llama_token[probabilities_size];
+                probabilities_probs = new float[probabilities_size];
+                float maxLogit = cur_p.size > 0 ? cur_p.data[0].logit : -INFINITY;
+
+                for (size_t i = 0; i < cur_p.size; i++) {
+                    auto logit = cur_p.data[i].logit;
+
+                    probabilities_tokens[i] = cur_p.data[i].id;
+                    probabilities_probs[i] = logit;
+
+                    if (logit > maxLogit) {
+                        maxLogit = logit;
+                    }
+                }
+
+                if (probabilities_size > 0 && maxLogit != -INFINITY) {
+                    float sum = 0.0f;
+                    for (size_t i = 0; i < probabilities_size; i++) {
+                        float prob = expf(probabilities_probs[i] - maxLogit);
+                        probabilities_probs[i] = prob;
+                        sum += prob;
+                    }
+
+                    for (size_t i = 0; i < probabilities_size; i++) {
+                        probabilities_probs[i] /= sum;
+                    }
+                }
+
+                has_probabilities = true;
+            }
+
+            if (returnConfidence) {
+                if (has_probabilities && cur_p.selected < probabilities_size) {
+                    tokenConfidence = probabilities_probs[cur_p.selected];
+                } else {
+                    float maxLogit = cur_p.data[0].logit;
+                    float sum = 0.0f;
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        auto logit = cur_p.data[i].logit;
+
+                        if (logit > maxLogit) {
+                            maxLogit = logit;
+                        }
+                    }
+
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        sum += expf(cur_p.data[i].logit - maxLogit);
+                    }
+
+                    tokenConfidence = expf(cur_p.data[cur_p.selected].logit - maxLogit) / sum;
+                }
+            }
+
             sampler->acceptToken(new_token_id);
             result = new_token_id;
         }
         void OnOK() {
+            Napi::Number resultToken;
             if (no_output) {
-                Napi::Number resultValue = Napi::Number::New(Env(), -1);
-                deferred.Resolve(resultValue);
+                resultToken = Napi::Number::New(Env(), -1);
+            } else {
+                resultToken = Napi::Number::New(Env(), static_cast<uint32_t>(result));
+            }
+
+            if (!arrayResult) {
+                deferred.Resolve(resultToken);
                 return;
             }
 
-            Napi::Number resultValue = Napi::Number::New(Env(), static_cast<uint32_t>(result));
-            deferred.Resolve(resultValue);
+            Napi::Array resultArray = Napi::Array::New(Env(), 2);
+            resultArray.Set(Napi::Number::New(Env(), 0), resultToken);
+
+            if (has_probabilities) {
+                Napi::Array probabilities = Napi::Array::New(Env(), probabilities_size * 2);
+                for (size_t i = 0; i < probabilities_size; i++) {
+                    probabilities.Set(i * 2, Napi::Number::New(Env(), probabilities_tokens[i]));
+                    probabilities.Set(i * 2 + 1, Napi::Number::New(Env(), probabilities_probs[i]));
+                }
+                resultArray.Set(1, probabilities);
+            }
+
+            if (returnConfidence && tokenConfidence != -1) {
+                resultArray.Set(2, Napi::Number::New(Env(), tokenConfidence));
+            }
+
+            deferred.Resolve(resultArray);
         }
         void OnError(const Napi::Error& err) {
             deferred.Reject(err.Value());
@@ -303,6 +413,10 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
 
         if (options.Has("embeddings")) {
             context_params.embeddings = options.Get("embeddings").As<Napi::Boolean>().Value();
+        }
+
+        if (options.Has("ranking") && options.Get("ranking").As<Napi::Boolean>().Value()) {
+            context_params.pooling_type = LLAMA_POOLING_TYPE_RANK;
         }
 
         if (options.Has("flashAttention")) {
@@ -441,24 +555,25 @@ Napi::Value AddonContext::AddToBatch(const Napi::CallbackInfo& info) {
     int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
     int32_t firstTokenContextIndex = info[1].As<Napi::Number>().Int32Value();
     Napi::Uint32Array tokens = info[2].As<Napi::Uint32Array>();
-    bool generateLogitAtTheEnd = info[3].As<Napi::Boolean>().Value();
+    Napi::Uint32Array tokenLogitIndexes = info[3].As<Napi::Uint32Array>();
 
     auto tokensLength = tokens.ElementLength();
+    auto tokenLogitIndexesLength = tokenLogitIndexes.ElementLength();
     GGML_ASSERT(batch.n_tokens + tokensLength <= batch_n_tokens);
 
-    for (size_t i = 0; i < tokensLength; i++) {
-        common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
+    Napi::Uint32Array resLogitIndexes = Napi::Uint32Array::New(info.Env(), tokenLogitIndexesLength);
+
+    for (size_t i = 0, l = 0; i < tokensLength; i++) {
+        if (l < tokenLogitIndexesLength && l < tokenLogitIndexesLength && tokenLogitIndexes[l] == i) {
+            common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, true);
+            resLogitIndexes[l] = batch.n_tokens - 1;
+            l++;
+        } else {
+            common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
+        }
     }
 
-    if (generateLogitAtTheEnd) {
-        batch.logits[batch.n_tokens - 1] = true;
-
-        auto logit_index = batch.n_tokens - 1;
-
-        return Napi::Number::From(info.Env(), logit_index);
-    }
-
-    return info.Env().Undefined();
+    return resLogitIndexes;
 }
 Napi::Value AddonContext::DisposeSequence(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -592,6 +707,62 @@ Napi::Value AddonContext::PrintTimings(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+Napi::Value AddonContext::EnsureDraftContextIsCompatibleForSpeculative(const Napi::CallbackInfo& info) {
+    constexpr auto vocabSizeMaxDifference = 128; // SPEC_VOCAB_MAX_SIZE_DIFFERENCE
+    constexpr auto vocabCheckStartTokenId = 5; // SPEC_VOCAB_CHECK_START_TOKEN_ID
+
+    const AddonContext * draftContext = Napi::ObjectWrap<AddonContext>::Unwrap(info[0].As<Napi::Object>());
+    const auto currentCtx = ctx;
+    const auto draftCtx = draftContext->ctx;
+    const auto currentModel = model->model;
+    const auto draftModel = draftContext->model->model;
+
+    if (llama_vocab_type(currentModel) != llama_vocab_type(draftModel)) {
+        Napi::Error::New(info.Env(), "Speculative draft model vocabulary type must match the target model vocabulary type").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    if (llama_add_bos_token(currentModel) != llama_add_bos_token(draftModel) ||
+        llama_add_eos_token(currentModel) != llama_add_eos_token(draftModel) ||
+        llama_token_bos(currentModel) != llama_token_bos(draftModel) ||
+        llama_token_eos(currentModel) != llama_token_eos(draftModel)
+    ) {
+        Napi::Error::New(info.Env(), "Speculative draft model special tokens must match the target model special tokens").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const int currentModelVocabSize = llama_n_vocab(currentModel);
+    const int draftModelVocabSize = llama_n_vocab(draftModel);
+
+    const int vocabDiff = std::abs(currentModelVocabSize - draftModelVocabSize);
+
+    if (vocabDiff > vocabSizeMaxDifference) {
+        Napi::Error::New(
+            info.Env(),
+            std::string("Speculative draft model vocabulary must closely match the target model vocabulary size (vocabulary size difference: ") +
+            std::to_string(vocabDiff) + std::string(", max allowed: ") + std::to_string(vocabSizeMaxDifference) + std::string(")")
+        ).ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const int minVocabSize = std::min(currentModelVocabSize, draftModelVocabSize);
+    for (int i = vocabCheckStartTokenId; i < minVocabSize; ++i) {
+        const char * currentTokenText = llama_token_get_text(currentModel, i);
+        const char * draftTokenText = llama_token_get_text(draftModel, i);
+        if (std::strcmp(currentTokenText, draftTokenText) != 0) {
+            Napi::Error::New(
+                info.Env(),
+                std::string("Speculative draft model vocabulary must match the target model vocabulary, but token ") +
+                std::to_string(i) + std::string(" content differs. Target: \"") + std::string(currentTokenText) +
+                std::string("\", Draft: \"") + std::string(draftTokenText) + std::string("")
+            ).ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        }
+    }
+
+    return info.Env().Undefined();
+}
+
 Napi::Value AddonContext::SetLora(const Napi::CallbackInfo& info) {
     AddonModelLora* lora = Napi::ObjectWrap<AddonModelLora>::Unwrap(info[0].As<Napi::Object>());
     float scale = info[1].As<Napi::Number>().FloatValue();
@@ -622,6 +793,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("getThreads", &AddonContext::GetThreads),
                 InstanceMethod("setThreads", &AddonContext::SetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),
+                InstanceMethod("ensureDraftContextIsCompatibleForSpeculative", &AddonContext::EnsureDraftContextIsCompatibleForSpeculative),
                 InstanceMethod("setLora", &AddonContext::SetLora),
                 InstanceMethod("dispose", &AddonContext::Dispose),
             }

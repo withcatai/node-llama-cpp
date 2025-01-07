@@ -10,6 +10,9 @@ export type LlamaTextJSONValue = string | LlamaTextSpecialTokensTextJSON | Llama
 export type LlamaTextSpecialTokensTextJSON = {type: "specialTokensText", value: string};
 export type LlamaTextSpecialTokenJSON = {type: "specialToken", value: string};
 
+/**
+ * @see [Using `LlamaText`](https://node-llama-cpp.withcat.ai/guide/llama-text) tutorial
+ */
 class LlamaText {
     public readonly values: readonly LlamaTextValue[];
 
@@ -512,7 +515,7 @@ export class SpecialTokensText {
     }
 }
 
-export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL" | "EOT";
+export type BuiltinSpecialTokenValue = "BOS" | "EOS" | "NL" | "EOT" | "SEP";
 export class SpecialToken {
     public readonly value: BuiltinSpecialTokenValue;
 
@@ -565,7 +568,7 @@ export class SpecialToken {
 
     public static getTokenToValueMap(tokenizer: Tokenizer): ReadonlyMap<Token | undefined, BuiltinSpecialTokenValue> {
         const supportedValues = [
-            "BOS", "EOS", "NL", "EOT"
+            "BOS", "EOS", "NL", "EOT", "SEP"
         ] as const satisfies BuiltinSpecialTokenValue[];
         void (0 as any as BuiltinSpecialTokenValue satisfies typeof supportedValues[number]);
 

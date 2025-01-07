@@ -5,11 +5,17 @@ import {LlamaText} from "../utils/LlamaText.js";
 import {Llama} from "../bindings/Llama.js";
 import {LlamaGrammar} from "./LlamaGrammar.js";
 
+/* eslint-disable @stylistic/max-len */
+/**
+ * @see [Using a JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#json-schema) tutorial
+ * @see [Reducing Hallucinations When Using JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#reducing-json-schema-hallucinations) tutorial
+ */
 export class LlamaJsonSchemaGrammar<const T extends GbnfJsonSchema> extends LlamaGrammar {
     private readonly _schema: T;
 
     /**
      * Prefer to create a new instance of this class by using `llama.createGrammarForJsonSchema(...)`.
+     * @deprecated Use `llama.createGrammarForJsonSchema(...)` instead.
      */
     public constructor(llama: Llama, schema: Readonly<T>) {
         const grammar = getGbnfGrammarForGbnfJsonSchema(schema);
@@ -35,3 +41,4 @@ export class LlamaJsonSchemaGrammar<const T extends GbnfJsonSchema> extends Llam
         return parsedJson;
     }
 }
+/* eslint-enable @stylistic/max-len */

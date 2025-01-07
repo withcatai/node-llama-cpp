@@ -68,12 +68,16 @@ function parseCmakeOptions(cmakeListsTxt: string, optionFilter: ((key: string) =
     for (let i = 0; i < cmakeOptions.length; i++) {
         const option = cmakeOptions[i]!;
 
-        if (!optionFilter(option.key) || option.key === "GGML_LLAMAFILE" || option.key === "GGML_CURL" || option.key === "GGML_RPC") {
+        if (!optionFilter(option.key) || option.key === "GGML_LLAMAFILE" || option.key === "GGML_CURL" || option.key === "GGML_RPC" ||
+            option.key === "GGML_WASM_SINGLE_FILE" || option.key === "BUILD_SHARED_LIBS" || option.key === "GGML_BACKEND_DL"
+        ) {
             cmakeOptions.splice(i, 1);
             i--;
             continue;
         } else if (option.key === "GGML_METAL" && option.defaultValue === "${GGML_METAL_DEFAULT}")
             option.defaultValue = htmlEscapeWithCodeMarkdown("`ON` on macOS on Apple Silicon, `OFF` otherwise");
+        else if (option.key === "GGML_BLAS" && option.defaultValue === "${GGML_BLAS_DEFAULT}")
+            option.defaultValue = htmlEscapeWithCodeMarkdown("`ON` on macOS, `OFF` otherwise");
         else if (option.key === "GGML_METAL_EMBED_LIBRARY" && option.defaultValue === "${GGML_METAL}")
             option.defaultValue = htmlEscapeWithCodeMarkdown("`ON` on macOS, `OFF` otherwise");
         else if (option.defaultValue === "${GGML_STANDALONE}") {

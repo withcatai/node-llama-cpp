@@ -38,7 +38,9 @@ const llamaChat = new LlamaChat({
     contextSequence: context.getSequence()
 });
 
-let chatHistory = llamaChat.chatWrapper.generateInitialChatHistory();
+let chatHistory = llamaChat.chatWrapper.generateInitialChatHistory({
+    // systemPrompt: "You're a helpful assistant"
+});
 
 const prompt = "Hi there, how are you?";
 

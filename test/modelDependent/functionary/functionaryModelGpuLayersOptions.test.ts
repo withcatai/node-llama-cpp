@@ -36,12 +36,14 @@ describe("functionary", () => {
                     }),
                     llamaVramPaddingSize: defaultLlamaVramPadding(llamaGpu === false ? 0 : totalVram),
                     llamaGpu,
-                    llamaSupportsGpuOffloading: llamaGpu !== false
+                    llamaSupportsGpuOffloading: llamaGpu !== false,
+                    useMmap: true
                 });
 
                 async function resolveAutoContextSize() {
                     const resolvedConfig = await ggufInsights.configurationResolver.resolveAndScoreConfig({
-                        targetGpuLayers: resolvedGpuLayers
+                        targetGpuLayers: resolvedGpuLayers,
+                        useMmap: true
                     }, {
                         llamaGpu,
                         getVramState: async () => ({
@@ -249,11 +251,11 @@ describe("functionary", () => {
                         const res = await resolveGpuLayers(16, {
                             totalVram: s1GB * 6,
                             freeVram: s1GB * 3,
-                            totalRam: s1GB * 3,
-                            freeRam: s1GB * 2
+                            totalRam: s1GB * 5,
+                            freeRam: s1GB * 4.5
                         });
                         expect(res.gpuLayers).to.eql(16);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("1924");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("3202");
                     }
                     try {
                         await resolveGpuLayers(16, {
@@ -323,44 +325,44 @@ describe("functionary", () => {
                 test("some unified RAM", async () => {
                     {
                         const res = await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 6,
-                            totalRam: s1GB * 6,
-                            freeRam: s1GB * 6,
-                            unifiedMemorySize: s1GB * 6
+                            totalVram: s1GB * 8,
+                            freeVram: s1GB * 8,
+                            totalRam: s1GB * 8,
+                            freeRam: s1GB * 8,
+                            unifiedMemorySize: s1GB * 8
                         });
                         expect(res.gpuLayers).to.eql(16);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7411");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
                         const res = await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 6,
-                            totalRam: s1GB * 6,
-                            freeRam: s1GB * 5,
-                            unifiedMemorySize: s1GB * 6
+                            totalVram: s1GB * 7,
+                            freeVram: s1GB * 7,
+                            totalRam: s1GB * 7,
+                            freeRam: s1GB * 5.5,
+                            unifiedMemorySize: s1GB * 7
                         });
                         expect(res.gpuLayers).to.eql(16);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("2168");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("2086");
                     }
                     {
                         const res = await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 6,
-                            totalRam: s1GB * 6,
-                            freeRam: s1GB * 5,
-                            unifiedMemorySize: s1GB * 5
+                            totalVram: s1GB * 6.4,
+                            freeVram: s1GB * 6.4,
+                            totalRam: s1GB * 6.4,
+                            freeRam: s1GB * 5.3,
+                            unifiedMemorySize: s1GB * 5.3
                         });
                         expect(res.gpuLayers).to.eql(16);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7411");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("6804");
                     }
                     try {
                         await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
+                            totalVram: s1GB * 8,
                             freeVram: s1GB * 0,
                             totalRam: s1GB * 3,
                             freeRam: s1GB * 2,
-                            unifiedMemorySize: s1GB * 6
+                            unifiedMemorySize: s1GB * 8
                         });
                         expect.unreachable("Should have thrown an error");
                     } catch (err) {
@@ -368,11 +370,11 @@ describe("functionary", () => {
                     }
                     try {
                         await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
+                            totalVram: s1GB * 8,
                             freeVram: s1GB * 0.2,
                             totalRam: s1GB * 3,
                             freeRam: s1GB * 2,
-                            unifiedMemorySize: s1GB * 6
+                            unifiedMemorySize: s1GB * 8
                         });
                         expect.unreachable("Should have thrown an error");
                     } catch (err) {
@@ -380,7 +382,7 @@ describe("functionary", () => {
                     }
                     {
                         const res = await resolveGpuLayers(16, {
-                            totalVram: s1GB * 6,
+                            totalVram: s1GB * 8,
 
                             // play with this number to make the test pass, it should be low enough so that there won't be any VRAM left
                             // to create a context
@@ -388,7 +390,7 @@ describe("functionary", () => {
 
                             totalRam: s1GB * 3,
                             freeRam: s1GB * 2,
-                            unifiedMemorySize: s1GB * 6,
+                            unifiedMemorySize: s1GB * 8,
 
                             ignoreMemorySafetyChecks: true
                         });
@@ -435,7 +437,7 @@ describe("functionary", () => {
                             freeSwap: s1GB * 3
                         });
                         expect(res.gpuLayers).to.eql(16);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("1924");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("2048");
                     }
                     try {
                         await resolveGpuLayers(16, {
@@ -572,7 +574,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 6
                         });
                         expect(res.gpuLayers).to.eql(32);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     try {
                         await resolveGpuLayers(32, {
@@ -637,12 +639,13 @@ describe("functionary", () => {
             describe("attempts to resolve 33 gpuLayers", () => {
                 test("no RAM", async () => {
                     {
+                        // some RAM is always used to load the model (for the input layer)
                         const res = await resolveGpuLayers(33, {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 6
+                            totalVram: s1GB * 8,
+                            freeVram: s1GB * 8
                         });
                         expect(res.gpuLayers).to.eql(33);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.eql(null);
                     }
                     try {
                         await resolveGpuLayers(33, {
@@ -693,7 +696,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 6
                         });
                         expect(res.gpuLayers).to.eql(33);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
                         const res = await resolveGpuLayers(33, {
@@ -703,7 +706,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.eql(33);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
                         const res = await resolveGpuLayers(33, {
@@ -713,7 +716,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 4
                         });
                         expect(res.gpuLayers).to.eql(33);
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     try {
                         await resolveGpuLayers(33, {
@@ -900,18 +903,22 @@ describe("functionary", () => {
                 {
                     const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
-                        freeVram: s1GB * 4.7
+                        freeVram: s1GB * 4.4,
+                        totalRam: s1GB * 1,
+                        freeRam: s1GB * 1
                     });
                     expect(res.gpuLayers).to.eql(33);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("607");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("502");
                 }
                 {
                     const res = await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
-                        freeVram: s1GB * 4.8
+                        freeVram: s1GB * 4.5,
+                        totalRam: s1GB * 1,
+                        freeRam: s1GB * 1
                     });
                     expect(res.gpuLayers).to.eql(33);
-                    expect(res.contextSize).to.toMatchInlineSnapshot("1142");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("1010");
                 }
             });
 
@@ -944,8 +951,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("1");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5192");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("3606");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -955,7 +962,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 8
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5164");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -964,23 +971,13 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("6");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("10");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5856");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
                             freeVram: s1GB * 3.1,
-                            totalRam: s1GB * 8,
-                            freeRam: s1GB * 8
-                        });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("11");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
-                    }
-                    {
-                        const res = await resolveGpuLayers("auto", {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 3.3,
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
@@ -990,11 +987,21 @@ describe("functionary", () => {
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
+                            freeVram: s1GB * 3.3,
+                            totalRam: s1GB * 8,
+                            freeRam: s1GB * 8
+                        });
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("13");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
+                    }
+                    {
+                        const res = await resolveGpuLayers("auto", {
+                            totalVram: s1GB * 6,
                             freeVram: s1GB * 3.5,
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("14");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("15");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1004,7 +1011,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1014,7 +1021,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1024,7 +1031,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("19");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("20");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1034,8 +1041,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("21");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8076");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("23");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("7977");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1044,8 +1051,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("23");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8140");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("25");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8043");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1055,7 +1062,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 8
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("3282");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("4754");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1065,7 +1072,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 8
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("6492");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("7964");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1075,7 +1082,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 8
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                 });
 
@@ -1107,8 +1114,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("1");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5192");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("3606");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1118,7 +1125,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5164");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1127,23 +1134,13 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("6");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("10");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5856");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
                             freeVram: s1GB * 3.1,
-                            totalRam: s1GB * 5,
-                            freeRam: s1GB * 5
-                        });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("11");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
-                    }
-                    {
-                        const res = await resolveGpuLayers("auto", {
-                            totalVram: s1GB * 6,
-                            freeVram: s1GB * 3.3,
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
@@ -1153,11 +1150,21 @@ describe("functionary", () => {
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
+                            freeVram: s1GB * 3.3,
+                            totalRam: s1GB * 5,
+                            freeRam: s1GB * 5
+                        });
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("13");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
+                    }
+                    {
+                        const res = await resolveGpuLayers("auto", {
+                            totalVram: s1GB * 6,
                             freeVram: s1GB * 3.5,
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("14");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("15");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1167,7 +1174,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1177,7 +1184,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1187,7 +1194,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("19");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("20");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1197,8 +1204,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("21");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8076");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("23");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("7977");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1207,8 +1214,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 5,
                             freeRam: s1GB * 5
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("23");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("8140");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("25");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8043");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1218,7 +1225,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("3282");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("4754");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1228,7 +1235,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("6492");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("7964");
                     }
                     {
                         const res = await resolveGpuLayers("auto", {
@@ -1238,7 +1245,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("33");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("7562");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                 });
             });
@@ -1317,7 +1324,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 8
                         });
                         expect(res.gpuLayers).to.be.gte(16);
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1329,7 +1336,7 @@ describe("functionary", () => {
                         });
                         expect(res.gpuLayers).to.be.gte(16);
                         expect(res.gpuLayers).to.be.lte(24);
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1342,7 +1349,7 @@ describe("functionary", () => {
                         expect(res.gpuLayers).to.be.gte(16);
                         expect(res.gpuLayers).to.be.lte(24);
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("1924");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("3202");
                     }
                 });
 
@@ -1419,7 +1426,7 @@ describe("functionary", () => {
                             freeRam: s1GB * 5
                         });
                         expect(res.gpuLayers).to.be.gte(16);
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1431,7 +1438,7 @@ describe("functionary", () => {
                         });
                         expect(res.gpuLayers).to.be.gte(16);
                         expect(res.gpuLayers).to.be.lte(24);
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("18");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                     }
                     {
@@ -1444,7 +1451,7 @@ describe("functionary", () => {
                         expect(res.gpuLayers).to.be.gte(16);
                         expect(res.gpuLayers).to.be.lte(24);
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("1924");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("3202");
                     }
                 });
             });
@@ -1472,8 +1479,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("20");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5561");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("21");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5737");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
@@ -1484,8 +1491,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5164");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("6");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5246");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
@@ -1496,7 +1503,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
@@ -1508,7 +1515,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("2");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
@@ -1561,8 +1568,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 7,
                             freeRam: s1GB * 7
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("19");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("6548");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("21");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5737");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
@@ -1573,8 +1580,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 7,
                             freeRam: s1GB * 7
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5164");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("6");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("5246");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
@@ -1585,7 +1592,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 7,
                             freeRam: s1GB * 7
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("16");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("17");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
@@ -1597,7 +1604,7 @@ describe("functionary", () => {
                             totalRam: s1GB * 7,
                             freeRam: s1GB * 7
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("2");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("4");
                         expect(res.contextSize).to.toMatchInlineSnapshot("8192");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }

@@ -9,6 +9,9 @@ import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {convertMetadataKeyValueRecordToNestedObject} from "../utils/convertMetadataKeyValueRecordToNestedObject.js";
 import {promisableLoop, Promisable, transformPromisable, transformPromisables} from "../../utils/transformPromisable.js";
 import {noDirectSubNestingGGufMetadataKeys} from "../consts.js";
+import {Writable} from "../../utils/utilTypes.js";
+
+const ggufDefaultAlignment = 32;
 
 export class GgufV2Parser {
     private readonly _fileReader: GgufFileReader;
@@ -33,8 +36,16 @@ export class GgufV2Parser {
         const headerReadResult = headerReadResultPromisable instanceof Promise
             ? await headerReadResultPromisable
             : headerReadResultPromisable;
+        const alignmentHeader = headerReadResult.metadata["general.alignment"];
+        const ggufAlignment = (
+            alignmentHeader != null &&
+            (typeof alignmentHeader === "number" || typeof alignmentHeader === "bigint") &&
+            Number.isFinite(Number(alignmentHeader))
+        )
+            ? Number(alignmentHeader)
+            : ggufDefaultAlignment;
         const tensorReadResultPromisable = this._shouldReadTensorInfo
-            ? await this._readTensorInfo(headerReadResult.tensorCount, readOffset)
+            ? await this._readTensorInfo(headerReadResult.tensorCount, readOffset, ggufAlignment)
             : null;
         const tensorReadResult = tensorReadResultPromisable instanceof Promise
             ? await tensorReadResultPromisable
@@ -50,7 +61,8 @@ export class GgufV2Parser {
             metadata: metadata as any as GgufMetadata,
             tensorInfo: tensorReadResult?.tensorInfo,
             metadataSize: headerReadResult.headerSize + initialOffset,
-            tensorInfoSize: tensorReadResult?.tensorInfoSize
+            tensorInfoSize: tensorReadResult?.tensorInfoSize,
+            tensorDataOffset: tensorReadResult?.tensorDataOffset
         };
     }
 
@@ -133,7 +145,7 @@ export class GgufV2Parser {
         });
     }
 
-    private _readTensorInfo(tensorCount: number | bigint, readOffset: GgufReadOffset) {
+    private _readTensorInfo(tensorCount: number | bigint, readOffset: GgufReadOffset, ggufAlignment: number) {
         const initialOffset = readOffset.offset;
         const tensorInfo: GgufTensorInfo[] = [];
 
@@ -164,7 +176,9 @@ export class GgufV2Parser {
                                     name,
                                     dimensions,
                                     ggmlType: ggmlType as GgmlType,
-                                    offset: GgufFileReader.castNumberIfSafe(offset)
+                                    offset: GgufFileReader.castNumberIfSafe(offset),
+                                    fileOffset: 0, // will be set later
+                                    filePart: 1 // will be updated later if needed
                                 });
                             });
                         }
@@ -172,10 +186,24 @@ export class GgufV2Parser {
                 });
             },
             afterthought: () => void i++,
-            returnValue: () => ({
-                tensorInfo,
-                tensorInfoSize: readOffset.offset - initialOffset
-            })
+            returnValue: () => {
+                const fileTensorDataOffset = alignOffset(readOffset.offset, ggufAlignment);
+
+                for (const tensor of tensorInfo)
+                    (tensor as Writable<GgufTensorInfo>).fileOffset = typeof tensor.offset === "bigint"
+                        ? BigInt(fileTensorDataOffset) + tensor.offset
+                        : fileTensorDataOffset + tensor.offset;
+
+                return {
+                    tensorInfo,
+                    tensorInfoSize: readOffset.offset - initialOffset,
+                    tensorDataOffset: fileTensorDataOffset
+                };
+            }
         });
     }
+}
+
+function alignOffset(offset: number, alignment: number) {
+    return offset + (alignment - (offset % alignment)) % alignment;
 }

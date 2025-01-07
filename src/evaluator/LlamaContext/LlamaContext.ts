@@ -1,4 +1,4 @@
-import {AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
 import {AddonContext, AddonModelLora, BatchLogitIndex} from "../../bindings/AddonTypes.js";
@@ -10,12 +10,17 @@ import {TokenBias} from "../TokenBias.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
+import {pushAll} from "../../utils/pushAll.js";
+import {safeEventCallback} from "../../utils/safeEventCallback.js";
+import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {
-    BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, EvaluationPriority, LlamaContextOptions,
-    LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem
+    BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
+    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateMetadataOptions,
+    SequenceEvaluateOptions, SequenceEvaluateOutput
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import {LlamaSampler} from "./LlamaSampler.js";
+import {TokenPredictor} from "./TokenPredictor.js";
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
@@ -25,6 +30,7 @@ const defaultFailedCreationRemedy = {
     retries: 6,
     autoContextSizeShrink: 0.16
 } as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
+const defaultEvaluationPriority: EvaluationPriority = 5;
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
@@ -70,11 +76,12 @@ export class LlamaContext {
         flashAttention = _model.defaultContextFlashAttention,
         threads,
         batching: {
-            dispatchSchedule: batchingDispatchSchedule = "nextTick",
+            dispatchSchedule: batchingDispatchSchedule = "nextCycle",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
         performanceTracking = false,
-        _embeddings
+        _embeddings,
+        _ranking
     }: LlamaContextOptions & {
         sequences: number,
         contextSize: number,
@@ -115,6 +122,7 @@ export class LlamaContext {
             flashAttention: this._flashAttention,
             threads: this._idealThreads,
             embeddings: _embeddings,
+            ranking: _ranking,
             performanceTracking: this._performanceTracking
         }));
         this._batchingOptions = {
@@ -237,6 +245,23 @@ export class LlamaContext {
     public getSequence(options: {
         contextShift?: ContextShiftOptions,
 
+        /**
+         * Token predictor to use for the sequence.
+         * Don't share the same token predictor between multiple sequences.
+         *
+         * Using a token predictor doesn't affect the generation output itself -
+         * it only allows for greater parallelization of the token evaluation to speed up the generation.
+         *
+         * > **Note:** that if a token predictor is too resource intensive,
+         * > it can slow down the generation process due to the overhead of running the predictor.
+         * >
+         * > Testing the effectiveness of a token predictor on the target machine is recommended before using it in production.
+         *
+         * Automatically disposed when disposing the sequence.
+         * @see [Using Token Predictors](https://node-llama-cpp.withcat.ai/guide/token-prediction)
+         */
+        tokenPredictor?: TokenPredictor,
+
         /** @internal */
         _tokenMeter?: TokenMeter
     } = {}): LlamaContextSequence {
@@ -245,6 +270,7 @@ export class LlamaContext {
                 size: contextShiftSize = Math.min(100, Math.ceil(this.contextSize / 2)),
                 strategy: contextShiftStrategy = "eraseBeginning"
             } = {},
+            tokenPredictor,
 
             _tokenMeter
         } = options;
@@ -262,7 +288,8 @@ export class LlamaContext {
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
-            }
+            },
+            tokenPredictor
         });
     }
 
@@ -281,6 +308,7 @@ export class LlamaContext {
             this._batchDispatchPending = false;
 
             let shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
+            const queuedDecodeToMappedLogits = new Map<InternalQueuedDecode, [tokenIndex: number, value: any][]>();
 
             const resolvePrioritizationStrategy = () => {
                 try {
@@ -302,6 +330,7 @@ export class LlamaContext {
                 for (const queuedDecode of this._queuedDecodes) {
                     const batchItem: BatchItem = {
                         tokens: queuedDecode.tokens,
+                        logits: queuedDecode.logits,
                         evaluationPriority: queuedDecode.evaluationPriority
                     };
                     batchItemToQueuedDecodeMap.set(batchItem, queuedDecode);
@@ -369,9 +398,11 @@ export class LlamaContext {
 
             const decodeTokenBatchItems = async (batchItems: CurrentBatchItem[], currentBatchSize: number) => {
                 const afterDecodeActions: Array<{
-                    batchLogitIndex: BatchLogitIndex | undefined,
-                    response: [accept: (res: any) => void, reject: (reason: unknown) => void],
-                    onDone?: (batchLogitIndex: BatchLogitIndex) => any
+                    queuedDecode: InternalQueuedDecode,
+                    batchLogitIndexes: Uint32Array,
+                    batchLogitTokenIndexes: number[],
+                    firstTokenIndex: number,
+                    returnResults?: true
                 }> = [];
                 const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
                 const currentQueuedDecodeItems = new Set<InternalQueuedDecode>();
@@ -380,22 +411,22 @@ export class LlamaContext {
                     this._ctx.initBatch(currentBatchSize);
 
                 for (const {queuedDecode, processAmount} of batchItems) {
-                    let batchLogitIndex: ReturnType<typeof this._ctx.addToBatch>;
+                    let batchLogitIndexes: ReturnType<typeof this._ctx.addToBatch>;
+                    const tokensToProcess = queuedDecode.tokens.slice(0, processAmount);
+                    const tokenIndexesWithLogitsToProcess = queuedDecode.logits.slice(0, processAmount)
+                        .map((logit, index) => (logit ? index : undefined))
+                        .filter((index) => index != undefined);
+
+                    const numberOfOutputTokens = tokenIndexesWithLogitsToProcess.length;
+                    TokenMeter.useTokens(queuedDecode.tokenMeter, Math.max(0, tokensToProcess.length - numberOfOutputTokens), "input");
+                    TokenMeter.useTokens(queuedDecode.tokenMeter, numberOfOutputTokens, "output");
+
                     try {
-                        const shouldGenerateLogitAtTheEnd = queuedDecode.generateLogitAtTheEnd &&
-                            processAmount === queuedDecode.tokens.length;
-
-                        const tokensToProcess = queuedDecode.tokens.slice(0, processAmount);
-
-                        const numberOfOutputTokens = shouldGenerateLogitAtTheEnd ? 1 : 0;
-                        TokenMeter.useTokens(queuedDecode.tokenMeter, Math.max(0, tokensToProcess.length - numberOfOutputTokens), "input");
-                        TokenMeter.useTokens(queuedDecode.tokenMeter, numberOfOutputTokens, "output");
-
-                        batchLogitIndex = this._ctx.addToBatch(
+                        batchLogitIndexes = this._ctx.addToBatch(
                             queuedDecode.sequenceId,
                             queuedDecode.firstTokenSequenceIndex,
                             Uint32Array.from(tokensToProcess),
-                            shouldGenerateLogitAtTheEnd
+                            Uint32Array.from(tokenIndexesWithLogitsToProcess)
                         );
                     } catch (err) {
                         this._dispatchErrorForQueuedDecodesAndDequeue(new Set([queuedDecode]), err);
@@ -406,12 +437,23 @@ export class LlamaContext {
                     if (queuedDecode.tokens.length === processAmount) {
                         queuedDecodesToDelete.add(queuedDecode);
                         afterDecodeActions.push({
-                            batchLogitIndex,
-                            response: queuedDecode.response,
-                            onDone: queuedDecode.onDone
+                            queuedDecode,
+                            batchLogitIndexes,
+                            batchLogitTokenIndexes: tokenIndexesWithLogitsToProcess,
+                            firstTokenIndex: queuedDecode.firstTokenSequenceIndex,
+                            returnResults: true
                         });
                     } else {
+                        if (batchLogitIndexes.length > 0)
+                            afterDecodeActions.push({
+                                queuedDecode,
+                                batchLogitIndexes,
+                                batchLogitTokenIndexes: tokenIndexesWithLogitsToProcess,
+                                firstTokenIndex: queuedDecode.firstTokenSequenceIndex
+                            });
+
                         queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
+                        queuedDecode.logits = queuedDecode.logits.slice(processAmount);
                         queuedDecode.firstTokenSequenceIndex += processAmount;
                     }
                 }
@@ -444,18 +486,69 @@ export class LlamaContext {
                     }
                 }
 
-                for (const action of afterDecodeActions) {
-                    const [accept, reject] = action.response;
-                    if (action.onDone != null && action.batchLogitIndex != null) {
-                        try {
-                            accept(action.onDone(action.batchLogitIndex ?? null));
-                        } catch (err) {
-                            reject(err);
-                        }
+                function finishAfterDecodeAction(
+                    action: typeof afterDecodeActions[number],
+                    mappedLogitValues?: [index: number, value: any][]
+                ) {
+                    if (mappedLogitValues != null && mappedLogitValues.length > 0) {
+                        if (queuedDecodeToMappedLogits.has(action.queuedDecode))
+                            pushAll(queuedDecodeToMappedLogits.get(action.queuedDecode)!, mappedLogitValues);
+                        else
+                            queuedDecodeToMappedLogits.set(action.queuedDecode, mappedLogitValues);
                     }
 
-                    accept(undefined);
+                    if (action.returnResults != null) {
+                        const [accept] = action.queuedDecode.response;
+                        const mappedLogits = queuedDecodeToMappedLogits.get(action.queuedDecode) ?? [];
+                        queuedDecodeToMappedLogits.delete(action.queuedDecode);
+                        accept(mappedLogits);
+                    }
                 }
+
+                const afterDecodeActionResults = afterDecodeActions.map((action): Promise<void> | void => {
+                    if (action.batchLogitIndexes.length === 0) {
+                        finishAfterDecodeAction(action);
+                        return undefined;
+                    }
+
+                    const mappedLogitValues: ([index: number, value: any] | Promise<[index: number, value: any]>)[] = [];
+                    let promiseChain: Promise<void> | undefined = undefined;
+
+                    const batchLogitIndexes = action.batchLogitIndexes;
+                    const batchLogitTokenIndexes = action.batchLogitTokenIndexes;
+                    for (let i = 0; i < batchLogitIndexes.length; i++) {
+                        const tokenIndex = batchLogitTokenIndexes[i]!;
+
+                        const mappedValue: Promise<any> | any = promiseChain != null
+                            ? promiseChain
+                                .then(() => action.queuedDecode.logitDataMapper(
+                                    batchLogitIndexes[i]! as BatchLogitIndex,
+                                    tokenIndex + action.firstTokenIndex
+                                ))
+                            : action.queuedDecode.logitDataMapper(
+                                batchLogitIndexes[i]! as BatchLogitIndex,
+                                tokenIndex + action.firstTokenIndex
+                            );
+
+                        if (mappedValue instanceof Promise) {
+                            promiseChain = mappedValue;
+                            mappedLogitValues.push(
+                                mappedValue
+                                    .then((value) => [tokenIndex + action.firstTokenIndex, value])
+                            );
+                        } else
+                            mappedLogitValues.push([tokenIndex + action.firstTokenIndex, mappedValue]);
+                    }
+
+                    if (promiseChain != null)
+                        return Promise.all(mappedLogitValues)
+                            .then((resolvedMappedLogitValues) => finishAfterDecodeAction(action, resolvedMappedLogitValues));
+
+                    finishAfterDecodeAction(action, mappedLogitValues as [index: number, value: any][]);
+                    return undefined;
+                });
+
+                await Promise.all(afterDecodeActionResults);
             };
 
             const prioritizationStrategy = resolvePrioritizationStrategy();
@@ -514,21 +607,21 @@ export class LlamaContext {
 
     /** @internal */
     public async _decodeTokens<T>({
-        sequenceId, firstTokenSequenceIndex, tokens, generateLogitAtTheEnd = false, evaluationPriority = 5, tokenMeter
+        sequenceId, firstTokenSequenceIndex, tokens, logits, evaluationPriority = defaultEvaluationPriority, tokenMeter
     }: {
-        sequenceId: number, firstTokenSequenceIndex: number, tokens: Token[], generateLogitAtTheEnd?: boolean,
+        sequenceId: number, firstTokenSequenceIndex: number, tokens: Token[], logits: (true | undefined)[],
         evaluationPriority?: EvaluationPriority, tokenMeter: TokenMeter
-    }, onDone?: ((batchLogitIndex: BatchLogitIndex) => (T | Promise<T>))): Promise<T> {
+    }, logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => T | Promise<T>)): Promise<[index: number, value: T][]> {
         return await new Promise((accept, reject) => {
             this._queuedDecodes.push({
                 sequenceId,
                 tokens,
+                logits,
                 firstTokenSequenceIndex,
-                generateLogitAtTheEnd,
                 evaluationPriority,
                 tokenMeter,
                 response: [accept, reject],
-                onDone
+                logitDataMapper
             });
             this._queuedDecodeSequenceIds.add(sequenceId);
 
@@ -586,10 +679,19 @@ export class LlamaContext {
 
         if (this._queuedDecodeSequenceIds.size === this._totalSequences)
             dispatch();
-        if (dispatchSchedule === "nextTick")
-            setTimeout(dispatch, 0);
-        else
+        if (dispatchSchedule === "nextCycle") {
+            if (typeof setImmediate === "function")
+                setImmediate(dispatch);
+            else
+                setTimeout(dispatch, 0);
+        } else if (typeof dispatchSchedule === "function")
             dispatchSchedule(dispatch);
+        else {
+            if (typeof setImmediate === "function")
+                setImmediate(dispatch);
+            else
+                setTimeout(dispatch, 0);
+        }
     }
 
     /** @internal */
@@ -811,26 +913,40 @@ export class LlamaContextSequence {
     /** @internal */ private readonly _gcRegistry: FinalizationRegistry<number>;
     /** @internal */ private readonly _context: LlamaContext;
     /** @internal */ private readonly _contextShift: Required<ContextShiftOptions>;
+    /** @internal */ private readonly _tokenPredictor?: TokenPredictor;
     /** @internal */ private readonly _tokenMeter: TokenMeter;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
-    /** @internal */ private _contextTokens: Token[] = [];
+    /** @internal */ private readonly _lock = {};
+    /** @internal */ private _resetTokenPredictor: boolean = false;
+    /** @internal */ private _tokenPredictorOwner: {} = {};
+    /** @internal */ public _contextTokens: Token[] = [];
     /** @internal */ private _nextTokenIndex: number = 0;
+    /** @internal */ private _loadedTokenPredictions: Array<[
+        input: Token,
+        output: [token: Token, probabilities: (Token | number)[] | undefined, confidence: number | undefined]
+    ]> = [];
+    /** @internal */ private _usedTokenPredictions: number = 0;
+    /** @internal */ private _unusedTokenPredictions: number = 0;
+    /** @internal */ private _validatedTokenPredictions: number = 0;
+    /** @internal */ private _refutedTokenPredictions: number = 0;
     /** @internal */ private _disposed = false;
 
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        sequenceId, context, tokenMeter, contextShift
+        sequenceId, context, tokenMeter, contextShift, tokenPredictor
     }: {
         sequenceId: number,
         context: LlamaContext,
         tokenMeter?: TokenMeter,
-        contextShift: Required<ContextShiftOptions>
+        contextShift: Required<ContextShiftOptions>,
+        tokenPredictor?: TokenPredictor
     }) {
         this._sequenceId = sequenceId;
         this._context = context;
         this._tokenMeter = tokenMeter ?? new TokenMeter();
         this._contextShift = contextShift;
+        this._tokenPredictor = tokenPredictor;
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
         this._gcRegistry.register(this, sequenceId);
@@ -846,6 +962,9 @@ export class LlamaContextSequence {
         this._disposeAggregator.add(() => {
             this._context._reclaimUnusedSequenceId(this._sequenceId);
         });
+
+        if (this._tokenPredictor != null)
+            this._disposeAggregator.add(this._tokenPredictor);
     }
 
     public dispose() {
@@ -876,16 +995,63 @@ export class LlamaContextSequence {
         return this._context.model;
     }
 
-    public get nextTokenIndex() {
-        return this._nextTokenIndex;
+    /** The maximum number of tokens that the sequence state can hold */
+    public get contextSize() {
+        return this._context.contextSize;
     }
 
+    /** The index where the next evaluated token will be placed in the context */
+    public get nextTokenIndex() {
+        return this._nextTokenIndex - this._loadedTokenPredictions.length;
+    }
+
+    /** The current context state tokens */
     public get contextTokens() {
-        return this._contextTokens.slice();
+        if (this._loadedTokenPredictions.length === 0)
+            return this._contextTokens.slice();
+
+        return this._contextTokens.slice(0, -this._loadedTokenPredictions.length);
     }
 
     public get tokenMeter() {
         return this._tokenMeter;
+    }
+
+    /**
+     * The token predictor used when creating this sequence.
+     */
+    public get tokenPredictor() {
+        return this._tokenPredictor;
+    }
+
+    /**
+     * Statistics of token predictions using the sequence's `tokenPredictor`.
+     *
+     * The statistics change only when token prediction is used in this sequence.
+     *
+     * `validated` + `refuted` = total number of evaluated predictions.
+     *
+     * Prefer using `validated` and `refuted` to evaluate the effectiveness of token prediction.
+     */
+    public get tokenPredictions(): {
+        /** Number of token predictions that were actually used (tokens that were validated and then consumed) */
+        used: number,
+
+        /** Number of token predictions that were not used (tokens that were validated and were not consumed) */
+        unused: number,
+
+        /** Number of token predictions that were validated successfully */
+        validated: number,
+
+        /** Number of token predictions that were refuted */
+        refuted: number
+    } {
+        return {
+            used: this._usedTokenPredictions,
+            unused: this._unusedTokenPredictions,
+            validated: this._validatedTokenPredictions,
+            refuted: this._refutedTokenPredictions
+        };
     }
 
     public get isLoadedToMemory() {
@@ -895,7 +1061,7 @@ export class LlamaContextSequence {
     public compareContextTokens(tokens: Token[]): {
         firstDifferentIndex: number
     } {
-        for (let i = 0; i < this._contextTokens.length; i++) {
+        for (let i = 0; i < this._contextTokens.length - this._loadedTokenPredictions.length; i++) {
             if (compareTokens(this._contextTokens[i], tokens[i]))
                 continue;
 
@@ -905,7 +1071,7 @@ export class LlamaContextSequence {
         }
 
         return {
-            firstDifferentIndex: this._contextTokens.length
+            firstDifferentIndex: this._contextTokens.length - this._loadedTokenPredictions.length
         };
     }
 
@@ -920,10 +1086,13 @@ export class LlamaContextSequence {
      * which incurs token evaluation of the shifted tokens.
      */
     public async adaptStateToTokens(tokens: Token[], allowShift: boolean = true) {
-        if (this.model.fileInsights.isRecurrent || !allowShift) {
+        const modelSupportsShifting = !this.model.fileInsights.isRecurrent &&
+            this.model.fileInfo.metadata?.general?.architecture !== GgufArchitectureType.deepseek2;
+
+        if (!modelSupportsShifting || !allowShift) {
             const {firstDifferentIndex} = this.compareContextTokens(tokens);
-            if (firstDifferentIndex < this._nextTokenIndex)
-                await this.eraseContextTokenRanges([{
+            if (firstDifferentIndex < this.nextTokenIndex)
+                await this._eraseContextTokenRanges([{
                     start: firstDifferentIndex,
                     end: this._nextTokenIndex
                 }]);
@@ -935,7 +1104,7 @@ export class LlamaContextSequence {
 
         let tokensIndex = 0;
         let differentTokenIndex: number | undefined = undefined;
-        for (let i = 0; i < this._contextTokens.length && tokensIndex < tokens.length; i++) {
+        for (let i = 0; i < this._contextTokens.length - this._loadedTokenPredictions.length && tokensIndex < tokens.length; i++) {
             if (compareTokens(this._contextTokens[i], tokens[tokensIndex])) {
                 if (differentTokenIndex != null) {
                     eraseRanges.push({
@@ -961,7 +1130,7 @@ export class LlamaContextSequence {
             });
 
         if (eraseRanges.length > 0)
-            await this.eraseContextTokenRanges(eraseRanges);
+            await this._eraseContextTokenRanges(eraseRanges);
     }
 
     /**
@@ -971,7 +1140,7 @@ export class LlamaContextSequence {
     public async clearHistory() {
         this._ensureNotDisposed();
 
-        await this.eraseContextTokenRanges([{start: 0, end: this._nextTokenIndex}]);
+        await this._eraseContextTokenRanges([{start: 0, end: this._nextTokenIndex}]);
     }
 
     /**
@@ -979,7 +1148,23 @@ export class LlamaContextSequence {
      * The start of each range is inclusive, and the end of each range is exclusive.
      * For example, the range `{start: 0, end: 1}` will remove the token at the `0` index only.
      */
-    public async eraseContextTokenRanges(ranges: ContextTokensDeleteRange[]) {
+    public eraseContextTokenRanges(ranges: ContextTokensDeleteRange[]) {
+        return this._eraseContextTokenRanges(ranges);
+    }
+
+    /** @internal */
+    private async _eraseContextTokenRanges(
+        ranges: ContextTokensDeleteRange[],
+        {
+            canResetTokenPredictor = true,
+            canRemovePredictionTokens = true,
+            skipLock = false
+        }: {
+            canResetTokenPredictor?: boolean,
+            canRemovePredictionTokens?: boolean,
+            skipLock?: boolean
+        } = {}
+    ) {
         this._ensureNotDisposed();
 
         await withLock(this._context, "context", async () => {
@@ -1023,6 +1208,21 @@ export class LlamaContextSequence {
                     return ranges;
                 }, [] as ContextTokensDeleteRange[]);
 
+            const tokenPredictionsToRemove = (resolvedRanges.length > 0 && canRemovePredictionTokens)
+                ? this._loadedTokenPredictions.length
+                : 0;
+            if (tokenPredictionsToRemove > 0) {
+                const startDeleteIndex = this._nextTokenIndex - this._loadedTokenPredictions.length;
+                const lastDeleteRange = resolvedRanges[resolvedRanges.length - 1]!;
+                if (lastDeleteRange.end >= startDeleteIndex)
+                    lastDeleteRange.end = this._nextTokenIndex;
+                else
+                    resolvedRanges.push({start: startDeleteIndex, end: this._nextTokenIndex});
+
+                if (canResetTokenPredictor)
+                    await this._abortTokenPredictor(true);
+            }
+
             let removedTokens = 0;
             let lastDeleteRangeEndPos: number | null = null;
             for (const range of resolvedRanges) {
@@ -1040,6 +1240,9 @@ export class LlamaContextSequence {
                 lastDeleteRangeEndPos = range.end;
             }
 
+            if (tokenPredictionsToRemove > 0)
+                this._loadedTokenPredictions.splice(0, tokenPredictionsToRemove);
+
             if (deletionSuccessful && lastDeleteRangeEndPos != null && removedTokens > 0 &&
                 lastDeleteRangeEndPos !== this._nextTokenIndex
             ) {
@@ -1050,6 +1253,9 @@ export class LlamaContextSequence {
 
             this._nextTokenIndex -= removedTokens;
 
+            if (canResetTokenPredictor && removedTokens > 0)
+                await this._abortTokenPredictor(true);
+
             if (deletionSuccessful)
                 return;
 
@@ -1057,57 +1263,42 @@ export class LlamaContextSequence {
             this._nextTokenIndex = 0;
             this._context._ctx.disposeSequence(this._sequenceId);
 
-            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens);
+            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
     }
 
-    public evaluate(tokens: Token[], options: {
-        temperature?: number, minP?: number, topK?: number, topP?: number,
+    /**
+     * Evaluate the provided tokens into the context sequence, and continue generating new tokens on iterator iterations.
+     *
+     * This method uses the token predictor (when provided) to generate new tokens faster.
+     */
+    public async *evaluate(tokens: Token[], options: SequenceEvaluateOptions = {}): AsyncGenerator<Token, void, void | Token | Token[]> {
+        const iterator = this.evaluateWithMetadata(tokens, {}, options);
+        let iterateInput: void | Token | Token[] = undefined;
 
-        /**
-         * Used to control the randomness of the generated text.
-         *
-         * Change the seed to get different results.
-         *
-         * Defaults to the current epoch time.
-         *
-         * Only relevant when using `temperature`.
-         */
-        seed?: number,
-        grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
-        repeatPenalty?: LlamaContextSequenceRepeatPenalty,
+        try {
+            while (true) {
+                const {value, done} = await iterator.next(iterateInput);
+                if (done)
+                    return;
 
-        /**
-         * Adjust the probability of tokens being generated.
-         * Can be used to bias the model to generate tokens that you want it to lean towards,
-         * or to avoid generating tokens that you want it to avoid.
-         */
-        tokenBias?: TokenBias | (() => TokenBias),
+                iterateInput = yield value.token;
+            }
+        } finally {
+            await iterator.return();
+        }
+    }
 
-        /**
-         * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
-         * evaluated based on the strategy chosen for the context.
-         * By default, the `"maximumParallelism"` strategy is used, which will try to evaluate as many sequences in parallel as possible,
-         * but at some point, it'll have to choose which sequences to evaluate more tokens of, so it'll prioritize the sequences with the
-         * highest evaluation priority.
-         * Also, a custom strategy can be used to prioritize the sequences differently, but generally, the higher the evaluation priority
-         * is, the more likely and more tokens will be evaluated for that sequence in the next queued batch.
-         */
-        evaluationPriority?: EvaluationPriority,
-
-        /** Override the sequence context shift options for this evaluation */
-        contextShift?: ContextShiftOptions,
-
-        /**
-         * Yield an EOG (End Of Generation) token (like EOS and EOT) when it's generated.
-         * When `false` the generation will stop when an EOG token is generated and the token won't be yielded.
-         * Defaults to `false`.
-         */
-        yieldEogToken?: boolean,
-
-        /** @internal */
-        _noSampling?: boolean
-    } = {}): AsyncGenerator<Token, void | Token> {
+    /**
+     * Like {@link evaluate `.evaluate(...)`}, but with additional metadata for each generated token.
+     *
+     * Configure the additional metadata options to choose which metadata to include.
+     */
+    public evaluateWithMetadata<const Metadata extends SequenceEvaluateMetadataOptions>(
+        tokens: Token[],
+        metadata: Metadata,
+        options: SequenceEvaluateOptions = {}
+    ): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
         const {
             temperature = 0,
             minP = 0,
@@ -1117,7 +1308,7 @@ export class LlamaContextSequence {
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
-            evaluationPriority = 5,
+            evaluationPriority = defaultEvaluationPriority,
             contextShift: {
                 size: contextShiftSize = this._contextShift.size,
                 strategy: contextShiftStrategy = this._contextShift.strategy
@@ -1127,7 +1318,26 @@ export class LlamaContextSequence {
             _noSampling = false
         } = options;
 
-        return this._evaluate(tokens, {
+        if (this._tokenPredictor != null && !_noSampling && tokens.length > 0)
+            return this._speculativeEvaluate(tokens, metadata, {
+                temperature,
+                minP,
+                topK,
+                topP,
+                seed,
+                grammarEvaluationState,
+                repeatPenalty,
+                tokenBias,
+                evaluationPriority,
+                contextShiftOptions: {
+                    size: contextShiftSize,
+                    strategy: contextShiftStrategy
+                },
+                yieldEogToken,
+                tokenPredictor: this._tokenPredictor
+            });
+
+        return this._evaluate(tokens, metadata, {
             temperature,
             minP,
             topK,
@@ -1149,16 +1359,8 @@ export class LlamaContextSequence {
 
     /**
      * Evaluate the provided tokens into the context sequence without generating new tokens.
-     * @param tokens
-     * @param [options]
      */
-    public async evaluateWithoutGeneratingNewTokens(tokens: Token[], {
-        evaluationPriority = 5,
-        contextShift: {
-            size: contextShiftSize = this._contextShift.size,
-            strategy: contextShiftStrategy = this._contextShift.strategy
-        } = {}
-    }: {
+    public async evaluateWithoutGeneratingNewTokens(tokens: Token[], options: {
         /**
          * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
          * evaluated based on the strategy chosen for the context.
@@ -1171,47 +1373,227 @@ export class LlamaContextSequence {
         evaluationPriority?: EvaluationPriority,
 
         /** Override the sequence context shift options for this evaluation */
-        contextShift?: ContextShiftOptions
+        contextShift?: ContextShiftOptions,
+
+        /** @internal */
+        _skipLock?: boolean
     } = {}): Promise<void> {
-        const iterator = this._evaluate(tokens, {
+        const {
+            evaluationPriority = defaultEvaluationPriority,
+            contextShift: {
+                size: contextShiftSize = this._contextShift.size,
+                strategy: contextShiftStrategy = this._contextShift.strategy
+            } = {},
+            _skipLock = false
+        } = options;
+
+        const iterator = this._evaluate(tokens, {}, {
             generateNewTokens: false,
             evaluationPriority,
             contextShiftOptions: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
-            }
+            },
+            _skipLock
         });
+        const predictorAlignmentPromise = this.tokenPredictor == null
+            ? undefined
+            : this._tokenPredictor?.reset({
+                stateTokens: [...this._contextTokens, ...tokens],
+                evaluateOptions: {
+                    evaluationPriority,
+                    contextShift: {
+                        size: contextShiftSize,
+                        strategy: contextShiftStrategy
+                    }
+                },
+                targetSequence: this
+            });
+        if (predictorAlignmentPromise != null) {
+            this._tokenPredictorOwner = {};
+            this._resetTokenPredictor = false;
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const token of iterator) {
             // Array.from doesn't work with async generators, so we have to iterate over the generator
         }
+
+        await iterator.return();
+
+        if (predictorAlignmentPromise != null)
+            await predictorAlignmentPromise;
+    }
+
+    /**
+     * Evaluate the provided tokens into the context sequence with custom options for each token.
+     *
+     * This method allows for more precise control of the generation process.
+     *
+     * A next token will be generated for a given token only if any of the `generateNext` options for it are used.
+     *
+     * To generate more tokens after this method finishes,
+     * use it again with token(s) you selected to add to the context from the previous evaluation.
+     *
+     * This method doesn't use the token predictor (when provided) since it cannot predict which tokens are actually needed.
+     * Use the `evaluate` method when you need to use token prediction.
+     * @returns An array where for each token in the input array, there can be an output item at the same index in the output array.
+     * For indexes that have no output, there won't be any value at the corresponding index in the output array.
+     *
+     * It's recommended to iterate from `0` up to the length of the input array to check the results in the output array.
+     */
+    public async controlledEvaluate(input: ControlledEvaluateInputItem[], options?: {
+        /**
+         * When a lot of tokens are queued for the next batch, more than the configured `batchSize`, the tokens for each sequence will be
+         * evaluated based on the strategy chosen for the context.
+         * By default, the `"maximumParallelism"` strategy is used, which will try to evaluate as many sequences in parallel as possible,
+         * but at some point, it'll have to choose which sequences to evaluate more tokens of, so it'll prioritize the sequences with the
+         * highest evaluation priority.
+         * Also, a custom strategy can be used to prioritize the sequences differently, but generally, the higher the evaluation priority
+         * is, the more likely and more tokens will be evaluated for that sequence in the next queued batch.
+         */
+        evaluationPriority?: EvaluationPriority,
+
+        /** Override the sequence context shift options for this evaluation */
+        contextShift?: ContextShiftOptions,
+
+        /** Called on each token result after it's generated */
+        onTokenResult?(inputTokenIndex: number, result: ControlledEvaluateIndexOutput): void
+    }): Promise<Array<undefined | ControlledEvaluateIndexOutput>> {
+        const {
+            evaluationPriority = defaultEvaluationPriority,
+            contextShift: {
+                size: contextShiftSize = this._contextShift.size,
+                strategy: contextShiftStrategy = this._contextShift.strategy
+            } = {}
+        } = options ?? {};
+        const contextShiftOptions: Required<ContextShiftOptions> = {
+            size: contextShiftSize,
+            strategy: contextShiftStrategy
+        };
+
+        this._ensureNotDisposed();
+
+        if (input.length === 0)
+            return [];
+
+        await this._abortTokenPredictor();
+
+        const sampler = new LlamaSampler(this.model);
+        const onTokenResult = safeEventCallback(options?.onTokenResult);
+
+        const logitsArray: (true | undefined)[] = [];
+        const resolvedTokens = input.map((item, index) => {
+            if (item instanceof Array) {
+                const [token, options] = item;
+                const generateNext = options?.generateNext ?? {};
+                if (generateNext.probabilities === true || generateNext.confidence === true || generateNext.token === true)
+                    logitsArray[index] = true;
+
+                return token;
+            }
+
+            return item;
+        });
+
+        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        try {
+            return await this._decodeTokens(
+                resolvedTokens,
+                logitsArray,
+                evaluationPriority,
+                this._tokenMeter,
+                contextShiftOptions,
+                async (batchLogitIndex, tokenIndex) => {
+                    const inputToken = input[tokenIndex];
+                    const inputOptions = inputToken instanceof Array
+                        ? (inputToken[1] ?? {})
+                        : {};
+                    const generateNext = inputOptions.generateNext;
+
+                    if (generateNext == null || (
+                        (generateNext.probabilities == null || !generateNext.probabilities) &&
+                        (generateNext.token == null || !generateNext.token) &&
+                        (generateNext.confidence == null || !generateNext.confidence)
+                    ))
+                        return undefined;
+
+                    const sampleOptions = generateNext.options ?? {};
+                    const samplerConfig = this._resolveSamplerConfig({
+                        temperature: sampleOptions.temperature,
+                        minP: sampleOptions.minP,
+                        topK: sampleOptions.topK,
+                        topP: sampleOptions.topP,
+                        seed: sampleOptions.seed,
+                        repeatPenalty: sampleOptions.repeatPenalty,
+                        tokenBias: sampleOptions.tokenBias
+                    });
+
+                    return await withLock(sampler, "sample", async () => {
+                        if (sampler.disposed)
+                            return undefined;
+
+                        sampler.applyConfig(samplerConfig);
+                        const [token, probabilities, confidence] = await this._context._ctx.sampleToken(
+                            batchLogitIndex,
+                            sampler._sampler,
+                            !!generateNext.probabilities,
+                            !!generateNext.confidence
+                        );
+
+                        const output: ControlledEvaluateIndexOutput = {
+                            next: {}
+                        };
+
+                        if (generateNext.token)
+                            output.next.token = token === -1
+                                ? null
+                                : (token ?? null);
+
+                        if (confidence != null)
+                            output.next.confidence = confidence;
+
+                        if (probabilities != null)
+                            output.next.probabilities = reviveTokenProbabilities(probabilities);
+
+                        onTokenResult?.(tokenIndex, output);
+
+                        return output;
+                    });
+                }
+            );
+        } finally {
+            evaluatorLock.dispose();
+            void withLock(sampler, "sample", sampler.asyncDispose);
+        }
     }
 
     /** @internal */
-    private async *_evaluate(tokens: Token[], {
-        temperature = 0,
-        minP = 0,
-        topK = 40,
-        topP = 0.95,
+    private async *_evaluate<const Metadata extends SequenceEvaluateMetadataOptions>(tokens: Token[], metadata: Metadata, {
+        temperature,
+        minP,
+        topK,
+        topP,
         seed,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias,
-        evaluationPriority = 5,
+        evaluationPriority = defaultEvaluationPriority,
         generateNewTokens = true,
         contextShiftOptions,
         yieldEogToken = false,
 
-        _noSampling = false
+        _noSampling = false,
+        _skipLock = false
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
         yieldEogToken?: boolean,
-        _noSampling?: boolean
-    }): AsyncGenerator<Token, void | Token> {
+        _noSampling?: boolean,
+        _skipLock?: boolean
+    }): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
         this._ensureNotDisposed();
 
         let evalTokens = tokens;
@@ -1219,86 +1601,102 @@ export class LlamaContextSequence {
         if (evalTokens.length === 0)
             return;
 
+        await this._abortTokenPredictor(false, true);
+
+        const sampleProbabilities = metadata.probabilities === true;
+        const sampleConfidence = metadata.confidence === true;
+
         const sampler = new LlamaSampler(this.model);
         try {
             while (true) {
                 this._ensureNotDisposed();
+                const evaluatorLock = _skipLock
+                    ? undefined
+                    : await acquireLock(this._lock, "evaluate");
+                let nextToken: Token | -1 | null | undefined;
+                const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
 
-                // Evaluate to get the next token.
-                const nextToken: Token | null = await this._decodeTokens(
-                    evalTokens,
-                    generateNewTokens,
-                    evaluationPriority,
-                    this._tokenMeter,
-                    contextShiftOptions,
-                    (batchLogitIndex) => {
-                        if (_noSampling)
-                            return null;
+                try {
+                    const logitsArray: (true | undefined)[] = [];
 
-                        const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
-                            ? repeatPenalty.punishTokens()
-                            : repeatPenalty?.punishTokens;
+                    if (generateNewTokens)
+                        logitsArray[evalTokens.length - 1] = true;
 
-                        const maxPunishTokens = Math.max(
-                            repeatPenalty?.maxPunishTokens ?? defaultMaxPunishTokens,
-                            repeatPenaltyTokens?.length ?? 0
-                        );
-
-                        const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
-                            ? grammarEvaluationState()
-                            : grammarEvaluationState;
-
-                        if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
-                            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
-
-                        const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
-
-                        sampler.applyConfig(removeNullFields({
-                            temperature,
-                            minP,
-                            topK,
-                            topP,
-                            seed: Math.max(
-                                0,
-                                Number.isFinite(seed)
-                                    ? Math.floor(seed ?? (Date.now() / 1000))
-                                    : Math.floor(Date.now() / 1000)
-                            ),
-                            repeatPenalty: repeatPenalty?.penalty,
-                            repeatPenaltyMaxTokens: maxPunishTokens,
-                            repeatPenaltyTokens: repeatPenaltyTokens != null
-                                ? Uint32Array.from(repeatPenaltyTokens)
-                                : undefined,
-                            repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
-                            repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
-                            tokenBiasKeys,
-                            tokenBiasValues,
-                            grammarEvaluationState: resolvedGrammarEvaluationState?._state
-                        }));
-
-                        return withLock(sampler, "sample", async () => {
-                            if (sampler.disposed)
+                    // Evaluate to get the next token.
+                    const decodeResult = await this._decodeTokens(
+                        evalTokens,
+                        logitsArray,
+                        evaluationPriority,
+                        this._tokenMeter,
+                        contextShiftOptions,
+                        (batchLogitIndex) => {
+                            if (_noSampling)
                                 return null;
 
-                            return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
-                        });
-                    }
-                );
+                            const samplerConfig = this._resolveSamplerConfig({
+                                temperature,
+                                minP,
+                                topK,
+                                topP,
+                                seed,
+                                grammarEvaluationState,
+                                repeatPenalty,
+                                tokenBias
+                            });
 
-                if (nextToken === -1)
-                    throw new Error("Failed to sample next token");
+                            return withLock(sampler, "sample", async () => {
+                                if (sampler.disposed)
+                                    return null;
 
-                if (nextToken == null)
-                    return;
+                                sampler.applyConfig(samplerConfig);
+                                if (sampleProbabilities || sampleConfidence)
+                                    return this._context._ctx.sampleToken(
+                                        batchLogitIndex,
+                                        sampler._sampler,
+                                        sampleProbabilities,
+                                        sampleConfidence
+                                    );
+                                else
+                                    return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                            });
+                        }
+                    );
 
-                // the model finished generating text
-                if (!yieldEogToken && this._context.model.isEogToken(nextToken))
-                    break;
+                    const lastDecodeResult = decodeResult[evalTokens.length - 1];
 
-                const replacementToken = (yield nextToken) as undefined | Token;
+                    if (lastDecodeResult instanceof Array) {
+                        const [token, probabilities, confidence] = lastDecodeResult;
+                        nextToken = token;
+
+                        if (probabilities != null)
+                            yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                        if (confidence != null)
+                            yieldRes.confidence = confidence;
+                    } else
+                        nextToken = lastDecodeResult;
+
+                    if (nextToken === -1)
+                        throw new Error("Failed to sample next token");
+
+                    if (nextToken == null)
+                        return;
+
+                    // the model finished generating text
+                    if (!yieldEogToken && this._context.model.isEogToken(nextToken))
+                        break;
+                } finally {
+                    evaluatorLock?.dispose();
+                }
+
+                yieldRes.token = nextToken;
+
+                const replacementToken = yield yieldRes as SequenceEvaluateOutput<Metadata>;
 
                 // set the tokens for the next evaluation
-                if (replacementToken != null)
+                if (replacementToken instanceof Array)
+                    evalTokens = replacementToken.slice();
+                else if (replacementToken != null)
                     evalTokens = [replacementToken];
                 else
                     evalTokens = [nextToken];
@@ -1309,55 +1707,402 @@ export class LlamaContextSequence {
     }
 
     /** @internal */
+    private async *_speculativeEvaluate<const Metadata extends SequenceEvaluateMetadataOptions>(tokens: Token[], metadata: Metadata, {
+        temperature,
+        minP,
+        topK,
+        topP,
+        seed,
+        grammarEvaluationState,
+        repeatPenalty,
+        tokenBias,
+        evaluationPriority = defaultEvaluationPriority,
+        contextShiftOptions,
+        yieldEogToken = false,
+        tokenPredictor
+    }: {
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
+        grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
+        evaluationPriority?: EvaluationPriority, contextShiftOptions: Required<ContextShiftOptions>,
+        yieldEogToken?: boolean, tokenPredictor: TokenPredictor
+    }): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
+        this._ensureNotDisposed();
+
+        let evalTokens = tokens.slice();
+
+        if (evalTokens.length === 0)
+            return;
+
+        const tokenPredictorOwner: {} = {};
+        this._tokenPredictorOwner = tokenPredictorOwner;
+        await this._abortTokenPredictor();
+
+        const sampleProbabilities = metadata.probabilities === true;
+        const sampleConfidence = metadata.confidence === true;
+
+        let logitsArray: (true | undefined)[] = [];
+        let logitsStartIndex = evalTokens.length - 1;
+        const validatedTokens: [input: Token, output: Token][] = [];
+        logitsArray[logitsStartIndex] = true;
+
+        const sampler = new LlamaSampler(this.model);
+        try {
+            while (true) {
+                this._ensureNotDisposed();
+                const evaluatorLock = await acquireLock(this._lock, "evaluate");
+                let nextToken: Token | undefined;
+                const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
+
+                try {
+                    if (this._tokenPredictorOwner === tokenPredictorOwner &&
+                        this._loadedTokenPredictions.length > 0 &&
+                        evalTokens.length === 1 &&
+                        evalTokens[0] === this._loadedTokenPredictions[0]?.[0]
+                    ) {
+                        const [token, probabilities, confidence] = this._loadedTokenPredictions.shift()![1];
+                        nextToken = token;
+                        yieldRes.token = nextToken;
+
+                        if (probabilities != null)
+                            yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                        if (confidence != null)
+                            yieldRes.confidence = confidence;
+
+                        const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+                            ? grammarEvaluationState()
+                            : grammarEvaluationState;
+
+                        if (resolvedGrammarEvaluationState != null)
+                            LlamaSampler._acceptTokenOnGrammarEvaluationState(
+                                this._context._llama,
+                                resolvedGrammarEvaluationState,
+                                nextToken
+                            );
+
+                        this._unusedTokenPredictions--;
+                        this._usedTokenPredictions++;
+                    } else if (this._tokenPredictorOwner === tokenPredictorOwner && this._loadedTokenPredictions.length > 0) {
+                        const deleteStartIndex = Math.max(0, this._nextTokenIndex - this._loadedTokenPredictions.length);
+                        await this._eraseContextTokenRanges(
+                            [{start: deleteStartIndex, end: this._nextTokenIndex}],
+                            {canResetTokenPredictor: true, canRemovePredictionTokens: true, skipLock: true}
+                        );
+                        this._loadedTokenPredictions.length = 0;
+                    }
+
+                    if (this._resetTokenPredictor) {
+                        await tokenPredictor.reset({
+                            stateTokens: [...this._contextTokens, ...evalTokens],
+                            evaluateOptions: {
+                                temperature,
+                                minP,
+                                topK,
+                                topP,
+                                seed,
+                                grammarEvaluationState: grammarEvaluationState instanceof Function
+                                    ? grammarEvaluationState()?.clone()
+                                    : grammarEvaluationState?.clone(),
+                                repeatPenalty,
+                                tokenBias,
+                                evaluationPriority,
+                                contextShift: contextShiftOptions,
+                                yieldEogToken: true
+                            },
+                            targetSequence: this
+                        });
+                        this._resetTokenPredictor = false;
+                        this._tokenPredictorOwner = tokenPredictorOwner;
+                    }
+
+                    if (nextToken == null) {
+                        if (this._tokenPredictorOwner === tokenPredictorOwner &&
+
+                            // prevent incurring context shifts due to token prediction validations
+                            this._nextTokenIndex + evalTokens.length < this._context.contextSize
+                        ) {
+                            const testGrammarClone = grammarEvaluationState instanceof Function
+                                ? grammarEvaluationState()?.clone()
+                                : grammarEvaluationState?.clone();
+                            for (const token of await tokenPredictor.predictTokens()) {
+                                if (testGrammarClone != null) {
+                                    const canAddToken = LlamaSampler._canBeNextTokenForGrammarEvaluationState(
+                                        this.model._llama,
+                                        testGrammarClone,
+                                        token
+                                    );
+
+                                    if (!canAddToken)
+                                        break;
+                                }
+
+                                evalTokens.push(token);
+                                logitsArray[evalTokens.length - 1] = true;
+
+                                // prevent incurring context shifts due to token prediction validations
+                                if (this._nextTokenIndex + evalTokens.length >= this._context.contextSize)
+                                    break;
+                            }
+                        }
+
+                        let resolvedGrammarEvaluationState: LlamaGrammarEvaluationState | undefined = undefined;
+
+                        // Evaluate to get the next token.
+                        const decodeResult = await this._decodeTokens(
+                            evalTokens,
+                            logitsArray,
+                            evaluationPriority,
+                            this._tokenMeter,
+                            contextShiftOptions,
+                            (batchLogitIndex, tokenIndex: number) => {
+                                if (tokenIndex === logitsStartIndex)
+                                    resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+                                        ? grammarEvaluationState()
+                                        : grammarEvaluationState;
+                                else if (tokenIndex === logitsStartIndex + 1)
+                                    resolvedGrammarEvaluationState = resolvedGrammarEvaluationState?.clone();
+
+                                const samplerConfig = this._resolveSamplerConfig({
+                                    temperature,
+                                    minP,
+                                    topK,
+                                    topP,
+                                    seed,
+                                    grammarEvaluationState: resolvedGrammarEvaluationState,
+                                    repeatPenalty,
+                                    tokenBias
+                                });
+
+                                return withLock(sampler, "sample", async () => {
+                                    if (sampler.disposed)
+                                        return null;
+
+                                    sampler.applyConfig(samplerConfig);
+                                    if (sampleProbabilities || sampleConfidence)
+                                        return this._context._ctx.sampleToken(
+                                            batchLogitIndex,
+                                            sampler._sampler,
+                                            sampleProbabilities,
+                                            sampleConfidence
+                                        );
+                                    else
+                                        return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
+                                });
+                            }
+                        );
+
+                        for (let i = logitsStartIndex; i < evalTokens.length; i++) {
+                            const item = decodeResult[i];
+                            const [resultToken, probabilities, confidence] = item instanceof Array
+                                ? item
+                                : [item];
+
+                            if (i === logitsStartIndex) {
+                                if (resultToken === -1)
+                                    throw new Error("Failed to sample next token");
+
+                                if (resultToken == null)
+                                    return;
+
+                                nextToken = resultToken;
+                                yieldRes.token = nextToken;
+
+                                if (probabilities != null)
+                                    yieldRes.probabilities = reviveTokenProbabilities(probabilities);
+
+                                if (confidence != null)
+                                    yieldRes.confidence = confidence;
+                            } else {
+                                if (resultToken === -1 || resultToken == null)
+                                    break;
+
+                                const lastValidatedTokenOutput = i === logitsStartIndex + 1
+                                    ? nextToken
+                                    : validatedTokens.at(-1)?.[1];
+                                if (lastValidatedTokenOutput != null && lastValidatedTokenOutput === evalTokens[i]) {
+                                    this._loadedTokenPredictions.push([evalTokens[i]!, [resultToken, probabilities, confidence]]);
+                                    this._validatedTokenPredictions++;
+                                    this._unusedTokenPredictions++;
+                                } else {
+                                    const deleteSize = Math.min(evalTokens.length - i, this.context.contextSize);
+                                    this._refutedTokenPredictions += deleteSize;
+                                    const deleteStartIndex = this._nextTokenIndex - deleteSize;
+                                    tokenPredictor.stop(true);
+                                    await this._eraseContextTokenRanges([{
+                                        start: deleteStartIndex,
+                                        end: this._nextTokenIndex
+                                    }], {canResetTokenPredictor: false, canRemovePredictionTokens: false, skipLock: true});
+                                    break; // the assumption that this token will be generated was wrong
+                                }
+                            }
+                        }
+                    }
+
+                    if (nextToken == null)
+                        throw new Error("Failed to generated next token");
+
+                    // the model finished generating text
+                    if (!yieldEogToken && this._context.model.isEogToken(nextToken))
+                        break;
+                } finally {
+                    evaluatorLock.dispose();
+                }
+
+                const replacementToken = yield yieldRes as SequenceEvaluateOutput<Metadata>;
+
+                // set the tokens for the next evaluation
+                if (replacementToken instanceof Array)
+                    evalTokens = replacementToken.slice();
+                else if (replacementToken != null)
+                    evalTokens = [replacementToken];
+                else
+                    evalTokens = [nextToken];
+
+                if (this._tokenPredictorOwner === tokenPredictorOwner)
+                    tokenPredictor.pushTokens(evalTokens);
+
+                logitsArray = [];
+                logitsStartIndex = evalTokens.length - 1;
+                logitsArray[logitsStartIndex] = true;
+            }
+        } finally {
+            void withLock(sampler, "sample", sampler.asyncDispose);
+
+            if (this._tokenPredictorOwner === tokenPredictorOwner)
+                tokenPredictor.stop();
+        }
+    }
+
+    /** @internal */
+    private async _abortTokenPredictor(skipClearingPredictionsFromState: boolean = false, skipLock: boolean = false) {
+        this._tokenPredictor?.stop();
+        this._resetTokenPredictor = true;
+
+        if (skipClearingPredictionsFromState)
+            return;
+
+        if (this._loadedTokenPredictions.length > 0)
+            await this._eraseContextTokenRanges([{
+                start: this._nextTokenIndex - this._loadedTokenPredictions.length,
+                end: this._nextTokenIndex
+            }], {canResetTokenPredictor: true, canRemovePredictionTokens: true, skipLock});
+    }
+
+    /** @internal */
+    private _resolveSamplerConfig({
+        temperature = 0,
+        minP = 0,
+        topK = 40,
+        topP = 0.95,
+        seed,
+        grammarEvaluationState,
+        repeatPenalty,
+        tokenBias
+    }: {
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
+        grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias)
+    }) {
+        const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
+            ? repeatPenalty.punishTokens()
+            : repeatPenalty?.punishTokens;
+
+        const maxPunishTokens = Math.max(
+            repeatPenalty?.maxPunishTokens ?? defaultMaxPunishTokens,
+            repeatPenaltyTokens?.length ?? 0
+        );
+
+        const resolvedGrammarEvaluationState = grammarEvaluationState instanceof Function
+            ? grammarEvaluationState()
+            : grammarEvaluationState;
+
+        if (resolvedGrammarEvaluationState != null && resolvedGrammarEvaluationState._llama !== this.model._llama)
+            throw new Error("The LlamaGrammar used by passed to this function was created with a different Llama instance than the one used by this sequence's model. Make sure you use the same Llama instance for both the model and the grammar.");
+
+        const {tokenBiasKeys, tokenBiasValues} = getTokenBiasesForAddon(tokenBias, this.model);
+
+        return removeNullFields<Parameters<typeof LlamaSampler.prototype.applyConfig>[0]>({
+            temperature,
+            minP,
+            topK,
+            topP,
+            seed: Math.max(
+                0,
+                Number.isFinite(seed)
+                    ? Math.floor(seed ?? (Date.now() / 1000))
+                    : Math.floor(Date.now() / 1000)
+            ),
+            repeatPenalty: repeatPenalty?.penalty,
+            repeatPenaltyMaxTokens: maxPunishTokens,
+            repeatPenaltyTokens: repeatPenaltyTokens != null
+                ? Uint32Array.from(repeatPenaltyTokens)
+                : undefined,
+            repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
+            repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+            tokenBiasKeys,
+            tokenBiasValues,
+            grammarEvaluationState: resolvedGrammarEvaluationState?._state
+        });
+    }
+
+    /**
+     * The caller of this function has to wrap it with a lock to ensure this function doesn't run concurrently.
+     * @internal
+     */
     private async _decodeTokens<T>(
         tokens: Token[],
-        generateLogit: boolean,
+        logits: (true | undefined)[],
         evaluationPriority: EvaluationPriority,
         tokenMeter: TokenMeter,
         contextShiftOptions: Required<ContextShiftOptions>,
-        onDecodeDone: ((batchLogitIndex: BatchLogitIndex) => T | Promise<T>)
-    ): Promise<T | null> {
+        logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => T | Promise<T>)
+    ): Promise<Array<undefined | T>> {
         this._ensureNotDisposed();
 
         const tokensLeftToDecode = tokens.slice();
+        const tokenLogitsLeftToDecode = logits.slice();
+        let currentTokenIndex = 0;
+        const res: Array<undefined | T> = [];
 
-        return await withLock(this, "evaluate", async (): Promise<T | null> => {
-            while (tokensLeftToDecode.length > 0) {
-                this._ensureNotDisposed();
+        const normalizedLogitDataMapper = (batchLogitIndex: BatchLogitIndex, contextStateTokenIndex: number) => {
+            return logitDataMapper(batchLogitIndex, currentTokenIndex + (contextStateTokenIndex - this._nextTokenIndex));
+        };
 
-                let freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
+        while (tokensLeftToDecode.length > 0) {
+            this._ensureNotDisposed();
 
-                if (freeSpace <= 0) {
-                    await this._freeUpSpaceForTokens(contextShiftOptions);
-                    freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
+            let freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
-                    if (freeSpace <= 0)
-                        throw new Error("Failed to free up space for new tokens");
-                }
+            if (freeSpace <= 0) {
+                await this._freeUpSpaceForTokens(contextShiftOptions);
+                freeSpace = this._context.contextSize - 1 - this._nextTokenIndex;
 
-                const tokensToDecode = tokensLeftToDecode.splice(0, freeSpace);
-                const generateLogitAtTheEnd = generateLogit && tokensLeftToDecode.length === 0;
-
-                const nextToken = await this._context._decodeTokens({
-                    sequenceId: this._sequenceId,
-                    tokens: tokensToDecode,
-                    firstTokenSequenceIndex: this._nextTokenIndex,
-                    generateLogitAtTheEnd,
-                    evaluationPriority,
-                    tokenMeter
-                }, !generateLogitAtTheEnd
-                    ? undefined
-                    : onDecodeDone
-                );
-                this._nextTokenIndex += tokensToDecode.length;
-                this._contextTokens = this._contextTokens.concat(tokensToDecode);
-
-                if (generateLogitAtTheEnd && nextToken != null)
-                    return nextToken;
+                if (freeSpace <= 0)
+                    throw new Error("Failed to free up space for new tokens");
             }
 
-            return null;
-        });
+            const tokensToDecode = tokensLeftToDecode.splice(0, freeSpace);
+            const tokensLogits = tokenLogitsLeftToDecode.slice(0, tokensToDecode.length);
+
+            const generatedLogits = await this._context._decodeTokens({
+                sequenceId: this._sequenceId,
+                tokens: tokensToDecode,
+                firstTokenSequenceIndex: this._nextTokenIndex,
+                logits: tokensLogits,
+                evaluationPriority,
+                tokenMeter
+            }, normalizedLogitDataMapper);
+
+            for (const [index, value] of generatedLogits)
+                res[currentTokenIndex + (index - this._nextTokenIndex)] = value;
+
+            this._nextTokenIndex += tokensToDecode.length;
+            currentTokenIndex += tokensToDecode.length;
+            this._contextTokens = this._contextTokens.concat(tokensToDecode);
+        }
+
+        return res;
     }
 
     /** @internal */
@@ -1381,7 +2126,7 @@ export class LlamaContextSequence {
             if (this.model.tokens.bos != null && this._contextTokens[0] === this.model.tokens.bos)
                 eraseStartIndex = 1;
 
-            await this.eraseContextTokenRanges([{start: eraseStartIndex, end: size + eraseStartIndex}]);
+            await this._eraseContextTokenRanges([{start: eraseStartIndex, end: size + eraseStartIndex}], {skipLock: true});
         } else {
             const ranges = await contextShiftOptions.strategy({
                 sequence: this,
@@ -1391,10 +2136,10 @@ export class LlamaContextSequence {
             if (ranges == null)
                 throw new Error("Invalid delete ranges");
 
-            await this.eraseContextTokenRanges(ranges);
+            await this._eraseContextTokenRanges(ranges, {skipLock: true});
 
-            if (this.nextTokenIndex >= this._context.contextSize - 1)
-                await this.eraseContextTokenRanges([{start: 0, end: size}]);
+            if (this._nextTokenIndex >= this._context.contextSize - 1)
+                await this._eraseContextTokenRanges([{start: 0, end: size}], {skipLock: true});
         }
     }
 
@@ -1413,12 +2158,14 @@ export class LlamaContextSequence {
         contextShift: {
             size: contextShiftSize = Math.min(100, Math.ceil(context.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
-        } = {}
+        } = {},
+        tokenPredictor
     }: {
         sequenceId: number,
         context: LlamaContext,
         tokenMeter?: TokenMeter,
-        contextShift?: ContextShiftOptions
+        contextShift?: ContextShiftOptions,
+        tokenPredictor?: TokenPredictor
     }): LlamaContextSequence {
         return new LlamaContextSequence({
             sequenceId,
@@ -1427,7 +2174,8 @@ export class LlamaContextSequence {
             contextShift: {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
-            }
+            },
+            tokenPredictor
         });
     }
 }
@@ -1436,11 +2184,11 @@ type InternalQueuedDecode = {
     sequenceId: number,
     firstTokenSequenceIndex: number,
     tokens: readonly Token[],
-    generateLogitAtTheEnd: boolean,
+    logits: (true | undefined)[],
     evaluationPriority: EvaluationPriority,
     tokenMeter: TokenMeter,
     response: [accept: (res: any) => void, reject: (reason: unknown) => void],
-    onDone?: (batchLogitIndex: BatchLogitIndex) => any
+    logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => any | Promise<any>)
 };
 
 type CurrentBatchItem = {
@@ -1483,6 +2231,22 @@ function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenB
         tokenBiasKeys: Uint32Array.from(tokenBiasKeys),
         tokenBiasValues: Float32Array.from(tokenBiasValues)
     };
+}
+
+function reviveTokenProbabilities(probabilities?: (Token | number)[]) {
+    if (probabilities == null)
+        return undefined;
+
+    const res = new Map<Token, number>();
+
+    for (let i = 1; i < probabilities.length; i += 2) {
+        const token = probabilities[i - 1]! as Token;
+        const probability = probabilities[i]! as number;
+
+        res.set(token, probability);
+    }
+
+    return res;
 }
 
 function disposeContextIfReferenced(contextRef: WeakRef<LlamaContext>) {

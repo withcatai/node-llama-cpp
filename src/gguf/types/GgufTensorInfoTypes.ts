@@ -2,7 +2,22 @@ export type GgufTensorInfo = {
     readonly name: string,
     readonly dimensions: readonly (number | bigint)[],
     readonly ggmlType: GgmlType,
-    readonly offset: number | bigint
+    readonly offset: number | bigint,
+
+    /**
+     * Adjusted offset relative to the file.
+     * 
+     * Added by the GGUF parser - not part of the file's metadata.
+     */
+    readonly fileOffset: number | bigint,
+
+    /**
+     * For spliced metadata of multiple file parts, this will be the file part number.
+     * Starts from `1`.
+     *
+     * Added by the GGUF parser - not part of the file's metadata.
+     */
+    readonly filePart: number
 };
 
 export const enum GgmlType {

@@ -4,6 +4,7 @@ import path from "path";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
+import prettyMilliseconds from "pretty-ms";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt, documentationPageUrls} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
@@ -28,6 +29,7 @@ import {withProgressLog} from "../../utils/withProgressLog.js";
 import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
+import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -61,8 +63,12 @@ type ChatCommand = {
     maxTokens: number,
     noHistory: boolean,
     environmentFunctions: boolean,
+    tokenPredictionDraftModel?: string,
+    tokenPredictionModelContextSize?: number,
     debug: boolean,
     meter: boolean,
+    timing: boolean,
+    noMmap: boolean,
     printTimings: boolean
 };
 
@@ -261,6 +267,17 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Provide access to environment functions like `getDate` and `getTime`"
             })
+            .option("tokenPredictionDraftModel", {
+                alias: ["dm", "draftModel"],
+                type: "string",
+                description: "Model file to use for draft sequence token prediction (speculative decoding). Can be a path to a local file or a URI of a model file to download"
+            })
+            .option("tokenPredictionModelContextSize", {
+                alias: ["dc", "draftContextSize", "draftContext"],
+                type: "number",
+                description: "Max context size to use for the draft sequence token prediction model context",
+                default: 4096
+            })
             .option("debug", {
                 alias: "d",
                 type: "boolean",
@@ -272,11 +289,21 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Print how many tokens were used as input and output for each response"
             })
+            .option("timing", {
+                type: "boolean",
+                default: false,
+                description: "Print how how long it took to generate each response"
+            })
+            .option("noMmap", {
+                type: "boolean",
+                default: false,
+                description: "Disable mmap (memory-mapped file) usage"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
                 default: false,
-                description: "Print llama.cpp timings after each response"
+                description: "Print llama.cpp's internal timings after each response"
             });
     },
     async handler({
@@ -285,14 +312,15 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
-        environmentFunctions, debug, meter, printTimings
+        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
     }) {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
                 batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-                maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
+                maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter,
+                timing, noMmap, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -307,7 +335,8 @@ async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
     contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
-    repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, debug, meter, printTimings
+    repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel,
+    tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -330,10 +359,19 @@ async function RunChat({
             logLevel: llamaLogLevel
         });
     const logBatchSize = batchSize != null;
+    const useMmap = !noMmap && llama.supportsMmap;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
-        flashAttention
+        flashAttention,
+        useMmap
     });
+    const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
+        ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
+            flashAttention,
+            useMmap,
+            consoleTitle: "Draft model file"
+        })
+        : undefined;
 
     if (systemInfo)
         console.log(llama.systemInfo);
@@ -375,6 +413,7 @@ async function RunChat({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -393,6 +432,58 @@ async function RunChat({
             }
         }
     });
+    const draftModel = resolvedDraftModelPath == null
+        ? undefined
+        : await withProgressLog({
+            loadingText: chalk.blue.bold("Loading draft model"),
+            successText: chalk.blue("Draft model loaded"),
+            failText: chalk.blue("Failed to load draft model"),
+            liveUpdates: !debug,
+            noProgress: debug,
+            liveCtrlCSendsAbortSignal: true
+        }, async (progressUpdater) => {
+            try {
+                return await llama.loadModel({
+                    modelPath: resolvedDraftModelPath,
+                    defaultContextFlashAttention: flashAttention,
+                    useMmap,
+                    onLoadProgress(loadProgress: number) {
+                        progressUpdater.setProgress(loadProgress);
+                    },
+                    loadSignal: progressUpdater.abortSignal
+                });
+            } catch (err) {
+                if (err === progressUpdater.abortSignal?.reason)
+                    process.exit(0);
+
+                throw err;
+            } finally {
+                if (llama.logLevel === LlamaLogLevel.debug) {
+                    await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                    console.info();
+                }
+            }
+        });
+
+    const draftContext = draftModel == null
+        ? undefined
+        : await withOra({
+            loading: chalk.blue("Creating draft context"),
+            success: chalk.blue("Draft context created"),
+            fail: chalk.blue("Failed to create draft context"),
+            useStatusLogs: debug
+        }, async () => {
+            try {
+                return await draftModel.createContext({
+                    contextSize: {max: tokenPredictionModelContextSize}
+                });
+            } finally {
+                if (llama.logLevel === LlamaLogLevel.debug) {
+                    await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
+                    console.info();
+                }
+            }
+        });
     const context = await withOra({
         loading: chalk.blue("Creating context"),
         success: chalk.blue("Context created"),
@@ -414,6 +505,7 @@ async function RunChat({
             }
         }
     });
+
     const grammar = jsonSchemaGrammarFilePath != null
         ? new LlamaJsonSchemaGrammar(
             llama,
@@ -432,13 +524,20 @@ async function RunChat({
         tokenizer: model.tokenizer,
         noJinja
     }) ?? new GeneralChatWrapper();
-    const contextSequence = context.getSequence();
+    const draftContextSequence = draftContext?.getSequence();
+    const contextSequence = draftContextSequence != null
+        ? context.getSequence({
+            tokenPredictor: new DraftSequenceTokenPredictor(draftContextSequence)
+        })
+        : context.getSequence();
     const session = new LlamaChatSession({
         contextSequence,
         systemPrompt,
         chatWrapper: chatWrapper
     });
+    let lastDraftTokenMeterState = draftContextSequence?.tokenMeter.getState();
     let lastTokenMeterState = contextSequence.tokenMeter.getState();
+    let lastTokenPredictionsStats = contextSequence.tokenPredictions;
 
     await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
 
@@ -450,10 +549,10 @@ async function RunChat({
         environmentFunctions = false;
     }
 
-    const padTitle = "Context".length + 1;
-    await printCommonInfoLines({
+    const padTitle = await printCommonInfoLines({
         context,
-        minTitleLength: padTitle,
+        draftContext,
+        useMmap,
         printBos: true,
         printEos: true,
         logBatchSize,
@@ -492,6 +591,10 @@ async function RunChat({
             show: environmentFunctions,
             title: "Environment functions",
             value: "enabled"
+        }, {
+            show: timing,
+            title: "Response timing",
+            value: "enabled"
         }]
     });
 
@@ -513,7 +616,18 @@ async function RunChat({
         return res;
     }
 
-    if (!printTimings && !meter)
+    if (prompt != null && prompt !== "" && !printTimings && (meter || timing)) {
+        // warm up the context sequence before the first evaluation, to make the timings of the actual evaluations more accurate
+        const contextFirstToken = session.chatWrapper.generateContextState({
+            chatHistory: [
+                ...session.getChatHistory(),
+                {type: "user", text: ""}
+            ]
+        }).contextText.tokenize(model.tokenizer)[0];
+
+        if (contextFirstToken != null)
+            await contextSequence.evaluateWithoutGeneratingNewTokens([contextFirstToken]);
+    } else if (!printTimings && !meter)
         void session.preloadPrompt("")
             .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
 
@@ -544,6 +658,7 @@ async function RunChat({
             consoleInteraction.stop();
         });
 
+        const timeBeforePrompt = Date.now();
         try {
             process.stdout.write(startColor!);
             consoleInteraction.start();
@@ -608,6 +723,7 @@ async function RunChat({
 
             console.log();
         }
+        const timeAfterPrompt = Date.now();
 
         if (printTimings) {
             if (LlamaLogLevelGreaterThan(llama.logLevel, LlamaLogLevel.info))
@@ -619,12 +735,62 @@ async function RunChat({
             llama.logLevel = llamaLogLevel;
         }
 
+        if (timing)
+            console.info(
+                chalk.dim("Response duration: ") +
+                prettyMilliseconds(timeAfterPrompt - timeBeforePrompt, {
+                    keepDecimalsOnWholeSeconds: true,
+                    secondsDecimalDigits: 2,
+                    separateMilliseconds: true,
+                    compact: false
+                })
+            );
+
         if (meter) {
             const newTokenMeterState = contextSequence.tokenMeter.getState();
             const tokenMeterDiff = TokenMeter.diff(newTokenMeterState, lastTokenMeterState);
             lastTokenMeterState = newTokenMeterState;
 
-            console.info(`${chalk.dim("Input tokens:")} ${String(tokenMeterDiff.usedInputTokens).padEnd(5, " ")}  ${chalk.dim("Output tokens:")} ${tokenMeterDiff.usedOutputTokens}`);
+            const showDraftTokenMeterDiff = lastDraftTokenMeterState != null && draftContextSequence != null;
+
+            const tokenPredictionsStats = contextSequence.tokenPredictions;
+            const validatedTokenPredictions = tokenPredictionsStats.validated - lastTokenPredictionsStats.validated;
+            const refutedTokenPredictions = tokenPredictionsStats.refuted - lastTokenPredictionsStats.refuted;
+            const usedTokenPredictions = tokenPredictionsStats.used - lastTokenPredictionsStats.used;
+            const unusedTokenPredictions = tokenPredictionsStats.unused - lastTokenPredictionsStats.unused;
+            lastTokenPredictionsStats = tokenPredictionsStats;
+
+            console.info([
+                showDraftTokenMeterDiff && (
+                    chalk.yellow("Main".padEnd("Drafter".length))
+                ),
+                chalk.dim("Input tokens:") + " " + String(tokenMeterDiff.usedInputTokens).padEnd(5, " "),
+                chalk.dim("Output tokens:") + " " + String(tokenMeterDiff.usedOutputTokens).padEnd(5, " "),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Validated predictions:") + " " + String(validatedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Refuted predictions:") + " " + String(refutedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Used predictions:") + " " + String(usedTokenPredictions).padEnd(5, " ")
+                ),
+                showDraftTokenMeterDiff && (
+                    chalk.dim("Unused predictions:") + " " + String(unusedTokenPredictions).padEnd(5, " ")
+                )
+            ].filter(Boolean).join("  "));
+
+            if (lastDraftTokenMeterState != null && draftContextSequence != null) {
+                const newDraftTokenMeterState = draftContextSequence.tokenMeter.getState();
+                const draftTokenMeterDiff = TokenMeter.diff(newDraftTokenMeterState, lastDraftTokenMeterState);
+                lastDraftTokenMeterState = newDraftTokenMeterState;
+
+                console.info([
+                    chalk.yellow("Drafter"),
+                    chalk.dim("Input tokens:") + " " + String(draftTokenMeterDiff.usedInputTokens).padEnd(5, " "),
+                    chalk.dim("Output tokens:") + " " + String(draftTokenMeterDiff.usedOutputTokens).padEnd(5, " ")
+                ].join("  "));
+            }
         }
     }
 }

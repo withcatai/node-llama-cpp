@@ -92,13 +92,13 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                model->model = llama_load_model_from_file(model->modelPath.c_str(), model->model_params);
+                model->model = llama_model_load_from_file(model->modelPath.c_str(), model->model_params);
 
                 model->modelLoaded = model->model != nullptr && model->model != NULL;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_load_model_from_file\"");
+                SetError("Unknown error when calling \"llama_model_load_from_file\"");
             }
         }
         void OnOK() {
@@ -141,14 +141,14 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                llama_free_model(model->model);
+                llama_model_free(model->model);
                 model->modelLoaded = false;
 
                 model->dispose();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_free_model\"");
+                SetError("Unknown error when calling \"llama_model_free\"");
             }
         }
         void OnOK() {
@@ -359,7 +359,7 @@ void AddonModel::dispose() {
     disposed = true;
     if (modelLoaded) {
         modelLoaded = false;
-        llama_free_model(model);
+        llama_model_free(model);
 
         adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
         loadedModelSize = 0;
@@ -515,7 +515,12 @@ Napi::Value AddonModel::TokenBos(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_bos(model));
+    auto token = llama_token_bos(model);
+    if (token == LLAMA_TOKEN_NULL) {
+        token = llama_token_cls(model);
+    }
+
+    return getNapiControlToken(info, model, token);
 }
 Napi::Value AddonModel::TokenEos(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -564,14 +569,6 @@ Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
     }
 
     return getNapiToken(info, model, llama_token_eot(model));
-}
-Napi::Value AddonModel::ClsToken(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
-        return info.Env().Undefined();
-    }
-
-    return getNapiToken(info, model, llama_token_cls(model));
 }
 Napi::Value AddonModel::SepToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -678,7 +675,6 @@ void AddonModel::init(Napi::Object exports) {
                 InstanceMethod("middleToken", &AddonModel::MiddleToken),
                 InstanceMethod("suffixToken", &AddonModel::SuffixToken),
                 InstanceMethod("eotToken", &AddonModel::EotToken),
-                InstanceMethod("clsToken", &AddonModel::ClsToken),
                 InstanceMethod("sepToken", &AddonModel::SepToken),
                 InstanceMethod("getTokenString", &AddonModel::GetTokenString),
                 InstanceMethod("getTokenAttributes", &AddonModel::GetTokenAttributes),

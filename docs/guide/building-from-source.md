@@ -25,13 +25,62 @@ This is useful for building from source on machines that aren't connected to the
 :::
 
 ::: info
-
 If `cmake` is not installed on your machine, `node-llama-cpp` will automatically download `cmake` to an internal directory and try to use it to build `llama.cpp` from source.
 
 If the build fails, make sure you have the required dependencies of `cmake` installed on your machine. More info is available [here](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) (you don't have to install `cmake` or `cmake-js`, just the dependencies).
+:::
 
-If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`, try running `xcode-select --install` to install the Xcode command line tools.
+::: details Dependencies for macOS
+If the build fails on macOS with the error `"/usr/bin/cc" is not able to compile a simple test program`,
+try running this command to install the Xcode command line tools:
+```shell
+xcode-select --install
+```
+:::
 
+::: details Dependencies for Windows x64
+If the build fails on your machine, ensure you have all the necessary build tools installed.
+
+You can install all the dependencies via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/) using this command:
+```shell
+winget install --id Microsoft.VisualStudio.2022.BuildTools --force --override "--add Microsoft.VisualStudio.Component.VC.CMake.Project Microsoft.VisualStudio.Component.VC.CoreBuildTools Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.ATL Microsoft.VisualStudio.Component.VC.ATLMFC Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset Microsoft.VisualStudio.Component.VC.Llvm.Clang Microsoft.VisualStudio.Component.VC.Redist.14.Latest Microsoft.Component.VC.Runtime.UCRTSDK Microsoft.VisualStudio.Component.Windows10SDK Microsoft.VisualStudio.Component.Windows10SDK.20348"
+```
+> WinGet is built-in on Windows 11 and modern Windows 10 versions
+
+---
+
+You can also install all the dependencies manually using the [Visual C++ Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/):
+* **`Workloads` tab:** select `Desktop development with C++`
+* **`Individual components` tab**: select the following:
+  * C++ ATL for latest v143 build tools (x86 & x64)
+  * C++ MFC for latest v143 build tools (x86 & x64)
+  * C++ CMake tools for Windows
+  * C++ Clang Compiler for Windows
+  * MSBuild support for LLVM (clang-cl) toolset
+  * Windows Universal CRT SDK
+:::
+
+::: details Dependencies for Windows on Arm
+On Windows on Arm you need to install additional build tools to build `llama.cpp` from source.
+
+You can install all the dependencies via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/) using this command:
+```shell
+winget install --id Microsoft.VisualStudio.2022.BuildTools --force --override "--add Microsoft.VisualStudio.Component.VC.CMake.Project Microsoft.VisualStudio.Component.VC.CoreBuildTools Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64 Microsoft.VisualStudio.Component.VC.ATL Microsoft.VisualStudio.Component.VC.ATL.ARM64 Microsoft.VisualStudio.Component.VC.ATLMFC Microsoft.VisualStudio.Component.VC.MFC.ARM64 Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset Microsoft.VisualStudio.Component.VC.Llvm.Clang Microsoft.VisualStudio.Component.VC.Redist.14.Latest Microsoft.Component.VC.Runtime.UCRTSDK Microsoft.VisualStudio.Component.Windows10SDK Microsoft.VisualStudio.Component.Windows10SDK.20348"
+```
+> WinGet is built-in on Windows 11 and modern Windows 10 versions
+
+---
+
+You can also install all the dependencies manually using the [Visual C++ Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/):
+* **`Workloads` tab:** select `Desktop development with C++`
+* **`Individual components` tab**: select the following:
+  * MSVC v143 - VS 2022 C++ ARM64 build tools (latest)
+  * C++ ATL for latest v143 build tools (ARM64/ARM64EC)
+  * C++ MFC for latest v143 build tools (ARM64/ARM64EC)
+  * C++ CMake tools for Windows
+  * C++ Clang Compiler for Windows
+  * MSBuild support for LLVM (clang-cl) toolset
+  * Windows Universal CRT SDK
 :::
 
 ## `source download` and `source build` Commands

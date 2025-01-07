@@ -19,7 +19,8 @@ const supportedModels = {
     "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf": "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf?download=true",
     "codegemma-2b-Q4_K_M.gguf": "https://huggingface.co/bartowski/codegemma-2b-GGUF/resolve/main/codegemma-2b-Q4_K_M.gguf?download=true",
     "Llama-3.2-3B-Instruct.Q4_K_M.gguf": "https://huggingface.co/mradermacher/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct.Q4_K_M.gguf?download=true",
-    "nomic-embed-text-v1.5.Q4_K_M.gguf": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf?download=true"
+    "nomic-embed-text-v1.5.Q4_K_M.gguf": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf?download=true",
+    "bge-reranker-v2-m3-Q8_0.gguf": "https://huggingface.co/gpustack/bge-reranker-v2-m3-GGUF/resolve/main/bge-reranker-v2-m3-Q8_0.gguf?download=true"
 } as const;
 
 export async function getModelFile(modelName: keyof typeof supportedModels) {

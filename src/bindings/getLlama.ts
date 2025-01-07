@@ -30,6 +30,7 @@ import {getLinuxDistroInfo, isDistroAlpineLinux} from "./utils/getLinuxDistroInf
 import {testBindingBinary} from "./utils/testBindingBinary.js";
 import {BinaryPlatformInfo, getPlatformInfo} from "./utils/getPlatformInfo.js";
 import {hasBuildingFromSourceDependenciesInstalled} from "./utils/hasBuildingFromSourceDependenciesInstalled.js";
+import {resolveActualBindingBinaryPath} from "./utils/resolveActualBindingBinaryPath.js";
 
 const require = createRequire(import.meta.url);
 
@@ -297,11 +298,13 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
         await waitForLockfileRelease({resourcePath: localBuildFolder});
         if (localBuildBinPath != null) {
             try {
-                const binding = loadBindingModule(localBuildBinPath);
+                const resolvedBindingPath = await resolveActualBindingBinaryPath(localBuildBinPath);
+                const binding = loadBindingModule(resolvedBindingPath);
                 const buildMetadata = await getLocalBuildBinaryBuildMetadata(lastBuildInfo.folderName);
 
                 return await Llama._create({
                     bindings: binding,
+                    bindingPath: resolvedBindingPath,
                     buildType: "localBuild",
                     buildMetadata,
                     logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
@@ -339,10 +342,12 @@ export async function getLlamaForOptions({
     debug = defaultLlamaCppDebugMode
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
-    skipLlamaInit = false
+    skipLlamaInit = false,
+    pipeBinaryTestErrorLogs = false
 }: {
     updateLastBuildInfoOnCompile?: boolean,
-    skipLlamaInit?: boolean
+    skipLlamaInit?: boolean,
+    pipeBinaryTestErrorLogs?: boolean
 } = {}): Promise<Llama> {
     const platform = getPlatform();
     const arch = process.arch;
@@ -460,7 +465,8 @@ export async function getLlamaForOptions({
                             ? "falling back to building from source"
                             : null
                     ),
-                debug
+                debug,
+                pipeBinaryTestErrorLogs
             });
 
             if (llama != null)
@@ -553,7 +559,8 @@ async function loadExistingLlamaBinary({
     vramPadding,
     ramPadding,
     fallbackMessage,
-    debug
+    debug,
+    pipeBinaryTestErrorLogs
 }: {
     buildOptions: BuildOptions,
     canUsePrebuiltBinaries: boolean,
@@ -568,7 +575,8 @@ async function loadExistingLlamaBinary({
     vramPadding: Required<LlamaOptions>["vramPadding"],
     ramPadding: Required<LlamaOptions>["ramPadding"],
     fallbackMessage: string | null,
-    debug: boolean
+    debug: boolean,
+    pipeBinaryTestErrorLogs: boolean
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -585,15 +593,17 @@ async function loadExistingLlamaBinary({
                 platformInfo,
                 buildMetadata
             });
+            const resolvedBindingPath = await resolveActualBindingBinaryPath(localBuildBinPath);
             const binaryCompatible = shouldTestBinaryBeforeLoading
-                ? await testBindingBinary(localBuildBinPath, buildOptions.gpu)
+                ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
                 : true;
 
             if (binaryCompatible) {
-                const binding = loadBindingModule(localBuildBinPath);
+                const binding = loadBindingModule(resolvedBindingPath);
 
                 return await Llama._create({
                     bindings: binding,
+                    bindingPath: resolvedBindingPath,
                     buildType: "localBuild",
                     buildMetadata,
                     logLevel,
@@ -642,15 +652,17 @@ async function loadExistingLlamaBinary({
                     platformInfo,
                     buildMetadata
                 });
+                const resolvedBindingPath = await resolveActualBindingBinaryPath(prebuiltBinDetails.binaryPath);
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(prebuiltBinDetails.binaryPath, buildOptions.gpu)
+                    ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
                     : true;
 
                 if (binaryCompatible) {
-                    const binding = loadBindingModule(prebuiltBinDetails.binaryPath);
+                    const binding = loadBindingModule(resolvedBindingPath);
 
                     return await Llama._create({
                         bindings: binding,
+                        bindingPath: resolvedBindingPath,
                         buildType: "prebuilt",
                         buildMetadata,
                         logLevel,
@@ -744,11 +756,13 @@ async function buildAndLoadLlamaBinary({
         throw new Error("Failed to build llama.cpp");
     }
 
-    const binding = loadBindingModule(localBuildBinPath);
+    const resolvedBindingPath = await resolveActualBindingBinaryPath(localBuildBinPath);
+    const binding = loadBindingModule(resolvedBindingPath);
     const buildMetadata = await getLocalBuildBinaryBuildMetadata(buildFolderName.withCustomCmakeOptions);
 
     return await Llama._create({
         bindings: binding,
+        bindingPath: resolvedBindingPath,
         buildType: "localBuild",
         buildMetadata,
         logLevel,

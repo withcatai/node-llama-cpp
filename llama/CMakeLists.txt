@@ -1,5 +1,19 @@
 cmake_minimum_required(VERSION 3.14)
 
+if (NLC_CURRENT_PLATFORM STREQUAL "win-x64" OR NLC_CURRENT_PLATFORM STREQUAL "win-arm64")
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+if (NLC_TARGET_PLATFORM STREQUAL "win-arm64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
+    if(NLC_CURRENT_PLATFORM STREQUAL "win-x64")
+        include("./profiles/llvm.win32.host-x64.target-arm64.cmake")
+    elseif(NLC_CURRENT_PLATFORM STREQUAL "win-arm64")
+        include("./profiles/llvm.win32.host-arm64.target-arm64.cmake")
+    endif()
+elseif (NLC_CURRENT_PLATFORM STREQUAL "win-x64" AND NLC_TARGET_PLATFORM STREQUAL "win-x64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
+    include("./profiles/llvm.win32.host-x64.target-x64.cmake")
+endif()
+
 project("llama-addon" C CXX)
 
 if (MSVC)
@@ -17,12 +31,12 @@ endif()
 add_definitions(-DNAPI_VERSION=7)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                OUTPUT_VARIABLE NODE_ADDON_API_DIR
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-
 set(LLAMA_BUILD_COMMON ON)
+
+if (MINGW)
+    set(GGML_BACKEND_DL OFF)
+    set(BUILD_SHARED_LIBS ON)
+endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     add_compile_options(-Wno-c++17-extensions)
@@ -38,10 +52,13 @@ else()
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 endif()
 
+execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE NODE_ADDON_API_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
 add_subdirectory("llama.cpp")
-include_directories("gpuInfo")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
 
@@ -86,6 +103,6 @@ if (DEFINED GPU_INFO_EXTRA_LIBS)
 endif()
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
-  # Generate node.lib
-  execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
+    # Generate node.lib
+    execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
 endif()

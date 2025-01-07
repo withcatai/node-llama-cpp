@@ -46,13 +46,10 @@ Napi::Value AddonGrammar::isTextCompatible(const Napi::CallbackInfo& info) {
     }
 
     const auto cpts = unicode_cpts_from_utf8(testText);
-    const llama_grammar_rules  & rules = llama_grammar_get_rules(parsed_grammar);
     llama_grammar_stacks & stacks_cur = llama_grammar_get_stacks(parsed_grammar);
 
     for (const auto & cpt : cpts) {
-        const llama_grammar_stacks stacks_prev = llama_grammar_get_stacks(parsed_grammar);
-
-        llama_grammar_accept(rules, stacks_prev, cpt, stacks_cur);
+        llama_grammar_accept(parsed_grammar, cpt);
 
         if (stacks_cur.empty()) {
             // no stacks means that the grammar failed to match at this point

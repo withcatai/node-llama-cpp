@@ -46,6 +46,9 @@ export type LlamaEmbeddingContextOptions = {
     ignoreMemorySafetyChecks?: boolean
 };
 
+/**
+ * @see [Using Embedding](https://node-llama-cpp.withcat.ai/guide/embedding) tutorial
+ */
 export class LlamaEmbeddingContext {
     /** @internal */ private readonly _llamaContext: LlamaContext;
     /** @internal */ private readonly _sequence: LlamaContextSequence;
