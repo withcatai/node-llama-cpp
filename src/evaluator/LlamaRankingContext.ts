@@ -88,11 +88,10 @@ export class LlamaRankingContext {
 
         if (resolvedInput.length > this._llamaContext.contextSize)
             throw new Error(
-                "Input is longer than the context size. " +
-                "Try to increase the context size or use another model that supports longer contexts."
+                "The input length exceed the context size. " +
+                `Try to increase the context size to at least ${resolvedInput.length + 1} ` +
+                "or use another model that supports longer contexts."
             );
-        else if (resolvedInput.length === 0)
-            return -Infinity;
 
         return this._evaluateRankingForInput(resolvedInput);
     }
@@ -105,22 +104,19 @@ export class LlamaRankingContext {
      */
     public async rankAll(query: Token[] | string | LlamaText, documents: Array<Token[] | string | LlamaText>): Promise<number[]> {
         const resolvedTokens = documents.map((document) => this._getEvaluationInput(query, document));
+        const maxInputTokensLength = resolvedTokens.reduce((max, tokens) => Math.max(max, tokens.length), 0);
 
-        if (resolvedTokens.some((tokens) => tokens.length > this._llamaContext.contextSize))
+        if (maxInputTokensLength > this._llamaContext.contextSize)
             throw new Error(
-                "The input of one of the document is longer than the context size. " +
-                "Try to increase the context size or use another model that supports longer contexts."
+                "The input lengths of some of the given documents exceed the context size. " +
+                `Try to increase the context size to at least ${maxInputTokensLength + 1} ` +
+                "or use another model that supports longer contexts."
             );
         else if (resolvedTokens.length === 0)
             return [];
 
         return await Promise.all(
-            resolvedTokens.map((tokens) => {
-                if (tokens.length === 0)
-                    return -Infinity;
-
-                return this._evaluateRankingForInput(tokens);
-            })
+            resolvedTokens.map((tokens) => this._evaluateRankingForInput(tokens))
         );
     }
 
@@ -186,6 +182,9 @@ export class LlamaRankingContext {
 
     /** @internal */
     private _evaluateRankingForInput(input: Token[]): Promise<number> {
+        if (input.length === 0)
+            return Promise.resolve(0);
+
         return withLock(this, "evaluate", async () => {
             await this._sequence.eraseContextTokenRanges([{
                 start: 0,
