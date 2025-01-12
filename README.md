@@ -27,7 +27,7 @@
 * Up-to-date with the latest `llama.cpp`. Download and compile the latest release with a [single CLI command](https://node-llama-cpp.withcat.ai//guide/building-from-source#downloading-a-release)
 * Enforce a model to generate output in a parseable format, [like JSON](https://node-llama-cpp.withcat.ai/guide/chat-session#json-response), or even force it to [follow a specific JSON schema](https://node-llama-cpp.withcat.ai/guide/chat-session#response-json-schema)
 * [Provide a model with functions it can call on demand](https://node-llama-cpp.withcat.ai/guide/chat-session#function-calling) to retrieve information or perform actions
-* [Embedding support](https://node-llama-cpp.withcat.ai/guide/embedding)
+* [Embedding and reranking support](https://node-llama-cpp.withcat.ai/guide/embedding)
 * [Safe against special token injection attacks](https://node-llama-cpp.withcat.ai/guide/llama-text#input-safety-in-node-llama-cpp)
 * Great developer experience with full TypeScript support, and [complete documentation](https://node-llama-cpp.withcat.ai/guide/)
 * Much more

@@ -52,7 +52,23 @@ const config: Omit<GlobalConfig, "repositoryUrl" | "tagFormat"> = {
         }],
         ["@semantic-release/release-notes-generator", {
             writerOpts: {
-                footerPartial: newFooterTemplate
+                footerPartial: newFooterTemplate,
+
+                // ensure that the "Features" group comes before the "Bug Fixes" group
+                commitGroupsSort(a: {title: string}, b: {title: string}) {
+                    const order = ["Features", "Bug Fixes"];
+                    const aIndex = order.indexOf(a?.title);
+                    const bIndex = order.indexOf(b?.title);
+
+                    if (aIndex >= 0 && bIndex >= 0)
+                        return aIndex - bIndex;
+                    else if (aIndex >= 0)
+                        return -1;
+                    else if (bIndex >= 0)
+                        return 1;
+
+                    return (a?.title || "").localeCompare(b?.title || "");
+                }
             }
         }],
         ["@semantic-release/exec", {

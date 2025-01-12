@@ -22,7 +22,7 @@ AddonGrammarEvaluationState::AddonGrammarEvaluationState(const Napi::CallbackInf
         grammarDef = Napi::ObjectWrap<AddonGrammar>::Unwrap(info[1].As<Napi::Object>());
         grammarDef->Ref();
 
-        sampler = llama_sampler_init_grammar(model->model, grammarDef->grammarCode.c_str(), grammarDef->rootRuleName.c_str());
+        sampler = llama_sampler_init_grammar(model->vocab, grammarDef->grammarCode.c_str(), grammarDef->rootRuleName.c_str());
     }
 }
 AddonGrammarEvaluationState::~AddonGrammarEvaluationState() {
