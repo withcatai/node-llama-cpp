@@ -105,13 +105,13 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                context->ctx = llama_new_context_with_model(context->model->model, context->context_params);
+                context->ctx = llama_init_from_model(context->model->model, context->context_params);
 
                 context->contextLoaded = context->ctx != nullptr && context->ctx != NULL;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_new_context_with_model\"");
+                SetError("Unknown error when calling \"llama_init_from_model\"");
             }
         }
         void OnOK() {
@@ -252,7 +252,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             sampler->rebuildChainIfNeeded();
 
             const auto * logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
-            const int n_vocab = llama_n_vocab(ctx->model->model);
+            const int n_vocab = llama_vocab_n_tokens(ctx->model->vocab);
 
             auto & candidates = sampler->tokenCandidates;
             for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
@@ -525,7 +525,7 @@ Napi::Value AddonContext::InitBatch(const Napi::CallbackInfo& info) {
     has_batch = true;
     batch_n_tokens = n_tokens;
 
-    uint64_t newBatchMemorySize = calculateBatchMemorySize(n_tokens, llama_n_embd(model->model), context_params.n_batch);
+    uint64_t newBatchMemorySize = calculateBatchMemorySize(n_tokens, llama_model_n_embd(model->model), context_params.n_batch);
     if (newBatchMemorySize > batchMemorySize) {
         adjustNapiExternalMemoryAdd(Env(), newBatchMemorySize - batchMemorySize);
         batchMemorySize = newBatchMemorySize;
@@ -645,7 +645,7 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    const int n_embd = llama_n_embd(model->model);
+    const int n_embd = llama_model_n_embd(model->model);
     const enum llama_pooling_type pooling_type = llama_pooling_type(ctx);
     const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
@@ -716,23 +716,25 @@ Napi::Value AddonContext::EnsureDraftContextIsCompatibleForSpeculative(const Nap
     const auto draftCtx = draftContext->ctx;
     const auto currentModel = model->model;
     const auto draftModel = draftContext->model->model;
+    const auto currentVocab = model->vocab;
+    const auto draftVocab = draftContext->model->vocab;
 
-    if (llama_vocab_type(currentModel) != llama_vocab_type(draftModel)) {
+    if (llama_vocab_type(currentVocab) != llama_vocab_type(draftVocab)) {
         Napi::Error::New(info.Env(), "Speculative draft model vocabulary type must match the target model vocabulary type").ThrowAsJavaScriptException();
         return info.Env().Undefined();
     }
 
-    if (llama_add_bos_token(currentModel) != llama_add_bos_token(draftModel) ||
-        llama_add_eos_token(currentModel) != llama_add_eos_token(draftModel) ||
-        llama_token_bos(currentModel) != llama_token_bos(draftModel) ||
-        llama_token_eos(currentModel) != llama_token_eos(draftModel)
+    if (llama_vocab_get_add_bos(currentVocab) != llama_vocab_get_add_bos(draftVocab) ||
+        llama_vocab_get_add_eos(currentVocab) != llama_vocab_get_add_eos(draftVocab) ||
+        llama_vocab_bos(currentVocab) != llama_vocab_bos(draftVocab) ||
+        llama_vocab_eos(currentVocab) != llama_vocab_eos(draftVocab)
     ) {
         Napi::Error::New(info.Env(), "Speculative draft model special tokens must match the target model special tokens").ThrowAsJavaScriptException();
         return info.Env().Undefined();
     }
 
-    const int currentModelVocabSize = llama_n_vocab(currentModel);
-    const int draftModelVocabSize = llama_n_vocab(draftModel);
+    const int currentModelVocabSize = llama_vocab_n_tokens(currentVocab);
+    const int draftModelVocabSize = llama_vocab_n_tokens(draftVocab);
 
     const int vocabDiff = std::abs(currentModelVocabSize - draftModelVocabSize);
 
@@ -747,8 +749,8 @@ Napi::Value AddonContext::EnsureDraftContextIsCompatibleForSpeculative(const Nap
 
     const int minVocabSize = std::min(currentModelVocabSize, draftModelVocabSize);
     for (int i = vocabCheckStartTokenId; i < minVocabSize; ++i) {
-        const char * currentTokenText = llama_token_get_text(currentModel, i);
-        const char * draftTokenText = llama_token_get_text(draftModel, i);
+        const char * currentTokenText = llama_vocab_get_text(currentVocab, i);
+        const char * draftTokenText = llama_vocab_get_text(draftVocab, i);
         if (std::strcmp(currentTokenText, draftTokenText) != 0) {
             Napi::Error::New(
                 info.Env(),
@@ -767,7 +769,7 @@ Napi::Value AddonContext::SetLora(const Napi::CallbackInfo& info) {
     AddonModelLora* lora = Napi::ObjectWrap<AddonModelLora>::Unwrap(info[0].As<Napi::Object>());
     float scale = info[1].As<Napi::Number>().FloatValue();
 
-    llama_lora_adapter_set(ctx, lora->lora_adapter, scale);
+    llama_set_adapter_lora(ctx, lora->lora_adapter, scale);
 
     return info.Env().Undefined();
 }

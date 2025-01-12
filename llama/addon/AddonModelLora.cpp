@@ -30,7 +30,7 @@ class AddonModelLoraUnloadLoraWorker : public Napi::AsyncWorker {
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_lora_adapter_free\"");
+                SetError("Unknown error when calling \"llama_adapter_lora_free\"");
             }
         }
         void OnOK() {
@@ -55,7 +55,7 @@ void AddonModelLora::dispose(bool skipErase) {
     if (lora_adapter != nullptr) {
         auto loraAdapterToDispose = lora_adapter;
         lora_adapter = nullptr;
-        llama_lora_adapter_free(loraAdapterToDispose);
+        llama_adapter_lora_free(loraAdapterToDispose);
         
         if (!skipErase && model->data != nullptr) {
             model->data->removeLora(this);
