@@ -103,6 +103,13 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                     cmakeToolchainOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
 
+                if (toolchainFile != null &&
+                    buildOptions.gpu === "vulkan" &&
+                    useWindowsLlvm &&
+                    !cmakeCustomOptions.has("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN")
+                )
+                    cmakeToolchainOptions.set("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN", toolchainFile);
+
                 if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "1");
                 else if (!cmakeCustomOptions.has("GGML_METAL"))
