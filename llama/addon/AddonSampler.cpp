@@ -10,8 +10,8 @@ AddonSampler::AddonSampler(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
     model->Ref();
 
-    tokenCandidates.resize(llama_n_vocab(model->model));
-    tokenCandidates.reserve(llama_n_vocab(model->model));
+    tokenCandidates.resize(llama_vocab_n_tokens(model->vocab));
+    tokenCandidates.reserve(llama_vocab_n_tokens(model->vocab));
 }
 AddonSampler::~AddonSampler() {
     dispose();
@@ -142,7 +142,7 @@ void AddonSampler::acceptToken(llama_token token) {
         repeatPenalty_lastTokens.push_back(token);
     }
 
-    if (grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr && !llama_token_is_eog(model->model, token)) {
+    if (grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr && !llama_vocab_is_eog(model->vocab, token)) {
         llama_sampler_accept(grammarEvaluationState->sampler, token);
     }
 }
@@ -231,8 +231,8 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             }
 
             const int32_t resolved_top_k = topKSampler_topK <= 0
-                ? llama_n_vocab(model->model)
-                : std::min(topKSampler_topK, llama_n_vocab(model->model));
+                ? llama_vocab_n_tokens(model->vocab)
+                : std::min(topKSampler_topK, llama_vocab_n_tokens(model->vocab));
 
             topKSampler = llama_sampler_init_top_k(resolved_top_k);
         }
@@ -404,7 +404,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
                 }
 
                 tokenBiasSampler = llama_sampler_init_logit_bias(
-                    llama_n_vocab(model->model),
+                    llama_vocab_n_tokens(model->vocab),
                     tokenBiasSampler_biases.size(),
                     tokenBiasSampler_biases.data()
                 );

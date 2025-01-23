@@ -12,6 +12,17 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
     ]
 }, {
+    name: "Phi 4 14B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Phi 4 model was created by Microsoft and is optimized for complex reasoning in areas such as math.",
+
+    fileOptions: [
+        "hf:mradermacher/phi-4-GGUF/phi-4.Q8_0.gguf",
+        "hf:mradermacher/phi-4-GGUF/phi-4.Q6_K.gguf",
+        "hf:mradermacher/phi-4-GGUF/phi-4.Q4_K_M.gguf",
+        "hf:mradermacher/phi-4-GGUF/phi-4.Q4_K_S.gguf"
+    ]
+}, {
     name: "Llama 3.1 70B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
@@ -64,7 +75,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     name: "Phi 3 3.8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Phi 3 model was created by Microsoft and is optimized for strong reasoning (especially math and logic).\n" +
-        "This is the smallversion of the model.",
+        "This is the small version of the model.",
 
     fileOptions: [
         "hf:bartowski/Phi-3.1-mini-4k-instruct-GGUF/Phi-3.1-mini-4k-instruct-Q8_0.gguf",

@@ -8,12 +8,12 @@
 #include "AddonModelData.h"
 #include "AddonModelLora.h"
 
-static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+static Napi::Value getNapiToken(const Napi::CallbackInfo& info, const llama_vocab* vocab, llama_token token) {
     if (token < 0 || token == LLAMA_TOKEN_NULL) {
         return Napi::Number::From(info.Env(), -1);
     }
 
-    auto tokenAttributes = llama_token_get_attr(model, token);
+    auto tokenAttributes = llama_vocab_get_attr(vocab, token);
 
     if (tokenAttributes & LLAMA_TOKEN_ATTR_UNDEFINED || tokenAttributes & LLAMA_TOKEN_ATTR_UNKNOWN) {
         return Napi::Number::From(info.Env(), -1);
@@ -22,12 +22,12 @@ static Napi::Value getNapiToken(const Napi::CallbackInfo& info, llama_model* mod
     return Napi::Number::From(info.Env(), token);
 }
 
-static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, llama_model* model, llama_token token) {
+static Napi::Value getNapiControlToken(const Napi::CallbackInfo& info, const llama_vocab* vocab, llama_token token) {
     if (token < 0) {
         return Napi::Number::From(info.Env(), -1);
     }
 
-    auto tokenAttributes = llama_token_get_attr(model, token);
+    auto tokenAttributes = llama_vocab_get_attr(vocab, token);
 
     if (!(tokenAttributes & LLAMA_TOKEN_ATTR_CONTROL) && !(tokenAttributes & LLAMA_TOKEN_ATTR_UNDEFINED)) {
         return Napi::Number::From(info.Env(), -1);
@@ -93,6 +93,7 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
         void Execute() {
             try {
                 model->model = llama_model_load_from_file(model->modelPath.c_str(), model->model_params);
+                model->vocab = llama_model_get_vocab(model->model);
 
                 model->modelLoaded = model->model != nullptr && model->model != NULL;
             } catch (const std::exception& e) {
@@ -190,7 +191,7 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                const auto loraAdapter = llama_lora_adapter_init(modelLora->model->model, modelLora->loraFilePath.c_str());
+                const auto loraAdapter = llama_adapter_lora_init(modelLora->model->model, modelLora->loraFilePath.c_str());
 
                 if (loraAdapter == nullptr) {
                     SetError(
@@ -213,7 +214,7 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_lora_adapter_init\"");
+                SetError("Unknown error when calling \"llama_adapter_lora_init\"");
             }
         }
         void OnOK() {
@@ -426,7 +427,7 @@ Napi::Value AddonModel::Tokenize(const Napi::CallbackInfo& info) {
     std::string text = info[0].As<Napi::String>().Utf8Value();
     bool specialTokens = info[1].As<Napi::Boolean>().Value();
 
-    std::vector<llama_token> tokens = common_tokenize(model, text, false, specialTokens);
+    std::vector<llama_token> tokens = common_tokenize(vocab, text, false, specialTokens);
 
     Napi::Uint32Array result = Napi::Uint32Array::New(info.Env(), tokens.size());
     for (size_t i = 0; i < tokens.size(); ++i) {
@@ -449,10 +450,10 @@ Napi::Value AddonModel::Detokenize(const Napi::CallbackInfo& info) {
     std::string result;
     result.resize(std::max(result.capacity(), tokens.ElementLength()));
 
-    int n_chars = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
+    int n_chars = llama_detokenize(vocab, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
     if (n_chars < 0) {
         result.resize(-n_chars);
-        n_chars = llama_detokenize(model, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
+        n_chars = llama_detokenize(vocab, (llama_token*)tokens.Data(), tokens.ElementLength(), &result[0], result.size(), false, decodeSpecialTokens);
         GGML_ASSERT(n_chars <= result.size());  // whitespace trimming is performed after per-token detokenization
     }
 
@@ -467,7 +468,7 @@ Napi::Value AddonModel::GetTrainContextSize(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return Napi::Number::From(info.Env(), llama_n_ctx_train(model));
+    return Napi::Number::From(info.Env(), llama_model_n_ctx_train(model));
 }
 
 Napi::Value AddonModel::GetEmbeddingVectorSize(const Napi::CallbackInfo& info) {
@@ -476,7 +477,7 @@ Napi::Value AddonModel::GetEmbeddingVectorSize(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return Napi::Number::From(info.Env(), llama_n_embd(model));
+    return Napi::Number::From(info.Env(), llama_model_n_embd(model));
 }
 
 Napi::Value AddonModel::GetTotalSize(const Napi::CallbackInfo& info) {
@@ -515,12 +516,7 @@ Napi::Value AddonModel::TokenBos(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    auto token = llama_token_bos(model);
-    if (token == LLAMA_TOKEN_NULL) {
-        token = llama_token_cls(model);
-    }
-
-    return getNapiControlToken(info, model, token);
+    return getNapiControlToken(info, vocab, llama_vocab_bos(vocab));
 }
 Napi::Value AddonModel::TokenEos(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -528,7 +524,7 @@ Napi::Value AddonModel::TokenEos(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiControlToken(info, model, llama_token_eos(model));
+    return getNapiControlToken(info, vocab, llama_vocab_eos(vocab));
 }
 Napi::Value AddonModel::TokenNl(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -536,7 +532,7 @@ Napi::Value AddonModel::TokenNl(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_nl(model));
+    return getNapiToken(info, vocab, llama_vocab_nl(vocab));
 }
 Napi::Value AddonModel::PrefixToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -544,7 +540,7 @@ Napi::Value AddonModel::PrefixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_fim_pre(model));
+    return getNapiToken(info, vocab, llama_vocab_fim_pre(vocab));
 }
 Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -552,7 +548,7 @@ Napi::Value AddonModel::MiddleToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_fim_mid(model));
+    return getNapiToken(info, vocab, llama_vocab_fim_mid(vocab));
 }
 Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -560,7 +556,7 @@ Napi::Value AddonModel::SuffixToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_fim_suf(model));
+    return getNapiToken(info, vocab, llama_vocab_fim_suf(vocab));
 }
 Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -568,7 +564,7 @@ Napi::Value AddonModel::EotToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_eot(model));
+    return getNapiToken(info, vocab, llama_vocab_eot(vocab));
 }
 Napi::Value AddonModel::SepToken(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -576,7 +572,7 @@ Napi::Value AddonModel::SepToken(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return getNapiToken(info, model, llama_token_sep(model));
+    return getNapiToken(info, vocab, llama_vocab_sep(vocab));
 }
 Napi::Value AddonModel::GetTokenString(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -587,7 +583,7 @@ Napi::Value AddonModel::GetTokenString(const Napi::CallbackInfo& info) {
     int token = info[0].As<Napi::Number>().Int32Value();
     std::stringstream ss;
 
-    const char* str = llama_token_get_text(model, token);
+    const char* str = llama_vocab_get_text(vocab, token);
     if (str == nullptr) {
         return info.Env().Undefined();
     }
@@ -608,7 +604,7 @@ Napi::Value AddonModel::GetTokenAttributes(const Napi::CallbackInfo& info) {
     }
 
     int token = info[0].As<Napi::Number>().Int32Value();
-    auto tokenAttributes = llama_token_get_attr(model, token);
+    auto tokenAttributes = llama_vocab_get_attr(vocab, token);
 
     return Napi::Number::From(info.Env(), int32_t(tokenAttributes));
 }
@@ -624,7 +620,7 @@ Napi::Value AddonModel::IsEogToken(const Napi::CallbackInfo& info) {
 
     int token = info[0].As<Napi::Number>().Int32Value();
 
-    return Napi::Boolean::New(info.Env(), llama_token_is_eog(model, token));
+    return Napi::Boolean::New(info.Env(), llama_vocab_is_eog(vocab, token));
 }
 Napi::Value AddonModel::GetVocabularyType(const Napi::CallbackInfo& info) {
     if (disposed) {
@@ -632,17 +628,17 @@ Napi::Value AddonModel::GetVocabularyType(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    auto vocabularyType = llama_vocab_type(model);
+    auto vocabularyType = llama_vocab_type(vocab);
 
     return Napi::Number::From(info.Env(), int32_t(vocabularyType));
 }
 Napi::Value AddonModel::ShouldPrependBosToken(const Napi::CallbackInfo& info) {
-    const bool addBos = llama_add_bos_token(model);
+    const bool addBos = llama_vocab_get_add_bos(vocab);
 
     return Napi::Boolean::New(info.Env(), addBos);
 }
 Napi::Value AddonModel::ShouldAppendEosToken(const Napi::CallbackInfo& info) {
-    const bool addEos = llama_add_eos_token(model);
+    const bool addEos = llama_vocab_get_add_eos(vocab);
 
     return Napi::Boolean::New(info.Env(), addEos);
 }

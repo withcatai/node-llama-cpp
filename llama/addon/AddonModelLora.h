@@ -6,7 +6,7 @@
 class AddonModelLora : public Napi::ObjectWrap<AddonModelLora> {
     public:
         AddonModel* model;
-        llama_lora_adapter * lora_adapter;
+        llama_adapter_lora * lora_adapter;
         std::string loraFilePath;
         uint32_t usages = 0;
 
