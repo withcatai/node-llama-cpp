@@ -59,7 +59,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         : buildFolderName.withoutCustomCmakeOptions;
     const useWindowsLlvm = (
         platform === "win" &&
-        (buildOptions.gpu === false || buildOptions.gpu === "vulkan") &&
+        (
+            buildOptions.gpu === false ||
+            (buildOptions.gpu === "vulkan" && buildOptions.arch === "arm64") // Vulkan can't be compiled on Windows x64 with LLVM ATM
+        ) &&
         !ignoreWorkarounds.includes("avoidWindowsLlvm") &&
         !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE") &&
         !requiresMsvcOnWindowsFlags.some((flag) => buildOptions.customCmakeOptions.has(flag))
@@ -105,7 +108,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                 if (toolchainFile != null &&
                     buildOptions.gpu === "vulkan" &&
-                    useWindowsLlvm &&
+                    (useWindowsLlvm || (platform === "win" && buildOptions.arch === "arm64")) &&
                     !cmakeCustomOptions.has("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN")
                 )
                     cmakeToolchainOptions.set("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN", toolchainFile);

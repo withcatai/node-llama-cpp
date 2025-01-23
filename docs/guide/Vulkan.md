@@ -59,6 +59,13 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
   
   :::
 
+* :::details Windows only: enable long paths support
+  Open cmd as Administrator and run this command:
+  ```shell
+  reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" /v "LongPathsEnabled" /t REG_DWORD /d "1" /f  
+  ```
+  :::
+
 ### Building From Source
 When you use the [`getLlama`](../api/functions/getLlama) method, if there's no binary that matches the provided options, it'll automatically build `llama.cpp` from source.
 
