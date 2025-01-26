@@ -1,4 +1,4 @@
-import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
 import {AddonContext, AddonModelLora, BatchLogitIndex} from "../../bindings/AddonTypes.js";
@@ -31,6 +31,10 @@ const defaultFailedCreationRemedy = {
     autoContextSizeShrink: 0.16
 } as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 const defaultEvaluationPriority: EvaluationPriority = 5;
+
+const decodeSyncWorkaround = {
+    vulkanLock: {}
+};
 
 export class LlamaContext {
     /** @internal */ public readonly _llama: Llama;
@@ -473,6 +477,11 @@ export class LlamaContext {
                         ? await allocationResult ?? []
                         : allocationResult ?? [];
 
+                    let decodeLock: Lock | undefined;
+                    // this is a workaround to prevent Vulkan from crashing the process when decoding on multiple contexts in parallel
+                    if (this._llama.gpu === "vulkan")
+                        decodeLock = await acquireLock(decodeSyncWorkaround.vulkanLock, "decode");
+
                     try {
                         if (threadsToUse != null)
                             this._ctx.setThreads(threadsToUse);
@@ -480,6 +489,7 @@ export class LlamaContext {
                         await this._ctx.decodeBatch();
                         consumerHandle?.dispose();
                     } catch (err) {
+                        decodeLock?.dispose();
                         consumerHandle?.dispose();
                         this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
                         return;
