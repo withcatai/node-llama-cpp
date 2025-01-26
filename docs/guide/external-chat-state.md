@@ -9,9 +9,9 @@ You can [save and restore a chat history](./chat-session.md#save-and-restore) on
 :::
 
 To interact with a model in a chat form, you can use [`LlamaChatSession`](../api/classes/LlamaChatSession.md),
-which is stateful chat session that manages the chat state on its own.
+which is a stateful chat session that manages the chat state on its own.
 
-When building a library around `node-llama-cpp`, you may want to store that chat state externally and control the evaluations on your own.
+When building a library around `node-llama-cpp`, you may want to store that chat state externally and control the evaluations yourself.
 
 This is where [`LlamaChat`](../api/classes/LlamaChat.md) may come in handy.
 [`LlamaChat`](../api/classes/LlamaChat.md) Allows you to generate a completion to an existing chat session and manage the evaluation yourself,
@@ -69,9 +69,9 @@ const res = await llamaChat.generateResponse(chatHistory, {
 console.log("AI: " + res.response);
 ```
 
-Now, let say we want to ask the model a follow-up question based on the previous response.
+Now, let's say we want to ask the model a follow-up question based on the previous response.
 Since we already have a context sequence loaded with the previous chat history,
-we'd want to use it as much a possible.
+we'd want to reuse it as much a possible.
 
 To do so, we pass the context window of the previous evaluation output to the new evaluation.
 This is important, since if a context shift has happened, we want to use the existing post-context-shift context sequence state
