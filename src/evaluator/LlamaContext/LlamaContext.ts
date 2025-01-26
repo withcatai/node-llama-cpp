@@ -477,11 +477,6 @@ export class LlamaContext {
                         ? await allocationResult ?? []
                         : allocationResult ?? [];
 
-                    let decodeLock: Lock | undefined;
-                    // this is a workaround to prevent Vulkan from crashing the process when decoding on multiple contexts in parallel
-                    if (this._llama.gpu === "vulkan")
-                        decodeLock = await acquireLock(decodeSyncWorkaround.vulkanLock, "decode");
-
                     try {
                         if (threadsToUse != null)
                             this._ctx.setThreads(threadsToUse);
@@ -489,7 +484,6 @@ export class LlamaContext {
                         await this._ctx.decodeBatch();
                         consumerHandle?.dispose();
                     } catch (err) {
-                        decodeLock?.dispose();
                         consumerHandle?.dispose();
                         this._dispatchErrorForQueuedDecodesAndDequeue(currentQueuedDecodeItems, err);
                         return;
@@ -583,11 +577,17 @@ export class LlamaContext {
                         return;
                     }
 
+                    let decodeLock: Lock | undefined;
+                    // this is a workaround to prevent Vulkan from crashing the process when decoding on multiple contexts in parallel
+                    if (this._llama.gpu === "vulkan")
+                        decodeLock = await acquireLock(decodeSyncWorkaround.vulkanLock, "decode");
+
                     try {
                         await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
 
                         shouldHaveAnotherLoop = this._queuedDecodes.length > 0;
                     } finally {
+                        decodeLock?.dispose();
                         preventDisposalHandle.dispose();
                     }
                 }
