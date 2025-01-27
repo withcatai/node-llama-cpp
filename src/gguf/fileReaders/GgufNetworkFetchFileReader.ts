@@ -104,7 +104,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
                 signal: this._signal
             });
 
-            if ((response.status >= 500 || response.status === 429) && headersToTry.length > 0)
+            if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
                 continue;
 
             if (!response.ok)

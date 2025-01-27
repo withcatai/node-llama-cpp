@@ -99,12 +99,7 @@ export abstract class GgufFileReader {
         const readLength = valueTypeToBytesToRead.uint8 * length;
 
         return this._withBufferRead(offset, readLength, (resolvedOffset) => {
-            const res: string[] = [];
-
-            for (let i = resolvedOffset; i < resolvedOffset + readLength && i < this._buffer.length; i++)
-                res.push(String.fromCharCode(this._buffer[i]!));
-
-            return res.join("");
+            return this._buffer.toString("utf8", resolvedOffset, Math.min(resolvedOffset + readLength, this._buffer.length));
         });
     }
 
