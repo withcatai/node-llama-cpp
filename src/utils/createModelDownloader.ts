@@ -9,6 +9,7 @@ import {safeEventCallback} from "./safeEventCallback.js";
 import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
 import {pushAll} from "./pushAll.js";
 import {resolveModelDestination} from "./resolveModelDestination.js";
+import {getAuthorizationHeader, resolveParsedModelUri} from "./parseModelUri.js";
 
 export type ModelDownloaderOptions = ({
     /**
@@ -122,10 +123,8 @@ export type ModelDownloaderOptions = ({
  * });
  * ```
  */
-export async function createModelDownloader(options: ModelDownloaderOptions) {
-    const downloader = ModelDownloader._create(options);
-    await downloader._init();
-    return downloader;
+export function createModelDownloader(options: ModelDownloaderOptions) {
+    return ModelDownloader._create(options);
 }
 
 /**
@@ -133,6 +132,13 @@ export async function createModelDownloader(options: ModelDownloaderOptions) {
  *
  * You can check each individual model downloader for its download progress,
  * but only the `onProgress` passed to the combined downloader will be called during the download.
+ *
+ * When combining `ModelDownloader` instances, the following options on each individual `ModelDownloader` are ignored:
+ * - `showCliProgress`
+ * - `onProgress`
+ * - `parallelDownloads`
+ *
+ * To set any of those options for the combined downloader, you have to pass them to the combined downloader instance.
  * @example
  * ```typescript
  * import {fileURLToPath} from "url";
@@ -196,31 +202,18 @@ export class ModelDownloader {
     /** @internal */ private _totalFiles?: number;
     /** @internal */ private _tryHeaders: Record<string, string>[] = [];
 
-    private constructor(options: ModelDownloaderOptions) {
+    private constructor(options: ModelDownloaderOptions, {resolvedModelUrl, resolvedFileName}: {
+        resolvedModelUrl: string,
+        resolvedFileName?: string
+    }) {
         const {
-            modelUri, modelUrl,
-            dirPath = cliModelsDirectory, fileName, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
+            dirPath = cliModelsDirectory, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
             skipExisting = true, parallelDownloads = 4, tokens
-        } = options as ModelDownloaderOptions & {
-            modelUri: string,
-            modelUrl: string
-        };
-        const resolvedModelUri = modelUri || modelUrl;
+        } = options;
 
-        if (resolvedModelUri == null || dirPath == null)
-            throw new Error("modelUri and dirPath cannot be null");
-
-        const resolvedModelDestination = resolveModelDestination(resolvedModelUri);
-
-        this._modelUrl = resolvedModelDestination.type === "file"
-            ? path.join(dirPath, resolvedModelUri)
-            : resolvedModelDestination.url;
+        this._modelUrl = resolvedModelUrl;
         this._dirPath = path.resolve(process.cwd(), dirPath);
-        this._fileName = fileName || (
-            resolvedModelDestination.type === "uri"
-                ? resolvedModelDestination.parsedUri.fullFilename
-                : undefined
-        );
+        this._fileName = resolvedFileName;
         this._headers = headers;
         this._showCliProgress = showCliProgress;
         this._onProgress = safeEventCallback(onProgress);
@@ -324,15 +317,11 @@ export class ModelDownloader {
          */
         deleteTempFile?: boolean
     } = {}) {
-        for (const downloader of this._specificFileDownloaders) {
-            if (deleteTempFile)
-                await downloader.closeAndDeleteFile();
-            else
-                await downloader.close();
-        }
+        for (const downloader of this._specificFileDownloaders)
+            await downloader.close({deleteTempFile});
 
         if (this._downloader !== this._specificFileDownloaders[0])
-            await this._downloader?.close();
+            await this._downloader?.close({deleteTempFile});
     }
 
     /** @internal */
@@ -435,8 +424,54 @@ export class ModelDownloader {
     }
 
     /** @internal */
-    public static _create(options: ModelDownloaderOptions) {
-        return new ModelDownloader(options);
+    public static async _create(options: ModelDownloaderOptions) {
+        const {
+            modelUri, modelUrl, dirPath = cliModelsDirectory, fileName
+        } = options as ModelDownloaderOptions & {
+            modelUri?: string,
+            modelUrl?: string
+        };
+        const resolvedModelUri = modelUri || modelUrl;
+
+        if (resolvedModelUri == null || dirPath == null)
+            throw new Error("modelUri and dirPath cannot be null");
+
+        async function getModelUrlAndFilename(): Promise<{
+            resolvedModelUrl: string,
+            resolvedFileName?: string
+        }> {
+            const resolvedModelDestination = resolveModelDestination(resolvedModelUri!);
+
+            if (resolvedModelDestination.type == "file")
+                return {
+                    resolvedModelUrl: path.resolve(dirPath, resolvedModelDestination.path),
+                    resolvedFileName: fileName
+                };
+            else if (resolvedModelDestination.type === "url")
+                return {
+                    resolvedModelUrl: resolvedModelDestination.url,
+                    resolvedFileName: fileName
+                };
+            else if (resolvedModelDestination.parsedUri.type === "resolved")
+                return {
+                    resolvedModelUrl: resolvedModelDestination.parsedUri.resolvedUrl,
+                    resolvedFileName: fileName || resolvedModelDestination.parsedUri.filename
+                };
+
+            const resolvedUri = await resolveParsedModelUri(resolvedModelDestination.parsedUri, {
+                tokens: options.tokens,
+                authorizationHeader: getAuthorizationHeader(options.headers)
+            });
+
+            return {
+                resolvedModelUrl: resolvedUri.resolvedUrl,
+                resolvedFileName: fileName || resolvedUri.filename
+            };
+        }
+
+        const modelDownloader = new ModelDownloader(options, await getModelUrlAndFilename());
+        await modelDownloader._init();
+        return modelDownloader;
     }
 }
 
@@ -472,7 +507,7 @@ export class CombinedModelDownloader {
      *
      * To set any of those options for the combined downloader, you have to pass them to the combined downloader instance
      */
-    public constructor(downloaders: ModelDownloader[], options?: CombinedModelDownloaderOptions) {
+    private constructor(downloaders: ModelDownloader[], options?: CombinedModelDownloaderOptions) {
         const {
             showCliProgress = false,
             onProgress,
@@ -488,18 +523,16 @@ export class CombinedModelDownloader {
     }
 
     public async cancel() {
-        for (const modelDownloader of await Promise.all(this._downloaders)) {
+        for (const modelDownloader of this._downloaders) {
             if (modelDownloader._specificFileDownloaders.every(
                 (downloader) => downloader.status.downloadStatus === "Finished"
             ))
                 continue;
 
-            for (const downloader of modelDownloader._specificFileDownloaders) {
-                if (modelDownloader._deleteTempFileOnCancel)
-                    await downloader.closeAndDeleteFile();
-                else
-                    await downloader.close();
-            }
+            for (const downloader of modelDownloader._specificFileDownloaders)
+                await downloader.close({
+                    deleteTempFile: modelDownloader._deleteTempFileOnCancel
+                });
         }
     }
 
@@ -543,7 +576,7 @@ export class CombinedModelDownloader {
         return this.entrypointFilePaths;
     }
 
-    public get modelDownloaders() {
+    public get modelDownloaders(): readonly ModelDownloader[] {
         return this._downloaders;
     }
 
@@ -598,7 +631,7 @@ export class CombinedModelDownloader {
                 cliStyle: isCI ? "ci" : "fancy",
                 parallelDownloads: this._parallelDownloads
             },
-            ...(await Promise.all(this._downloaders)).flatMap((downloader) => downloader._specificFileDownloaders)
+            ...this._downloaders.flatMap((downloader) => downloader._specificFileDownloaders)
         );
     }
 

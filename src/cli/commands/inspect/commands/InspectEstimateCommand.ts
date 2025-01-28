@@ -17,7 +17,7 @@ import {Llama} from "../../../../bindings/Llama.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import withOra from "../../../../utils/withOra.js";
-import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
+import {resolveModelArgToFilePathOrUrl} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {toBytes} from "../../../utils/toBytes.js";
 
@@ -121,12 +121,9 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
         if (contextSizeArg === -1) contextSizeArg = undefined;
         if (contextSizeArg === -2) contextSizeArg = "train";
 
-        const resolvedModelDestination = resolveModelDestination(ggufPath);
-        const resolvedGgufPath = resolvedModelDestination.type == "file"
-            ? resolvedModelDestination.path
-            : resolvedModelDestination.url;
-
         const headers = resolveHeaderFlag(headerArg);
+
+        const [resolvedModelDestination, resolvedGgufPath] = await resolveModelArgToFilePathOrUrl(ggufPath, headers);
 
         const llama = gpu == null
             ? await getLlama("lastBuild", {

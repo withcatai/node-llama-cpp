@@ -10,7 +10,7 @@ import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {documentationPageUrls} from "../../../../config.js";
 import withOra from "../../../../utils/withOra.js";
-import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
+import {resolveModelArgToFilePathOrUrl} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
 import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
@@ -91,12 +91,9 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
     async handler({
         modelPath: ggufPath, header: headerArg, key, noSplice, fullTensorInfo, fullMetadataArrays, plainJson, outputToJsonFile
     }: InspectGgufCommand) {
-        const resolvedModelDestination = resolveModelDestination(ggufPath);
-        const resolvedGgufPath = resolvedModelDestination.type == "file"
-            ? resolvedModelDestination.path
-            : resolvedModelDestination.url;
-
         const headers = resolveHeaderFlag(headerArg);
+
+        const [resolvedModelDestination, resolvedGgufPath] = await resolveModelArgToFilePathOrUrl(ggufPath, headers);
 
         if (!plainJson)
             printModelDestination(resolvedModelDestination);

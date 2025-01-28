@@ -1,7 +1,7 @@
 export function normalizeGgufDownloadUrl(url: string) {
     const parsedUrl = new URL(url);
 
-    if (parsedUrl.hostname === "huggingface.co") {
+    if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
         const pathnameParts = parsedUrl.pathname.split("/");
 
         if (pathnameParts.length > 3 && pathnameParts[3] === "blob") {

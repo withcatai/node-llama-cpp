@@ -21,7 +21,7 @@ export async function resolveModelFileAccessTokensTryHeaders(
     const parsedUrl = new URL(modelUrl);
     const {huggingFace} = tokens;
 
-    if (parsedUrl.hostname === "huggingface.co") {
+    if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
         const hfToken = resolveHfToken(huggingFace);
 
         res.push({
