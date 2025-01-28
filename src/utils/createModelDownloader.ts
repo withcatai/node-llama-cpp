@@ -17,6 +17,7 @@ export type ModelDownloaderOptions = ({
      *
      * The supported URI schemes are:
      * - **HTTP:** `https://`, `http://`
+     * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`#<quant>` is optional, but recommended)
      * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
      */
     modelUri: string
@@ -83,6 +84,7 @@ export type ModelDownloaderOptions = ({
  *
  * The supported URI schemes are:
  * - **HTTP:** `https://`, `http://`
+ * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`#<quant>` is optional, but recommended)
  * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
  * @example
  * ```typescript
@@ -112,7 +114,7 @@ export type ModelDownloaderOptions = ({
  * const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *
  * const downloader = await createModelDownloader({
- *     modelUri: "hf:user/model/model-file.gguf",
+ *     modelUri: "hf:user/model:quant",
  *     dirPath: path.join(__dirname, "models")
  * });
  * const modelPath = await downloader.download();
@@ -153,7 +155,11 @@ export function createModelDownloader(options: ModelDownloaderOptions) {
  *         dirPath: path.join(__dirname, "models")
  *     }),
  *     createModelDownloader({
- *         modelUri: "hf:user/model/model2.gguf",
+ *         modelUri: "hf:user/model2:quant",
+ *         dirPath: path.join(__dirname, "models")
+ *     }),
+ *     createModelDownloader({
+ *         modelUri: "hf:user/model/model3.gguf",
  *         dirPath: path.join(__dirname, "models")
  *     })
  * ];
@@ -162,7 +168,8 @@ export function createModelDownloader(options: ModelDownloaderOptions) {
  * });
  * const [
  *     model1Path,
- *     model2Path
+ *     model2Path,
+ *     model3Path
  * ] = await combinedDownloader.download();
  *
  * const llama = await getLlama();
@@ -171,6 +178,9 @@ export function createModelDownloader(options: ModelDownloaderOptions) {
  * });
  * const model2 = await llama.loadModel({
  *     modelPath: model2Path!
+ * });
+ * const model3 = await llama.loadModel({
+ *     modelPath: model3Path!
  * });
  * ```
  */

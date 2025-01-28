@@ -75,14 +75,19 @@ You can reference models using a URI instead of their full download URL when usi
 
 When downloading a model from a URI, the model files will be prefixed with a corresponding adaptation of the URI.
 
-To reference a model from Hugging Face, you can use the scheme
-<br/>
-`hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional).
+To reference a model from Hugging Face, you can use one of these schemes:
+* `hf:<user>/<model>:<quant>` (`#<quant>` is optional, [but recommended](#hf-scheme-specify-quant))
+* `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
 
-Here's an example usage of the Hugging Face URI scheme:
+Here are example usages of the Hugging Face URI scheme:
+::: code-group
+```[With quant]
+hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M
 ```
+```[Specific file]
 hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
 ```
+:::
 
 When using a URI to reference a model,
 it's recommended [to add it to your `package.json` file](#cli) to ensure it's downloaded when running `npm install`,
@@ -98,7 +103,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modelsDirectory = path.join(__dirname, "models");
 
 const modelPath = await resolveModelFile(
-    "hf:user/model/model-file.gguf",
+    "hf:user/model:quant",
     modelsDirectory
 );
 
@@ -112,6 +117,13 @@ If a corresponding model file is not found in the given directory, the model wil
 When a file is being downloaded, the download progress is shown in the console by default.
 <br/>
 Set the [`cli`](../api/type-aliases/ResolveModelFileOptions#cli) option to `false` to disable this behavior.
+:::
+
+::: tip TIP {#hf-scheme-specify-quant}
+When using the `hf:<user>/<model>:<quant>` scheme, always specify the quantization level in the URI (`:<quant>`).
+<br/>
+Doing this allows the resolver to resolve to a local model file without checking the model metadata on Hugging Face first,
+so it will be resolved offline and faster.
 :::
 
 ## Downloading Gated Models From Hugging Face {#hf-token}

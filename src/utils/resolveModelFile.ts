@@ -111,7 +111,7 @@ export type ResolveModelFileOptions = {
  *
  * // resolve a model from Hugging Face to the models directory
  * const modelPath = await resolveModelFile(
- *     "hf:user/model/model-file.gguf",
+ *     "hf:user/model:quant",
  *     path.join(__dirname, "models")
  * );
  *
