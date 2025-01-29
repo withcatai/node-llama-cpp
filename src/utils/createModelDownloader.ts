@@ -465,7 +465,7 @@ export class ModelDownloader {
             else if (resolvedModelDestination.parsedUri.type === "resolved")
                 return {
                     resolvedModelUrl: resolvedModelDestination.parsedUri.resolvedUrl,
-                    resolvedFileName: fileName || resolvedModelDestination.parsedUri.filename
+                    resolvedFileName: fileName || resolvedModelDestination.parsedUri.fullFilename
                 };
 
             const resolvedUri = await resolveParsedModelUri(resolvedModelDestination.parsedUri, {
@@ -475,7 +475,7 @@ export class ModelDownloader {
 
             return {
                 resolvedModelUrl: resolvedUri.resolvedUrl,
-                resolvedFileName: fileName || resolvedUri.filename
+                resolvedFileName: fileName || resolvedUri.fullFilename
             };
         }
 
