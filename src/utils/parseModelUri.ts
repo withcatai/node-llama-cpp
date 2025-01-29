@@ -263,7 +263,7 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
             resolveDetails: {
                 type: "hf",
                 user,
-                model,
+                model: actualModel,
                 tag: actualTag
             }
         };

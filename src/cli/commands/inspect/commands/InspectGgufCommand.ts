@@ -15,6 +15,7 @@ import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
 import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 import {toBytes} from "../../../utils/toBytes.js";
+import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -94,6 +95,12 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
         const headers = resolveHeaderFlag(headerArg);
 
         const [resolvedModelDestination, resolvedGgufPath] = await resolveModelArgToFilePathOrUrl(ggufPath, headers);
+
+        if (resolvedModelDestination.type === "file" && !await fs.pathExists(resolvedGgufPath)) {
+            console.error(`${chalk.red("File does not exist:")} ${resolvedGgufPath}`);
+            printDidYouMeanUri(ggufPath);
+            process.exit(1);
+        }
 
         if (!plainJson)
             printModelDestination(resolvedModelDestination);
