@@ -190,17 +190,22 @@ async function fetchHuggingFaceModelManifest({
     while (headersToTry.length > 0) {
         const headers = headersToTry.shift();
 
-        const response = await fetch(manifestUrl, {
-            headers: {
-                ...(authorizationHeader != null ? {"Authorization": authorizationHeader} : {}),
-                ...headers,
+        let response: Awaited<ReturnType<typeof fetch>> | undefined;
+        try {
+            response = await fetch(manifestUrl, {
+                headers: {
+                    ...(authorizationHeader != null ? {"Authorization": authorizationHeader} : {}),
+                    ...headers,
 
-                // we need this to get the `ggufFile` field in the response
-                // https://github.com/ggerganov/llama.cpp/pull/11195
-                "User-Agent": "llama-cpp"
-            },
-            signal
-        });
+                    // we need this to get the `ggufFile` field in the response
+                    // https://github.com/ggerganov/llama.cpp/pull/11195
+                    "User-Agent": "llama-cpp"
+                },
+                signal
+            });
+        } catch (err) {
+            throw new Error(`Failed to fetch manifest for resolving URI ${JSON.stringify(fullUri)}: ${err}`);
+        }
 
         if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
             continue;
@@ -243,8 +248,11 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
         const actualTag = tagParts.length > 0
             ? [tag, ...tagParts].join(":").trimEnd()
             : (tag ?? "").trimEnd();
-        const resolvedTag = ggufQuantNames.has(actualTag.toUpperCase())
+        const assumedQuant = ggufQuantNames.has(actualTag.toUpperCase())
             ? actualTag.toUpperCase()
+            : undefined;
+        const resolvedTag = assumedQuant != null
+            ? assumedQuant
             : actualTag;
 
         if (actualModel == null || actualModel === "" || user === "")
@@ -260,12 +268,23 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
             uri: `hf:${user}/${actualModel}${resolvedTag !== "" ? `:${resolvedTag}` : ""}`,
             filePrefix,
             baseFilename,
-            possibleFullFilenames: [
-                `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}.gguf`,
-                `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}-00001-of-${genericFilePartNumber}.gguf`,
-                `${filePrefix}${baseFilename}.gguf`,
-                `${filePrefix}${baseFilename}-00001-of-${genericFilePartNumber}.gguf`
-            ],
+            possibleFullFilenames:
+                assumedQuant != null
+                    ? [
+                        `${filePrefix}${baseFilename}.${assumedQuant}.gguf`,
+                        `${filePrefix}${baseFilename}.${assumedQuant}-00001-of-${genericFilePartNumber}.gguf`
+                    ]
+                    : (resolvedTag != null && resolvedTag !== "" && resolvedTag !== "latest")
+                        ? [
+                            `${filePrefix}${baseFilename}.${resolvedTag.toUpperCase()}.gguf`,
+                            `${filePrefix}${baseFilename}.${resolvedTag.toUpperCase()}-00001-of-${genericFilePartNumber}.gguf`
+                        ]
+                        : [
+                            `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}.gguf`,
+                            `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}-00001-of-${genericFilePartNumber}.gguf`,
+                            `${filePrefix}${baseFilename}.gguf`,
+                            `${filePrefix}${baseFilename}-00001-of-${genericFilePartNumber}.gguf`
+                        ],
             resolveDetails: {
                 type: "hf",
                 user,

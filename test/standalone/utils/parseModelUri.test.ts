@@ -167,10 +167,6 @@ describe("utils", () => {
                   "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.Q4_K_M-00001-of-{:
               {number}
               :}.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct-00001-of-{:
-              {number}
-              :}.gguf",
                 ],
                 "resolveDetails": {
                   "model": "Meta-Llama-3.1-8B-Instruct-GGUF",
@@ -208,10 +204,6 @@ describe("utils", () => {
                   "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.Q4_K_M-00001-of-{:
               {number}
               :}.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct-00001-of-{:
-              {number}
-              :}.gguf",
                 ],
                 "resolveDetails": {
                   "model": "Meta-Llama-3.1-8B-Instruct-GGUF",
@@ -245,12 +237,8 @@ describe("utils", () => {
                 "baseFilename": "Meta-Llama-3.1-70B-Instruct",
                 "filePrefix": "hf_bartowski_",
                 "possibleFullFilenames": [
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q4_K_M.gguf",
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q4_K_M-00001-of-{:
-              {number}
-              :}.gguf",
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.gguf",
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct-00001-of-{:
+                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_L.gguf",
+                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_L-00001-of-{:
               {number}
               :}.gguf",
                 ],
@@ -327,12 +315,8 @@ describe("utils", () => {
                 "baseFilename": "Meta-Llama-3.1-70B-Instruct",
                 "filePrefix": "hf_mradermacher_",
                 "possibleFullFilenames": [
-                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.Q4_K_M.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.Q4_K_M-00001-of-{:
-              {number}
-              :}.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.gguf",
-                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct-00001-of-{:
+                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.Q8_0.gguf",
+                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.Q8_0-00001-of-{:
               {number}
               :}.gguf",
                 ],
@@ -352,6 +336,38 @@ describe("utils", () => {
                 expect.unreachable("This quantization cannot be resolved due to being binary split");
             } catch (err) {
                 expect(err).toMatchInlineSnapshot('[Error: Cannot get quantization "Q8_0" for model "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF" or it does not exist]');
+            }
+        });
+
+        test("Hugging Face simple URI is resolved 5", async () => {
+            const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:invalid");
+
+            expect(parsedModelUri).toMatchInlineSnapshot(`
+              {
+                "baseFilename": "Meta-Llama-3.1-70B-Instruct",
+                "filePrefix": "hf_mradermacher_",
+                "possibleFullFilenames": [
+                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.INVALID.gguf",
+                  "hf_mradermacher_Meta-Llama-3.1-70B-Instruct.INVALID-00001-of-{:
+              {number}
+              :}.gguf",
+                ],
+                "resolveDetails": {
+                  "model": "Meta-Llama-3.1-70B-Instruct-GGUF",
+                  "tag": "invalid",
+                  "type": "hf",
+                  "user": "mradermacher",
+                },
+                "type": "unresolved",
+                "uri": "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:invalid",
+              }
+            `);
+
+            try {
+                await resolveParsedModelUri(parsedModelUri);
+                expect.unreachable("This quantization cannot be resolved due to not existing");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot('[Error: Cannot get quantization "invalid" for model "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF" or it does not exist]');
             }
         });
     });
