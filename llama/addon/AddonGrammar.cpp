@@ -17,7 +17,7 @@ AddonGrammar::AddonGrammar(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
     }
 
-    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str());
+    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str(), false, nullptr, 0, nullptr, 0);
     
     // will be empty if there are parse errors
     if (parsed_grammar == nullptr) {
@@ -37,7 +37,7 @@ AddonGrammar::~AddonGrammar() {
 Napi::Value AddonGrammar::isTextCompatible(const Napi::CallbackInfo& info) {
     const std::string testText = info[0].As<Napi::String>().Utf8Value();
 
-    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str());
+    auto parsed_grammar = llama_grammar_init_impl(nullptr, grammarCode.c_str(), rootRuleName.c_str(), false, nullptr, 0, nullptr, 0);
     
     // will be empty if there are parse errors
     if (parsed_grammar == nullptr) {
