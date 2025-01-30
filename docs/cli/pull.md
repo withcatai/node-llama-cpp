@@ -20,6 +20,7 @@ If a file already exists and its size matches the expected size, it will not be 
 
 The supported URI schemes are:
 - **HTTP:** `https://`, `http://`
+- **Hugging Face:** `hf:<user>/<model>:<quant>` (`#<quant>` is optional, [but recommended](../guide/downloading-models.md#hf-scheme-specify-quant))
 - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
 
 Learn more about using model URIs in the [Downloading Models guide](../guide/downloading-models.md#model-uris).

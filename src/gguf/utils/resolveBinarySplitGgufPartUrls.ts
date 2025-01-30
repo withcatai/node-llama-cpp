@@ -22,8 +22,7 @@ export function resolveBinarySplitGgufPartUrls(ggufUrl: string) {
         const res: string[] = [];
         for (let i = 1; i <= parts; i++) {
             const url = new URL(parsedGgufUrl.href);
-            url.pathname = pathnameWithoutPart + `.part${String(i)
-                .padStart(partString.length, "0")}of${partsString}`;
+            url.pathname = pathnameWithoutPart + `.part${String(i).padStart(partString.length, "0")}of${partsString}`;
             res.push(url.href);
         }
 

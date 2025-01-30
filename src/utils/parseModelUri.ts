@@ -1,12 +1,34 @@
 import filenamify from "filenamify";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
-import {getGgufSplitPartsInfo} from "../gguf/utils/resolveSplitGgufParts.js";
+import {createSplitPartFilename, getGgufSplitPartsInfo} from "../gguf/utils/resolveSplitGgufParts.js";
+import {ggufQuantNames} from "../gguf/utils/ggufQuantNames.js";
 import {isUrl} from "./isUrl.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
+import {parseModelFileName} from "./parseModelFileName.js";
 
 const defaultHuggingFaceBranch = "main";
+const defaultHuggingFaceFileQuantization = "Q4_K_M";
 
-export type ParseModelUri = {
+export const genericFilePartNumber = "{:\n{number}\n:}" as const;
+
+export type ParsedModelUri = ResolvedParsedModelUri | UnresolvedParsedModelUri;
+export type UnresolvedParsedModelUri = {
+    type: "unresolved",
+    uri: string,
+    filePrefix: string,
+    baseFilename: string,
+    possibleFullFilenames: (string | `${string}${typeof genericFilePartNumber}${string}`)[],
+    resolveDetails: {
+        type: "hf",
+        user: string,
+        model: string,
+        tag: string
+    }
+};
+
+export type ResolvedParsedModelUri = {
+    type: "resolved",
     uri: string,
     resolvedUrl: string,
     filePrefix: string,
@@ -14,15 +36,38 @@ export type ParseModelUri = {
     fullFilename: string
 };
 
-export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolean = false): ParseModelUri | null {
-    if (urlOrUri.startsWith("hf:"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("hf:".length));
+export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolean = false): ParsedModelUri | null {
+    if (urlOrUri.startsWith("hf://"))
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf://".length), urlOrUri);
+    else if (urlOrUri.startsWith("huggingface://"))
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface://".length), urlOrUri);
+    else if (urlOrUri.startsWith("hf:"))
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf:".length), urlOrUri);
     else if (urlOrUri.startsWith("huggingface:"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface:".length));
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface:".length), urlOrUri);
+    else if (urlOrUri.startsWith("hf.co/"))
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf.co/".length), urlOrUri);
+    else if (urlOrUri.startsWith("huggingface.co/"))
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface.co/".length), urlOrUri);
+
+    if (isUrl(urlOrUri)) {
+        const parsedUrl = new URL(urlOrUri);
+        if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+            const pathnameParts = parsedUrl.pathname.split("/");
+            const slashes = pathnameParts.length - 1;
+            const [, user, model] = pathnameParts;
+
+            if (slashes === 2 && user != null && model != null) {
+                return parseHuggingFaceUriContent([
+                    decodeURIComponent(user), "/", decodeURIComponent(model)
+                ].join(""), urlOrUri);
+            }
+        }
+    }
 
     if (convertUrlToSupportedUri && isUrl(urlOrUri)) {
         const parsedUrl = new URL(normalizeGgufDownloadUrl(urlOrUri));
-        if (parsedUrl.hostname === "huggingface.co") {
+        if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
             const pathnameParts = parsedUrl.pathname.split("/");
             const [, user, model, resolve, branch, ...pathParts] = pathnameParts;
             const filePath = pathParts.join("/");
@@ -38,7 +83,7 @@ export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolea
                     branch !== defaultHuggingFaceBranch
                         ? `#${decodeURIComponent(branch)}`
                         : ""
-                ].join(""));
+                ].join(""), urlOrUri);
             }
         }
     }
@@ -54,9 +99,216 @@ export function isModelUri(modelUri: string) {
     }
 }
 
-function parseHuggingFaceUriContent(uri: string): ParseModelUri {
+export async function resolveParsedModelUri(
+    modelUri: ParsedModelUri,
+    options?: {tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string}
+): Promise<ResolvedParsedModelUri>;
+export async function resolveParsedModelUri(
+    modelUri: ParsedModelUri | undefined | null,
+    options?: {tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string}
+): Promise<ResolvedParsedModelUri | undefined | null>;
+export async function resolveParsedModelUri(
+    modelUri: ParsedModelUri | undefined | null,
+    {tokens, signal, authorizationHeader}: {
+        tokens?: ModelFileAccessTokens,
+        signal?: AbortSignal,
+        authorizationHeader?: string
+    } = {}
+): Promise<ResolvedParsedModelUri | undefined | null> {
+    if (modelUri == null)
+        return modelUri;
+
+    if (modelUri.type === "resolved")
+        return modelUri;
+
+    if (modelUri.resolveDetails.type !== "hf")
+        throw new Error(`Unsupported model URI type: ${modelUri.resolveDetails.type}`);
+
+    const modelTag = modelUri.resolveDetails.tag || "latest";
+    const manifest = await fetchHuggingFaceModelManifest({
+        user: modelUri.resolveDetails.user,
+        model: modelUri.resolveDetails.model,
+        modelTag,
+        fullUri: modelUri.uri,
+        tokens,
+        signal,
+        authorizationHeader
+    });
+
+    const filename = manifest.rfilename;
+    const splitPartsInfo = getGgufSplitPartsInfo(filename);
+
+    function resolveQuantizationText() {
+        if (modelTag.toLowerCase() !== "latest")
+            return modelTag.toUpperCase();
+
+        if (filename.toLowerCase().includes(defaultHuggingFaceFileQuantization.toLowerCase()))
+            return defaultHuggingFaceFileQuantization;
+
+        const quantizationText = parseModelFileName(filename).quantization;
+        if (quantizationText != null && ggufQuantNames.has(quantizationText))
+            return quantizationText;
+
+        return "";
+    }
+
+    const quantizationText = resolveQuantizationText();
+    const resolvedBaseFilename = modelUri.baseFilename + (quantizationText !== "" ? ("." + quantizationText) : "") + ".gguf";
+    const resolvedFilename = splitPartsInfo != null
+        ? createSplitPartFilename(resolvedBaseFilename, splitPartsInfo.part, splitPartsInfo.parts)
+        : resolvedBaseFilename;
+
+    const resolvedUrl = normalizeGgufDownloadUrl([
+        "https://huggingface.co/", encodeURIComponent(modelUri.resolveDetails.user),
+        "/", encodeURIComponent(modelUri.resolveDetails.model),
+        "/resolve/", encodeURIComponent(defaultHuggingFaceBranch), "/",
+        filename
+            .split("/")
+            .map((item) => encodeURIComponent(item))
+            .join("/"),
+        "?download=true"
+    ].join(""));
+
+    return {
+        type: "resolved",
+        uri: modelUri.uri,
+        filePrefix: modelUri.filePrefix,
+        filename: resolvedFilename,
+        fullFilename: `${modelUri.filePrefix}${resolvedFilename}`,
+        resolvedUrl
+    };
+}
+
+export function getAuthorizationHeader(headers?: Record<string, string>): string | undefined {
+    return headers?.["Authorization"] || headers?.["authorization"];
+}
+
+async function fetchHuggingFaceModelManifest({
+    user, model, modelTag, fullUri, tokens, signal, authorizationHeader
+}: {
+    user: string, model: string, modelTag: string,
+    fullUri: string, tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string
+}): Promise<{
+    rfilename: string,
+    size: number
+}> {
+    const manifestUrl = [
+        "https://huggingface.co/v2/", encodeURIComponent(user),
+        "/", encodeURIComponent(model),
+        "/manifests/", encodeURIComponent(modelTag)
+    ].join("");
+    const headersToTry = [
+        {},
+        await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens)
+    ];
+
+    while (headersToTry.length > 0) {
+        const headers = headersToTry.shift();
+
+        let response: Awaited<ReturnType<typeof fetch>> | undefined;
+        try {
+            response = await fetch(manifestUrl, {
+                headers: {
+                    ...(authorizationHeader != null ? {"Authorization": authorizationHeader} : {}),
+                    ...headers,
+
+                    // we need this to get the `ggufFile` field in the response
+                    // https://github.com/ggerganov/llama.cpp/pull/11195
+                    "User-Agent": "llama-cpp"
+                },
+                signal
+            });
+        } catch (err) {
+            throw new Error(`Failed to fetch manifest for resolving URI ${JSON.stringify(fullUri)}: ${err}`);
+        }
+
+        if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
+            continue;
+
+        if (response.status === 400 || response.status === 404)
+            throw new Error(`Cannot get quantization "${modelTag}" for model "hf:${user}/${model}" or it does not exist`);
+
+        if (!response.ok)
+            throw new Error(`Failed to fetch manifest for ${JSON.stringify(fullUri)}: ${response.status} ${response.statusText}`);
+
+        try {
+            const json = await response.json() as {
+                ggufFile?: {
+                    rfilename?: string,
+                    size: number
+                }
+            };
+
+            if (json?.ggufFile?.rfilename == null)
+                throw new Error(`Invalid manifest for ${JSON.stringify(fullUri)}`);
+
+            return json.ggufFile as {
+                rfilename: string,
+                size: number
+            };
+        } catch (err) {
+            throw new Error(`Invalid manifest response for ${JSON.stringify(fullUri)}`);
+        }
+    }
+
+    throw new Error(`Failed to fetch manifest for ${JSON.stringify(fullUri)}: no more headers to try`);
+}
+
+function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUri {
     const [user, model, ...pathParts] = uri.split("/");
     let rest = pathParts.join("/");
+
+    if (user != null && model != null && (rest === "" || model.includes(":"))) {
+        const [actualModel, tag, ...tagParts] = model.split(":");
+        const actualTag = tagParts.length > 0
+            ? [tag, ...tagParts].join(":").trimEnd()
+            : (tag ?? "").trimEnd();
+        const assumedQuant = ggufQuantNames.has(actualTag.toUpperCase())
+            ? actualTag.toUpperCase()
+            : undefined;
+        const resolvedTag = assumedQuant != null
+            ? assumedQuant
+            : actualTag;
+
+        if (actualModel == null || actualModel === "" || user === "")
+            throw new Error(`Invalid Hugging Face URI: ${fullUri}`);
+
+        const baseFilename = actualModel.toLowerCase().endsWith("-gguf")
+            ? filenamify(actualModel.slice(0, -"-gguf".length))
+            : filenamify(actualModel);
+
+        const filePrefix = buildHuggingFaceFilePrefix(user, actualModel, defaultHuggingFaceBranch, [], baseFilename + ".gguf");
+        return {
+            type: "unresolved",
+            uri: `hf:${user}/${actualModel}${resolvedTag !== "" ? `:${resolvedTag}` : ""}`,
+            filePrefix,
+            baseFilename,
+            possibleFullFilenames:
+                assumedQuant != null
+                    ? [
+                        `${filePrefix}${baseFilename}.${assumedQuant}.gguf`,
+                        `${filePrefix}${baseFilename}.${assumedQuant}-00001-of-${genericFilePartNumber}.gguf`
+                    ]
+                    : (resolvedTag != null && resolvedTag !== "" && resolvedTag !== "latest")
+                        ? [
+                            `${filePrefix}${baseFilename}.${resolvedTag.toUpperCase()}.gguf`,
+                            `${filePrefix}${baseFilename}.${resolvedTag.toUpperCase()}-00001-of-${genericFilePartNumber}.gguf`
+                        ]
+                        : [
+                            `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}.gguf`,
+                            `${filePrefix}${baseFilename}.${defaultHuggingFaceFileQuantization}-00001-of-${genericFilePartNumber}.gguf`,
+                            `${filePrefix}${baseFilename}.gguf`,
+                            `${filePrefix}${baseFilename}-00001-of-${genericFilePartNumber}.gguf`
+                        ],
+            resolveDetails: {
+                type: "hf",
+                user,
+                model: actualModel,
+                tag: resolvedTag
+            }
+        };
+    }
+
     const hashIndex = rest.indexOf("#");
     let branch = defaultHuggingFaceBranch;
 
@@ -74,7 +326,7 @@ function parseHuggingFaceUriContent(uri: string): ParseModelUri {
         .join("/");
 
     if (!user || !model || filePath === "")
-        throw new Error(`Invalid Hugging Face URI: ${uri}`);
+        throw new Error(`Invalid Hugging Face URI: ${fullUri}`);
 
     const resolvedUrl = normalizeGgufDownloadUrl([
         "https://huggingface.co/", encodeURIComponent(user),
@@ -83,37 +335,38 @@ function parseHuggingFaceUriContent(uri: string): ParseModelUri {
         "/", filePath, "?download=true"
     ].join(""));
 
-    function buildFilePrefix(user: string, model: string, branch: string, pathParts: string[], filename: string) {
-        const res: string[] = ["hf"];
-
-        res.push(filenamify(user));
-
-        if (!doesFilenameMatchExactModelName(filename, model) || branch !== defaultHuggingFaceBranch)
-            res.push(filenamify(model));
-
-        if (branch !== defaultHuggingFaceBranch)
-            res.push(filenamify(branch));
-
-        if (pathParts.length > 0) {
-            if (doesFilenameMatchExactFolderName(filename, pathParts.at(-1)!))
-                pathParts = pathParts.slice(0, -1);
-
-            if (pathParts.length > 0)
-                res.push(filenamify(pathParts.join("__")));
-        }
-
-        return res.join("_") + "_";
-    }
-
     const filename = resolveModelFilenameFromUrl(resolvedUrl)!;
-    const filePrefix = buildFilePrefix(user, model, branch, filePathParts.slice(0, -1), filename);
+    const filePrefix = buildHuggingFaceFilePrefix(user, model, branch, filePathParts.slice(0, -1), filename);
     return {
+        type: "resolved",
         uri: `hf:${user}/${model}/${filePathParts.join("/")}${branch !== defaultHuggingFaceBranch ? `#${branch}` : ""}`,
         resolvedUrl,
         filePrefix,
         filename,
         fullFilename: `${filePrefix}${filename}`
     };
+}
+
+function buildHuggingFaceFilePrefix(user: string, model: string, branch: string, pathParts: string[], filename: string) {
+    const res: string[] = ["hf"];
+
+    res.push(filenamify(user));
+
+    if (!doesFilenameMatchExactModelName(filename, model) || branch !== defaultHuggingFaceBranch)
+        res.push(filenamify(model));
+
+    if (branch !== defaultHuggingFaceBranch)
+        res.push(filenamify(branch));
+
+    if (pathParts.length > 0) {
+        if (doesFilenameMatchExactFolderName(filename, pathParts.at(-1)!))
+            pathParts = pathParts.slice(0, -1);
+
+        if (pathParts.length > 0)
+            res.push(filenamify(pathParts.join("__")));
+    }
+
+    return res.join("_") + "_";
 }
 
 function resolveModelFilenameFromUrl(modelUrl: string) {

@@ -1,5 +1,7 @@
+import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
+import fs from "fs-extra";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
@@ -17,9 +19,11 @@ import {Llama} from "../../../../bindings/Llama.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import withOra from "../../../../utils/withOra.js";
-import {resolveModelDestination} from "../../../../utils/resolveModelDestination.js";
+import {resolveModelArgToFilePathOrUrl} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {toBytes} from "../../../utils/toBytes.js";
+import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
+import {isModelUri} from "../../../../utils/parseModelUri.js";
 
 type InspectEstimateCommand = {
     modelPath: string,
@@ -121,12 +125,22 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
         if (contextSizeArg === -1) contextSizeArg = undefined;
         if (contextSizeArg === -2) contextSizeArg = "train";
 
-        const resolvedModelDestination = resolveModelDestination(ggufPath);
-        const resolvedGgufPath = resolvedModelDestination.type == "file"
-            ? resolvedModelDestination.path
-            : resolvedModelDestination.url;
-
         const headers = resolveHeaderFlag(headerArg);
+
+        const [resolvedModelDestination, resolvedGgufPath] = isModelUri(ggufPath)
+            ? await withOra({
+                loading: chalk.blue("Resolving model URI"),
+                success: chalk.blue("Resolved model URI"),
+                fail: chalk.blue("Failed to resolve model URI"),
+                noSuccessLiveStatus: true
+            }, () => resolveModelArgToFilePathOrUrl(ggufPath, headers))
+            : await resolveModelArgToFilePathOrUrl(ggufPath, headers);
+
+        if (resolvedModelDestination.type === "file" && !await fs.pathExists(resolvedGgufPath)) {
+            console.error(`${chalk.red("File does not exist:")} ${resolvedGgufPath}`);
+            printDidYouMeanUri(ggufPath);
+            process.exit(1);
+        }
 
         const llama = gpu == null
             ? await getLlama("lastBuild", {

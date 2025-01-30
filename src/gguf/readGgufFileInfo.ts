@@ -1,7 +1,7 @@
 import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
 import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
-import {isModelUri, parseModelUri} from "../utils/parseModelUri.js";
+import {getAuthorizationHeader, isModelUri, parseModelUri, resolveParsedModelUri} from "../utils/parseModelUri.js";
 import {Writable} from "../utils/utilTypes.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
@@ -75,9 +75,12 @@ export async function readGgufFileInfo(pathOrUri: string, {
 } = {}) {
     const useNetworkReader = sourceType === "network" || (sourceType == null && (isUrl(pathOrUri) || isModelUri(pathOrUri)));
 
-    function createFileReader(pathOrUri: string) {
+    async function createFileReader(pathOrUri: string) {
         if (useNetworkReader) {
-            const parsedModelUri = parseModelUri(pathOrUri);
+            const parsedModelUri = await resolveParsedModelUri(parseModelUri(pathOrUri), {
+                tokens, signal,
+                authorizationHeader: getAuthorizationHeader(fetchHeaders)
+            });
             return new GgufNetworkFetchFileReader({
                 url: parsedModelUri?.resolvedUrl ?? normalizeGgufDownloadUrl(pathOrUri),
                 retryOptions: fetchRetryOptions,
@@ -97,7 +100,7 @@ export async function readGgufFileInfo(pathOrUri: string, {
     }
 
     async function readSingleFile(pathOrUri: string, splitPartNumber: number = 1) {
-        const fileReader = createFileReader(pathOrUri);
+        const fileReader = await createFileReader(pathOrUri);
         const res = await parseGguf({
             fileReader,
             ignoreKeys,

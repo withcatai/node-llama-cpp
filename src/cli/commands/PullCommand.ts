@@ -117,7 +117,8 @@ export const PullCommand: CommandModule<object, PullCommand> = {
                 deleteTempFileOnCancel: noTempFile,
                 skipExisting: !override,
                 fileName: filename || undefined,
-                parallelDownloads: parallel
+                parallelDownloads: parallel,
+                _showUriResolvingProgress: !noProgress
             });
 
             if (!override && downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {

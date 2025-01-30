@@ -7,9 +7,9 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 8 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q8_0.gguf",
-        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q6_K.gguf",
-        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
+        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q8_0",
+        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q6_K",
+        "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M"
     ]
 }, {
     name: "Phi 4 14B",
@@ -17,10 +17,10 @@ export const recommendedModels: ModelRecommendation[] = [{
     description: "Phi 4 model was created by Microsoft and is optimized for complex reasoning in areas such as math.",
 
     fileOptions: [
-        "hf:mradermacher/phi-4-GGUF/phi-4.Q8_0.gguf",
-        "hf:mradermacher/phi-4-GGUF/phi-4.Q6_K.gguf",
-        "hf:mradermacher/phi-4-GGUF/phi-4.Q4_K_M.gguf",
-        "hf:mradermacher/phi-4-GGUF/phi-4.Q4_K_S.gguf"
+        "hf:mradermacher/phi-4-GGUF:Q8_0",
+        "hf:mradermacher/phi-4-GGUF:Q6_K",
+        "hf:mradermacher/phi-4-GGUF:Q4_K_M",
+        "hf:mradermacher/phi-4-GGUF:Q4_K_S"
     ]
 }, {
     name: "Llama 3.1 70B",
@@ -32,8 +32,8 @@ export const recommendedModels: ModelRecommendation[] = [{
     fileOptions: [
         "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct.Q8_0.gguf.part1of2",
         "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct.Q6_K.gguf.part1of2",
-        "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct.Q4_K_M.gguf",
-        "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct.Q4_K_S.gguf"
+        "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:Q4_K_M",
+        "hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:Q4_K_S"
     ]
 }, {
     name: "Llama 3.1 405B",
@@ -54,10 +54,10 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is a 12 billion parameters model.",
 
     fileOptions: [
-        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF/Mistral-Nemo-Instruct-2407.Q8_0.gguf",
-        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF/Mistral-Nemo-Instruct-2407.Q6_K.gguf",
-        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF/Mistral-Nemo-Instruct-2407.Q4_K_M.gguf",
-        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF/Mistral-Nemo-Instruct-2407.Q4_K_S.gguf"
+        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF:Q8_0",
+        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF:Q6_K",
+        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF:Q4_K_M",
+        "hf:mradermacher/Mistral-Nemo-Instruct-2407-GGUF:Q4_K_S"
     ]
 }, {
     name: "Llama 3.2 3B",
@@ -66,10 +66,10 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This model is smarter than the 1B model, but is still relatively small and can run on less capable machines.",
 
     fileOptions: [
-        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q8_0.gguf",
-        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q6_K.gguf",
-        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q4_K_M.gguf",
-        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct.Q4_K_S.gguf"
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF:Q8_0",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF:Q6_K",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF:Q4_K_M",
+        "hf:mradermacher/Llama-3.2-3B-Instruct-GGUF:Q4_K_S"
     ]
 }, {
     name: "Phi 3 3.8B",
@@ -78,8 +78,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the small version of the model.",
 
     fileOptions: [
-        "hf:bartowski/Phi-3.1-mini-4k-instruct-GGUF/Phi-3.1-mini-4k-instruct-Q8_0.gguf",
-        "hf:bartowski/Phi-3.1-mini-4k-instruct-GGUF/Phi-3.1-mini-4k-instruct-Q4_K_M.gguf"
+        "hf:bartowski/Phi-3.1-mini-4k-instruct-GGUF:Q8_0",
+        "hf:bartowski/Phi-3.1-mini-4k-instruct-GGUF:Q4_K_M"
     ]
 }, {
     name: "OLMoE 1B 7B MoE",
@@ -104,8 +104,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This model includes 8 expert models, each with 7 billion parameters.",
 
     fileOptions: [
-        "hf:TheBloke/Mixtral-8x7B-v0.1-GGUF/mixtral-8x7b-v0.1.Q5_K_M.gguf",
-        "hf:TheBloke/Mixtral-8x7B-v0.1-GGUF/mixtral-8x7b-v0.1.Q4_K_M.gguf"
+        "hf:TheBloke/Mixtral-8x7B-v0.1-GGUF:Q5_K_M",
+        "hf:TheBloke/Mixtral-8x7B-v0.1-GGUF:Q4_K_M"
     ]
 }, {
     name: "Mistral 7B Instruct v0.2",
@@ -114,8 +114,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 7 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:TheBloke/Mistral-7B-Instruct-v0.2-GGUF/mistral-7b-instruct-v0.2.Q5_K_M.gguf",
-        "hf:TheBloke/Mistral-7B-Instruct-v0.2-GGUF/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+        "hf:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M",
+        "hf:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M"
     ]
 }, {
     name: "Dolphin 2.5 Mixtral 8x7B MoE",
@@ -125,8 +125,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This model includes 8 expert models, each with 7 billion parameters.",
 
     fileOptions: [
-        "hf:TheBloke/dolphin-2.5-mixtral-8x7b-GGUF/dolphin-2.5-mixtral-8x7b.Q5_K_M.gguf",
-        "hf:TheBloke/dolphin-2.5-mixtral-8x7b-GGUF/dolphin-2.5-mixtral-8x7b.Q4_K_M.gguf"
+        "hf:TheBloke/dolphin-2.5-mixtral-8x7b-GGUF:Q5_K_M",
+        "hf:TheBloke/dolphin-2.5-mixtral-8x7b-GGUF:Q4_K_M"
     ]
 }, {
     name: "Gemma 2 9B",
@@ -136,13 +136,13 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 9 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q6_K_L.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q6_K.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q5_K_L.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q5_K_M.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q5_K_S.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q4_K_L.gguf",
-        "hf:bartowski/gemma-2-9b-it-GGUF/gemma-2-9b-it-Q4_K_M.gguf"
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q6_K_L",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q6_K",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_L",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_M",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_S",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q4_K_L",
+        "hf:bartowski/gemma-2-9b-it-GGUF:Q4_K_M"
     ]
 }, {
     name: "Gemma 2 2B",
@@ -152,11 +152,11 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 2 billion parameters version of the model and is significantly less powerful than the 9B version.",
 
     fileOptions: [
-        "hf:bartowski/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q6_K_L.gguf",
-        "hf:bartowski/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q6_K.gguf",
-        "hf:bartowski/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q5_K_M.gguf",
-        "hf:bartowski/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q5_K_S.gguf",
-        "hf:bartowski/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q4_K_M.gguf"
+        "hf:bartowski/gemma-2-2b-it-GGUF:Q6_K_L",
+        "hf:bartowski/gemma-2-2b-it-GGUF:Q6_K",
+        "hf:bartowski/gemma-2-2b-it-GGUF:Q5_K_M",
+        "hf:bartowski/gemma-2-2b-it-GGUF:Q5_K_S",
+        "hf:bartowski/gemma-2-2b-it-GGUF:Q4_K_M"
     ]
 }, {
     name: "Gemma 2 27B",
@@ -167,13 +167,13 @@ export const recommendedModels: ModelRecommendation[] = [{
         "Since the model is relatively big, it may not run well on your machine",
 
     fileOptions: [
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q6_K_L.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q6_K.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q5_K_L.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q5_K_M.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q5_K_S.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q4_K_L.gguf",
-        "hf:bartowski/gemma-2-27b-it-GGUF/gemma-2-27b-it-Q4_K_M.gguf"
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q6_K_L",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q6_K",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_L",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_M",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_S",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q4_K_L",
+        "hf:bartowski/gemma-2-27b-it-GGUF:Q4_K_M"
     ]
 }, {
     name: "Orca 2 13B",
@@ -182,8 +182,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 13 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:TheBloke/Orca-2-13B-GGUF/orca-2-13b.Q5_K_M.gguf",
-        "hf:TheBloke/Orca-2-13B-GGUF/orca-2-13b.Q4_K_M.gguf"
+        "hf:TheBloke/Orca-2-13B-GGUF:Q5_K_M",
+        "hf:TheBloke/Orca-2-13B-GGUF:Q4_K_M"
     ]
 }, {
     name: "Code Llama 7B",
@@ -192,8 +192,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 7 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:TheBloke/CodeLlama-7B-GGUF/codellama-7b.Q5_K_M.gguf",
-        "hf:TheBloke/CodeLlama-7B-GGUF/codellama-7b.Q4_K_M.gguf"
+        "hf:TheBloke/CodeLlama-7B-GGUF:Q5_K_M",
+        "hf:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
     ]
 }, {
     name: "Code Llama 13B",
@@ -202,8 +202,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 13 billion parameters version of the model.",
 
     fileOptions: [
-        "hf:TheBloke/CodeLlama-13B-GGUF/codellama-13b.Q5_K_M.gguf",
-        "hf:TheBloke/CodeLlama-13B-GGUF/codellama-13b.Q4_K_M.gguf"
+        "hf:TheBloke/CodeLlama-13B-GGUF:Q5_K_M",
+        "hf:TheBloke/CodeLlama-13B-GGUF:Q4_K_M"
     ]
 }, {
     name: "Code Llama 34B",
@@ -213,8 +213,8 @@ export const recommendedModels: ModelRecommendation[] = [{
         "You need a GPU with handful of VRAM to use this version.",
 
     fileOptions: [
-        "hf:TheBloke/CodeLlama-34B-GGUF/codellama-34b.Q5_K_M.gguf",
-        "hf:TheBloke/CodeLlama-34B-GGUF/codellama-34b.Q4_K_M.gguf"
+        "hf:TheBloke/CodeLlama-34B-GGUF:Q5_K_M",
+        "hf:TheBloke/CodeLlama-34B-GGUF:Q4_K_M"
     ]
 }, {
     name: "CodeGemma 2B",
@@ -225,11 +225,11 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 2 billion parameters version of the model.\n",
 
     fileOptions: [
-        "hf:bartowski/codegemma-2b-GGUF/codegemma-2b-Q8_0.gguf",
-        "hf:bartowski/codegemma-2b-GGUF/codegemma-2b-Q6_K.gguf",
-        "hf:bartowski/codegemma-2b-GGUF/codegemma-2b-Q5_K_M.gguf",
-        "hf:bartowski/codegemma-2b-GGUF/codegemma-2b-Q5_K_S.gguf",
-        "hf:bartowski/codegemma-2b-GGUF/codegemma-2b-Q4_K_M.gguf"
+        "hf:bartowski/codegemma-2b-GGUF:Q8_0",
+        "hf:bartowski/codegemma-2b-GGUF:Q6_K",
+        "hf:bartowski/codegemma-2b-GGUF:Q5_K_M",
+        "hf:bartowski/codegemma-2b-GGUF:Q5_K_S",
+        "hf:bartowski/codegemma-2b-GGUF:Q4_K_M"
     ]
 }, {
     name: "CodeGemma 7B",
@@ -240,10 +240,10 @@ export const recommendedModels: ModelRecommendation[] = [{
         "This is the 7 billion parameters version of the model.\n",
 
     fileOptions: [
-        "hf:bartowski/codegemma-1.1-7b-it-GGUF/codegemma-1.1-7b-it-Q6_K.gguf",
-        "hf:bartowski/codegemma-1.1-7b-it-GGUF/codegemma-1.1-7b-it-Q5_K_M.gguf",
-        "hf:bartowski/codegemma-1.1-7b-it-GGUF/codegemma-1.1-7b-it-Q5_K_S.gguf",
-        "hf:bartowski/codegemma-1.1-7b-it-GGUF/codegemma-1.1-7b-it-Q4_K_M.gguf"
+        "hf:bartowski/codegemma-1.1-7b-it-GGUF:Q6_K",
+        "hf:bartowski/codegemma-1.1-7b-it-GGUF:Q5_K_M",
+        "hf:bartowski/codegemma-1.1-7b-it-GGUF:Q5_K_S",
+        "hf:bartowski/codegemma-1.1-7b-it-GGUF:Q4_K_M"
     ]
 }, {
     name: "Stable Code Instruct 3B",
