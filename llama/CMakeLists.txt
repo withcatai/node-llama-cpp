@@ -50,6 +50,14 @@ if(APPLE)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 else()
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+
+    if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Android")
+        set(CMAKE_SKIP_BUILD_RPATH FALSE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+        set(CMAKE_BUILD_RPATH "$ORIGIN")
+        set(CMAKE_INSTALL_RPATH "$ORIGIN")
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+    endif()
 endif()
 
 execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
