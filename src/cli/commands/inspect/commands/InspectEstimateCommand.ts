@@ -23,6 +23,7 @@ import {resolveModelArgToFilePathOrUrl} from "../../../../utils/resolveModelDest
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
+import {isModelUri} from "../../../../utils/parseModelUri.js";
 
 type InspectEstimateCommand = {
     modelPath: string,
@@ -126,7 +127,14 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
 
         const headers = resolveHeaderFlag(headerArg);
 
-        const [resolvedModelDestination, resolvedGgufPath] = await resolveModelArgToFilePathOrUrl(ggufPath, headers);
+        const [resolvedModelDestination, resolvedGgufPath] = isModelUri(ggufPath)
+            ? await withOra({
+                loading: chalk.blue("Resolving model URI"),
+                success: chalk.blue("Resolved model URI"),
+                fail: chalk.blue("Failed to resolve model URI"),
+                noSuccessLiveStatus: true
+            }, () => resolveModelArgToFilePathOrUrl(ggufPath, headers))
+            : await resolveModelArgToFilePathOrUrl(ggufPath, headers);
 
         if (resolvedModelDestination.type === "file" && !await fs.pathExists(resolvedGgufPath)) {
             console.error(`${chalk.red("File does not exist:")} ${resolvedGgufPath}`);

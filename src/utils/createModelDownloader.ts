@@ -2,6 +2,7 @@ import process from "process";
 import path from "path";
 import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence} from "ipull";
 import fs from "fs-extra";
+import chalk from "chalk";
 import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {cliModelsDirectory, isCI} from "../config.js";
@@ -10,6 +11,7 @@ import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./m
 import {pushAll} from "./pushAll.js";
 import {resolveModelDestination} from "./resolveModelDestination.js";
 import {getAuthorizationHeader, resolveParsedModelUri} from "./parseModelUri.js";
+import withOra from "./withOra.js";
 
 export type ModelDownloaderOptions = ({
     /**
@@ -65,7 +67,10 @@ export type ModelDownloaderOptions = ({
      */
     parallelDownloads?: number,
 
-    tokens?: ModelFileAccessTokens
+    tokens?: ModelFileAccessTokens,
+
+    /** @internal */
+    _showUriResolvingProgress?: boolean
 };
 
 /**
@@ -436,7 +441,7 @@ export class ModelDownloader {
     /** @internal */
     public static async _create(options: ModelDownloaderOptions) {
         const {
-            modelUri, modelUrl, dirPath = cliModelsDirectory, fileName
+            modelUri, modelUrl, dirPath = cliModelsDirectory, fileName, _showUriResolvingProgress = false
         } = options as ModelDownloaderOptions & {
             modelUri?: string,
             modelUrl?: string
@@ -468,10 +473,22 @@ export class ModelDownloader {
                     resolvedFileName: fileName || resolvedModelDestination.parsedUri.fullFilename
                 };
 
-            const resolvedUri = await resolveParsedModelUri(resolvedModelDestination.parsedUri, {
-                tokens: options.tokens,
-                authorizationHeader: getAuthorizationHeader(options.headers)
-            });
+            const resolvedUri = _showUriResolvingProgress
+                ? await withOra({
+                    loading: chalk.blue("Resolving model URI"),
+                    success: chalk.blue("Resolved model URI"),
+                    fail: chalk.blue("Failed to resolve model URI"),
+                    noSuccessLiveStatus: true
+                }, () => {
+                    return resolveParsedModelUri(resolvedModelDestination.parsedUri, {
+                        tokens: options.tokens,
+                        authorizationHeader: getAuthorizationHeader(options.headers)
+                    });
+                })
+                : await resolveParsedModelUri(resolvedModelDestination.parsedUri, {
+                    tokens: options.tokens,
+                    authorizationHeader: getAuthorizationHeader(options.headers)
+                });
 
             return {
                 resolvedModelUrl: resolvedUri.resolvedUrl,
