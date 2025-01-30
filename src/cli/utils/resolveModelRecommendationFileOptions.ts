@@ -1,17 +1,21 @@
 import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 
-export type ModelURI = `${
-    `http://${string}/${string}` |
-    `https://${string}/${string}` |
+export type ModelURI = (
+    `${
+        `http://${string}/${string}` |
+        `https://${string}/${string}` |
+        `hf:${string}/${string}/${string}` |
+        `huggingface:${string}/${string}/${string}`
+    }${
+        ".gguf" | `.gguf.part${number}of${number}`
+    }`
+) | (
     `hf:${string}/${string}:${string}` |
     `huggingface:${string}/${string}:${string}` |
     `hf.co/${string}/${string}:${string}` |
-    `huggingface.co/${string}/${string}:${string}` |
-    `hf:${string}/${string}/${string}` |
-    `huggingface:${string}/${string}/${string}`
-}${
-    ".gguf" | `.gguf.part${number}of${number}`
-}`;
+    `huggingface.co/${string}/${string}:${string}`
+);
+
 export type ModelRecommendation = {
     name: string,
     abilities: ("code" | "chat" | "complete" | "infill" | "functionCalling")[],
