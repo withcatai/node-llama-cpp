@@ -205,6 +205,9 @@ async function fetchHuggingFaceModelManifest({
         if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
             continue;
 
+        if (response.status === 400 || response.status === 404)
+            throw new Error(`Cannot get quantization "${modelTag}" for model "hf:${user}/${model}" or it does not exist`);
+
         if (!response.ok)
             throw new Error(`Failed to fetch manifest for ${JSON.stringify(fullUri)}: ${response.status} ${response.statusText}`);
 
@@ -240,6 +243,9 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
         const actualTag = tagParts.length > 0
             ? [tag, ...tagParts].join(":").trimEnd()
             : (tag ?? "").trimEnd();
+        const resolvedTag = ggufQuantNames.has(actualTag.toUpperCase())
+            ? actualTag.toUpperCase()
+            : actualTag;
 
         if (actualModel == null || actualModel === "" || user === "")
             throw new Error(`Invalid Hugging Face URI: ${fullUri}`);
@@ -251,7 +257,7 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
         const filePrefix = buildHuggingFaceFilePrefix(user, actualModel, defaultHuggingFaceBranch, [], baseFilename + ".gguf");
         return {
             type: "unresolved",
-            uri: `hf:${user}/${actualModel}${actualTag !== "" ? `:${actualTag}` : ""}`,
+            uri: `hf:${user}/${actualModel}${resolvedTag !== "" ? `:${resolvedTag}` : ""}`,
             filePrefix,
             baseFilename,
             possibleFullFilenames: [
@@ -264,7 +270,7 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
                 type: "hf",
                 user,
                 model: actualModel,
-                tag: actualTag
+                tag: resolvedTag
             }
         };
     }
