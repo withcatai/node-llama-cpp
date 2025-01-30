@@ -340,6 +340,47 @@ describe("utils", () => {
         });
 
         test("Hugging Face simple URI is resolved 5", async () => {
+            const parsedModelUri = parseModelUri("https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF");
+
+            expect(parsedModelUri).toMatchInlineSnapshot(`
+              {
+                "baseFilename": "Meta-Llama-3.1-8B-Instruct",
+                "filePrefix": "hf_mradermacher_",
+                "possibleFullFilenames": [
+                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf",
+                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.Q4_K_M-00001-of-{:
+              {number}
+              :}.gguf",
+                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.gguf",
+                  "hf_mradermacher_Meta-Llama-3.1-8B-Instruct-00001-of-{:
+              {number}
+              :}.gguf",
+                ],
+                "resolveDetails": {
+                  "model": "Meta-Llama-3.1-8B-Instruct-GGUF",
+                  "tag": "",
+                  "type": "hf",
+                  "user": "mradermacher",
+                },
+                "type": "unresolved",
+                "uri": "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF",
+              }
+            `);
+
+            const resolvedUri = await resolveParsedModelUri(parsedModelUri);
+            expect(resolvedUri).toMatchInlineSnapshot(`
+              {
+                "filePrefix": "hf_mradermacher_",
+                "filename": "Meta-Llama-3.1-8B-Instruct.IQ3_M.gguf",
+                "fullFilename": "hf_mradermacher_Meta-Llama-3.1-8B-Instruct.IQ3_M.gguf",
+                "resolvedUrl": "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.IQ3_M.gguf?download=true",
+                "type": "resolved",
+                "uri": "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF",
+              }
+            `);
+        });
+
+        test("Hugging Face simple URI is resolved 6", async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:invalid");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`

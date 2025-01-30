@@ -50,6 +50,21 @@ export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolea
     else if (urlOrUri.startsWith("huggingface.co/"))
         return parseHuggingFaceUriContent(urlOrUri.slice("huggingface.co/".length), urlOrUri);
 
+    if (isUrl(urlOrUri)) {
+        const parsedUrl = new URL(urlOrUri);
+        if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+            const pathnameParts = parsedUrl.pathname.split("/");
+            const slashes = pathnameParts.length - 1;
+            const [, user, model] = pathnameParts;
+
+            if (slashes === 2 && user != null && model != null) {
+                return parseHuggingFaceUriContent([
+                    decodeURIComponent(user), "/", decodeURIComponent(model)
+                ].join(""), urlOrUri);
+            }
+        }
+    }
+
     if (convertUrlToSupportedUri && isUrl(urlOrUri)) {
         const parsedUrl = new URL(normalizeGgufDownloadUrl(urlOrUri));
         if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
