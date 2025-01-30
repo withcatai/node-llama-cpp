@@ -141,7 +141,7 @@
     "@semantic-release/github": "11.0.1",
     "@semantic-release/npm": "12.0.1",
     "@shikijs/vitepress-twoslash": "^2.2.0",
-    "@stylistic/eslint-plugin": "^2.12.1",
+    "@stylistic/eslint-plugin": "^3.0.1",
     "@types/async-retry": "^1.4.9",
     "@types/bytes": "^3.1.5",
     "@types/cross-spawn": "^6.0.6",
