@@ -126,6 +126,14 @@ Doing this allows the resolver to resolve to a local model file without checking
 so it will be resolved offline and faster.
 :::
 
+::: tip Shortcuts for quick experimentation {#uri-shortcuts}
+You can copy the page URLs of models and files on Hugging Face
+and use them with any of the [CLI commands](../cli/index.md).
+
+**Important:** do not use these page URL shortcuts in production code, and do not commit them to your codebase.
+The resolving of such page URL shortcuts are inefficient and unreliable for production use.
+:::
+
 ## Downloading Gated Models From Hugging Face {#hf-token}
 Some models on Hugging Face are "gated", meaning they require a manual consent from you before you can download them.
 
