@@ -61,9 +61,20 @@ body, #__next {
         border-radius: 12px;
     }
 
+    .gsc-left-header {
+        > .gsc-comments-count:not(:hover) > .underline {
+            text-decoration-line: initial;
+        }
+
+        > .gsc-comments-count + .color-text-secondary > .link-secondary {
+            text-decoration-line: initial;
+        }
+    }
+
     .gsc-comment-box-bottom {
         > .link-secondary {
             padding-inline-start: 7px;
+            text-decoration-line: initial;
         }
     }
 
