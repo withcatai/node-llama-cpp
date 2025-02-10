@@ -9,7 +9,7 @@ import {ChatSessionModelFunction} from "../../../types.js";
  * The handler function can return a Promise, and the return value will be awaited before being returned to the model.
  * @param functionDefinition
  */
-export function defineChatSessionFunction<const Params extends GbnfJsonSchema | undefined>({
+export function defineChatSessionFunction<const Params extends GbnfJsonSchema>({
     description,
     params,
     handler
