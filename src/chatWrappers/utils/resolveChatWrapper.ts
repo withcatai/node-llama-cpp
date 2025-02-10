@@ -12,6 +12,7 @@ import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
 import {Llama3_2LightweightChatWrapper} from "../Llama3_2LightweightChatWrapper.js";
+import {DeepSeekChatWrapper} from "../DeepSeekChatWrapper.js";
 import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {includesText} from "../../utils/includesText.js";
@@ -22,7 +23,8 @@ import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML", "falconChat", "gemma"
+    "general", "deepSeek", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML",
+    "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -40,6 +42,7 @@ export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNam
 
 export const chatWrappers = Object.freeze({
     "general": GeneralChatWrapper,
+    "deepSeek": DeepSeekChatWrapper,
     "llama3.1": Llama3_1ChatWrapper,
     "llama3.2-lightweight": Llama3_2LightweightChatWrapper,
     "llama3": Llama3ChatWrapper,

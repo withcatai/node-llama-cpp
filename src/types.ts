@@ -80,6 +80,17 @@ export type ChatWrapperSettings = {
                 readonly sectionSuffix?: string | LlamaText
             }
         }
+    },
+
+    readonly segments?: {
+        /** When this text is detected, active text segments are considered closed */
+        readonly closeAllSegments?: string | LlamaText,
+
+        /** Chain of Thought text segment */
+        readonly thought?: {
+            readonly prefix: string | LlamaText,
+            readonly suffix?: string | LlamaText
+        }
     }
 };
 
@@ -120,7 +131,7 @@ export type ChatUserMessage = {
 };
 export type ChatModelResponse = {
     type: "model",
-    response: (string | ChatModelFunctionCall)[]
+    response: Array<string | ChatModelFunctionCall | ChatModelSegment>
 };
 export type ChatModelFunctionCall = {
     type: "functionCall",
@@ -136,6 +147,16 @@ export type ChatModelFunctionCall = {
      * Relevant only when parallel function calling is supported.
      */
     startsNewChunk?: boolean
+};
+export type ChatModelSegmentType = "thought";
+export type ChatModelSegment = {
+    type: "segment",
+    segmentType: ChatModelSegmentType,
+    text: string,
+    ended: boolean,
+    raw?: LlamaTextJSON,
+    startTime?: string,
+    endTime?: string
 };
 
 export type ChatModelFunctions = {
@@ -155,11 +176,18 @@ export type ChatSessionModelFunction<Params extends GbnfJsonSchema | undefined =
     readonly handler: (params: GbnfJsonSchemaToType<Params>) => any
 };
 
-export function isChatModelResponseFunctionCall(item: ChatModelResponse["response"][number]): item is ChatModelFunctionCall {
-    if (typeof item === "string")
+export function isChatModelResponseFunctionCall(item: ChatModelResponse["response"][number] | undefined): item is ChatModelFunctionCall {
+    if (item == null || typeof item === "string")
         return false;
 
     return item.type === "functionCall";
+}
+
+export function isChatModelResponseSegment(item: ChatModelResponse["response"][number] | undefined): item is ChatModelSegment {
+    if (item == null || typeof item === "string")
+        return false;
+
+    return item.type === "segment";
 }
 
 export type LLamaContextualRepeatPenalty = {

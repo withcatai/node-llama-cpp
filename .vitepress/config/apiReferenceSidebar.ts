@@ -44,6 +44,7 @@ const chatWrappersOrder = [
     "GeneralChatWrapper",
     "TemplateChatWrapper",
     "JinjaTemplateChatWrapper",
+    "DeepSeekChatWrapper",
     "Llama3_1ChatWrapper",
     "Llama3ChatWrapper",
     "Llama2ChatWrapper",

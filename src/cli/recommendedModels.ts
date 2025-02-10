@@ -1,6 +1,23 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "DeepSeek R1 Distill Qwen 14B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 14 billion parameters version of the model - a fine tuned Qwen 2.5 14B base model with distillation from the 617B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q8_0",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q6_K_L",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q6_K",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q5_K_L",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q5_K_M",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q5_K_S",
+        "hf:bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q4_K_M"
+    ]
+}, {
     name: "Llama 3.1 8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +

@@ -1,6 +1,7 @@
 import {
-    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperCheckModelCompatibilityParams,
-    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType,
+    ChatWrapperCheckModelCompatibilityParams, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
+    ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings, isChatModelResponseSegment
 } from "./types.js";
 import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
@@ -140,6 +141,7 @@ export abstract class ChatWrapper {
     public generateModelResponseText(modelResponse: ChatModelResponse["response"], useRawCall: boolean = true): LlamaText {
         const res: LlamaText[] = [];
         const pendingFunctionCalls: ChatModelFunctionCall[] = [];
+        const segmentStack: ChatModelSegmentType[] = [];
 
         const addFunctionCalls = () => {
             if (pendingFunctionCalls.length === 0)
@@ -153,6 +155,36 @@ export abstract class ChatWrapper {
             if (typeof response === "string") {
                 addFunctionCalls();
                 res.push(LlamaText(response));
+                continue;
+            } else if (isChatModelResponseSegment(response)) {
+                addFunctionCalls();
+
+                if (response.raw != null && useRawCall)
+                    res.push(LlamaText.fromJSON(response.raw));
+                else {
+                    const segmentDefinition = response.segmentType === "thought"
+                        ? this.settings.segments?.thought
+                        : undefined;
+                    void (response.segmentType satisfies "thought");
+
+                    res.push(
+                        LlamaText([
+                            (segmentStack.length > 0 && segmentStack.at(-1) === response.segmentType)
+                                ? ""
+                                : segmentDefinition?.prefix ?? "",
+                            response.text,
+                            response.ended
+                                ? (segmentDefinition?.suffix ?? "")
+                                : ""
+                        ])
+                    );
+
+                    if (!response.ended)
+                        segmentStack.push(response.segmentType);
+                    else if (segmentStack.at(-1) === response.segmentType)
+                        segmentStack.pop();
+                }
+
                 continue;
             }
 

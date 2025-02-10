@@ -116,6 +116,11 @@ export class TokenStreamRegulator {
     public clearQueue() {
         this._queue.length = 0;
     }
+
+    public reset() {
+        this.clearQueue();
+        this._LastTokens.length = 0;
+    }
 }
 
 export class QueuedTokenRelease {

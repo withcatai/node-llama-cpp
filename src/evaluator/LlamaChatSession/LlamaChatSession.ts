@@ -7,7 +7,9 @@ import {
 import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToChatHistory.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
-import {LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse, LlamaChatResponseFunctionCall} from "../LlamaChat/LlamaChat.js";
+import {
+    LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse, LlamaChatResponseFunctionCall, LlamaChatResponseChunk
+} from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
 import {LlamaText, LlamaTextJSON} from "../../utils/LlamaText.js";
@@ -63,18 +65,34 @@ export type LlamaChatSessionContextShiftOptions = {
 
 export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions | undefined = ChatSessionModelFunctions | undefined> = {
     /**
-     * Called as the model generates a response with the generated text chunk.
+     * Called as the model generates the main response with the generated text chunk.
      *
      * Useful for streaming the generated response as it's being generated.
+     *
+     * Includes only the main response without any text segments (like thoughts).
+     * For streaming the response with segments, use {@link onResponseChunk `onResponseChunk`}.
      */
     onTextChunk?: (text: string) => void,
 
     /**
-     * Called as the model generates a response with the generated tokens.
+     * Called as the model generates the main response with the generated tokens.
      *
-     * Preferably, you'd want to use `onTextChunk` instead of this.
+     * Preferably, you'd want to use {@link onTextChunk `onTextChunk`} instead of this.
+     *
+     * Includes only the main response without any segments (like thoughts).
+     * For streaming the response with segments, use {@link onResponseChunk `onResponseChunk`}.
      */
     onToken?: (tokens: Token[]) => void,
+
+    /**
+     * Called as the model generates a response with the generated text and tokens,
+     * including segment information (when the generated output is part of a segment).
+     *
+     * Useful for streaming the generated response as it's being generated, including the main response and all segments.
+     *
+     * Only use this function when you need the segmented texts, like thought segments (chain of thought text).
+     */
+    onResponseChunk?: (chunk: LlamaChatResponseChunk) => void,
 
     signal?: AbortSignal,
 
@@ -405,6 +423,7 @@ export class LlamaChatSession {
             maxParallelFunctionCalls,
             onTextChunk,
             onToken,
+            onResponseChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -427,8 +446,8 @@ export class LlamaChatSession {
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
 
-            onTextChunk, onToken, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar, trimWhitespaceSuffix,
-            responsePrefix, repeatPenalty, tokenBias, customStopTriggers
+            onTextChunk, onToken, onResponseChunk, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar,
+            trimWhitespaceSuffix, responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
 
         return responseText;
@@ -444,6 +463,7 @@ export class LlamaChatSession {
         maxParallelFunctionCalls,
         onTextChunk,
         onToken,
+        onResponseChunk,
         signal,
         stopOnAbortSignal = false,
         maxTokens,
@@ -503,6 +523,12 @@ export class LlamaChatSession {
             if (resolvedResponsePrefix != null) {
                 safeEventCallback(onToken)?.(this.model.tokenize(resolvedResponsePrefix));
                 safeEventCallback(onTextChunk)?.(resolvedResponsePrefix);
+                safeEventCallback(onResponseChunk)?.({
+                    type: undefined,
+                    segmentType: undefined,
+                    text: resolvedResponsePrefix,
+                    tokens: this.model.tokenize(resolvedResponsePrefix)
+                });
             }
 
             try {
@@ -526,6 +552,7 @@ export class LlamaChatSession {
                         grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                         onTextChunk: safeEventCallback(onTextChunk),
                         onToken: safeEventCallback(onToken),
+                        onResponseChunk: safeEventCallback(onResponseChunk),
                         signal: abortController.signal,
                         stopOnAbortSignal,
                         repeatPenalty,
@@ -775,35 +802,38 @@ export class LlamaChatSession {
                 if (this._chat == null)
                     throw new DisposedError();
 
-                const {completion, lastEvaluation, metadata} = await this._chat.loadChatAndCompleteUserMessage(this._chatHistory, {
-                    initialUserPrompt: prompt,
-                    functions,
-                    documentFunctionParams,
-                    grammar,
-                    onTextChunk,
-                    onToken,
-                    signal: abortController.signal,
-                    stopOnAbortSignal: true,
-                    repeatPenalty,
-                    minP,
-                    topK,
-                    topP,
-                    seed,
-                    tokenBias,
-                    customStopTriggers,
-                    maxTokens,
-                    temperature,
-                    trimWhitespaceSuffix,
-                    contextShift: {
-                        ...this._contextShift,
-                        lastEvaluationMetadata: this._lastEvaluation?.contextShiftMetadata
-                    },
-                    evaluationPriority,
-                    lastEvaluationContextWindow: {
-                        history: this._lastEvaluation?.contextWindow,
-                        minimumOverlapPercentageToPreventContextShift: 0.8
+                const {completion, lastEvaluation, metadata} = await this._chat.loadChatAndCompleteUserMessage(
+                    asWithLastUserMessageRemoved(this._chatHistory),
+                    {
+                        initialUserPrompt: prompt,
+                        functions,
+                        documentFunctionParams,
+                        grammar,
+                        onTextChunk,
+                        onToken,
+                        signal: abortController.signal,
+                        stopOnAbortSignal: true,
+                        repeatPenalty,
+                        minP,
+                        topK,
+                        topP,
+                        seed,
+                        tokenBias,
+                        customStopTriggers,
+                        maxTokens,
+                        temperature,
+                        trimWhitespaceSuffix,
+                        contextShift: {
+                            ...this._contextShift,
+                            lastEvaluationMetadata: this._lastEvaluation?.contextShiftMetadata
+                        },
+                        evaluationPriority,
+                        lastEvaluationContextWindow: {
+                            history: asWithLastUserMessageRemoved(this._lastEvaluation?.contextWindow),
+                            minimumOverlapPercentageToPreventContextShift: 0.8
+                        }
                     }
-                });
+                );
                 this._ensureNotDisposed();
 
                 this._lastEvaluation = {
@@ -934,4 +964,18 @@ function getLastModelResponseItem(chatHistory: ChatHistoryItem[]) {
         throw new Error("Expected chat history to end with a model response");
 
     return chatHistory[chatHistory.length - 1] as ChatModelResponse;
+}
+
+function asWithLastUserMessageRemoved(chatHistory: ChatHistoryItem[]): ChatHistoryItem[];
+function asWithLastUserMessageRemoved(chatHistory: ChatHistoryItem[] | undefined): ChatHistoryItem[] | undefined;
+function asWithLastUserMessageRemoved(chatHistory?: ChatHistoryItem[]) {
+    if (chatHistory == null)
+        return chatHistory;
+
+    const newChatHistory = chatHistory.slice();
+
+    while (newChatHistory.at(-1)?.type === "user")
+        newChatHistory.pop();
+
+    return newChatHistory;
 }

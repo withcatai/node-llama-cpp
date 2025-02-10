@@ -34,9 +34,6 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
         }
     };
 
-    /**
-     * @param options
-     */
     public constructor(options: {
         /**
          * Set to `null` to disable
