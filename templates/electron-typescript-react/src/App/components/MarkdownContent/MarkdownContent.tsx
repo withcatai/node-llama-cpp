@@ -18,15 +18,18 @@ const md = markdownit({
     }
 });
 
-export function MarkdownContent({children, className}: MarkdownContentProps) {
+export function MarkdownContent({children, inline = false, className}: MarkdownContentProps) {
     const divRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
         if (divRef.current == null)
             return;
 
-        divRef.current.innerHTML = md.render(children ?? "");
-    }, [children]);
+        if (inline)
+            divRef.current.innerHTML = md.renderInline(children ?? "");
+        else
+            divRef.current.innerHTML = md.render(children ?? "");
+    }, [inline, children]);
 
     return <div
         className={className}
@@ -36,5 +39,6 @@ export function MarkdownContent({children, className}: MarkdownContentProps) {
 
 type MarkdownContentProps = {
     className?: string,
+    inline?: boolean,
     children: string
 };

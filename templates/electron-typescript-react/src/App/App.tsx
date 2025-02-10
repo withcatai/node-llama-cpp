@@ -123,6 +123,15 @@ export function App() {
                             <div className="links">
                                 <a
                                     target="_blank"
+                                    href="https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf"
+                                >
+                                    <DownloadIconSVG className="downloadIcon" />
+                                    <div className="text">Get DeepSeek R1 Distill Qwen 14B model</div>
+                                </a>
+                            </div>
+                            <div className="links">
+                                <a
+                                    target="_blank"
                                     href="https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
                                 >
                                     <DownloadIconSVG className="downloadIcon" />

@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
-    getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel
+    getLlama, Llama, LlamaChatSession, LlamaChatSessionPromptCompletionEngine, LlamaContext, LlamaContextSequence, LlamaModel,
+    isChatModelResponseSegment, type ChatModelSegmentType
 } from "node-llama-cpp";
 import {withLock, State} from "lifecycle-utils";
 import packageJson from "../../package.json";
@@ -62,9 +63,23 @@ export type LlmState = {
     }
 };
 
-type SimplifiedChatItem = {
-    type: "user" | "model",
+export type SimplifiedChatItem = SimplifiedUserChatItem | SimplifiedModelChatItem;
+export type SimplifiedUserChatItem = {
+    type: "user",
     message: string
+};
+export type SimplifiedModelChatItem = {
+    type: "model",
+    message: Array<{
+        type: "text",
+        text: string
+    } | {
+        type: "segment",
+        segmentType: ChatModelSegmentType,
+        text: string,
+        startTime?: string,
+        endTime?: string
+    }>
 };
 
 let llama: Llama | null = null;
@@ -75,7 +90,7 @@ let contextSequence: LlamaContextSequence | null = null;
 let chatSession: LlamaChatSession | null = null;
 let chatSessionCompletionEngine: LlamaChatSessionPromptCompletionEngine | null = null;
 let promptAbortController: AbortController | null = null;
-let inProgressResponse: string = "";
+let inProgressResponse: SimplifiedModelChatItem["message"] = [];
 
 export const llmFunctions = {
     async loadLlama() {
@@ -347,8 +362,25 @@ export const llmFunctions = {
                 await chatSession.prompt(message, {
                     signal: promptAbortController.signal,
                     stopOnAbortSignal: true,
-                    onTextChunk(chunk) {
-                        inProgressResponse += chunk;
+                    onResponseChunk(chunk) {
+                        if (chunk.type === "segment" && chunk.segmentStartTime != null)
+                            console.log("chunk.segmentStartTime", chunk.segmentStartTime?.toISOString());
+
+                        inProgressResponse = squashMessageIntoModelChatMessages(
+                            inProgressResponse,
+                            (chunk.type == null || chunk.segmentType == null)
+                                ? {
+                                    type: "text",
+                                    text: chunk.text
+                                }
+                                : {
+                                    type: "segment",
+                                    segmentType: chunk.segmentType,
+                                    text: chunk.text,
+                                    startTime: chunk.segmentStartTime?.toISOString(),
+                                    endTime: chunk.segmentEndTime?.toISOString()
+                                }
+                        );
 
                         llmState.state = {
                             ...llmState.state,
@@ -371,7 +403,7 @@ export const llmFunctions = {
                         }
                     }
                 };
-                inProgressResponse = "";
+                inProgressResponse = [];
             });
         },
         stopActivePrompt() {
@@ -462,8 +494,31 @@ function getSimplifiedChatHistory(generatingResult: boolean, currentPrompt?: str
                 return [{
                     type: "model",
                     message: item.response
-                        .filter((value) => typeof value === "string")
-                        .join("")
+                        .filter((item) => (typeof item === "string" || isChatModelResponseSegment(item)))
+                        .map((item): SimplifiedModelChatItem["message"][number] | null => {
+                            if (typeof item === "string")
+                                return {
+                                    type: "text",
+                                    text: item
+                                };
+                            else if (isChatModelResponseSegment(item))
+                                return {
+                                    type: "segment",
+                                    segmentType: item.segmentType,
+                                    text: item.text,
+                                    startTime: item.startTime,
+                                    endTime: item.endTime
+                                };
+
+                            void (item satisfies never); // ensure all item types are handled
+                            return null;
+                        })
+                        .filter((item) => item != null)
+
+                        // squash adjacent response items of the same type
+                        .reduce((res, item) => {
+                            return squashMessageIntoModelChatMessages(res, item);
+                        }, [] as SimplifiedModelChatItem["message"])
                 }];
 
             void (item satisfies never); // ensure all item types are handled
@@ -484,4 +539,36 @@ function getSimplifiedChatHistory(generatingResult: boolean, currentPrompt?: str
     }
 
     return chatHistory;
+}
+
+/** Squash a new model response message into the existing model response messages array */
+function squashMessageIntoModelChatMessages(
+    modelChatMessages: SimplifiedModelChatItem["message"],
+    message: SimplifiedModelChatItem["message"][number]
+): SimplifiedModelChatItem["message"] {
+    const newModelChatMessages = structuredClone(modelChatMessages);
+    const lastExistingModelMessage = newModelChatMessages.at(-1);
+
+    if (lastExistingModelMessage == null || lastExistingModelMessage.type !== message.type) {
+        // avoid pushing empty text messages
+        if (message.type !== "text" || message.text !== "")
+            newModelChatMessages.push(message);
+
+        return newModelChatMessages;
+    }
+
+    if (lastExistingModelMessage.type === "text" && message.type === "text") {
+        lastExistingModelMessage.text += message.text;
+        return newModelChatMessages;
+    } else if (
+        lastExistingModelMessage.type === "segment" && message.type === "segment" &&
+        lastExistingModelMessage.segmentType === message.segmentType
+    ) {
+        lastExistingModelMessage.text += message.text;
+        lastExistingModelMessage.endTime = message.endTime ?? lastExistingModelMessage.endTime;
+        return newModelChatMessages;
+    }
+
+    newModelChatMessages.push(message);
+    return newModelChatMessages;
 }

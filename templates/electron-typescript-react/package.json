@@ -22,12 +22,14 @@
     "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.1.1",
     "birpc": "^2.0.19",
     "classnames": "^2.5.1",
     "highlight.js": "^11.11.1",
     "lifecycle-utils": "^2.0.0",
     "markdown-it": "^14.1.0",
     "node-llama-cpp": "file:../..",
+    "pretty-ms": "^9.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "semver": "^7.7.0"

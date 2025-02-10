@@ -1,0 +1,78 @@
+.appMessageMarkdown {
+    > :first-child {
+        margin-top: 0px;
+    }
+
+    > :last-child {
+        margin-bottom: 0px;
+    }
+
+    h2 {
+        margin: 16px 0px;
+        padding-top: 24px;
+    }
+
+    h3 {
+        margin: 32px 0px 0px 0px;
+    }
+
+    hr {
+        background-color: var(--message-hr-color);
+        height: 2px;
+        border: none;
+        border-radius: 12px;
+    }
+
+    blockquote {
+        margin: 0px 0px;
+        padding-inline-start: 24px;
+        opacity: 0.64;
+        border: none;
+        position: relative;
+
+        &:before {
+            content: "";
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background-color: var(--message-blockquote-border-color);
+            inset-inline-start: 0px;
+        }
+    }
+
+    table {
+        display: block;
+        border-style: hidden;
+        border-radius: 12px;
+        outline: solid 1px var(--message-table-outline-color);
+        outline-offset: -1px;
+        max-width: max-content;
+        border-collapse: collapse;
+        overflow-x: auto;
+        background-color: var(--background-color);
+
+        thead {
+            text-align: justify;
+        }
+
+        tr {
+            background-color: var(--message-table-background-color);
+            border-top: 1px solid var(--message-table-outline-color);
+
+            &:nth-child(2n) td {
+                background-color: var(--message-table-even-background-color);
+            }
+
+            th {
+                background-color: var(--message-table-even-background-color);
+                border: 1px solid var(--message-table-outline-color);
+                padding: 8px 16px;
+            }
+
+            td {
+                border: 1px solid var(--message-table-outline-color);
+                padding: 8px 16px;
+            }
+        }
+    }
+}

@@ -1,7 +1,6 @@
-import classNames from "classnames";
-import {LlmState} from "../../../../electron/state/llmState.ts";
-import {MarkdownContent} from "../MarkdownContent/MarkdownContent.js";
-import {MessageCopyButton} from "./components/MessageCopyButton/MessageCopyButton.js";
+import {LlmState, SimplifiedModelChatItem} from "../../../../electron/state/llmState.ts";
+import {UserMessage} from "./components/UserMessage/UserMessage.js";
+import {ModelMessage} from "./components/ModelMessage/ModelMessage.js";
 
 import "./ChatHistory.css";
 
@@ -10,22 +9,14 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
     return <div className="appChatHistory">
         {
             simplifiedChat.map((item, index) => {
-                if (item.type === "model") {
-                    const isActive = index === simplifiedChat.length - 1 && generatingResult;
-                    return <>
-                        <MarkdownContent key={index} className={classNames("message", "model", isActive && "active")}>
-                            {item.message}
-                        </MarkdownContent>
-                        {
-                            !isActive && <div className="buttons">
-                                <MessageCopyButton text={item.message} />
-                            </div>
-                        }
-                    </>;
-                } else if (item.type === "user")
-                    return <MarkdownContent key={index} className="message user">
-                        {item.message}
-                    </MarkdownContent>;
+                if (item.type === "model")
+                    return <ModelMessage
+                        key={index}
+                        modelMessage={item}
+                        active={index === simplifiedChat.length - 1 && generatingResult}
+                    />;
+                else if (item.type === "user")
+                    return <UserMessage key={index} message={item} />;
 
                 return null;
             })
@@ -36,7 +27,7 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
                 simplifiedChat[simplifiedChat.length - 1]!.type !== "model" &&
                 generatingResult
             ) &&
-            <div className="message model active" />
+            <ModelMessage modelMessage={emptyModelMessage} active />
         }
     </div>;
 }
@@ -44,4 +35,9 @@ export function ChatHistory({simplifiedChat, generatingResult}: ChatHistoryProps
 type ChatHistoryProps = {
     simplifiedChat: LlmState["chatSession"]["simplifiedChat"],
     generatingResult: boolean
+};
+
+const emptyModelMessage: SimplifiedModelChatItem = {
+    type: "model",
+    message: []
 };
