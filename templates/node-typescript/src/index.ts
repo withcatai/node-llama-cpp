@@ -32,9 +32,23 @@ console.log(chalk.yellow("User: ") + q1);
 
 process.stdout.write(chalk.yellow("AI: "));
 const a1 = await session.prompt(q1, {
-    onTextChunk(chunk) {
+    // uncomment for a simpler response streaming, without segment information
+    // onTextChunk(chunk) {
+    //     // stream the response to the console as it's being generated
+    //     process.stdout.write(chunk);
+    // }
+    onResponseChunk(chunk) {
         // stream the response to the console as it's being generated
-        process.stdout.write(chunk);
+        // including segment information (like chain of thought)
+
+        if (chunk.type === "segment") {
+            if (chunk.segmentEndTime != null)
+                process.stdout.write(chalk.bold(` [segment end: ${chunk.segmentType}] `));
+            else if (chunk.segmentStartTime != null)
+                process.stdout.write(chalk.bold(` [segment start: ${chunk.segmentType}] `));
+        }
+
+        process.stdout.write(chunk.text);
     }
 });
 process.stdout.write("\n");
