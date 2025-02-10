@@ -99,6 +99,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 const cmakeCustomOptions = new Map(buildOptions.customCmakeOptions);
                 const cmakeToolchainOptions = new Map<string, string>();
 
+                if (!cmakeCustomOptions.has("GGML_BUILD_NUMBER"))
+                    cmakeCustomOptions.set("GGML_BUILD_NUMBER", "1");
+
                 cmakeCustomOptions.set("CMAKE_CONFIGURATION_TYPES", buildConfigType);
                 cmakeCustomOptions.set("NLC_CURRENT_PLATFORM", platform + "-" + process.arch);
                 cmakeCustomOptions.set("NLC_TARGET_PLATFORM", buildOptions.platform + "-" + buildOptions.arch);
