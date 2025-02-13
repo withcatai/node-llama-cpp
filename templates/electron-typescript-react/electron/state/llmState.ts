@@ -5,6 +5,7 @@ import {
 } from "node-llama-cpp";
 import {withLock, State} from "lifecycle-utils";
 import packageJson from "../../package.json";
+import {modelFunctions} from "../llm/modelFunctions.js";
 
 export const llmState = new State<LlmState>({
     appVersion: packageJson.version,
@@ -362,10 +363,8 @@ export const llmFunctions = {
                 await chatSession.prompt(message, {
                     signal: promptAbortController.signal,
                     stopOnAbortSignal: true,
+                    functions: modelFunctions,
                     onResponseChunk(chunk) {
-                        if (chunk.type === "segment" && chunk.segmentStartTime != null)
-                            console.log("chunk.segmentStartTime", chunk.segmentStartTime?.toISOString());
-
                         inProgressResponse = squashMessageIntoModelChatMessages(
                             inProgressResponse,
                             (chunk.type == null || chunk.segmentType == null)
