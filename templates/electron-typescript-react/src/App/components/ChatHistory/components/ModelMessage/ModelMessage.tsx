@@ -27,7 +27,8 @@ export function ModelMessage({modelMessage, active}: ModelMessageProps) {
 
                 return <MessageMarkdown
                     key={responseIndex}
-                    className={classNames("text", isLastMessage && active && "active")}
+                    activeDot={isLastMessage && active}
+                    className="text"
                 >
                     {message.text}
                 </MessageMarkdown>;
@@ -35,7 +36,7 @@ export function ModelMessage({modelMessage, active}: ModelMessageProps) {
         }
         {
             (modelMessage.message.length === 0 && active) &&
-            <div className={classNames("text", "active")} />
+            <MessageMarkdown className="text" activeDot />
         }
         {
             !active && <div className="buttons">

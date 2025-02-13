@@ -38,7 +38,7 @@ export function ModelResponseThought({text, active, duration}: ModelResponseThou
             </span>
             <MarkdownContent className={classNames("excerpt", isOpen && "hide")} inline>{text.slice(-excerptLength)}</MarkdownContent>
         </button>
-        <MessageMarkdown className={classNames("content", !isOpen && "hide")}>{text}</MessageMarkdown>
+        <MessageMarkdown className={classNames("content", !isOpen && "hide")} activeDot={active}>{text}</MessageMarkdown>
     </div>;
 }
 

@@ -38,9 +38,19 @@
     > .header {
         border: none;
         background-color: transparent;
-        display: block;
+        display: flex;
+        flex-direction: column;
         padding: 0px;
         user-select: none;
+        outline: solid 2px transparent;
+        border-radius: 4px;
+        outline-offset: 4px;
+        align-self: flex-start;
+        max-width: 100%;
+
+        &:focus-visible {
+            outline: solid 2px Highlight;
+        }
 
         &:hover > .summary {
             opacity: 1;
@@ -83,17 +93,17 @@
 
         > .excerpt {
             white-space: nowrap;
-            overflow: clip;
+            overflow: hidden;
             display: flex;
             justify-content: end;
             justify-self: flex-start;
             mask: linear-gradient(to right, transparent, black 48px);
-            max-width: min(360px, 100%);
+            max-width: 360px;
             opacity: 0.24;
             font-size: 14px;
             margin-top: 2px;
             user-select: none;
-            overflow: clip;
+            padding-inline-end: 24px;
 
             interpolate-size: allow-keywords;
             transition: height 0.5s var(--transition-easing), opacity 0.3s 0.2s var(--transition-easing);
