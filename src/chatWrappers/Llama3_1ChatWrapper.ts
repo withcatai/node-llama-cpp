@@ -268,7 +268,11 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             "- Function calls MUST follow the specified format",
             "- Only call one function at a time",
             "- Put the entire function call reply on one line",
-            "- Always add your sources when using search results to answer the user query"
+            "- Always add your sources when using search results to answer the user query",
+            "- After calling a function, the result will appear afterwards and is only visible to you",
+            "- To make information visible to the user, you must include it in your response",
+            "- Do not tell the user about the functions your are using",
+            "- Only call functions when needed"
         ]);
     }
 
