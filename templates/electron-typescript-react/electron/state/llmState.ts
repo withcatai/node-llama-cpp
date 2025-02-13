@@ -562,10 +562,11 @@ function squashMessageIntoModelChatMessages(
         return newModelChatMessages;
     } else if (
         lastExistingModelMessage.type === "segment" && message.type === "segment" &&
-        lastExistingModelMessage.segmentType === message.segmentType
+        lastExistingModelMessage.segmentType === message.segmentType &&
+        lastExistingModelMessage.endTime == null
     ) {
         lastExistingModelMessage.text += message.text;
-        lastExistingModelMessage.endTime = message.endTime ?? lastExistingModelMessage.endTime;
+        lastExistingModelMessage.endTime = message.endTime;
         return newModelChatMessages;
     }
 

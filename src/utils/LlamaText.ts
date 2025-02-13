@@ -448,23 +448,22 @@ export class SpecialTokensText {
     public tokenizeSpecialTokensOnly(tokenizer: Tokenizer): (string | Token)[] {
         const tokens = this.tokenize(tokenizer, true);
         const res: (string | Token)[] = [];
-        let currentText = "";
+        const pendingTextTokens: Token[] = [];
 
         for (const token of tokens) {
             if (tokenizer.isSpecialToken(token)) {
-                if (currentText !== "") {
-                    res.push(currentText);
-                    currentText = "";
+                if (pendingTextTokens.length !== 0) {
+                    res.push(tokenizer.detokenize(pendingTextTokens, false));
+                    pendingTextTokens.length = 0;
                 }
 
                 res.push(token);
-            } else {
-                currentText += tokenizer.detokenize([token], false);
-            }
+            } else
+                pendingTextTokens.push(token);
         }
 
-        if (currentText !== "")
-            res.push(currentText);
+        if (pendingTextTokens.length !== 0)
+            res.push(tokenizer.detokenize(pendingTextTokens, false));
 
         return res;
     }

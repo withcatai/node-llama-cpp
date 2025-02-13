@@ -86,12 +86,20 @@ export type ChatWrapperSettings = {
         /** When this text is detected, active text segments are considered closed */
         readonly closeAllSegments?: string | LlamaText,
 
+        /**
+         * After function calls, reiterate the stack of the active text segments to remind the model of the context.
+         *
+         * Defaults to `false`.
+         */
+        readonly reiterateStackAfterFunctionCalls?: boolean,
+
         /** Chain of Thought text segment */
-        readonly thought?: {
-            readonly prefix: string | LlamaText,
-            readonly suffix?: string | LlamaText
-        }
+        readonly thought?: ChatWrapperSettingsSegment
     }
+};
+export type ChatWrapperSettingsSegment = {
+    readonly prefix: string | LlamaText,
+    readonly suffix?: string | LlamaText
 };
 
 export type ChatWrapperGenerateContextStateOptions = {
@@ -148,6 +156,8 @@ export type ChatModelFunctionCall = {
      */
     startsNewChunk?: boolean
 };
+
+export const allSegmentTypes = ["thought"] as const satisfies ChatModelSegmentType[];
 export type ChatModelSegmentType = "thought";
 export type ChatModelSegment = {
     type: "segment",

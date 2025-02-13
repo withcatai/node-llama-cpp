@@ -68,6 +68,10 @@ export class TokenStreamRegulator {
                     const tokenText = tokenizer.detokenize([token], false, lastTokens);
                     lastTokens.push(token);
 
+                    // ensure partial tokens are detokenized correctly
+                    if (resTokensText.length + tokenText.length > text.length)
+                        resTokensText = tokenizer.detokenize(resTokens, false, this._LastTokens);
+
                     if (resTokensText.length + tokenText.length > text.length) {
                         const remainingText = text.slice(resTokensText.length);
                         const remainingTokens = tokenizer(remainingText, false, "trimLeadingSpace");
@@ -120,6 +124,13 @@ export class TokenStreamRegulator {
     public reset() {
         this.clearQueue();
         this._LastTokens.length = 0;
+    }
+
+    public removeChunkIfLast(queuedTokenRelease: QueuedTokenRelease | undefined) {
+        if (this._queue.at(-1) === queuedTokenRelease)
+            return this._queue.pop() != null;
+
+        return false;
     }
 }
 

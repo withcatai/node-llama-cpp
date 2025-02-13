@@ -3,7 +3,7 @@ import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage,
-    isChatModelResponseFunctionCall, isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer
+    isChatModelResponseFunctionCall, isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes
 } from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
@@ -22,6 +22,7 @@ import {pushAll} from "../../utils/pushAll.js";
 import {resolveLastTokens} from "../../utils/resolveLastTokens.js";
 import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
+import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -87,7 +88,10 @@ export type LlamaChatResponseSegmentChunk = {
     tokens: Token[],
 
     /**
-     * When the current chunk is that start of a segment, this field will be set.
+     * When the current chunk is the start of a segment, this field will be set.
+     *
+     * It's possible that a chunk with no tokens and empty text will be emitted just to set this field
+     * to signify that the segment has started.
      */
     segmentStartTime?: Date,
 
@@ -568,31 +572,33 @@ export class LlamaChat {
                     await generateResponseState.createNewEvaluationIterator();
 
                     while (await generateResponseState.iterateEvaluation()) {
-                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+                        if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
+                            generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                        generateResponseState.detectAndHandleFunctionStartSyntax();
-                        if (generateResponseState.functionEvaluationMode !== false) {
-                            generateResponseState.canAvoidReloadingHistory = false;
-                            generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
-                            const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
-                                loadContextWindowForFunctionCallingLoop
-                            );
-                            if (functionsCallsRes != null)
-                                return functionsCallsRes;
+                            generateResponseState.detectAndHandleFunctionStartSyntax();
+                            if (generateResponseState.functionEvaluationMode !== false) {
+                                generateResponseState.canAvoidReloadingHistory = false;
+                                generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
+                                const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
+                                    loadContextWindowForFunctionCallingLoop
+                                );
+                                if (functionsCallsRes != null)
+                                    return functionsCallsRes;
+                            }
+
+                            generateResponseState.recordStopGenerationEvaluation();
+
+                            generateResponseState.popStreamRegulatorFreeTokens();
+                            generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
+
+                            const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
+                            if (stopGenerationTriggerRes != null)
+                                return stopGenerationTriggerRes;
+
+                            generateResponseState.spliceIgnoreStartTextDetectedTokens();
+
+                            generateResponseState.moveFreePendingTokensToRes();
                         }
-
-                        generateResponseState.recordStopGenerationEvaluation();
-
-                        generateResponseState.popStreamRegulatorFreeTokens();
-                        generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
-
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
-                        if (stopGenerationTriggerRes != null)
-                            return stopGenerationTriggerRes;
-
-                        generateResponseState.spliceIgnoreStartTextDetectedTokens();
-
-                        generateResponseState.moveFreePendingTokensToRes();
 
                         const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("model");
                         if (maxTokensTriggerRes != null)
@@ -761,30 +767,32 @@ export class LlamaChat {
 
                     await generateResponseState.createNewEvaluationIterator();
                     while (await generateResponseState.iterateEvaluation()) {
-                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+                        if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
+                            generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                        generateResponseState.recordStopGenerationEvaluation();
+                            generateResponseState.recordStopGenerationEvaluation();
 
-                        generateResponseState.popStreamRegulatorFreeTokens();
+                            generateResponseState.popStreamRegulatorFreeTokens();
 
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
-                        if (stopGenerationTriggerRes != null)
-                            return {
-                                completion: stopGenerationTriggerRes.response,
-                                lastEvaluation: {
-                                    contextWindow: mergeGeneratedResultWithChatHistory(
-                                        "user",
-                                        generateResponseState.lastContextWindowHistory,
-                                        generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
-                                    ),
-                                    contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
-                                },
-                                metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
-                                    ? stopGenerationTriggerRes.metadata
-                                    : stopGenerationTriggerRes.metadata
-                            };
+                            const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
+                            if (stopGenerationTriggerRes != null)
+                                return {
+                                    completion: stopGenerationTriggerRes.response,
+                                    lastEvaluation: {
+                                        contextWindow: mergeGeneratedResultWithChatHistory(
+                                            "user",
+                                            generateResponseState.lastContextWindowHistory,
+                                            generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
+                                        ),
+                                        contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
+                                    },
+                                    metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
+                                        ? stopGenerationTriggerRes.metadata
+                                        : stopGenerationTriggerRes.metadata
+                                };
 
-                        generateResponseState.moveFreePendingTokensToRes(false);
+                            generateResponseState.moveFreePendingTokensToRes(false);
+                        }
 
                         const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("user");
                         if (maxTokensTriggerRes != null)
@@ -1474,6 +1482,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         raw: LlamaText
     }> = [];
     public readonly segmentHandler: SegmentHandler;
+    public readonly pendingPartialTokens: Token[] = [];
 
     public functionEvaluationMode: false | "prefixOrDisengage" | "functionName" | "params" | "sectionSuffixOrBetweenCalls" = false;
     private currentFunctionCallPreviousText: LlamaText = LlamaText([]);
@@ -1627,8 +1636,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             );
 
         const segmentDefinitions: ConstructorParameters<typeof SegmentHandler>[0]["segmentDefinitions"] = new Map();
-        if (this.chatWrapper.settings.segments?.thought != null)
-            segmentDefinitions.set("thought", this.chatWrapper.settings.segments.thought);
+        for (const segmentType of allSegmentTypes) {
+            const segmentDefinition = getChatWrapperSegmentDefinition(this.chatWrapper.settings, segmentType);
+            if (segmentDefinition != null)
+                segmentDefinitions.set(segmentType, segmentDefinition);
+        }
 
         this.segmentHandler = new SegmentHandler({
             model: this.llamaChat.model,
@@ -1723,14 +1735,30 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.contextWindowTokens,
                 this.ignoredStartTextTokens
             ]);
+
+            const pendingPartialTokens: Token[] = [];
             for (let i = 0; i < this.pendingTokens.length; i++) {
+                const currentToken = this.pendingTokens[i]!;
+                const tokens = [...pendingPartialTokens, currentToken];
+                const text = this.llamaChat.model.detokenize(tokens, false, lastTokensForDetokenizer);
+
+                if (pendingPartialTokens.length === 0 &&
+                    text.endsWith(UNKNOWN_UNICODE_CHAR) &&
+                    !this.llamaChat.model.isSpecialToken(currentToken) &&
+                    !this.llamaChat.model.isEogToken(currentToken)
+                ) {
+                    pendingPartialTokens.length = 0;
+                    pushAll(pendingPartialTokens, tokens);
+                    continue;
+                }
+
                 this.ignoreStartTextDetector.recordGeneration({
-                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]!], false, lastTokensForDetokenizer),
-                    tokens: [this.pendingTokens[i]!],
+                    text: this.llamaChat.model.detokenize(tokens, false, lastTokensForDetokenizer),
+                    tokens,
                     startNewChecks: i === 0,
                     triggerMustStartWithGeneration: true
                 });
-                lastTokensForDetokenizer.push(this.pendingTokens[i]!);
+                pushAll(lastTokensForDetokenizer, tokens);
 
                 if (this.ignoreStartTextDetector.hasTriggeredStops) {
                     mostExhaustiveTriggeredStops = this.ignoreStartTextDetector.getTriggeredStops();
@@ -1831,7 +1859,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 resolvedHistory: resolvedHistory,
                 resolvedContextShift: this.resolvedContextShift,
                 lastHistoryCompressionMetadata: this.lastHistoryCompressionMetadata,
-                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length,
+                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length +
+                    this.pendingPartialTokens.length,
                 isFirstEvaluation: this.isFirstEvaluation,
                 chatWrapper: this.chatWrapper,
                 lastEvaluationContextWindowHistory: resolvedContextWindowsHistory,
@@ -1869,7 +1898,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             ...this.ignoredStartTextTokens,
             ...this.pendingTokens,
             ...queuedChunkTokens,
-            ...functionCallsTokens
+            ...functionCallsTokens,
+            ...this.pendingPartialTokens
         ];
 
         if (avoidReloadingHistory && this.tokens.length >= this.llamaChat.sequence.context.contextSize - 1)
@@ -1971,27 +2001,27 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
                     const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
                     if (stopGenerationTriggerRes != null)
                         return stopGenerationTriggerRes;
 
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     this.disengageInitiallyEngagedFunctionMode.recordGeneration({
                         text: this.currentText,
                         tokens: this.currentTokens,
-                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === tokens.length,
                         triggerMustStartWithGeneration: true
                     });
 
                     if (prefixDetector.hasTriggeredStops)
-                        afterPrefixLeftoverTokens.push(token);
+                        pushAll(afterPrefixLeftoverTokens, tokens);
                     else {
                         prefixDetector.recordGeneration({
                             text: this.currentText,
                             tokens: this.currentTokens,
-                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === tokens.length,
                             triggerMustStartWithGeneration: true
                         });
                         pushAll(prefixDetectorRecordedTokens, this.currentTokens);
@@ -2103,8 +2133,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     functionNameGenerationDoneDetector.recordGeneration({
                         text: this.currentText,
@@ -2162,8 +2192,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                         .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
 
-                    for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                        this.currentFunctionCallCurrentPartTokens.push(token);
+                    for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                        pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                         functionParamsGenerationDoneDetector.recordGeneration({
                             text: this.currentText,
@@ -2235,8 +2265,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ], this.llamaChat.model.tokenizer)
                     .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     sectionSuffixDetector.recordGeneration({
                         text: this.currentText,
@@ -2341,7 +2371,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return undefined;
     }
 
-    public async *evaluateWithContextShift(loadContextWindow: () => Promise<void>): AsyncGenerator<Token> {
+    public async *evaluateWithContextShift(loadContextWindow: () => Promise<void>): AsyncGenerator<Token[], void> {
         while (true) {
             this.startTokenLoop();
             await loadContextWindow();
@@ -2349,10 +2379,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             await this.createNewEvaluationIterator();
             while (await this.iterateEvaluation()) {
-                if (this.currentToken == null)
+                if (this.currentTokens.length === 0)
                     break;
 
-                yield this.currentToken;
+                if (!this.holdPartialTokensForNextEvaluation())
+                    yield this.currentTokens;
 
                 if (this.shouldAbort)
                     return;
@@ -2444,9 +2475,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.ensureNotAborted();
         this.generatedTokens++;
 
-        if (this.currentIteration != null && this.currentIteration?.done !== true) {
-            this.currentToken = this.currentIteration.value;
-            this.currentTokens = [this.currentToken];
+        if ((this.currentIteration != null && this.currentIteration?.done !== true) || this.pendingPartialTokens.length !== 0) {
+            this.currentToken = this.currentIteration?.value ?? undefined;
+            this.currentTokens = this.currentToken != null
+                ? this.pendingPartialTokens.length === 0
+                    ? [this.currentToken]
+                    : [...this.pendingPartialTokens, this.currentToken]
+                : [...this.pendingPartialTokens];
+            this.pendingPartialTokens.length = 0;
+
             this.currentText = this.llamaChat.model.detokenize(this.currentTokens, false, this.getLastTokens());
 
             if (this.functionEvaluationMode === false)
@@ -2457,6 +2494,22 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             else
                 this.currentQueuedTokenRelease = undefined;
 
+            return true;
+        }
+
+        return false;
+    }
+
+    public holdPartialTokensForNextEvaluation() {
+        if (this.pendingPartialTokens.length === 0 &&
+            this.currentText.endsWith(UNKNOWN_UNICODE_CHAR) &&
+            this.currentToken != null &&
+            !this.llamaChat.model.isSpecialToken(this.currentToken) &&
+            !this.llamaChat.model.isEogToken(this.currentToken)
+        ) {
+            this.pendingPartialTokens.length = 0;
+            pushAll(this.pendingPartialTokens, this.currentTokens);
+            this.streamRegulator.removeChunkIfLast(this.currentQueuedTokenRelease);
             return true;
         }
 
@@ -2742,7 +2795,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.ignoredStartTextTokens,
             this.pendingTokens,
             this.streamRegulator.getLastQueuedChunkTokens(maxTokens),
-            this.getContextWindowFunctionCallsTokens()
+            this.getContextWindowFunctionCallsTokens(),
+            this.pendingPartialTokens
         ], maxTokens);
     }
 }
@@ -2954,7 +3008,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             return;
 
         for (const [type, {prefix, suffix}] of this._segmentDetectors.entries()) {
-            if (handleDetector(prefix, "push", type))
+            if (type !== currentType && handleDetector(prefix, "push", type))
                 return;
 
             if (handleDetector(suffix, "pop", type))
