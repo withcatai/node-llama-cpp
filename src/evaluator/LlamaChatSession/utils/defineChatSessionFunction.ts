@@ -15,7 +15,7 @@ export function defineChatSessionFunction<const Params extends GbnfJsonSchema>({
     handler
 }: {
     description?: string,
-    params?: Readonly<Params>,
+    params?: Readonly<Params> & ProhibitUnknownProperties<GbnfJsonSchema, Params>,
     handler: (params: GbnfJsonSchemaToType<Params>) => Promise<any> | any
 }): ChatSessionModelFunction<Params> {
     return {
@@ -24,3 +24,17 @@ export function defineChatSessionFunction<const Params extends GbnfJsonSchema>({
         handler
     };
 }
+
+type ProhibitUnknownProperties<BaseType, Input extends BaseType> = BaseType extends object
+    ? Input extends object
+        ? (
+            Input &
+            {[K in Exclude<keyof Input, keyof BaseType>]: never} &
+            {
+                [K in keyof BaseType]: K extends keyof Input
+                ? ProhibitUnknownProperties<BaseType[K], Input[K]>
+                : BaseType[K]
+            }
+        )
+        : never
+    : Input;

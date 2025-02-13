@@ -27,6 +27,6 @@
     "interfacePropertiesFormat": "list",
     "sort": ["source-order"],
     "docsRoot": "../docs",
-    "intentionallyNotExported": ["MergeOptionalUnionTypes", "PickOptions", "GbnfJsonSchemaToTSType", "_LlamaText"],
+    "intentionallyNotExported": ["MergeOptionalUnionTypes", "PickOptions", "ProhibitUnknownProperties", "GbnfJsonSchemaToTSType", "_LlamaText"],
     "useHTMLEncodedBrackets": true
 }
