@@ -1,4 +1,3 @@
-import classNames from "classnames";
 import {MessageMarkdown} from "../../../MessageMarkdown/MessageMarkdown.js";
 import {SimplifiedModelChatItem} from "../../../../../../electron/state/llmState.js";
 import {ModelResponseThought} from "../ModelResponseThought/ModelResponseThought.js";
