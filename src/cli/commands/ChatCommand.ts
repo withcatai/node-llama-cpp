@@ -829,7 +829,11 @@ const defaultEnvironmentFunctions = {
         description: "Retrieve the current date",
         handler() {
             const date = new Date();
-            return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+            return [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, "0"),
+                String(date.getDate()).padStart(2, "0")
+            ].join("-");
         }
     }),
     getTime: defineChatSessionFunction({
