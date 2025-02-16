@@ -25,6 +25,7 @@ export function defineChatSessionFunction<const Params extends GbnfJsonSchema>({
     };
 }
 
+/** @hidden */
 type ProhibitUnknownProperties<BaseType, Input extends BaseType> = BaseType extends object
     ? Input extends object
         ? (
