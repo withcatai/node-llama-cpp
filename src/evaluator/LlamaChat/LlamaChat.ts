@@ -532,6 +532,7 @@ export class LlamaChat {
         return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatResponse<Functions>> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsModel();
+                generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
 
                 const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
                     await generateResponseState.loadContextWindow(
@@ -1682,6 +1683,43 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             });
     }
 
+    public ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded() {
+        if (this.chatWrapper.settings.segments?.thought?.reopenAfterFunctionCalls !== true)
+            return;
+
+        const lastModelResponseItem = this.resolvedHistory.at(-1);
+        if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
+            return;
+
+        const lastResponse = lastModelResponseItem.response.at(-1);
+        if (lastResponse == null)
+            return;
+
+        const lastResponseIsFunctionCall = typeof lastResponse !== "string" && lastResponse.type === "functionCall";
+        if (!lastResponseIsFunctionCall)
+            return;
+
+        const currentResponseSegmentsStack = SegmentHandler.getStackFromModelResponse(lastModelResponseItem.response);
+        if (currentResponseSegmentsStack.includes("thought"))
+            return;
+
+        const hadThoughtSegments = this.resolvedHistory.some((chatItem) => {
+            if (chatItem.type !== "model")
+                return false;
+
+            return chatItem.response.some((responseItem) => {
+                if (typeof responseItem === "string")
+                    return false;
+
+                return responseItem.type === "segment" && responseItem.segmentType === "thought";
+            });
+        });
+        if (!hadThoughtSegments)
+            return;
+
+        this.segmentHandler.openSegment("thought");
+    }
+
     public ensureNotAborted() {
         if (this.signal?.aborted && (!this.stopOnAbortSignal || this.res.length === 0))
             throw this.signal.reason;
@@ -2823,6 +2861,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         suffix?: StopGenerationDetector
     }>;
     private readonly _segmentsStack: S[] = [];
+    private readonly _segmentsStackSet: Set<S> = new Set<S>();
     private _ownedSegmentsStackLength: number = 0;
     private readonly _segments: RawSegment<S>[] = [];
     private readonly _segmentsStartTokenTrail: Token[] = [];
@@ -2867,6 +2906,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             : undefined;
         this._segmentDetectors = new Map();
         this._segmentsStack = initialSegmentStack;
+        this._segmentsStackSet = new Set(initialSegmentStack);
         this._ownedSegmentsStackLength = initialSegmentStack.length;
         this._segmentDefinitions = segmentDefinitions;
 
@@ -2914,6 +2954,22 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         pushAll(this._contextWindowStartTokenTrail, this._getTokenTrailFromResult());
     }
 
+    public openSegment(type: S) {
+        const now = Date.now();
+
+        this._segmentsStack.push(type);
+        this._segmentsStackSet.add(type);
+        this._segments.push({type, tokens: [], ended: false, start: true, startTime: now});
+        this._contextWindowSegments.push({type, tokens: [], ended: false, start: true, startTime: now});
+        this.onResponseChunk?.({
+            type: "segment",
+            segmentType: type,
+            tokens: [],
+            text: "",
+            segmentStartTime: new Date(now)
+        });
+    }
+
     private _processTokens(tokens: Token[], text: string) {
         const queuedTokenRelease = this._streamRegulator.addChunk({
             tokens,
@@ -2938,23 +2994,13 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                 if (action === "pop")
                     this._closeSegment(type);
                 else if (action === "push") {
-                    const now = Date.now();
-
-                    this._segmentsStack.push(type);
-                    this._segments.push({type, tokens: [], ended: false, start: true, startTime: now});
-                    this._contextWindowSegments.push({type, tokens: [], ended: false, start: true, startTime: now});
-                    this.onResponseChunk?.({
-                        type: "segment",
-                        segmentType: type,
-                        tokens: [],
-                        text: "",
-                        segmentStartTime: new Date(now)
-                    });
+                    this.openSegment(type);
                 } else if (action === "reset") {
                     const now = Date.now();
 
                     while (this._segmentsStack.length > 0) {
                         const segmentType = this._segmentsStack.pop()!;
+                        this._segmentsStackSet.delete(segmentType);
 
                         const lastSegment = this._segments.at(-1);
                         if (lastSegment != null && !(lastSegment instanceof Array) && lastSegment.type === segmentType) {
@@ -3001,18 +3047,28 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             return false;
         };
 
-        if (currentType != null && handleDetector(this._closeAllSegmentsDetector, "reset", currentType))
-            return;
+        if (currentType != null) {
+            if (handleDetector(this._closeAllSegmentsDetector, "reset", currentType))
+                return;
 
-        if (currentType != null && handleDetector(this._segmentDetectors.get(currentType)?.suffix, "pop", currentType))
-            return;
+            if (handleDetector(this._segmentDetectors.get(currentType)?.suffix, "pop", currentType))
+                return;
+        } else
+            this._closeAllSegmentsDetector?.clearInProgressStops();
 
         for (const [type, {prefix, suffix}] of this._segmentDetectors.entries()) {
-            if (type !== currentType && handleDetector(prefix, "push", type))
-                return;
+            if (!this._segmentsStackSet.has(type)) {
+                if (handleDetector(prefix, "push", type))
+                    return;
+            } else
+                prefix.clearInProgressStops();
 
-            if (handleDetector(suffix, "pop", type))
-                return;
+            if (this._segmentsStackSet.has(type)) {
+                // `currentType` suffix is already handled above
+                if (type === currentType && handleDetector(suffix, "pop", type))
+                    return;
+            } else
+                suffix?.clearInProgressStops();
         }
 
         this._pushCurrentTokens(this._streamRegulator.popFreeChunkTokens());
@@ -3075,7 +3131,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                 });
             }
 
-            this._segmentsStack.pop();
+            this._segmentsStackSet.delete(this._segmentsStack.pop()!);
 
             if (this._segmentsStack.length < this._ownedSegmentsStackLength)
                 this._ownedSegmentsStackLength = this._segmentsStack.length;
@@ -3100,6 +3156,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
         for (let i = this._segmentsStack.length - 1; i >= typeIndex; i--) {
             const segmentType = this._segmentsStack.pop()!;
+            this._segmentsStackSet.delete(segmentType);
 
             if (this._segmentsStack.length < this._ownedSegmentsStackLength)
                 this._ownedSegmentsStackLength = this._segmentsStack.length;
@@ -3341,15 +3398,20 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
     public static getStackFromModelResponse(modelResponse: ChatModelResponse["response"]) {
         const stack: ChatModelSegmentType[] = [];
+        const stackSet: Set<ChatModelSegmentType> = new Set();
+
         for (const item of modelResponse) {
             if (typeof item === "string" || isChatModelResponseFunctionCall(item))
                 continue;
 
             void (item.type satisfies "segment");
-            if (item.ended && stack.at(-1) === item.segmentType)
+            if (item.ended && stack.at(-1) === item.segmentType) {
                 stack.pop();
-            else if (!item.ended)
+                stackSet.delete(item.segmentType);
+            } else if (!item.ended && !stackSet.has(item.segmentType)) {
                 stack.push(item.segmentType);
+                stackSet.add(item.segmentType);
+            }
         }
 
         return stack;

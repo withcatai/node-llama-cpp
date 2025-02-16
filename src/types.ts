@@ -94,7 +94,9 @@ export type ChatWrapperSettings = {
         readonly reiterateStackAfterFunctionCalls?: boolean,
 
         /** Chain of Thought text segment */
-        readonly thought?: ChatWrapperSettingsSegment
+        readonly thought?: ChatWrapperSettingsSegment & {
+            reopenAfterFunctionCalls?: boolean
+        }
     }
 };
 export type ChatWrapperSettingsSegment = {

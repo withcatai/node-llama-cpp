@@ -5,13 +5,14 @@ import {
 } from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
+import {jsonDumps} from "./utils/jsonDumps.js";
 
 
 export class DeepSeekChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "DeepSeek";
 
     public readonly keepOnlyLastThought: boolean;
-    public readonly functionCallingSyntax: "simplified" | "original";
+    public readonly functionCallingSyntax: "r1-workaround" | "simplified" | "original";
     public readonly parallelFunctionCalling: boolean;
 
     public override readonly settings: ChatWrapperSettings;
@@ -27,11 +28,11 @@ export class DeepSeekChatWrapper extends ChatWrapper {
         keepOnlyLastThought?: boolean,
 
         /**
-         * Use a simplified function calling syntax to improve syntax compliance.
+         * Use a different variation function calling syntax to improve syntax compliance.
          *
-         * Defaults to `"simplified"`.
+         * Defaults to `"r1-workaround"`.
          */
-        functionCallingSyntax?: "simplified" | "original",
+        functionCallingSyntax?: "r1-workaround" | "simplified" | "original",
 
         /**
          * Support parallel function calling.
@@ -46,7 +47,7 @@ export class DeepSeekChatWrapper extends ChatWrapper {
 
         const {
             keepOnlyLastThought = true,
-            functionCallingSyntax = "simplified",
+            functionCallingSyntax = "r1-workaround",
             parallelFunctionCalling = false
         } = options;
 
@@ -54,68 +55,116 @@ export class DeepSeekChatWrapper extends ChatWrapper {
         this.functionCallingSyntax = functionCallingSyntax;
         this.parallelFunctionCalling = parallelFunctionCalling;
 
-        this.settings = {
-            supportsSystemMessages: true,
-            functions: this.parallelFunctionCalling
-                ? {
-                    call: this.functionCallingSyntax === "simplified"
-                        ? {
-                            optionalPrefixSpace: true,
-                            prefix: LlamaText(new SpecialTokensText("<｜tool▁call▁begin｜>")),
-                            paramsPrefix: LlamaText(new SpecialTokensText("<｜tool▁sep｜>\n```json\n")),
-                            suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜>")])
-                        }
-                        : {
+        const getFunctionsSettings = (): ChatWrapperSettings["functions"] => {
+            if (functionCallingSyntax === "original") {
+                if (parallelFunctionCalling)
+                    return {
+                        call: {
                             optionalPrefixSpace: true,
                             prefix: LlamaText(new SpecialTokensText("<｜tool▁call▁begin｜>function<｜tool▁sep｜>")),
                             paramsPrefix: LlamaText(new SpecialTokensText("\n```json\n")),
                             suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜>")])
                         },
-                    result: {
-                        prefix: LlamaText(new SpecialTokensText("<｜tool▁output▁begin｜>")),
-                        suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜>"))
-                    },
-                    parallelism: {
-                        call: {
-                            sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁calls▁begin｜>")),
-                            betweenCalls: LlamaText(new SpecialTokensText("\n")),
-                            sectionSuffix: LlamaText(new SpecialTokensText("<｜tool▁calls▁end｜><｜end▁of▁sentence｜>"))
-                        },
                         result: {
-                            sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁begin｜>")),
-                            betweenResults: LlamaText(new SpecialTokensText("\n")),
-                            sectionSuffix: this.functionCallingSyntax === "simplified"
-                                ? LlamaText(new SpecialTokensText("<｜tool▁outputs▁end｜>"))
-                                : LlamaText(new SpecialTokensText("<｜tool▁outputs▁end｜><｜Assistant｜>"))
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁output▁begin｜>")),
+                            suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜>"))
+                        },
+                        parallelism: {
+                            call: {
+                                sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁calls▁begin｜>")),
+                                betweenCalls: LlamaText(new SpecialTokensText("\n")),
+                                sectionSuffix: LlamaText(new SpecialTokensText("<｜tool▁calls▁end｜><｜end▁of▁sentence｜>"))
+                            },
+                            result: {
+                                sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁begin｜>")),
+                                betweenResults: LlamaText(new SpecialTokensText("\n")),
+                                sectionSuffix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁end｜><｜Assistant｜>"))
+                            }
                         }
-                    }
-                }
-                : {
-                    call: this.functionCallingSyntax === "simplified"
-                        ? {
-                            optionalPrefixSpace: true,
-                            prefix: LlamaText(new SpecialTokensText("<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>")),
-                            paramsPrefix: LlamaText(new SpecialTokensText("<｜tool▁sep｜>\n```json\n")),
-                            suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜>")])
-                        }
-                        : {
+                    };
+                else
+                    return {
+                        call: {
                             optionalPrefixSpace: true,
                             prefix: LlamaText(new SpecialTokensText("<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>")),
                             paramsPrefix: LlamaText(new SpecialTokensText("\n```json\n")),
                             suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜>")])
                         },
-                    result: {
-                        prefix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>")),
-                        suffix: this.functionCallingSyntax === "simplified"
-                            ? LlamaText(new SpecialTokensText("<｜tool▁output▁end｜><｜tool▁outputs▁end｜>"))
-                            : LlamaText(new SpecialTokensText("<｜tool▁output▁end｜><｜tool▁outputs▁end｜><｜Assistant｜>"))
-                    }
+                        result: {
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>")),
+                            suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜><｜tool▁outputs▁end｜><｜Assistant｜>"))
+                        }
+                    };
+            } else if (functionCallingSyntax === "simplified") {
+                if (parallelFunctionCalling)
+                    return {
+                        call: {
+                            optionalPrefixSpace: true,
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁call▁begin｜>")),
+                            paramsPrefix: LlamaText(new SpecialTokensText("<｜tool▁sep｜>\n```json\n")),
+                            suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜>")])
+                        },
+                        result: {
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁output▁begin｜>")),
+                            suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜>"))
+                        },
+                        parallelism: {
+                            call: {
+                                sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁calls▁begin｜>")),
+                                betweenCalls: LlamaText(new SpecialTokensText("\n")),
+                                sectionSuffix: LlamaText(new SpecialTokensText("<｜tool▁calls▁end｜><｜end▁of▁sentence｜>"))
+                            },
+                            result: {
+                                sectionPrefix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁begin｜>")),
+                                betweenResults: LlamaText(new SpecialTokensText("\n")),
+                                sectionSuffix: LlamaText(new SpecialTokensText("<｜tool▁outputs▁end｜>"))
+                            }
+                        }
+                    };
+                else
+                    return {
+                        call: {
+                            optionalPrefixSpace: true,
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁call▁begin｜>")),
+                            paramsPrefix: LlamaText(new SpecialTokensText("<｜tool▁sep｜>\n```json\n")),
+                            suffix: LlamaText([new SpecialTokensText("\n```<｜tool▁call▁end｜><｜end▁of▁sentence｜>")])
+                        },
+                        result: {
+                            prefix: LlamaText(new SpecialTokensText("<｜tool▁output▁begin｜>")),
+                            suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜>"))
+                        }
+                    };
+            }
+
+            void (functionCallingSyntax satisfies "r1-workaround");
+            if (parallelFunctionCalling)
+                throw new Error(
+                    `parallel function calling is not supported with "${"r1-workaround" satisfies typeof functionCallingSyntax}" syntax`
+                );
+
+            return {
+                call: {
+                    optionalPrefixSpace: true,
+                    prefix: LlamaText(new SpecialTokensText("<function=")),
+                    paramsPrefix: LlamaText(new SpecialTokensText(">")),
+                    suffix: LlamaText(new SpecialTokensText("</function>"))
                 },
+                result: {
+                    prefix: LlamaText(new SpecialTokensText("<｜tool▁output▁begin｜>")),
+                    suffix: LlamaText(new SpecialTokensText("<｜tool▁output▁end｜>\n"))
+                }
+            };
+        };
+
+        this.settings = {
+            supportsSystemMessages: true,
+            functions: getFunctionsSettings(),
             segments: {
                 reiterateStackAfterFunctionCalls: true,
                 thought: {
                     prefix: LlamaText(new SpecialTokensText("<think>")),
-                    suffix: LlamaText(new SpecialTokensText("</think>"))
+                    suffix: LlamaText(new SpecialTokensText("</think>")),
+                    reopenAfterFunctionCalls: functionCallingSyntax === "simplified"
                 }
             }
         };
@@ -186,9 +235,80 @@ export class DeepSeekChatWrapper extends ChatWrapper {
         if (!functionsDocumentationGenerator.hasAnyFunctions)
             return LlamaText([]);
 
-        const getFunctionCallingFormat = () => {
-            if (!this.parallelFunctionCalling)
-                return LlamaText.joinValues("\n", [
+        if (this.functionCallingSyntax === "r1-workaround") {
+            return LlamaText.joinValues("\n", [
+                "The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.",
+                "To fulfill a request, the assistant calls relevant functions in advance when needed before responding to the request, and does not tell the user prior to calling a function.",
+                "If the result of function calls from previous turns might be stale, the assistant will call the functions again if needed.",
+                // "The assistant NEVER relies on existing knowledge when there's a function that can be used instead.",
+                "Provided functions:",
+                functionsDocumentationGenerator.getLlama3_2LightweightFunctionSignatures({documentParams}),
+                "",
+                "Calling any of the provided functions can be done like this:",
+                LlamaText.joinValues("", [
+                    this.settings.functions.call.prefix,
+                    "getSomeInfo",
+                    this.settings.functions.call.paramsPrefix,
+                    jsonDumps({someKey: "someValue"}),
+                    this.settings.functions.call.suffix
+                ]),
+                "",
+                LlamaText(["Note that the verbatim ", this.settings.functions.call.prefix, " prefix is mandatory."]),
+                "",
+                "The assistant never assumes the results of function calls, and instead uses the raw results directly for processing.",
+                "The assistant does not inform the user about using functions and does not explain anything before calling a function.",
+                "After calling a function, the raw result appears afterwards and is not part of the conversation.",
+                "To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
+                "The assistant never repeats itself unless necessary."
+            ]);
+        }
+
+        return LlamaText.joinValues("\n", [
+            "You have access to the following functions:",
+            functionsDocumentationGenerator.getLlama3_2LightweightFunctionSignatures({documentParams}),
+            "",
+            this.parallelFunctionCalling
+                ? LlamaText.joinValues("\n", [
+                    "If you choose to call a function, use the following format:",
+                    LlamaText([
+                        this.settings.functions.parallelism!.call.sectionPrefix,
+                        this.settings.functions.call.prefix,
+                        "funcName",
+                        this.settings.functions.call.paramsPrefix,
+                        "parameters",
+                        this.settings.functions.call.suffix,
+                        this.settings.functions.parallelism!.call.sectionSuffix!
+                    ]),
+                    "where",
+                    "",
+                    "funcName => the function name to call",
+                    "parameters => a JSON dict with the function arguments",
+                    // "",
+                    // "Note that the following syntax is mandatory to precede the function name:",
+                    // LlamaText([
+                    //     this.settings.functions.parallelism!.call.sectionPrefix,
+                    //     this.settings.functions.call.prefix
+                    // ]),
+                    "",
+                    "You can call multiple functions in parallel using the following format:",
+                    LlamaText([
+                        this.settings.functions.parallelism!.call.sectionPrefix,
+                        this.settings.functions.call.prefix,
+                        "funcName1",
+                        this.settings.functions.call.paramsPrefix,
+                        "parameters1",
+                        this.settings.functions.call.suffix,
+                        this.settings.functions.parallelism!.call.betweenCalls ?? "",
+                        this.settings.functions.call.prefix,
+                        "funcName2",
+                        this.settings.functions.call.paramsPrefix,
+                        "parameters2",
+                        this.settings.functions.call.suffix,
+                        this.settings.functions.parallelism!.call.sectionSuffix!
+                    ])
+                ])
+                : LlamaText.joinValues("\n", [
+                    "If you choose to call a function, use the following format:",
                     LlamaText.joinValues("", [
                         this.settings.functions.call.prefix,
                         "funcName",
@@ -200,66 +320,29 @@ export class DeepSeekChatWrapper extends ChatWrapper {
                     "",
                     "funcName => the function name to call",
                     "parameters => a JSON dict with the function arguments"
-                    // "Note that the following syntax is mandatory to precede the function name:",
-                    // this.settings.functions.call.prefix,
-                ]);
-
-            return LlamaText.joinValues("\n", [
-                LlamaText.joinValues("", [
-                    this.settings.functions.parallelism!.call.sectionPrefix,
-                    this.settings.functions.call.prefix,
-                    "funcName",
-                    this.settings.functions.call.paramsPrefix,
-                    "parameters",
-                    this.settings.functions.call.suffix,
-                    this.settings.functions.parallelism!.call.sectionSuffix!
                 ]),
-                "where",
-                "",
-                "funcName => the function name to call",
-                "parameters => a JSON dict with the function arguments",
-                // "Note that the following syntax is mandatory to precede the function name:",
-                // this.settings.functions.call.prefix,
-                "",
-                "",
-                "You can call multiple functions in parallel using the following format:",
-                LlamaText.joinValues("", [
-                    this.settings.functions.parallelism!.call.sectionPrefix,
-                    this.settings.functions.call.prefix,
-                    "funcName1",
-                    this.settings.functions.call.paramsPrefix,
-                    "parameters1",
-                    this.settings.functions.call.suffix,
-                    this.settings.functions.parallelism!.call.betweenCalls ?? "",
-                    this.settings.functions.call.prefix,
-                    "funcName2",
-                    this.settings.functions.call.paramsPrefix,
-                    "parameters2",
-                    this.settings.functions.call.suffix,
-                    this.settings.functions.parallelism!.call.sectionSuffix!
-                ])
-            ]);
-        };
-
-        return LlamaText.joinValues("\n", [
-            "You have access to the following functions:",
-            "",
-            functionsDocumentationGenerator.getLlama3_2LightweightFunctionSignatures({documentParams}),
-            "",
-            "",
-            "If you choose to call a function ONLY reply in the following format:",
-            getFunctionCallingFormat(),
             "",
             "Reminder:",
             "- Function calls MUST follow the specified format verbatim",
             this.parallelFunctionCalling
-                ? "- You can a single or multiple functions at a time, their responses will appear afterwards in the order they were called"
-                : "- After calling a function, the result will appear afterwards and is only visible to you",
-            "- After calling functions, the results will appear afterwards and are only visible to you",
-            "- To make information visible to the user, you must include it in your response",
-            "- Only call functions when needed, avoid redundant calls",
+                ? LlamaText.joinValues("\n", [
+                    "- You can call a single or multiple functions at a time, their responses will appear afterwards in the order they were called",
+                    "- After calling functions, the results will appear afterwards and are visible only to you"
+                ])
+                : LlamaText.joinValues("\n", [
+                    "- Only call one function at a time",
+                    "- After calling a function, the result will appear afterwards and is visible only to you"
+                ]),
+            "- Do not inform the user about using functions and do not explain anything before calling a function",
+            "- After calling a function, the raw result appears afterwards and is not part of the conversation.",
+            "- To make information be part of the conversation, paraphrase and repeat the information without the function syntax.",
+            "- To make information visible to the user, you MUST include it in your response",
+            "- Call functions when needed and avoid redundant calls",
+            "- NEVER speak about functions, just use them",
+            "- NEVER tell the user about the functions you are using",
+            "- NEVER repeat yourself unless necessary",
             LlamaText([
-                "- After calling a function, ALWAYS use ", new SpecialTokensText("<think>"), " AGAIN to think"
+                "- After calling a function, use ", new SpecialTokensText("</think>"), " to finish thinking and respond to the user"
             ])
         ]);
     }
@@ -269,6 +352,8 @@ export class DeepSeekChatWrapper extends ChatWrapper {
         return [
             {},
             {keepOnlyLastThought: true},
+            {functionCallingSyntax: "simplified"},
+            {functionCallingSyntax: "simplified", keepOnlyLastThought: true},
             {functionCallingSyntax: "original"},
             {functionCallingSyntax: "original", keepOnlyLastThought: true}
         ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
