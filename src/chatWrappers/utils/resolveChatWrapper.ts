@@ -100,6 +100,37 @@ export type ResolveChatWrapperOptions = {
     noJinja?: boolean
 };
 
+export type ResolveChatWrapperWithModelOptions = {
+    /**
+     * Resolve to a specific chat wrapper type.
+     * You better not set this option unless you need to force a specific chat wrapper type.
+     *
+     * Defaults to `"auto"`.
+     */
+    type?: "auto" | SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName,
+
+    customWrapperSettings?: {
+        [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
+    },
+
+    /**
+     * Defaults to `true`.
+     */
+    warningLogs?: boolean,
+
+    /**
+     * Defaults to `true`.
+     */
+    fallbackToOtherWrappersOnJinjaError?: boolean,
+
+    /**
+     * Don't resolve to a Jinja chat wrapper unless `type` is set to a Jinja chat wrapper type.
+     *
+     * Defaults to `false`.
+     */
+    noJinja?: boolean
+};
+
 /**
  * Resolve to a chat wrapper instance based on the provided information.
  * The more information provided, the better the resolution will be (except for `type`).
@@ -112,6 +143,21 @@ export type ResolveChatWrapperOptions = {
  * When loading a Jinja chat template from either `fileInfo` or `customWrapperSettings.jinjaTemplate.template`,
  * if the chat template format is invalid, it fallbacks to resolve other chat wrappers,
  * unless `fallbackToOtherWrappersOnJinjaError` is set to `false` (in which case, it will throw an error).
+ * @example
+ * ```typescript
+ * import {getLlama, resolveChatWrapper, GeneralChatWrapper} from "node-llama-cpp";
+ *
+ * const llama = await getLlama();
+ * const model = await llama.loadModel({modelPath: "path/to/model.gguf"});
+ *
+ * const chatWrapper = resolveChatWrapper(model, {
+ *     customWrapperSettings: {
+ *         "llama3.1": {
+ *             cuttingKnowledgeDate: new Date("2025-01-01T00:00:00Z")
+ *         }
+ *     }
+ * }) ?? new GeneralChatWrapper()
+ * ```
  * @example
  *```typescript
  * import {getLlama, resolveChatWrapper, GeneralChatWrapper} from "node-llama-cpp";
@@ -127,11 +173,15 @@ export type ResolveChatWrapperOptions = {
  * }) ?? new GeneralChatWrapper()
  * ```
  */
+export function resolveChatWrapper(model: LlamaModel, options?: ResolveChatWrapperWithModelOptions): BuiltInChatWrapperType;
 export function resolveChatWrapper(options: ResolveChatWrapperOptions): BuiltInChatWrapperType | null;
-export function resolveChatWrapper(options: LlamaModel): BuiltInChatWrapperType;
-export function resolveChatWrapper(options: ResolveChatWrapperOptions | LlamaModel): BuiltInChatWrapperType | null {
+export function resolveChatWrapper(
+    options: ResolveChatWrapperOptions | LlamaModel,
+    modelOptions?: ResolveChatWrapperWithModelOptions
+): BuiltInChatWrapperType | null {
     if (options instanceof LlamaModel)
         return resolveChatWrapper({
+            ...(modelOptions ?? {}),
             bosString: options.tokens.bosString,
             filename: options.filename,
             fileInfo: options.fileInfo,

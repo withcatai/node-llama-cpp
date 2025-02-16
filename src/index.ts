@@ -66,7 +66,7 @@ import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/uti
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
-    type ResolveChatWrapperOptions, type BuiltInChatWrapperType, chatWrappers
+    type ResolveChatWrapperOptions, type ResolveChatWrapperWithModelOptions, type BuiltInChatWrapperType, chatWrappers
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
@@ -90,8 +90,8 @@ import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
 import {
-    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelSegmentType, type ChatModelFunctions, type ChatModelResponse,
-    type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
+    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelSegmentType, type ChatModelSegment, type ChatModelFunctions,
+    type ChatModelResponse, type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, isChatModelResponseSegment,
     type LLamaContextualRepeatPenalty, type ChatWrapperSettings, type ChatWrapperSettingsSegment,
     type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState, type ChatWrapperGenerateInitialHistoryOptions
@@ -222,6 +222,7 @@ export {
     resolveChatWrapper,
     type BuiltInChatWrapperType,
     type ResolveChatWrapperOptions,
+    type ResolveChatWrapperWithModelOptions,
     resolvableChatWrapperTypeNames,
     type ResolvableChatWrapperTypeName,
     specializedChatWrapperTypeNames,
@@ -250,6 +251,7 @@ export {
     type ChatHistoryItem,
     type ChatModelFunctionCall,
     type ChatModelSegmentType,
+    type ChatModelSegment,
     type ChatModelFunctions,
     type ChatModelResponse,
     type ChatSessionModelFunction,
