@@ -171,7 +171,7 @@ describe("Llama3_1ChatWrapper", () => {
           - Always add your sources when using search results to answer the user query
           - After calling a function, the result will appear afterwards and is only visible to you
           - To make information visible to the user, you must include it in your response
-          - Do not tell the user about the functions your are using
+          - Do not tell the user about the functions you are using
           - Only call functions when needed
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
