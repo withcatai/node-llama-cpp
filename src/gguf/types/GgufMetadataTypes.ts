@@ -361,7 +361,7 @@ export type GgufMetadataDefaultArchitectureType = {
 //     }
 // };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#llama
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#llama
 export type GgufMetadataLlmLLaMA = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -381,7 +381,7 @@ export type GgufMetadataLlmLLaMA = {
     readonly tensor_data_layout?: string
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#mpt
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#mpt
 export type GgufMetadataMPT = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -394,7 +394,7 @@ export type GgufMetadataMPT = {
     }
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-neox
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#gpt-neox
 export type GgufMetadataGPTNeoX = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -411,7 +411,7 @@ export type GgufMetadataGPTNeoX = {
     }
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-j
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#gpt-j
 export type GgufMetadataGPTJ = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -426,7 +426,7 @@ export type GgufMetadataGPTJ = {
     }
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#gpt-2
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#gpt-2
 export type GgufMetadataGPT2 = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -437,7 +437,7 @@ export type GgufMetadataGPT2 = {
     }
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#bloom
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#bloom
 export type GgufMetadataBloom = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -449,7 +449,7 @@ export type GgufMetadataBloom = {
     }
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#falcon
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#falcon
 export type GgufMetadataFalcon = {
     readonly context_length: number,
     readonly embedding_length: number,
@@ -463,7 +463,7 @@ export type GgufMetadataFalcon = {
     readonly tensor_data_layout?: string
 };
 
-// source: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md#mamba
+// source: https://github.com/ggml-org/ggml/blob/master/docs/gguf.md#mamba
 export type GgufMetadataMamba = {
     readonly context_length: number,
     readonly embedding_length: number,

@@ -213,7 +213,7 @@ async function fetchHuggingFaceModelManifest({
                     ...headers,
 
                     // we need this to get the `ggufFile` field in the response
-                    // https://github.com/ggerganov/llama.cpp/pull/11195
+                    // https://github.com/ggml-org/llama.cpp/pull/11195
                     "User-Agent": "llama-cpp"
                 },
                 signal

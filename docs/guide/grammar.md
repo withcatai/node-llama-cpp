@@ -26,7 +26,7 @@ so it's recommended to use it together with `maxTokens` set to the context size 
 ## Using a Builtin Grammar {#builtin-grammar}
 The [`llama.getGrammarFor("<format>")`](../api/classes/Llama.md#getgrammarfor) method reads a GBNF grammar file that's originally provided by `llama.cpp` and is included inside of `node-llama-cpp`.
 
-You can see the full list of supported grammar files [here](https://github.com/ggerganov/llama.cpp/tree/master/grammars).
+You can see the full list of supported grammar files [here](https://github.com/ggml-org/llama.cpp/tree/master/grammars).
 
 ```typescript
 import {fileURLToPath} from "url";
@@ -174,7 +174,7 @@ so there's no need to explain the schema in the prompt.
 :::
 
 ## Creating Your Own Grammar {#custom-grammar}
-To create your own grammar, read the [GBNF guide](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md) to create a GBNF grammar file.
+To create your own grammar, read the [GBNF guide](https://github.com/ggml-org/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md) to create a GBNF grammar file.
 
 To use your custom grammar file, load it via the [`llama.createGrammar(...)`](../api/classes/Llama.md#creategrammar) method:
 ```typescript

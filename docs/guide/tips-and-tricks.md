@@ -67,8 +67,8 @@ or provide additional information regarding flash attention when used.
 
 OpenMP can help improve inference performance on Linux and Windows, but requires additional installation and setup.
 
-The performance improvement can be [up to 8% faster](https://github.com/ggerganov/llama.cpp/pull/7606) inference times (on specific conditions).
-Setting the `OMP_PROC_BIND` environment variable to `TRUE` on systems that support many threads (assume 36 as the minimum) can improve performance [by up to 23%](https://github.com/ggerganov/llama.cpp/pull/7606).
+The performance improvement can be [up to 8% faster](https://github.com/ggml-org/llama.cpp/pull/7606) inference times (on specific conditions).
+Setting the `OMP_PROC_BIND` environment variable to `TRUE` on systems that support many threads (assume 36 as the minimum) can improve performance [by up to 23%](https://github.com/ggml-org/llama.cpp/pull/7606).
 
 The pre-built binaries are compiled without OpenMP since OpenMP isn't always available on all systems, and has to be installed separately.
 

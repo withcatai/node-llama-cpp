@@ -16,7 +16,7 @@ const loader = {
         const clonedRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
         const release = clonedRepoReleaseInfo?.tag ?? await getBinariesGithubRelease();
 
-        const githubFileUrl = `https://github.com/ggerganov/llama.cpp/blob/${encodeURIComponent(release)}/ggml/CMakeLists.txt`;
+        const githubFileUrl = `https://github.com/ggml-org/llama.cpp/blob/${encodeURIComponent(release)}/ggml/CMakeLists.txt`;
 
         return {
             cmakeOptionsFileUrl: githubFileUrl,

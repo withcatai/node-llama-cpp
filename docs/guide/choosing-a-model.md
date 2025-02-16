@@ -142,7 +142,7 @@ Here are a few concepts to be aware of when choosing a model:
 If you plan to feed the model with a lot of data at once, you'll need a model that supports a large context size.
 The larger the context size is, the more data the model can process at once.
 
-You can only create a context with a size that is smaller or equal to the context size the model was trained on (although there are techniques around that, like [RoPE](https://github.com/ggerganov/llama.cpp/discussions/1965)).
+You can only create a context with a size that is smaller or equal to the context size the model was trained on (although there are techniques around that, like [RoPE](https://github.com/ggml-org/llama.cpp/discussions/1965)).
 The larger the context size is, the more memory the model will require to run.
 If you plan to feed the model with a lot of data at once, you may want to choose a smaller model that uses less memory, so you can create a larger context.
 
