@@ -7,7 +7,7 @@ description: Using function calling
 When prompting a model using a [`LlamaChatSession`](../api/classes/LlamaChatSession.md), you can provide a list of functions that a model can call during generation to retrieve information or perform actions.
 
 For this to work, `node-llama-cpp` tells the model what functions are available and what parameters they take, and instructs it to call those as needed.
-It also ensures that the model can only call functions with the correct parameters.
+It also ensures that when the model calls a function, it always uses the correct parameters.
 
 Some models have built-in support for function calling, and some of them are not trained for that.
 
@@ -15,7 +15,7 @@ For example, _Llama 3_ is not trained for function calling.
 When using a _Llama 3_ model, the [`Llama3ChatWrapper`](../api/classes/Llama3ChatWrapper.md) is automatically used, and it includes a custom handling for function calling,
 which contains a fine-tuned instruction for explaining the model how to call functions and when to do so.
 
-There are also model that do have built-in support for function calling, like _Llama 3.1_.
+There are also models that do have built-in support for function calling, like _Llama 3.1_.
 When using a _Llama 3.1_ model, the [`Llama3_1ChatWrapper`](../api/classes/Llama3_1ChatWrapper.md) is automatically used, and it knows how to handle function calling for this model.
 
 In order for the model to know what functions can do and what they return, you need to provide this information in the function description.
