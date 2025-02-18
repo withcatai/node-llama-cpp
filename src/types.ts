@@ -83,11 +83,11 @@ export type ChatWrapperSettings = {
     },
 
     readonly segments?: {
-        /** When this text is detected, active text segments are considered closed */
+        /** Consider all active segments to be closed when this text is detected */
         readonly closeAllSegments?: string | LlamaText,
 
         /**
-         * After function calls, reiterate the stack of the active text segments to remind the model of the context.
+         * After function calls, reiterate the stack of the active segments to remind the model of the context.
          *
          * Defaults to `false`.
          */

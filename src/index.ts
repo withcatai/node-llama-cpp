@@ -62,7 +62,6 @@ import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappe
 import {
     JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
 } from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
-import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
@@ -112,6 +111,8 @@ import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js
 import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
 import {type OverridesObject} from "./utils/OverridesObject.js";
 import type {LlamaClasses} from "./utils/getLlamaClasses.js";
+import type {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
+import type {TemplateChatWrapperSegmentsOptions} from "./chatWrappers/generic/utils/templateSegmentOptionsToChatWrapperSettings.js";
 
 
 export {
@@ -219,6 +220,7 @@ export {
     type JinjaTemplateChatWrapperOptions,
     type JinjaTemplateChatWrapperOptionsConvertMessageFormat,
     type ChatHistoryFunctionCallMessageTemplate,
+    type TemplateChatWrapperSegmentsOptions,
     resolveChatWrapper,
     type BuiltInChatWrapperType,
     type ResolveChatWrapperOptions,
