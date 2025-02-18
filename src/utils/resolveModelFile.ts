@@ -279,6 +279,9 @@ export async function resolveModelFile(
 async function findMatchingFilesInDirectory(dirPath: string, fileNames: (string | `${string}${typeof genericFilePartNumber}${string}`)[]) {
     let directoryFileNames: string[] | undefined = undefined;
 
+    if (!(await fs.pathExists(dirPath)) || !(await fs.stat(dirPath)).isDirectory())
+        return undefined;
+
     for (const expectedFileName of fileNames) {
         if (expectedFileName.includes(genericFilePartNumber)) {
             const [firstPart, ...restParts] = expectedFileName.split(genericFilePartNumber);
