@@ -647,7 +647,7 @@ export class LlamaChatSession {
                                 .filter((result): result is Exclude<typeof result, null> => result != null);
                             this._ensureNotDisposed();
 
-                            if (abortController.signal.aborted)
+                            if (abortController.signal.aborted && (abortedOnFunctionCallError || !stopOnAbortSignal))
                                 throw abortController.signal.reason;
 
                             newContextWindowChatHistory = lastEvaluation.contextWindow;
@@ -680,7 +680,11 @@ export class LlamaChatSession {
                             lastEvaluation.cleanHistory = newChatHistory;
                             lastEvaluation.contextWindow = newContextWindowChatHistory;
 
-                            continue;
+                            if (abortController.signal.aborted && !abortedOnFunctionCallError && stopOnAbortSignal) {
+                                metadata.stopReason = "abort";
+                                metadata.remainingGenerationAfterStop = undefined;
+                            } else
+                                continue;
                         }
                     }
 

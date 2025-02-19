@@ -1730,7 +1730,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public getPenaltyTokens() {
         if (this.llamaChat.disposed)
-            throw new DisposedError();
+            return [];
 
         let punishTokens = this.res.slice(-this.resolvedRepeatPenalty.lastTokens);
 
