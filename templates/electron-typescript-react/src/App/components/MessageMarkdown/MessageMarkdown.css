@@ -4,7 +4,8 @@
     &.active {
         &:empty:after,
         &:not(:empty)>:last-child:not(ol, ul, table):after,
-        &:not(:empty)>:last-child:where(ol, ul)>:last-child:after,
+        &:not(:empty)>:last-child:where(ol, ul)>:last-child:not(:has(>:last-child:where(ol, ul))):after,
+        &:not(:empty)>:last-child:where(ol, ul)>:last-child>:last-child:where(ol, ul)>:last-child:after,
         &:not(:empty)>:last-child:where(table)>:last-child>:last-child>:last-child:after {
             content: "";
             position: static;

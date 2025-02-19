@@ -360,36 +360,46 @@ export const llmFunctions = {
                         simplifiedChat: getSimplifiedChatHistory(true, message)
                     }
                 };
-                await chatSession.prompt(message, {
-                    signal: promptAbortController.signal,
-                    stopOnAbortSignal: true,
-                    functions: modelFunctions,
-                    onResponseChunk(chunk) {
-                        inProgressResponse = squashMessageIntoModelChatMessages(
-                            inProgressResponse,
-                            (chunk.type == null || chunk.segmentType == null)
-                                ? {
-                                    type: "text",
-                                    text: chunk.text
-                                }
-                                : {
-                                    type: "segment",
-                                    segmentType: chunk.segmentType,
-                                    text: chunk.text,
-                                    startTime: chunk.segmentStartTime?.toISOString(),
-                                    endTime: chunk.segmentEndTime?.toISOString()
-                                }
-                        );
 
-                        llmState.state = {
-                            ...llmState.state,
-                            chatSession: {
-                                ...llmState.state.chatSession,
-                                simplifiedChat: getSimplifiedChatHistory(true, message)
-                            }
-                        };
-                    }
-                });
+                const abortSignal = promptAbortController.signal;
+                try {
+                    await chatSession.prompt(message, {
+                        signal: abortSignal,
+                        stopOnAbortSignal: true,
+                        functions: modelFunctions,
+                        onResponseChunk(chunk) {
+                            inProgressResponse = squashMessageIntoModelChatMessages(
+                                inProgressResponse,
+                                (chunk.type == null || chunk.segmentType == null)
+                                    ? {
+                                        type: "text",
+                                        text: chunk.text
+                                    }
+                                    : {
+                                        type: "segment",
+                                        segmentType: chunk.segmentType,
+                                        text: chunk.text,
+                                        startTime: chunk.segmentStartTime?.toISOString(),
+                                        endTime: chunk.segmentEndTime?.toISOString()
+                                    }
+                            );
+
+                            llmState.state = {
+                                ...llmState.state,
+                                chatSession: {
+                                    ...llmState.state.chatSession,
+                                    simplifiedChat: getSimplifiedChatHistory(true, message)
+                                }
+                            };
+                        }
+                    });
+                } catch (err) {
+                    if (err !== abortSignal.reason)
+                        throw err;
+
+                    // if the prompt was aborted before the generation even started, we ignore the error
+                }
+
                 llmState.state = {
                     ...llmState.state,
                     chatSession: {
@@ -450,6 +460,8 @@ export const llmFunctions = {
             };
 
             chatSession.onDispose.createListener(() => {
+                chatSessionCompletionEngine = null;
+                promptAbortController = null;
                 llmState.state = {
                     ...llmState.state,
                     chatSession: {

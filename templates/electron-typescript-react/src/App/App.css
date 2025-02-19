@@ -17,6 +17,10 @@
     min-height: 100%;
     max-width: 1280px;
 
+    > .chatHistory {
+        margin-bottom: 32px;
+    }
+
     > .message {
         flex: 1;
         display: flex;

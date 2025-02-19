@@ -16,21 +16,40 @@ export function App() {
     const state = useExternalState(llmState);
     const {generatingResult} = state.chatSession;
     const isScrollAnchoredRef = useRef(false);
+    const lastAnchorScrollTopRef = useRef<number>(0);
 
     const isScrolledToTheBottom = useCallback(() => {
-        return document.documentElement.scrollHeight - document.documentElement.scrollTop === document.documentElement.clientHeight;
+        return (
+            document.documentElement.scrollHeight - document.documentElement.scrollTop - 1
+        ) <= document.documentElement.clientHeight;
     }, []);
 
     const scrollToBottom = useCallback(() => {
-        document.documentElement.scrollTop = document.documentElement.scrollHeight;
-        isScrollAnchoredRef.current = isScrolledToTheBottom();
+        const newScrollTop = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+
+        if (newScrollTop > document.documentElement.scrollTop && newScrollTop > lastAnchorScrollTopRef.current) {
+            document.documentElement.scrollTo({
+                top: newScrollTop,
+                behavior: "smooth"
+            });
+            lastAnchorScrollTopRef.current = document.documentElement.scrollTop;
+        }
+
+        isScrollAnchoredRef.current = true;
     }, []);
 
     useLayoutEffect(() => {
         // anchor scroll to bottom
 
         function onScroll() {
-            isScrollAnchoredRef.current = isScrolledToTheBottom();
+            const currentScrollTop = document.documentElement.scrollTop;
+
+            isScrollAnchoredRef.current = isScrolledToTheBottom() ||
+                currentScrollTop >= lastAnchorScrollTopRef.current;
+
+            // handle scroll animation
+            if (isScrollAnchoredRef.current)
+                lastAnchorScrollTopRef.current = currentScrollTop;
         }
 
         const observer = new ResizeObserver(() => {
@@ -169,6 +188,7 @@ export function App() {
         {
             !showMessage &&
             <ChatHistory
+                className="chatHistory"
                 simplifiedChat={state.chatSession.simplifiedChat}
                 generatingResult={generatingResult}
             />

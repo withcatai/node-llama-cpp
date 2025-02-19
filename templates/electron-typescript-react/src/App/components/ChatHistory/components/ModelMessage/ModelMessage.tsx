@@ -37,11 +37,9 @@ export function ModelMessage({modelMessage, active}: ModelMessageProps) {
             (modelMessage.message.length === 0 && active) &&
             <MessageMarkdown className="text" activeDot />
         }
-        {
-            !active && <div className="buttons">
-                <ModelMessageCopyButton modelMessage={modelMessage.message} />
-            </div>
-        }
+        <div className="buttons" inert={active}>
+            <ModelMessageCopyButton modelMessage={modelMessage.message} />
+        </div>
     </div>;
 }
 
