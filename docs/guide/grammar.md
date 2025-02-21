@@ -184,7 +184,7 @@ import fs from "fs/promises";
 import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const myGrammar = await fs.readFile(path.join(__dirname, "my-json-grammar.gbnf"), "utf-8");
+const myGrammar = await fs.readFile(path.join(__dirname, "my-json-grammar.gbnf"), "utf8");
 
 const llama = await getLlama();
 const model = await llama.loadModel({
