@@ -46,7 +46,6 @@
             text-align: start;
 
             > .hint {
-                margin-top: 64px;
                 opacity: 0.6;
             }
 
@@ -76,6 +75,20 @@
                         flex-shrink: 0;
                         fill: currentColor;
                     }
+                }
+
+                > .separator {
+                    height: 1px;
+                    background-color: var(--actions-block-border-color);
+                    margin: 0px -24px;
+                    align-self: stretch;
+                }
+
+                > .title {
+                    padding-inline-end: 16px;
+                    color: var(--text-color);
+                    opacity: 0.8;
+                    font-weight: 600;
                 }
 
                 > .links {
