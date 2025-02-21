@@ -254,3 +254,38 @@ console.log("User: " + q2);
 const a2 = await session.prompt(q2);
 console.log("AI: " + a2);
 ```
+
+## Default Chat Wrapper Options
+You can use the [`resolveChatWrapper(...)`](../api/functions/resolveChatWrapper.md) function to resolve the best chat wrapper for a given model,
+and configure the default options for each of the builtin chat wrappers it may resolve to. 
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession, resolveChatWrapper} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    chatWrapper: resolveChatWrapper(model, {// [!code highlight]
+        customWrapperSettings: {// [!code highlight]
+            "llama3.1": {// [!code highlight]
+                cuttingKnowledgeDate: new Date("2025-01-01T00:00:00Z")// [!code highlight]
+            }// [!code highlight]
+        }// [!code highlight]
+    })// [!code highlight]
+});
+
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+```

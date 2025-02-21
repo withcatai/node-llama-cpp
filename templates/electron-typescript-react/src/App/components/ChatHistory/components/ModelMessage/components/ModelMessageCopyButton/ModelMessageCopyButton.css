@@ -1,4 +1,4 @@
-.appChatHistory > .buttons {
+.appChatHistory > .message.model > .buttons {
     > .copyButton {
         display: grid;
         grid-template-areas: "icon";

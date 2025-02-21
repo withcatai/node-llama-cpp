@@ -80,7 +80,28 @@ export type ChatWrapperSettings = {
                 readonly sectionSuffix?: string | LlamaText
             }
         }
+    },
+
+    readonly segments?: {
+        /** Consider all active segments to be closed when this text is detected */
+        readonly closeAllSegments?: string | LlamaText,
+
+        /**
+         * After function calls, reiterate the stack of the active segments to remind the model of the context.
+         *
+         * Defaults to `false`.
+         */
+        readonly reiterateStackAfterFunctionCalls?: boolean,
+
+        /** Chain of Thought text segment */
+        readonly thought?: ChatWrapperSettingsSegment & {
+            reopenAfterFunctionCalls?: boolean
+        }
     }
+};
+export type ChatWrapperSettingsSegment = {
+    readonly prefix: string | LlamaText,
+    readonly suffix?: string | LlamaText
 };
 
 export type ChatWrapperGenerateContextStateOptions = {
@@ -120,7 +141,7 @@ export type ChatUserMessage = {
 };
 export type ChatModelResponse = {
     type: "model",
-    response: (string | ChatModelFunctionCall)[]
+    response: Array<string | ChatModelFunctionCall | ChatModelSegment>
 };
 export type ChatModelFunctionCall = {
     type: "functionCall",
@@ -136,6 +157,18 @@ export type ChatModelFunctionCall = {
      * Relevant only when parallel function calling is supported.
      */
     startsNewChunk?: boolean
+};
+
+export const allSegmentTypes = ["thought"] as const satisfies ChatModelSegmentType[];
+export type ChatModelSegmentType = "thought";
+export type ChatModelSegment = {
+    type: "segment",
+    segmentType: ChatModelSegmentType,
+    text: string,
+    ended: boolean,
+    raw?: LlamaTextJSON,
+    startTime?: string,
+    endTime?: string
 };
 
 export type ChatModelFunctions = {
@@ -155,11 +188,18 @@ export type ChatSessionModelFunction<Params extends GbnfJsonSchema | undefined =
     readonly handler: (params: GbnfJsonSchemaToType<Params>) => any
 };
 
-export function isChatModelResponseFunctionCall(item: ChatModelResponse["response"][number]): item is ChatModelFunctionCall {
-    if (typeof item === "string")
+export function isChatModelResponseFunctionCall(item: ChatModelResponse["response"][number] | undefined): item is ChatModelFunctionCall {
+    if (item == null || typeof item === "string")
         return false;
 
     return item.type === "functionCall";
+}
+
+export function isChatModelResponseSegment(item: ChatModelResponse["response"][number] | undefined): item is ChatModelSegment {
+    if (item == null || typeof item === "string")
+        return false;
+
+    return item.type === "segment";
 }
 
 export type LLamaContextualRepeatPenalty = {

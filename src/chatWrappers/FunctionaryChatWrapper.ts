@@ -1,7 +1,8 @@
 import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings,
-    isChatModelResponseFunctionCall
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatModelSegment,
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings, isChatModelResponseFunctionCall,
+    isChatModelResponseSegment
 } from "../types.js";
 import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
@@ -25,6 +26,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
 
         if (variation === "v3")
             this.settings = {
+                ...ChatWrapper.defaultSettings,
                 supportsSystemMessages: true,
                 functions: {
                     call: {
@@ -55,6 +57,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             };
         else if (variation === "v2.llama3")
             this.settings = {
+                ...ChatWrapper.defaultSettings,
                 supportsSystemMessages: true,
                 functions: {
                     call: {
@@ -87,6 +90,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             };
         else
             this.settings = {
+                ...ChatWrapper.defaultSettings,
                 supportsSystemMessages: true,
                 functions: {
                     call: {
@@ -180,19 +184,20 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         pendingFunctionResults.length = 0;
                     };
 
-                    for (let index = 0; index < item.response.length; index++) {
-                        const response = item.response[index];
-                        const isLastResponse = index === item.response.length - 1;
+                    const simplifiedResponse = convertModelResponseToLamaTextAndFunctionCalls(item.response, this);
+                    for (let index = 0; index < simplifiedResponse.length; index++) {
+                        const response = simplifiedResponse[index];
+                        const isLastResponse = index === simplifiedResponse.length - 1;
 
                         if (response == null)
                             continue;
 
-                        if (typeof response === "string") {
+                        if (LlamaText.isLlamaText(response)) {
                             addPendingFunctions();
                             res.push(
                                 LlamaText([
                                     new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"),
-                                    (isLastResponse && response === "")
+                                    (isLastResponse && response.values.length === 0)
                                         ? hasFunctions
                                             ? LlamaText(new SpecialTokensText(">>>"))
                                             : LlamaText(new SpecialTokensText(">>>all\n"))
@@ -344,14 +349,15 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         pendingFunctionResults.length = 0;
                     };
 
-                    for (let index = 0; index < item.response.length; index++) {
-                        const response = item.response[index];
-                        const isLastResponse = index === item.response.length - 1;
+                    const simplifiedResponse = convertModelResponseToLamaTextAndFunctionCalls(item.response, this);
+                    for (let index = 0; index < simplifiedResponse.length; index++) {
+                        const response = simplifiedResponse[index];
+                        const isLastResponse = index === simplifiedResponse.length - 1;
 
                         if (response == null)
                             continue;
 
-                        if (typeof response === "string") {
+                        if (LlamaText.isLlamaText(response)) {
                             addPendingFunctions();
                             res.push(
                                 LlamaText([
@@ -488,14 +494,15 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         pendingFunctionResults.length = 0;
                     };
 
-                    for (let index = 0; index < item.response.length; index++) {
-                        const response = item.response[index];
+                    const simplifiedResponse = convertModelResponseToLamaTextAndFunctionCalls(item.response, this);
+                    for (let index = 0; index < simplifiedResponse.length; index++) {
+                        const response = simplifiedResponse[index];
                         const isFirstResponse = index === 0;
 
                         if (response == null)
                             continue;
 
-                        if (typeof response === "string") {
+                        if (LlamaText.isLlamaText(response)) {
                             addPendingFunctions();
                             res.push(
                                 LlamaText([
@@ -726,4 +733,31 @@ export class FunctionaryChatWrapper extends ChatWrapper {
             {variation: "v2"}
         ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
+}
+
+function convertModelResponseToLamaTextAndFunctionCalls(
+    modelResponse: ChatModelResponse["response"], chatWrapper: ChatWrapper
+): Array<LlamaText | ChatModelFunctionCall> {
+    const pendingItems: Array<string | ChatModelSegment> = [];
+    const res: Array<LlamaText | ChatModelFunctionCall> = [];
+
+    function pushPendingItems() {
+        if (pendingItems.length === 0)
+            return;
+
+        res.push(chatWrapper.generateModelResponseText(pendingItems));
+        pendingItems.length = 0;
+    }
+
+    for (const item of modelResponse) {
+        if (typeof item === "string" || isChatModelResponseSegment(item))
+            pendingItems.push(item);
+        else {
+            pushPendingItems();
+            res.push(item);
+        }
+    }
+
+    pushPendingItems();
+    return res;
 }

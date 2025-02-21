@@ -632,7 +632,7 @@ async function RunChat({
             .catch(() => void 0); // don't throw an error if preloading fails because a real prompt is sent early
 
     while (true) {
-        let hadNoWhitespaceTextInThisIteration = false;
+        let hadTrimmedWhitespaceTextInThisIterationAndSegment = false;
         let nextPrintLeftovers = "";
         const input = initialPrompt != null
             ? initialPrompt
@@ -650,6 +650,7 @@ async function RunChat({
         process.stdout.write(chalk.yellow("AI: "));
 
         const [startColor, endColor] = chalk.blue("MIDDLE").split("MIDDLE");
+        const [segmentStartColor, segmentEndColor] = chalk.gray("MIDDLE").split("MIDDLE");
 
         const abortController = new AbortController();
         const consoleInteraction = new ConsoleInteraction();
@@ -659,6 +660,7 @@ async function RunChat({
         });
 
         const timeBeforePrompt = Date.now();
+        let currentSegmentType: string | undefined;
         try {
             process.stdout.write(startColor!);
             consoleInteraction.start();
@@ -683,16 +685,39 @@ async function RunChat({
                     : maxTokens <= 0
                         ? undefined
                         : maxTokens,
-                onTextChunk(chunk) {
+                onResponseChunk({text: chunk, type: chunkType, segmentType}) {
+                    if (segmentType != currentSegmentType) {
+                        const printNewline = hadTrimmedWhitespaceTextInThisIterationAndSegment
+                            ? "\n"
+                            : "";
+                        hadTrimmedWhitespaceTextInThisIterationAndSegment = false;
+
+                        if (chunkType !== "segment" || segmentType == null) {
+                            process.stdout.write(segmentEndColor!);
+                            process.stdout.write(chalk.reset.whiteBright.bold(printNewline + "[response] "));
+                            process.stdout.write(startColor!);
+                        } else if (currentSegmentType == null) {
+                            process.stdout.write(endColor!);
+                            process.stdout.write(chalk.reset.whiteBright.bold(printNewline + `[segment: ${segmentType}] `));
+                            process.stdout.write(segmentStartColor!);
+                        } else {
+                            process.stdout.write(segmentEndColor!);
+                            process.stdout.write(chalk.reset.whiteBright.bold(printNewline + `[segment: ${segmentType}] `));
+                            process.stdout.write(segmentStartColor!);
+                        }
+
+                        currentSegmentType = segmentType;
+                    }
+
                     let text = nextPrintLeftovers + chunk;
                     nextPrintLeftovers = "";
 
                     if (trimWhitespace) {
-                        if (!hadNoWhitespaceTextInThisIteration) {
+                        if (!hadTrimmedWhitespaceTextInThisIterationAndSegment) {
                             text = text.trimStart();
 
                             if (text.length > 0)
-                                hadNoWhitespaceTextInThisIteration = true;
+                                hadTrimmedWhitespaceTextInThisIterationAndSegment = true;
                         }
 
                         const textWithTrimmedEnd = text.trimEnd();
@@ -716,10 +741,14 @@ async function RunChat({
         } finally {
             consoleInteraction.stop();
 
+            const currentEndColor = currentSegmentType != null
+                ? segmentEndColor!
+                : endColor!;
+
             if (abortController.signal.aborted)
-                process.stdout.write(endColor! + chalk.yellow("[generation aborted by user]"));
+                process.stdout.write(currentEndColor + chalk.yellow("[generation aborted by user]"));
             else
-                process.stdout.write(endColor!);
+                process.stdout.write(currentEndColor);
 
             console.log();
         }
@@ -800,7 +829,11 @@ const defaultEnvironmentFunctions = {
         description: "Retrieve the current date",
         handler() {
             const date = new Date();
-            return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+            return [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, "0"),
+                String(date.getDate()).padStart(2, "0")
+            ].join("-");
         }
     }),
     getTime: defineChatSessionFunction({

@@ -52,6 +52,9 @@
     --message-table-outline-color: light-dark(rgba(0 0 0 / 8%), rgba(255 255 255 / 6%));
     --message-table-background-color: light-dark(rgba(0 0 0 / 0%), rgba(0 0 0 / 12%));
     --message-table-even-background-color: light-dark(rgba(0 0 0 / 4%), rgba(255 255 255 / 6%));
+
+    --message-hr-color: light-dark(rgba(0 0 0 / 16%), rgba(255 255 255 / 16%));
+    --message-blockquote-border-color: light-dark(rgba(0 0 0 / 8%), rgba(255 255 255 / 8%));
 }
 
 body {

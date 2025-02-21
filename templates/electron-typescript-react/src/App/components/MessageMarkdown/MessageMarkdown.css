@@ -1,0 +1,116 @@
+.appMessageMarkdown {
+    word-break: break-word;
+
+    &.active {
+        &:empty:after,
+        &:not(:empty)>:last-child:not(ol, ul, table):after,
+        &:not(:empty)>:last-child:where(ol, ul)>:last-child:not(:has(>:last-child:where(ol, ul))):after,
+        &:not(:empty)>:last-child:where(ol, ul)>:last-child>:last-child:where(ol, ul)>:last-child:after,
+        &:not(:empty)>:last-child:where(table)>:last-child>:last-child>:last-child:after {
+            content: "";
+            position: static;
+            display: inline-block;
+            background-color: currentColor;
+            width: 8px;
+            height: 8px;
+            translate: 0px -2px;
+            border-radius: 9999px;
+            margin-inline-start: 8px;
+            vertical-align: middle;
+
+            animation: messageMarkdownActiveDot 2s infinite ease-in-out;
+        }
+    }
+
+    > :first-child {
+        margin-top: 0px;
+    }
+
+    > :last-child {
+        margin-bottom: 0px;
+    }
+
+    h2 {
+        margin: 16px 0px;
+        padding-top: 24px;
+    }
+
+    h3 {
+        margin: 32px 0px 0px 0px;
+    }
+
+    hr {
+        background-color: var(--message-hr-color);
+        height: 2px;
+        border: none;
+        border-radius: 12px;
+    }
+
+    blockquote {
+        margin: 0px 0px;
+        padding-inline-start: 24px;
+        opacity: 0.64;
+        border: none;
+        position: relative;
+
+        &:before {
+            content: "";
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background-color: var(--message-blockquote-border-color);
+            inset-inline-start: 0px;
+        }
+    }
+
+    table {
+        display: block;
+        border-style: hidden;
+        border-radius: 12px;
+        outline: solid 1px var(--message-table-outline-color);
+        outline-offset: -1px;
+        max-width: max-content;
+        border-collapse: collapse;
+        overflow-x: auto;
+        background-color: var(--background-color);
+
+        thead {
+            text-align: justify;
+        }
+
+        tr {
+            background-color: var(--message-table-background-color);
+            border-top: 1px solid var(--message-table-outline-color);
+
+            &:nth-child(2n) td {
+                background-color: var(--message-table-even-background-color);
+            }
+
+            th {
+                background-color: var(--message-table-even-background-color);
+                border: 1px solid var(--message-table-outline-color);
+                padding: 8px 16px;
+            }
+
+            td {
+                border: 1px solid var(--message-table-outline-color);
+                padding: 8px 16px;
+            }
+        }
+    }
+}
+
+@keyframes messageMarkdownActiveDot {
+    0% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+    50% {
+        transform: scale(1.4);
+        opacity: 0.32;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.64;
+    }
+}

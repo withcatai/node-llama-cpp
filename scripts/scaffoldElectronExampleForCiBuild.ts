@@ -1,4 +1,5 @@
 import path from "path";
+import {fileURLToPath} from "url";
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
 import fs from "fs-extra";
@@ -6,6 +7,8 @@ import {ProjectTemplate, ProjectTemplateParameter, scaffoldProjectTemplate} from
 import {packedProjectTemplatesDirectory} from "../src/config.js";
 
 import "./packTemplates.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const electronTemplateName = "electron-typescript-react";
 const projectName = "node-llama-cpp-electron-example";
@@ -53,5 +56,10 @@ delete packageJson.scripts.postinstall;
 delete packageJson.scripts["models:pull"];
 
 await fs.writeJson(packageJsonPath, packageJson, {spaces: 2});
+
+const sourceAppIconPath = path.join(__dirname, "..", "assets", "electronTemplate.icon.png");
+const appIconPath = path.join(resolvedPackageFolderPath, "public", "app-icon.png");
+
+await fs.copyFile(sourceAppIconPath, appIconPath);
 
 console.info(`Scaffolded ${projectName} in ${resolvedPackageFolderPath} with package version ${packageVersion}`);

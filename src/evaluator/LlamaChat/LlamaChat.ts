@@ -2,7 +2,8 @@ import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatUserMessage, LLamaContextualRepeatPenalty, Token, Tokenizer
+    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage,
+    isChatModelResponseFunctionCall, isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes
 } from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
@@ -20,6 +21,8 @@ import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {resolveLastTokens} from "../../utils/resolveLastTokens.js";
 import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
+import {LlamaModel} from "../LlamaModel/LlamaModel.js";
+import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -40,20 +43,97 @@ export type LlamaChatOptions = {
     autoDisposeSequence?: boolean
 };
 
+export type LlamaChatResponseChunk = LlamaChatResponseTextChunk | LlamaChatResponseSegmentChunk;
+
+export type LlamaChatResponseTextChunk = {
+    /** When `type` is `undefined`, the chunk is part of the main response and is not a segment */
+    type: undefined,
+
+    /**
+     * `segmentType` has no purpose when `type` is `undefined` (meaning that this chunk is part of the main response and is not a segment).
+     */
+    segmentType: undefined,
+
+    /**
+     * The generated text chunk.
+     *
+     * Detokenized from the `tokens` property,
+     * but with the context of the previous generation (for better spacing of the text with some models).
+     *
+     * Prefer using this property over `tokens` when streaming the generated response as text.
+     */
+    text: string,
+
+    /** The generated tokens */
+    tokens: Token[]
+};
+
+export type LlamaChatResponseSegmentChunk = {
+    type: "segment",
+
+    /** Segment type */
+    segmentType: ChatModelSegmentType,
+
+    /**
+     * The generated text chunk.
+     *
+     * Detokenized from the `tokens` property,
+     * but with the context of the previous generation (for better spacing of the text with some models).
+     *
+     * Prefer using this property over `tokens` when streaming the generated response as text.
+     */
+    text: string,
+
+    /** The generated tokens */
+    tokens: Token[],
+
+    /**
+     * When the current chunk is the start of a segment, this field will be set.
+     *
+     * It's possible that a chunk with no tokens and empty text will be emitted just to set this field
+     * to signify that the segment has started.
+     */
+    segmentStartTime?: Date,
+
+    /**
+     * When the current chunk is the last one of a segment (meaning the current segment has ended), this field will be set.
+     *
+     * It's possible that a chunk with no tokens and empty text will be emitted just to set this field
+     * to signify that the segment has ended.
+     */
+    segmentEndTime?: Date
+};
+
 export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
     /**
-     * Called as the model generates a response with the generated text chunk.
+     * Called as the model generates the main response with the generated text chunk.
      *
      * Useful for streaming the generated response as it's being generated.
+     *
+     * Includes only the main response without any text segments (like thoughts).
+     * For streaming the response with segments, use {@link onResponseChunk `onResponseChunk`}.
      */
     onTextChunk?: (text: string) => void,
 
     /**
-     * Called as the model generates a response with the generated tokens.
+     * Called as the model generates the main response with the generated tokens.
      *
-     * Preferably, you'd want to use `onTextChunk` instead of this.
+     * Preferably, you'd want to use {@link onTextChunk `onTextChunk`} instead of this.
+     *
+     * Includes only the main response without any segments (like thoughts).
+     * For streaming the response with segments, use {@link onResponseChunk `onResponseChunk`}.
      */
     onToken?: (tokens: Token[]) => void,
+
+    /**
+     * Called as the model generates a response with the generated text and tokens,
+     * including segment information (when the generated output is part of a segment).
+     *
+     * Useful for streaming the generated response as it's being generated, including the main response and all segments.
+     *
+     * Only use this function when you need the segmented texts, like thought segments (chain of thought text).
+     */
+    onResponseChunk?: (chunk: LlamaChatResponseChunk) => void,
 
     signal?: AbortSignal,
 
@@ -383,6 +463,7 @@ export class LlamaChat {
         const {
             onTextChunk,
             onToken,
+            onResponseChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -418,6 +499,7 @@ export class LlamaChat {
             {
                 onTextChunk,
                 onToken,
+                onResponseChunk,
                 signal,
                 stopOnAbortSignal,
                 maxTokens,
@@ -450,6 +532,7 @@ export class LlamaChat {
         return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatResponse<Functions>> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsModel();
+                generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
 
                 const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
                     await generateResponseState.loadContextWindow(
@@ -490,31 +573,33 @@ export class LlamaChat {
                     await generateResponseState.createNewEvaluationIterator();
 
                     while (await generateResponseState.iterateEvaluation()) {
-                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+                        if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
+                            generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                        generateResponseState.detectAndHandleFunctionStartSyntax();
-                        if (generateResponseState.functionEvaluationMode !== false) {
-                            generateResponseState.canAvoidReloadingHistory = false;
-                            generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
-                            const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
-                                loadContextWindowForFunctionCallingLoop
-                            );
-                            if (functionsCallsRes != null)
-                                return functionsCallsRes;
+                            generateResponseState.detectAndHandleFunctionStartSyntax();
+                            if (generateResponseState.functionEvaluationMode !== false) {
+                                generateResponseState.canAvoidReloadingHistory = false;
+                                generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
+                                const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
+                                    loadContextWindowForFunctionCallingLoop
+                                );
+                                if (functionsCallsRes != null)
+                                    return functionsCallsRes;
+                            }
+
+                            generateResponseState.recordStopGenerationEvaluation();
+
+                            generateResponseState.popStreamRegulatorFreeTokens();
+                            generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
+
+                            const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
+                            if (stopGenerationTriggerRes != null)
+                                return stopGenerationTriggerRes;
+
+                            generateResponseState.spliceIgnoreStartTextDetectedTokens();
+
+                            generateResponseState.moveFreePendingTokensToRes();
                         }
-
-                        generateResponseState.recordStopGenerationEvaluation();
-
-                        generateResponseState.popStreamRegulatorFreeTokens();
-                        generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
-
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("model");
-                        if (stopGenerationTriggerRes != null)
-                            return stopGenerationTriggerRes;
-
-                        generateResponseState.spliceIgnoreStartTextDetectedTokens();
-
-                        generateResponseState.moveFreePendingTokensToRes();
 
                         const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("model");
                         if (maxTokensTriggerRes != null)
@@ -574,24 +659,33 @@ export class LlamaChat {
             } = {}
         } = options;
 
-        const lastEvaluationContextWindowHistoryItem = lastEvaluationContextWindowHistory == null
-            ? null
-            : lastEvaluationContextWindowHistory[lastEvaluationContextWindowHistory.length - 1];
-        const lastEvaluationContextWindowUserMessage = lastEvaluationContextWindowHistoryItem?.type === "user"
-            ? lastEvaluationContextWindowHistoryItem.text
-            : "";
-
         this.sequence.tokenPredictor?.updateInputTokens?.(
             this.model.tokenize(
                 (findLastModelMessageInChatHistory(history)?.response ?? [])
-                    .filter((item) => typeof item === "string")
+                    .map((item) => {
+                        if (typeof item === "string")
+                            return item;
+                        else if (isChatModelResponseFunctionCall(item))
+                            return null;
+                        else if (isChatModelResponseSegment(item))
+                            return item.text;
+
+                        void (item satisfies never);
+                        return null;
+                    })
+                    .filter((item) => item != null)
                     .join(" ")
             )
         );
+
         const generateResponseState = new GenerateResponseState<Functions>(
             this,
             this._chatWrapper,
-            history,
+            mergeGeneratedResultWithChatHistory(
+                "user",
+                history,
+                [initialUserPrompt]
+            ),
             {
                 onTextChunk,
                 onToken,
@@ -613,12 +707,11 @@ export class LlamaChat {
                 contextShift,
                 customStopTriggers,
                 lastEvaluationContextWindow: {
-                    history: lastEvaluationContextWindowHistory == null
-                        ? undefined
-                        : setLastUserTextInChatHistory(
-                            lastEvaluationContextWindowHistory,
-                            lastEvaluationContextWindowUserMessage + initialUserPrompt
-                        ),
+                    history: mergeGeneratedResultWithChatHistory(
+                        "user",
+                        lastEvaluationContextWindowHistory ?? history,
+                        [initialUserPrompt]
+                    ),
                     minimumOverlapPercentageToPreventContextShift
                 }
             }
@@ -627,29 +720,19 @@ export class LlamaChat {
         return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsUser();
-                const getInitialUserMessage = (history: ChatHistoryItem[]) => {
-                    const lastResolvedHistoryItem = history[history.length - 1];
-
-                    if (lastResolvedHistoryItem?.type === "user")
-                        return lastResolvedHistoryItem.text;
-
-                    return "";
-                };
-
-                const initialUserMessage = getInitialUserMessage(generateResponseState.resolvedHistory);
-                const contextWindowInitialUserMessage = getInitialUserMessage(generateResponseState.lastContextWindowHistory);
 
                 while (true) {
                     generateResponseState.startTokenLoop();
                     const {userTextSuffix} = await generateResponseState.loadContextWindow(
-                        setLastUserTextInChatHistory(
+                        mergeGeneratedResultWithChatHistory(
+                            "user",
                             generateResponseState.resolvedHistory,
-                            initialUserMessage + initialUserPrompt + this.model.detokenize(generateResponseState.res)
+                            generateResponseState.segmentHandler.getModelResponseSegments()
                         ),
-                        setLastUserTextInChatHistory(
+                        mergeGeneratedResultWithChatHistory(
+                            "user",
                             generateResponseState.lastContextWindowHistory,
-                            contextWindowInitialUserMessage + initialUserPrompt +
-                            this.model.detokenize(generateResponseState.contextWindowsRes)
+                            generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
                         ),
                         true
                     );
@@ -670,9 +753,10 @@ export class LlamaChat {
                         return {
                             completion: "",
                             lastEvaluation: {
-                                contextWindow: setLastUserTextInChatHistory(
+                                contextWindow: mergeGeneratedResultWithChatHistory(
+                                    "user",
                                     generateResponseState.lastContextWindowHistory,
-                                    initialUserMessage
+                                    generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
                                 ),
                                 contextShiftMetadata: generateResponseState.lastHistoryCompressionMetadata
                             },
@@ -684,38 +768,42 @@ export class LlamaChat {
 
                     await generateResponseState.createNewEvaluationIterator();
                     while (await generateResponseState.iterateEvaluation()) {
-                        generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
+                        if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
+                            generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                        generateResponseState.recordStopGenerationEvaluation();
+                            generateResponseState.recordStopGenerationEvaluation();
 
-                        generateResponseState.popStreamRegulatorFreeTokens();
+                            generateResponseState.popStreamRegulatorFreeTokens();
 
-                        const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
-                        if (stopGenerationTriggerRes != null)
-                            return {
-                                completion: stopGenerationTriggerRes.response,
-                                lastEvaluation: {
-                                    contextWindow: setLastUserTextInChatHistory(
-                                        generateResponseState.lastContextWindowHistory,
-                                        initialUserMessage
-                                    ),
-                                    contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
-                                },
-                                metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
-                                    ? stopGenerationTriggerRes.metadata
-                                    : stopGenerationTriggerRes.metadata
-                            };
+                            const stopGenerationTriggerRes = generateResponseState.handleStopGenerationTrigger("user");
+                            if (stopGenerationTriggerRes != null)
+                                return {
+                                    completion: stopGenerationTriggerRes.response,
+                                    lastEvaluation: {
+                                        contextWindow: mergeGeneratedResultWithChatHistory(
+                                            "user",
+                                            generateResponseState.lastContextWindowHistory,
+                                            generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
+                                        ),
+                                        contextShiftMetadata: stopGenerationTriggerRes.lastEvaluation.contextShiftMetadata
+                                    },
+                                    metadata: stopGenerationTriggerRes.metadata.stopReason === "customStopTrigger"
+                                        ? stopGenerationTriggerRes.metadata
+                                        : stopGenerationTriggerRes.metadata
+                                };
 
-                        generateResponseState.moveFreePendingTokensToRes(false);
+                            generateResponseState.moveFreePendingTokensToRes(false);
+                        }
 
                         const maxTokensTriggerRes = generateResponseState.handleMaxTokensTrigger("user");
                         if (maxTokensTriggerRes != null)
                             return {
                                 completion: maxTokensTriggerRes.response,
                                 lastEvaluation: {
-                                    contextWindow: setLastUserTextInChatHistory(
+                                    contextWindow: mergeGeneratedResultWithChatHistory(
+                                        "user",
                                         generateResponseState.lastContextWindowHistory,
-                                        initialUserMessage
+                                        generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
                                     ),
                                     contextShiftMetadata: maxTokensTriggerRes.lastEvaluation.contextShiftMetadata
                                 },
@@ -730,9 +818,10 @@ export class LlamaChat {
                             return {
                                 completion: abortRes.response,
                                 lastEvaluation: {
-                                    contextWindow: setLastUserTextInChatHistory(
+                                    contextWindow: mergeGeneratedResultWithChatHistory(
+                                        "user",
                                         generateResponseState.lastContextWindowHistory,
-                                        initialUserMessage
+                                        generateResponseState.segmentHandler.getContextWindowModelResponseSegments()
                                     ),
                                     contextShiftMetadata: abortRes.lastEvaluation.contextShiftMetadata
                                 },
@@ -757,7 +846,15 @@ export class LlamaChat {
 }
 
 export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined = undefined> = {
+    /**
+     * The response text only, _without_ any text segments (like thoughts).
+     */
     response: string,
+
+    /**
+     * The full response, including all text and text segments (like thoughts).
+     */
+    fullResponse: Array<string | LlamaChatResponseSegment>,
     functionCalls?: Functions extends ChatModelFunctions
         ? LlamaChatResponseFunctionCall<Functions>[]
         : never,
@@ -788,6 +885,16 @@ export type LlamaChatResponseFunctionCall<
     raw: LlamaTextJSON
 };
 
+export type LlamaChatResponseSegment = {
+    type: "segment",
+    segmentType: ChatModelSegmentType,
+    text: string,
+    ended: boolean,
+    raw: LlamaTextJSON,
+    startTime?: string,
+    endTime?: string
+};
+
 export type LlamaChatLoadAndCompleteUserResponse = {
     completion: string,
     lastEvaluation: {
@@ -814,11 +921,19 @@ function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Ite
         newHistoryItem.response = newHistoryItem.response.map((item) => {
             if (typeof item === "string")
                 return item;
-            else
+            else if (isChatModelResponseFunctionCall(item))
                 return {
                     ...item,
                     rawCall: undefined
                 };
+            else if (isChatModelResponseSegment(item))
+                return {
+                    ...item,
+                    raw: undefined
+                };
+
+            void (item satisfies never);
+            return item;
         });
 
         return newHistoryItem as Item;
@@ -926,17 +1041,12 @@ async function compressHistoryToFitContextSize({
     };
 }
 
-function getLastTextModelResponseFromChatHistory(chatHistory: ChatHistoryItem[]) {
-    if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1]!.type !== "model")
-        return "";
+function getLastModelMessageFullResponseFromChatHistory(chatHistory: ChatHistoryItem[]) {
+    const lastModelResponseItem = chatHistory.at(-1);
+    if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
+        return [];
 
-    const lastModelResponseItem = chatHistory[chatHistory.length - 1] as ChatModelResponse;
-    const modelResponse = lastModelResponseItem.response;
-
-    if (modelResponse.length > 0 && typeof modelResponse[modelResponse.length - 1] === "string")
-        return modelResponse[modelResponse.length - 1] as string;
-
-    return "";
+    return lastModelResponseItem.response;
 }
 
 function getLastUserTextFromChatHistory(chatHistory: readonly ChatHistoryItem[]) {
@@ -944,32 +1054,6 @@ function getLastUserTextFromChatHistory(chatHistory: readonly ChatHistoryItem[])
         return "";
 
     return (chatHistory[chatHistory.length - 1] as ChatUserMessage).text;
-}
-
-function setLastModelTextResponseInChatHistory(chatHistory: ChatHistoryItem[], textResponse: string) {
-    const newChatHistory = chatHistory.slice();
-    if (newChatHistory.length === 0 || newChatHistory[newChatHistory.length - 1]!.type !== "model")
-        newChatHistory.push({
-            type: "model",
-            response: []
-        });
-
-    const lastModelResponseItem = newChatHistory[newChatHistory.length - 1] as ChatModelResponse;
-    const newLastModelResponseItem = {...lastModelResponseItem};
-    newChatHistory[newChatHistory.length - 1] = newLastModelResponseItem;
-
-    const modelResponse = newLastModelResponseItem.response.slice();
-    newLastModelResponseItem.response = modelResponse;
-
-    if (modelResponse.length > 0 && typeof modelResponse[modelResponse.length - 1] === "string") {
-        if (textResponse === "")
-            modelResponse.pop();
-        else
-            modelResponse[modelResponse.length - 1] = textResponse;
-    } else if (textResponse !== "")
-        modelResponse.push(textResponse);
-
-    return newChatHistory;
 }
 
 function setLastUserTextInChatHistory(chatHistory: readonly ChatHistoryItem[], userText: string) {
@@ -989,11 +1073,86 @@ function setLastUserTextInChatHistory(chatHistory: readonly ChatHistoryItem[], u
     return newChatHistory;
 }
 
-function setLastTextInChatHistory(itemType: "user" | "model", chatHistory: ChatHistoryItem[], text: string) {
-    if (itemType === "user")
-        return setLastUserTextInChatHistory(chatHistory, text);
-    else
-        return setLastModelTextResponseInChatHistory(chatHistory, text);
+function mergeGeneratedResultWithChatHistory(
+    itemType: "user" | "model", chatHistory: ChatHistoryItem[], generatedResult: ChatSegments | string[]
+) {
+    if (generatedResult.length === 0 || (generatedResult.length === 1 && generatedResult[0] === ""))
+        return chatHistory;
+
+    const newChatHistory = chatHistory.slice();
+
+    if (itemType === "user") {
+        let lastUserItem = newChatHistory.at(-1);
+        if (lastUserItem?.type !== "user") {
+            lastUserItem = {
+                type: "user",
+                text: ""
+            };
+            newChatHistory.push(lastUserItem);
+        }
+
+        const newLastUserItem = {...lastUserItem};
+        newChatHistory[newChatHistory.length - 1] = newLastUserItem;
+
+        newLastUserItem.text += generatedResult
+            .map((item) => {
+                if (typeof item === "string")
+                    return item;
+
+                return item.text;
+            })
+            .join("");
+
+        return newChatHistory;
+    } else {
+        let lastModelItem = newChatHistory.at(-1);
+        if (lastModelItem?.type !== "model") {
+            lastModelItem = {
+                type: "model",
+                response: []
+            };
+            newChatHistory.push(lastModelItem);
+        }
+
+        const newLastModelItem = {...lastModelItem};
+        newChatHistory[newChatHistory.length - 1] = newLastModelItem;
+
+        const modelResponse = newLastModelItem.response.slice();
+        newLastModelItem.response = modelResponse;
+
+        const firstGeneratedResultItem = generatedResult[0];
+        if (firstGeneratedResultItem == null)
+            return newChatHistory;
+
+        const lastModelResponseItem = modelResponse.at(-1);
+        if (typeof firstGeneratedResultItem === "string" && typeof lastModelResponseItem === "string") {
+            modelResponse[modelResponse.length - 1] = lastModelResponseItem + firstGeneratedResultItem;
+        } else if (
+            typeof firstGeneratedResultItem !== "string" && isChatModelResponseSegment(firstGeneratedResultItem) &&
+            typeof lastModelResponseItem !== "string" && isChatModelResponseSegment(lastModelResponseItem) &&
+            !lastModelResponseItem.ended && lastModelResponseItem.segmentType === firstGeneratedResultItem.segmentType
+        ) {
+            modelResponse[modelResponse.length - 1] = {
+                ...lastModelResponseItem,
+                ...firstGeneratedResultItem,
+                text: lastModelResponseItem.text + firstGeneratedResultItem.text,
+                ended: firstGeneratedResultItem.ended,
+                raw: (lastModelResponseItem.raw != null && firstGeneratedResultItem.raw != null)
+                    ? LlamaText([
+                        LlamaText.fromJSON(lastModelResponseItem.raw),
+                        LlamaText.fromJSON(firstGeneratedResultItem.raw)
+                    ]).toJSON()
+                    : undefined,
+                startTime: lastModelResponseItem.startTime,
+                endTime: firstGeneratedResultItem.endTime
+            };
+        } else
+            modelResponse.push(firstGeneratedResultItem);
+
+        pushAll(modelResponse, generatedResult.slice(1));
+
+        return newChatHistory;
+    }
 }
 
 function findLastUserMessageInChatHistory(chatHistory: readonly ChatHistoryItem[]) {
@@ -1085,7 +1244,7 @@ async function getContextWindow({
     documentFunctionParams?: boolean, endWithUserText: boolean
 }): Promise<{
     history: ChatHistoryItem[], stopGenerationTriggers: LlamaText[], tokens: Token[],
-    newResolvedHistory: ChatHistoryItem[], newHistoryCompressionMetadata: object | null | undefined,
+    removeRawFromHistory: boolean, newHistoryCompressionMetadata: object | null | undefined,
     ignoreStartText: LlamaText[], functionCallInitiallyEngaged: boolean,
     disengageInitiallyEngagedFunctionCall: LlamaText[], userTextSuffix?: LlamaText
 }> {
@@ -1094,6 +1253,7 @@ async function getContextWindow({
 
     const model = sequence.model;
     const context = sequence.context;
+    let removeRawFromHistory = false;
 
     if (isFirstEvaluation && lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory) {
         const newContextWindow = lastEvaluationContextWindowHistory.slice();
@@ -1130,7 +1290,7 @@ async function getContextWindow({
                     history: newContextWindow,
                     stopGenerationTriggers,
                     tokens,
-                    newResolvedHistory: resolvedHistory,
+                    removeRawFromHistory,
                     newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                     ignoreStartText: ignoreStartText ?? [],
                     functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
@@ -1140,9 +1300,10 @@ async function getContextWindow({
         }
     }
 
-    resolvedHistory = sequence.isLoadedToMemory
-        ? resolvedHistory.slice()
-        : resolvedHistory.map(removeRawFromHistoryItem);
+    removeRawFromHistory = !sequence.isLoadedToMemory;
+    resolvedHistory = removeRawFromHistory
+        ? resolvedHistory.map(removeRawFromHistoryItem)
+        : resolvedHistory.slice();
 
     if (resolvedContextShift.lastEvaluationMetadata != null) {
         const contextShiftSize = resolvedContextShift.size instanceof Function
@@ -1178,7 +1339,7 @@ async function getContextWindow({
             history: compressedHistory,
             stopGenerationTriggers,
             tokens: contextText.tokenize(model.tokenizer),
-            newResolvedHistory: resolvedHistory,
+            removeRawFromHistory,
             newHistoryCompressionMetadata: metadata,
             ignoreStartText: ignoreStartText ?? [],
             functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
@@ -1204,7 +1365,7 @@ async function getContextWindow({
                 history: resolvedHistory,
                 stopGenerationTriggers,
                 tokens,
-                newResolvedHistory: resolvedHistory,
+                removeRawFromHistory,
                 newHistoryCompressionMetadata: lastHistoryCompressionMetadata,
                 ignoreStartText: ignoreStartText ?? [],
                 functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
@@ -1254,7 +1415,7 @@ async function getContextWindow({
         history: compressedHistory,
         stopGenerationTriggers,
         tokens: contextText.tokenize(model.tokenizer),
-        newResolvedHistory: resolvedHistory,
+        removeRawFromHistory,
         newHistoryCompressionMetadata: metadata,
         ignoreStartText: ignoreStartText ?? [],
         functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
@@ -1270,6 +1431,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly history: ChatHistoryItem[];
     private readonly onTextChunk: LLamaChatGenerateResponseOptions<Functions>["onTextChunk"];
     private readonly onToken: LLamaChatGenerateResponseOptions<Functions>["onToken"];
+    private readonly onResponseChunk: LLamaChatGenerateResponseOptions<Functions>["onResponseChunk"];
     private readonly signal: LLamaChatGenerateResponseOptions<Functions>["signal"];
     private readonly stopOnAbortSignal: LLamaChatGenerateResponseOptions<Functions>["stopOnAbortSignal"];
     public readonly maxTokens: LLamaChatGenerateResponseOptions<Functions>["maxTokens"];
@@ -1296,7 +1458,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly resolvedRepeatPenalty: LLamaContextualRepeatPenalty & {
         lastTokens: number
     };
-    private readonly lastModelResponse: string;
     private readonly grammarEvaluationState: LlamaGrammarEvaluationState | undefined;
     private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
     private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
@@ -1311,6 +1472,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly locksToReleaseOnValidGeneration: QueuedTokenReleaseLock[] = [];
 
     public resolvedHistory: ChatHistoryItem[];
+    private noRawInResolvedHistory: boolean;
 
     public readonly res: Token[] = [];
     public readonly pendingTokens: Token[] = [];
@@ -1320,6 +1482,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         params: any,
         raw: LlamaText
     }> = [];
+    public readonly segmentHandler: SegmentHandler;
+    public readonly pendingPartialTokens: Token[] = [];
 
     public functionEvaluationMode: false | "prefixOrDisengage" | "functionName" | "params" | "sectionSuffixOrBetweenCalls" = false;
     private currentFunctionCallPreviousText: LlamaText = LlamaText([]);
@@ -1348,8 +1512,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public userTextSuffix?: LlamaText = undefined;
 
     public tokens: Token[] = [];
-    public contextWindowLastModelResponse: string = "";
-    public contextWindowsRes: Token[] = [];
 
     // token evaluation loop
     public evaluationIterator?: AsyncGenerator<Token, void | Token>;
@@ -1367,6 +1529,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         {
             onTextChunk,
             onToken,
+            onResponseChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -1398,6 +1561,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.history = history;
         this.onTextChunk = safeEventCallback(onTextChunk);
         this.onToken = safeEventCallback(onToken);
+        this.onResponseChunk = safeEventCallback(onResponseChunk);
         this.signal = signal;
         this.stopOnAbortSignal = stopOnAbortSignal;
         this.maxTokens = maxTokens;
@@ -1426,9 +1590,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (this.llamaChat.disposed)
             throw new DisposedError();
 
-        this.resolvedHistory = this.llamaChat.sequence.isLoadedToMemory
-            ? this.history.slice()
-            : this.history.map(removeRawFromHistoryItem);
+        this.noRawInResolvedHistory = !this.llamaChat.sequence.isLoadedToMemory;
+        this.resolvedHistory = this.noRawInResolvedHistory
+            ? this.history.map(removeRawFromHistoryItem)
+            : this.history.slice();
         this.resolvedContextShift = {
             ...defaultContextShiftOptions,
             ...removeNullFields(this.contextShift)
@@ -1439,7 +1604,6 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ...(repeatPenalty ?? {}),
                 lastTokens: repeatPenalty?.lastTokens ?? defaultRepeatPenaltyLastTokens
             };
-        this.lastModelResponse = getLastTextModelResponseFromChatHistory(this.resolvedHistory);
         this.repeatPenaltyEnabled = this.resolvedRepeatPenalty.lastTokens > 0;
         this.grammarEvaluationState = this.grammar != null
             ? new LlamaGrammarEvaluationState({model: this.llamaChat.model, grammar: this.grammar})
@@ -1451,7 +1615,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.functionsEvaluationState = undefined;
 
         this.lastContextWindowHistory = lastEvaluationContextWindowHistory ?? this.resolvedHistory;
-        this.lastHistoryCompressionMetadata = this.resolvedContextShift;
+        this.lastHistoryCompressionMetadata = this.resolvedContextShift.lastEvaluationMetadata;
 
         if (this.customStopTriggers != null)
             StopGenerationDetector.resolveStopTriggers(this.customStopTriggers, this.llamaChat.model.tokenizer)
@@ -1472,6 +1636,26 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 )
             );
 
+        const segmentDefinitions: ConstructorParameters<typeof SegmentHandler>[0]["segmentDefinitions"] = new Map();
+        for (const segmentType of allSegmentTypes) {
+            const segmentDefinition = getChatWrapperSegmentDefinition(this.chatWrapper.settings, segmentType);
+            if (segmentDefinition != null)
+                segmentDefinitions.set(segmentType, segmentDefinition);
+        }
+
+        this.segmentHandler = new SegmentHandler({
+            model: this.llamaChat.model,
+            onTextChunk: this.onTextChunk,
+            onToken: this.onToken,
+            onResponseChunk: this.onResponseChunk,
+            previousTokens: this.getLastTokens(),
+            closeAllSegments: this.chatWrapper.settings.segments?.closeAllSegments,
+            segmentDefinitions,
+            initialSegmentStack: SegmentHandler.getStackFromModelResponse(
+                getLastModelMessageFullResponseFromChatHistory(this.resolvedHistory)
+            )
+        });
+
         this.getPenaltyTokens = this.getPenaltyTokens.bind(this);
     }
 
@@ -1484,7 +1668,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public ensureLastHistoryItemIsModel() {
-        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1]!.type !== "model")
+        if (this.resolvedHistory.at(-1)?.type !== "model")
             this.resolvedHistory.push({
                 type: "model",
                 response: []
@@ -1492,11 +1676,48 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public ensureLastHistoryItemIsUser() {
-        if (this.resolvedHistory.length === 0 || this.resolvedHistory[this.resolvedHistory.length - 1]!.type !== "user")
+        if (this.resolvedHistory.at(-1)?.type !== "user")
             this.resolvedHistory.push({
                 type: "user",
                 text: ""
             });
+    }
+
+    public ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded() {
+        if (this.chatWrapper.settings.segments?.thought?.reopenAfterFunctionCalls !== true)
+            return;
+
+        const lastModelResponseItem = this.resolvedHistory.at(-1);
+        if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
+            return;
+
+        const lastResponse = lastModelResponseItem.response.at(-1);
+        if (lastResponse == null)
+            return;
+
+        const lastResponseIsFunctionCall = typeof lastResponse !== "string" && lastResponse.type === "functionCall";
+        if (!lastResponseIsFunctionCall)
+            return;
+
+        const currentResponseSegmentsStack = SegmentHandler.getStackFromModelResponse(lastModelResponseItem.response);
+        if (currentResponseSegmentsStack.includes("thought"))
+            return;
+
+        const hadThoughtSegments = this.resolvedHistory.some((chatItem) => {
+            if (chatItem.type !== "model")
+                return false;
+
+            return chatItem.response.some((responseItem) => {
+                if (typeof responseItem === "string")
+                    return false;
+
+                return responseItem.type === "segment" && responseItem.segmentType === "thought";
+            });
+        });
+        if (!hadThoughtSegments)
+            return;
+
+        this.segmentHandler.openSegment("thought");
     }
 
     public ensureNotAborted() {
@@ -1509,7 +1730,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public getPenaltyTokens() {
         if (this.llamaChat.disposed)
-            throw new DisposedError();
+            return [];
 
         let punishTokens = this.res.slice(-this.resolvedRepeatPenalty.lastTokens);
 
@@ -1527,38 +1748,14 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public getResolvedHistoryWithCurrentModelResponse() {
-        if (this.res.length === 0)
-            return this.resolvedHistory;
-
-        let modelResponse = this.llamaChat.model.detokenize(this.res);
-
-        if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix)
-            modelResponse = modelResponse.trimEnd();
-
-        if (modelResponse === "")
-            return this.resolvedHistory;
-
-        return setLastModelTextResponseInChatHistory(
-            this.resolvedHistory,
-            this.lastModelResponse + modelResponse
-        );
+        return mergeGeneratedResultWithChatHistory("model", this.resolvedHistory, this.segmentHandler.getModelResponseSegments());
     }
 
     public getContextWindowsHistoryWithCurrentModelResponse() {
-        if (this.contextWindowsRes.length === 0)
-            return this.lastContextWindowHistory;
-
-        let modelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
-
-        if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix)
-            modelResponse = modelResponse.trimEnd();
-
-        if (modelResponse === "")
-            return this.lastContextWindowHistory;
-
-        return setLastModelTextResponseInChatHistory(
+        return mergeGeneratedResultWithChatHistory(
+            "model",
             this.lastContextWindowHistory,
-            this.contextWindowLastModelResponse + modelResponse
+            this.segmentHandler.getContextWindowModelResponseSegments()
         );
     }
 
@@ -1576,14 +1773,30 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.contextWindowTokens,
                 this.ignoredStartTextTokens
             ]);
+
+            const pendingPartialTokens: Token[] = [];
             for (let i = 0; i < this.pendingTokens.length; i++) {
+                const currentToken = this.pendingTokens[i]!;
+                const tokens = [...pendingPartialTokens, currentToken];
+                const text = this.llamaChat.model.detokenize(tokens, false, lastTokensForDetokenizer);
+
+                if (pendingPartialTokens.length === 0 &&
+                    text.endsWith(UNKNOWN_UNICODE_CHAR) &&
+                    !this.llamaChat.model.isSpecialToken(currentToken) &&
+                    !this.llamaChat.model.isEogToken(currentToken)
+                ) {
+                    pendingPartialTokens.length = 0;
+                    pushAll(pendingPartialTokens, tokens);
+                    continue;
+                }
+
                 this.ignoreStartTextDetector.recordGeneration({
-                    text: this.llamaChat.model.detokenize([this.pendingTokens[i]!], false, lastTokensForDetokenizer),
-                    tokens: [this.pendingTokens[i]!],
+                    text: this.llamaChat.model.detokenize(tokens, false, lastTokensForDetokenizer),
+                    tokens,
                     startNewChecks: i === 0,
                     triggerMustStartWithGeneration: true
                 });
-                lastTokensForDetokenizer.push(this.pendingTokens[i]!);
+                pushAll(lastTokensForDetokenizer, tokens);
 
                 if (this.ignoreStartTextDetector.hasTriggeredStops) {
                     mostExhaustiveTriggeredStops = this.ignoreStartTextDetector.getTriggeredStops();
@@ -1674,7 +1887,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 history: contextWindowHistory,
                 stopGenerationTriggers,
                 tokens: contextWindowTokens,
-                newResolvedHistory,
+                removeRawFromHistory,
                 newHistoryCompressionMetadata,
                 ignoreStartText,
                 functionCallInitiallyEngaged,
@@ -1684,7 +1897,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 resolvedHistory: resolvedHistory,
                 resolvedContextShift: this.resolvedContextShift,
                 lastHistoryCompressionMetadata: this.lastHistoryCompressionMetadata,
-                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length,
+                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length +
+                    this.pendingPartialTokens.length,
                 isFirstEvaluation: this.isFirstEvaluation,
                 chatWrapper: this.chatWrapper,
                 lastEvaluationContextWindowHistory: resolvedContextWindowsHistory,
@@ -1705,13 +1919,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.disengageInitiallyEngagedFunctionCall = disengageInitiallyEngagedFunctionCall;
             this.userTextSuffix = userTextSuffix;
 
-            this.resolvedHistory = newResolvedHistory;
             this.lastHistoryCompressionMetadata = newHistoryCompressionMetadata;
             this.lastContextWindowHistory = contextWindowHistory;
-            this.contextWindowLastModelResponse = getLastTextModelResponseFromChatHistory(contextWindowHistory);
-            this.contextWindowsRes = [];
+            this.segmentHandler.resetContextWindow();
 
             this.canAvoidReloadingHistory = true;
+
+            if (removeRawFromHistory && !this.noRawInResolvedHistory) {
+                this.noRawInResolvedHistory = true;
+                this.resolvedHistory = this.resolvedHistory.map(removeRawFromHistoryItem);
+            }
         }
 
         this.tokens = [
@@ -1719,7 +1936,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             ...this.ignoredStartTextTokens,
             ...this.pendingTokens,
             ...queuedChunkTokens,
-            ...functionCallsTokens
+            ...functionCallsTokens,
+            ...this.pendingPartialTokens
         ];
 
         if (avoidReloadingHistory && this.tokens.length >= this.llamaChat.sequence.context.contextSize - 1)
@@ -1821,27 +2039,27 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
                     const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
                     if (stopGenerationTriggerRes != null)
                         return stopGenerationTriggerRes;
 
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     this.disengageInitiallyEngagedFunctionMode.recordGeneration({
                         text: this.currentText,
                         tokens: this.currentTokens,
-                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                        startNewChecks: this.currentFunctionCallCurrentPartTokens.length === tokens.length,
                         triggerMustStartWithGeneration: true
                     });
 
                     if (prefixDetector.hasTriggeredStops)
-                        afterPrefixLeftoverTokens.push(token);
+                        pushAll(afterPrefixLeftoverTokens, tokens);
                     else {
                         prefixDetector.recordGeneration({
                             text: this.currentText,
                             tokens: this.currentTokens,
-                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === 1,
+                            startNewChecks: this.currentFunctionCallCurrentPartTokens.length === tokens.length,
                             triggerMustStartWithGeneration: true
                         });
                         pushAll(prefixDetectorRecordedTokens, this.currentTokens);
@@ -1953,8 +2171,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     functionNameGenerationDoneDetector.recordGeneration({
                         text: this.currentText,
@@ -2012,8 +2230,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                         .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
 
-                    for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                        this.currentFunctionCallCurrentPartTokens.push(token);
+                    for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                        pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                         functionParamsGenerationDoneDetector.recordGeneration({
                             text: this.currentText,
@@ -2085,8 +2303,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ], this.llamaChat.model.tokenizer)
                     .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
 
-                for await (const token of this.evaluateWithContextShift(loadContextWindow)) {
-                    this.currentFunctionCallCurrentPartTokens.push(token);
+                for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     sectionSuffixDetector.recordGeneration({
                         text: this.currentText,
@@ -2151,26 +2369,25 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (this.resFunctionCalls.length > 0) {
             this.releasePartiallyFreeTokensBeforeFunctionCallStart();
 
-            let modelResponse = this.llamaChat.model.detokenize(this.res);
-            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
-
-            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
-                modelResponse = modelResponse.trimEnd();
-                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-            }
+            this.segmentHandler.onFinishedGeneration();
+            const trimWhitespaceSuffix = this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix;
+            const responseSegments = this.segmentHandler.getModelResponseSegments(trimWhitespaceSuffix);
 
             return {
-                response: modelResponse,
+                response: responseSegments
+                    .filter((segment) => typeof segment === "string")
+                    .join(""),
+                fullResponse: responseSegments,
                 lastEvaluation: {
-                    contextWindow: setLastTextInChatHistory(
+                    contextWindow: mergeGeneratedResultWithChatHistory(
                         "model",
                         this.lastContextWindowHistory,
-                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                        this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                     ),
-                    cleanHistory: setLastTextInChatHistory(
+                    cleanHistory: mergeGeneratedResultWithChatHistory(
                         "model",
                         this.resolvedHistory,
-                        this.lastModelResponse + modelResponse
+                        responseSegments
                     ),
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
@@ -2192,7 +2409,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return undefined;
     }
 
-    public async *evaluateWithContextShift(loadContextWindow: () => Promise<void>): AsyncGenerator<Token> {
+    public async *evaluateWithContextShift(loadContextWindow: () => Promise<void>): AsyncGenerator<Token[], void> {
         while (true) {
             this.startTokenLoop();
             await loadContextWindow();
@@ -2200,10 +2417,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             await this.createNewEvaluationIterator();
             while (await this.iterateEvaluation()) {
-                if (this.currentToken == null)
+                if (this.currentTokens.length === 0)
                     break;
 
-                yield this.currentToken;
+                if (!this.holdPartialTokensForNextEvaluation())
+                    yield this.currentTokens;
 
                 if (this.shouldAbort)
                     return;
@@ -2295,9 +2513,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.ensureNotAborted();
         this.generatedTokens++;
 
-        if (this.currentIteration != null && this.currentIteration?.done !== true) {
-            this.currentToken = this.currentIteration.value;
-            this.currentTokens = [this.currentToken];
+        if ((this.currentIteration != null && this.currentIteration?.done !== true) || this.pendingPartialTokens.length !== 0) {
+            this.currentToken = this.currentIteration?.value ?? undefined;
+            this.currentTokens = this.currentToken != null
+                ? this.pendingPartialTokens.length === 0
+                    ? [this.currentToken]
+                    : [...this.pendingPartialTokens, this.currentToken]
+                : [...this.pendingPartialTokens];
+            this.pendingPartialTokens.length = 0;
+
             this.currentText = this.llamaChat.model.detokenize(this.currentTokens, false, this.getLastTokens());
 
             if (this.functionEvaluationMode === false)
@@ -2308,6 +2532,22 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             else
                 this.currentQueuedTokenRelease = undefined;
 
+            return true;
+        }
+
+        return false;
+    }
+
+    public holdPartialTokensForNextEvaluation() {
+        if (this.pendingPartialTokens.length === 0 &&
+            this.currentText.endsWith(UNKNOWN_UNICODE_CHAR) &&
+            this.currentToken != null &&
+            !this.llamaChat.model.isSpecialToken(this.currentToken) &&
+            !this.llamaChat.model.isEogToken(this.currentToken)
+        ) {
+            this.pendingPartialTokens.length = 0;
+            pushAll(this.pendingPartialTokens, this.currentTokens);
+            this.streamRegulator.removeChunkIfLast(this.currentQueuedTokenRelease);
             return true;
         }
 
@@ -2420,24 +2660,23 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             this.pushPendingTokensAndCallOnToken();
 
-            let modelResponse = this.llamaChat.model.detokenize(this.res);
-            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
-
-            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
-                modelResponse = modelResponse.trimEnd();
-                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-            }
+            this.segmentHandler.onFinishedGeneration();
+            const trimWhitespaceSuffix = this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix;
+            const responseSegments = this.segmentHandler.getModelResponseSegments(trimWhitespaceSuffix);
+            const response = responseSegments
+                .filter((segment) => typeof segment === "string")
+                .join("");
 
             const lastEvaluation = {
-                contextWindow: setLastTextInChatHistory(
+                contextWindow: mergeGeneratedResultWithChatHistory(
                     lastHistoryItemType,
                     this.lastContextWindowHistory,
-                    this.contextWindowLastModelResponse + contextWindowModelResponse
+                    this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                 ),
-                cleanHistory: setLastTextInChatHistory(
+                cleanHistory: mergeGeneratedResultWithChatHistory(
                     lastHistoryItemType,
                     this.resolvedHistory,
-                    this.lastModelResponse + modelResponse
+                    responseSegments
                 ),
                 contextShiftMetadata: this.lastHistoryCompressionMetadata
             };
@@ -2445,7 +2684,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             if (isEogToken || this.stopGenerationDetector.hasTriggeredStops) {
                 return {
-                    response: modelResponse,
+                    response,
+                    fullResponse: responseSegments,
                     lastEvaluation,
                     metadata: {
                         remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
@@ -2457,7 +2697,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             }
 
             return {
-                response: modelResponse,
+                response,
+                fullResponse: responseSegments,
                 lastEvaluation,
                 metadata: {
                     remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
@@ -2501,26 +2742,25 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public handleMaxTokensTrigger(lastHistoryItemType: "user" | "model") {
         if (this.isMaxTokensTriggered()) {
-            let modelResponse = this.llamaChat.model.detokenize(this.res);
-            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
-
-            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
-                modelResponse = modelResponse.trimEnd();
-                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-            }
+            this.segmentHandler.onFinishedGeneration();
+            const trimWhitespaceSuffix = this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix;
+            const responseSegments = this.segmentHandler.getModelResponseSegments(trimWhitespaceSuffix);
 
             return {
-                response: modelResponse,
+                response: responseSegments
+                    .filter((segment) => typeof segment === "string")
+                    .join(""),
+                fullResponse: responseSegments,
                 lastEvaluation: {
-                    contextWindow: setLastTextInChatHistory(
+                    contextWindow: mergeGeneratedResultWithChatHistory(
                         lastHistoryItemType,
                         this.lastContextWindowHistory,
-                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                        this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                     ),
-                    cleanHistory: setLastTextInChatHistory(
+                    cleanHistory: mergeGeneratedResultWithChatHistory(
                         lastHistoryItemType,
                         this.resolvedHistory,
-                        this.lastModelResponse + modelResponse
+                        responseSegments
                     ),
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
@@ -2547,26 +2787,25 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             if (this.res.length === 0)
                 throw this.signal.reason;
 
-            let modelResponse = this.llamaChat.model.detokenize(this.res);
-            let contextWindowModelResponse = this.llamaChat.model.detokenize(this.contextWindowsRes);
-
-            if (this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix) {
-                modelResponse = modelResponse.trimEnd();
-                contextWindowModelResponse = contextWindowModelResponse.trimEnd();
-            }
+            this.segmentHandler.onFinishedGeneration();
+            const trimWhitespaceSuffix = this.grammar?.trimWhitespaceSuffix || this.trimWhitespaceSuffix;
+            const responseSegments = this.segmentHandler.getModelResponseSegments(trimWhitespaceSuffix);
 
             return {
-                response: modelResponse,
+                response: responseSegments
+                    .filter((segment) => typeof segment === "string")
+                    .join(""),
+                fullResponse: responseSegments,
                 lastEvaluation: {
-                    contextWindow: setLastTextInChatHistory(
+                    contextWindow: mergeGeneratedResultWithChatHistory(
                         lastHistoryItemType,
                         this.lastContextWindowHistory,
-                        this.contextWindowLastModelResponse + contextWindowModelResponse
+                        this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                     ),
-                    cleanHistory: setLastTextInChatHistory(
+                    cleanHistory: mergeGeneratedResultWithChatHistory(
                         lastHistoryItemType,
                         this.resolvedHistory,
-                        this.lastModelResponse + modelResponse
+                        responseSegments
                     ),
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
@@ -2583,10 +2822,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (this.pendingTokens.length === 0)
             return;
 
-        this.onToken?.(this.pendingTokens.slice());
-        this.onTextChunk?.(this.llamaChat.model.detokenize(this.pendingTokens, false, this.res));
+        this.segmentHandler.processTokens(this.pendingTokens);
         pushAll(this.res, this.pendingTokens);
-        pushAll(this.contextWindowsRes, this.pendingTokens);
         this.pendingTokens.length = 0;
     }
 
@@ -2596,8 +2833,587 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.ignoredStartTextTokens,
             this.pendingTokens,
             this.streamRegulator.getLastQueuedChunkTokens(maxTokens),
-            this.getContextWindowFunctionCallsTokens()
+            this.getContextWindowFunctionCallsTokens(),
+            this.pendingPartialTokens
         ], maxTokens);
     }
 }
 
+type RawSegment<S extends ChatModelSegmentType = ChatModelSegmentType> = Token[] | {
+    type: S,
+    tokens: Token[],
+    start: boolean,
+    ended: boolean,
+    startTime?: number,
+    endTime?: number
+};
+type ChatSegments = Array<string | LlamaChatResponseSegment>;
+class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType> {
+    public readonly model: LlamaModel;
+
+    private readonly onToken?: LLamaChatGenerateResponseOptions["onToken"];
+    private readonly onTextChunk?: LLamaChatGenerateResponseOptions["onTextChunk"];
+    private readonly onResponseChunk?: LLamaChatGenerateResponseOptions["onResponseChunk"];
+
+    private readonly _closeAllSegmentsDetector?: StopGenerationDetector;
+    private readonly _segmentDetectors: Map<S, {
+        prefix: StopGenerationDetector,
+        suffix?: StopGenerationDetector
+    }>;
+    private readonly _segmentsStack: S[] = [];
+    private readonly _segmentsStackSet: Set<S> = new Set<S>();
+    private _ownedSegmentsStackLength: number = 0;
+    private readonly _segments: RawSegment<S>[] = [];
+    private readonly _segmentsStartTokenTrail: Token[] = [];
+    private readonly _contextWindowSegments: RawSegment<S>[] = [];
+    private readonly _contextWindowStartTokenTrail: Token[] = [];
+    private readonly _initialTokensTrail: Token[];
+    private readonly _tokensTrail: Token[];
+    private readonly _streamRegulator = new TokenStreamRegulator();
+    private readonly _segmentDefinitions: Map<S, {
+        prefix: string | LlamaText,
+        suffix?: string | LlamaText
+    }>;
+
+    public constructor({
+        model, onTextChunk, onToken, onResponseChunk,
+        segmentDefinitions, closeAllSegments, initialSegmentStack,
+        previousTokens
+    }: {
+        model: LlamaModel,
+        onToken?: LLamaChatGenerateResponseOptions["onToken"],
+        onTextChunk?: LLamaChatGenerateResponseOptions["onTextChunk"],
+        onResponseChunk?: LLamaChatGenerateResponseOptions["onResponseChunk"],
+        segmentDefinitions: Map<S, {
+            prefix: string | LlamaText,
+            suffix?: string | LlamaText
+        }>,
+        closeAllSegments?: string | LlamaText,
+        initialSegmentStack: S[],
+        previousTokens: Token[]
+    }) {
+        this.model = model;
+        this.onTextChunk = onTextChunk;
+        this.onToken = onToken;
+        this.onResponseChunk = onResponseChunk;
+        this._initialTokensTrail = previousTokens.slice(-maxRecentDetokenizerTokens);
+        this._segmentsStartTokenTrail = previousTokens.slice(-maxRecentDetokenizerTokens);
+        this._tokensTrail = previousTokens.slice(-maxRecentDetokenizerTokens);
+
+        this._closeAllSegmentsDetector = closeAllSegments != null
+            ? new StopGenerationDetector()
+                .addStopTrigger(StopGenerationDetector.resolveLlamaTextTrigger(LlamaText(closeAllSegments), this.model.tokenizer))
+            : undefined;
+        this._segmentDetectors = new Map();
+        this._segmentsStack = initialSegmentStack;
+        this._segmentsStackSet = new Set(initialSegmentStack);
+        this._ownedSegmentsStackLength = initialSegmentStack.length;
+        this._segmentDefinitions = segmentDefinitions;
+
+        for (const [segment, {prefix, suffix}] of segmentDefinitions.entries()) {
+            this._segmentDetectors.set(segment, {
+                prefix: new StopGenerationDetector()
+                    .addStopTrigger(StopGenerationDetector.resolveLlamaTextTrigger(LlamaText(prefix), this.model.tokenizer)),
+                suffix: suffix != null
+                    ? new StopGenerationDetector()
+                        .addStopTrigger(StopGenerationDetector.resolveLlamaTextTrigger(LlamaText(suffix), this.model.tokenizer))
+                    : undefined
+            });
+        }
+    }
+
+    public processTokens(tokens: Token[]) {
+        if (tokens.length === 0)
+            return;
+
+        let pendingTokens: Token[] = [];
+        for (const token of tokens) {
+            pendingTokens.push(token);
+            const currentText = this.model.detokenize(pendingTokens, false, this._tokensTrail);
+
+            if (currentText.endsWith(UNKNOWN_UNICODE_CHAR))
+                continue;
+
+            pushAll(this._tokensTrail, pendingTokens);
+
+            this._processTokens(pendingTokens, currentText);
+
+            pendingTokens = [];
+        }
+    }
+
+    public onFinishedGeneration() {
+        this._clearDetectors();
+        this._pushCurrentTokens(this._streamRegulator.popFreeChunkTokens());
+    }
+
+    public resetContextWindow() {
+        this._contextWindowSegments.length = 0;
+
+        this._contextWindowStartTokenTrail.length = 0;
+        pushAll(this._contextWindowStartTokenTrail, this._getTokenTrailFromResult());
+    }
+
+    public openSegment(type: S) {
+        const now = Date.now();
+
+        this._segmentsStack.push(type);
+        this._segmentsStackSet.add(type);
+        this._segments.push({type, tokens: [], ended: false, start: true, startTime: now});
+        this._contextWindowSegments.push({type, tokens: [], ended: false, start: true, startTime: now});
+        this.onResponseChunk?.({
+            type: "segment",
+            segmentType: type,
+            tokens: [],
+            text: "",
+            segmentStartTime: new Date(now)
+        });
+    }
+
+    private _processTokens(tokens: Token[], text: string) {
+        const queuedTokenRelease = this._streamRegulator.addChunk({
+            tokens,
+            text
+        });
+
+        const currentType = this._segmentsStack.at(-1);
+
+        const handleDetector = (stopDetector: StopGenerationDetector | undefined, action: "pop" | "push" | "reset", type: S) => {
+            if (stopDetector == null)
+                return false;
+
+            stopDetector.recordGeneration({
+                text,
+                tokens,
+                queuedTokenRelease
+            });
+
+            if (stopDetector.hasTriggeredStops) {
+                const [leftTokens, leftText] = this._handleTriggeredStopDetector(stopDetector);
+
+                if (action === "pop")
+                    this._closeSegment(type);
+                else if (action === "push") {
+                    this.openSegment(type);
+                } else if (action === "reset") {
+                    const now = Date.now();
+
+                    while (this._segmentsStack.length > 0) {
+                        const segmentType = this._segmentsStack.pop()!;
+                        this._segmentsStackSet.delete(segmentType);
+
+                        const lastSegment = this._segments.at(-1);
+                        if (lastSegment != null && !(lastSegment instanceof Array) && lastSegment.type === segmentType) {
+                            lastSegment.ended = true;
+                            lastSegment.endTime = now;
+                            this.onResponseChunk?.({
+                                type: "segment",
+                                segmentType: segmentType,
+                                tokens: [],
+                                text: "",
+                                segmentStartTime: undefined,
+                                segmentEndTime: new Date(now)
+                            });
+                        } else {
+                            this._segments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
+                            this.onResponseChunk?.({
+                                type: "segment",
+                                segmentType: segmentType,
+                                tokens: [],
+                                text: "",
+                                segmentStartTime: undefined,
+                                segmentEndTime: new Date(now)
+                            });
+                        }
+
+                        const lastContextWindowSegment = this._contextWindowSegments.at(-1);
+                        if (lastContextWindowSegment != null && !(lastContextWindowSegment instanceof Array) &&
+                            lastContextWindowSegment.type === segmentType
+                        )
+                            lastContextWindowSegment.ended = true;
+                        else
+                            this._contextWindowSegments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
+                    }
+
+                    this._ownedSegmentsStackLength = 0;
+                }
+
+                if (leftTokens.length > 0)
+                    this._processTokens(leftTokens, leftText);
+
+                return true;
+            }
+
+            return false;
+        };
+
+        if (currentType != null) {
+            if (handleDetector(this._closeAllSegmentsDetector, "reset", currentType))
+                return;
+
+            if (handleDetector(this._segmentDetectors.get(currentType)?.suffix, "pop", currentType))
+                return;
+        } else
+            this._closeAllSegmentsDetector?.clearInProgressStops();
+
+        for (const [type, {prefix, suffix}] of this._segmentDetectors.entries()) {
+            if (!this._segmentsStackSet.has(type)) {
+                if (handleDetector(prefix, "push", type))
+                    return;
+            } else
+                prefix.clearInProgressStops();
+
+            if (this._segmentsStackSet.has(type)) {
+                // `currentType` suffix is already handled above
+                if (type === currentType && handleDetector(suffix, "pop", type))
+                    return;
+            } else
+                suffix?.clearInProgressStops();
+        }
+
+        this._pushCurrentTokens(this._streamRegulator.popFreeChunkTokens());
+    }
+
+    private _handleTriggeredStopDetector(stopDetector: StopGenerationDetector): [remainingTokens: Token[], reamingText: string] {
+        this._clearDetectors(stopDetector);
+        stopDetector.clearInProgressStops();
+        const triggeredStops = stopDetector.getTriggeredStops();
+        const freeTokens = this._streamRegulator.popFreeChunkTokens();
+        const partiallyFreeTokens = this._streamRegulator.getPartiallyFreeChunk(this.model.tokenizer);
+        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+            triggeredStops,
+            partiallyFreeTokens,
+            this.model.tokenizer
+        );
+
+        const {firstRemainingGenerationAfterStop} = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+        const remainingTokens = typeof firstRemainingGenerationAfterStop === "string"
+            ? firstRemainingGenerationAfterStop === ""
+                ? []
+                : this.model.tokenize(firstRemainingGenerationAfterStop, false)
+            : (firstRemainingGenerationAfterStop ?? []);
+        const remainingText = typeof firstRemainingGenerationAfterStop === "string"
+            ? firstRemainingGenerationAfterStop
+            : this.model.detokenize(
+                remainingTokens,
+                false,
+                queuedTokensBeforeStopTrigger.length === 0
+                    ? this._getTokenTrailFromResult()
+                    : queuedTokensBeforeStopTrigger
+            );
+
+        this._pushCurrentTokens([...freeTokens, ...queuedTokensBeforeStopTrigger]);
+
+        stopDetector.clearTriggeredStops();
+        this._streamRegulator.reset();
+
+        return [remainingTokens, remainingText];
+    }
+
+    private _closeSegment(type?: S) {
+        if (type == null)
+            return;
+
+        const lastSegment = this._segments.at(-1);
+        const now = Date.now();
+        if (lastSegment != null && !(lastSegment instanceof Array) && lastSegment.type === type && this._segmentsStack.at(-1) === type) {
+            if (lastSegment.ended !== true) {
+                lastSegment.ended = true;
+                lastSegment.endTime = now;
+
+                this.onResponseChunk?.({
+                    type: "segment",
+                    segmentType: type,
+                    tokens: [],
+                    text: "",
+                    segmentStartTime: undefined,
+                    segmentEndTime: new Date(now)
+                });
+            }
+
+            this._segmentsStackSet.delete(this._segmentsStack.pop()!);
+
+            if (this._segmentsStack.length < this._ownedSegmentsStackLength)
+                this._ownedSegmentsStackLength = this._segmentsStack.length;
+
+            const lastContextWindowSegment = this._contextWindowSegments.at(-1);
+            if (lastContextWindowSegment != null && !(lastContextWindowSegment instanceof Array) &&
+                lastContextWindowSegment.type === type && this._segmentsStack.at(-1) === type
+            ) {
+                if (lastContextWindowSegment.ended !== true) {
+                    lastContextWindowSegment.ended = true;
+                    lastContextWindowSegment.endTime = now;
+                }
+            } else
+                this._contextWindowSegments.push({type, tokens: [], ended: true, start: false, endTime: now});
+
+            return;
+        }
+
+        const typeIndex = this._segmentsStack.lastIndexOf(type);
+        if (typeIndex < 0)
+            return;
+
+        for (let i = this._segmentsStack.length - 1; i >= typeIndex; i--) {
+            const segmentType = this._segmentsStack.pop()!;
+            this._segmentsStackSet.delete(segmentType);
+
+            if (this._segmentsStack.length < this._ownedSegmentsStackLength)
+                this._ownedSegmentsStackLength = this._segmentsStack.length;
+
+            this._segments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
+            this._contextWindowSegments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
+
+            this.onResponseChunk?.({
+                type: "segment",
+                segmentType: segmentType,
+                tokens: [],
+                text: "",
+                segmentStartTime: undefined,
+                segmentEndTime: new Date(now)
+            });
+        }
+    }
+
+    private _clearDetectors(skipDetector?: StopGenerationDetector) {
+        if (this._closeAllSegmentsDetector !== skipDetector) {
+            this._closeAllSegmentsDetector?.clearInProgressStops();
+            this._closeAllSegmentsDetector?.clearTriggeredStops();
+        }
+
+        for (const {prefix, suffix} of this._segmentDetectors.values()) {
+            if (prefix !== skipDetector) {
+                prefix.clearInProgressStops();
+                prefix.clearTriggeredStops();
+            }
+
+            if (suffix !== skipDetector) {
+                suffix?.clearInProgressStops();
+                suffix?.clearTriggeredStops();
+            }
+        }
+    }
+
+    private _pushCurrentTokens(tokens: Token[]) {
+        const lastSegment = this._segments.at(-1);
+        const lastContextWindowSegment = this._contextWindowSegments.at(-1);
+        const type = this._segmentsStack.at(-1);
+
+        if (type == null) {
+            if (lastSegment == null) {
+                const text = (this.onResponseChunk != null || this.onTextChunk != null)
+                    ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
+                    : "";
+
+                this._segments.push(tokens);
+
+                this.onToken?.(tokens.slice());
+                this.onTextChunk?.(text);
+                this.onResponseChunk?.({type: undefined, segmentType: undefined, tokens: tokens.slice(), text});
+            } else {
+                if (lastSegment instanceof Array) {
+                    const text = (this.onResponseChunk != null || this.onTextChunk != null)
+                        ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
+                        : "";
+
+                    pushAll(lastSegment, tokens);
+
+                    this.onToken?.(tokens);
+                    this.onTextChunk?.(text);
+                    this.onResponseChunk?.({type: undefined, segmentType: undefined, tokens, text});
+                } else
+                    this._segments.push(tokens);
+            }
+
+            if (lastContextWindowSegment == null)
+                this._contextWindowSegments.push(tokens.slice());
+            else {
+                if (lastContextWindowSegment instanceof Array)
+                    pushAll(lastContextWindowSegment, tokens);
+                else
+                    this._contextWindowSegments.push(tokens.slice());
+            }
+        } else {
+            const now = Date.now();
+            if (lastSegment == null) {
+                const text = this.onResponseChunk != null
+                    ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
+                    : "";
+
+                this._segments.push({
+                    type,
+                    tokens,
+                    ended: false,
+                    start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                    startTime: now
+                });
+
+                this.onResponseChunk?.({
+                    type: "segment",
+                    segmentType: type,
+                    tokens: tokens.slice(),
+                    text,
+                    segmentStartTime: new Date(now)
+                });
+            } else {
+                const text = this.onResponseChunk != null
+                    ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
+                    : "";
+
+                if (lastSegment instanceof Array || lastSegment.type !== type) {
+                    this._segments.push({
+                        type,
+                        tokens,
+                        ended: false,
+                        start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                        startTime: now
+                    });
+                    this.onResponseChunk?.({
+                        type: "segment",
+                        segmentType: type,
+                        tokens: tokens.slice(),
+                        text,
+                        segmentStartTime: new Date(now)
+                    });
+                } else {
+                    pushAll(lastSegment.tokens, tokens);
+                    this.onResponseChunk?.({
+                        type: "segment",
+                        segmentType: type,
+                        tokens: tokens.slice(),
+                        text,
+                        segmentStartTime: undefined
+                    });
+                }
+            }
+
+            if (lastContextWindowSegment == null)
+                this._contextWindowSegments.push({
+                    type,
+                    tokens: tokens.slice(),
+                    ended: false,
+                    start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                    startTime: now
+                });
+            else {
+                if (lastContextWindowSegment instanceof Array || lastContextWindowSegment.type !== type)
+                    this._contextWindowSegments.push({
+                        type,
+                        tokens: tokens.slice(),
+                        ended: false,
+                        start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                        startTime: now
+                    });
+                else
+                    pushAll(lastContextWindowSegment.tokens, tokens);
+            }
+        }
+    }
+
+    private _getTokenTrailFromResult(): Token[] {
+        const res: Token[] = [];
+
+        for (let i = this._segments.length - 1; i >= 0; i--) {
+            const segment = this._segments[i]!;
+            const segmentTokens = segment instanceof Array
+                ? segment
+                : segment.tokens;
+
+            for (let j = segmentTokens.length - 1; j >= 0; j--) {
+                res.unshift(segmentTokens[j]!);
+
+                if (res.length >= maxRecentDetokenizerTokens)
+                    return res;
+            }
+        }
+
+        for (let i = this._initialTokensTrail.length - 1; i >= 0; i--) {
+            res.unshift(this._initialTokensTrail[i]!);
+
+            if (res.length >= maxRecentDetokenizerTokens)
+                return res;
+        }
+
+        return res;
+    }
+
+    public getModelResponseSegments(trimWhitespaceSuffix: boolean = false) {
+        return this._getModelResponseForSegments(this._segments, this._segmentsStartTokenTrail, trimWhitespaceSuffix);
+    }
+
+    public getContextWindowModelResponseSegments(trimWhitespaceSuffix: boolean = false) {
+        return this._getModelResponseForSegments(this._contextWindowSegments, this._contextWindowStartTokenTrail, trimWhitespaceSuffix);
+    }
+
+    private _getModelResponseForSegments(
+        rawSegments: RawSegment<S>[], recentTokens: Token[], trimWhitespaceSuffix: boolean
+    ): ChatSegments {
+        let tokenTrail = resolveLastTokens([recentTokens]);
+
+        return rawSegments.map((rawSegment, index): ChatSegments[number] => {
+            const isLast = index === rawSegments.length - 1;
+
+            if (rawSegment instanceof Array) {
+                let text = this.model.detokenize(rawSegment, false, tokenTrail);
+                if (isLast && trimWhitespaceSuffix)
+                    text = text.trimEnd();
+
+                tokenTrail = resolveLastTokens([tokenTrail, rawSegment]);
+                return text;
+            }
+
+            let text = this.model.detokenize(rawSegment.tokens, false, tokenTrail);
+            if (isLast && rawSegment.ended && trimWhitespaceSuffix)
+                text = text.trimEnd();
+
+            tokenTrail = resolveLastTokens([tokenTrail, rawSegment.tokens]);
+
+            const segmentDefinition = this._segmentDefinitions.get(rawSegment.type);
+
+            return {
+                type: "segment",
+                segmentType: rawSegment.type,
+                text,
+                ended: rawSegment.ended,
+                raw: segmentDefinition == null
+                    ? LlamaText([text]).toJSON()
+                    : LlamaText([
+                        rawSegment.start
+                            ? segmentDefinition.prefix
+                            : "",
+                        text,
+                        rawSegment.ended
+                            ? (segmentDefinition.suffix ?? "")
+                            : ""
+                    ]).toJSON(),
+                startTime: rawSegment.startTime != null
+                    ? new Date(rawSegment.startTime).toISOString()
+                    : undefined,
+                endTime: rawSegment.endTime != null
+                    ? new Date(rawSegment.endTime).toISOString()
+                    : undefined
+            };
+        });
+    }
+
+    public static getStackFromModelResponse(modelResponse: ChatModelResponse["response"]) {
+        const stack: ChatModelSegmentType[] = [];
+        const stackSet: Set<ChatModelSegmentType> = new Set();
+
+        for (const item of modelResponse) {
+            if (typeof item === "string" || isChatModelResponseFunctionCall(item))
+                continue;
+
+            void (item.type satisfies "segment");
+            if (item.ended && stack.at(-1) === item.segmentType) {
+                stack.pop();
+                stackSet.delete(item.segmentType);
+            } else if (!item.ended && !stackSet.has(item.segmentType)) {
+                stack.push(item.segmentType);
+                stackSet.add(item.segmentType);
+            }
+        }
+
+        return stack;
+    }
+}

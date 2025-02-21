@@ -15,7 +15,7 @@
 
 </div>
 
-✨ [`v3.0` is here!](https://node-llama-cpp.withcat.ai/blog/v3) ✨
+✨ [DeepSeek R1 is here!](https://node-llama-cpp.withcat.ai/blog/v3.6-deepseek-r1) ✨
 
 ## Features
 * Run LLMs locally on your machine
@@ -94,7 +94,7 @@ console.log("AI: " + a2);
 To contribute to `node-llama-cpp` read the [contribution guide](https://node-llama-cpp.withcat.ai/guide/contributing).
 
 ## Acknowledgements
-* llama.cpp: [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
+* llama.cpp: [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
 
 
 <br />

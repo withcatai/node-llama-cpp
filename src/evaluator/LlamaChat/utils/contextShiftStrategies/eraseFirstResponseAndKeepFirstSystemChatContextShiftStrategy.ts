@@ -1,4 +1,6 @@
-import {ChatHistoryItem, Tokenizer} from "../../../../types.js";
+import {
+    ChatHistoryItem, ChatModelResponse, isChatModelResponseFunctionCall, isChatModelResponseSegment, Tokenizer
+} from "../../../../types.js";
 import {findCharacterRemovalCountToFitChatHistoryInContext} from "../../../../utils/findCharacterRemovalCountToFitChatHistoryInContext.js";
 import {truncateLlamaTextAndRoundToWords, truncateTextAndRoundToWords} from "../../../../utils/truncateTextAndRoundToWords.js";
 import {ChatWrapper} from "../../../../ChatWrapper.js";
@@ -170,6 +172,48 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                 return removedItems;
             }
 
+            function removeEmptySegmentsFromModelResponse(modelResponse: ChatModelResponse["response"]) {
+                const stack: Array<{
+                    type: string,
+                    startIndex: number,
+                    canRemove: boolean
+                }> = [];
+
+                for (let t = 0; t < modelResponse.length && charactersLeftToRemove > 0; t++) {
+                    const item = modelResponse[t]!;
+                    const isLastItem = t === modelResponse.length - 1;
+
+                    if (!isChatModelResponseSegment(item))
+                        continue;
+
+                    const type = item.segmentType;
+                    const topStack = stack.at(-1);
+
+                    if (topStack?.type === type) {
+                        if (item.ended && item.text === "" && topStack.canRemove) {
+                            modelResponse.splice(t, 1);
+                            t--;
+
+                            modelResponse.splice(topStack.startIndex, 1);
+                            t--;
+
+                            stack.pop();
+                        } else if (!item.ended && item.text === "" && !isLastItem) {
+                            modelResponse.splice(t, 1);
+                            t--;
+                        } else if (!item.ended && item.text !== "")
+                            topStack.canRemove = false;
+                        else if (item.ended)
+                            stack.pop();
+                    } else if (!item.ended)
+                        stack.push({
+                            type,
+                            startIndex: t,
+                            canRemove: item.text === ""
+                        });
+                }
+            }
+
             function compressFirstModelResponse() {
                 for (let i = 0; i < res.length && charactersLeftToRemove > 0; i++) {
                     const historyItem = res[i]!;
@@ -179,7 +223,7 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                         continue;
 
                     for (let t = 0; t < historyItem.response.length && charactersLeftToRemove > 0; t++) {
-                        const item: Readonly<typeof historyItem.response[number]> = historyItem.response[t]!;
+                        const item = historyItem.response[t]!;
                         const isLastText = t === historyItem.response.length - 1;
 
                         if (isLastHistoryItem && isLastText)
@@ -196,15 +240,33 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                                 historyItem.response[t] = newText;
                                 charactersLeftToRemove -= item.length - newText.length;
                             }
-                        } else if (item.type === "functionCall") {
+                        } else if (isChatModelResponseFunctionCall(item)) {
                             historyItem.response.splice(t, 1);
                             t--;
 
                             const functionCallAndResultTokenUsage = chatWrapper.generateFunctionCallsAndResults([item], true)
                                 .tokenize(tokenizer, "trimLeadingSpace").length;
                             charactersLeftToRemove -= functionCallAndResultTokenUsage * estimatedCharactersPerToken;
-                        }
+                        } else if (isChatModelResponseSegment(item)) {
+                            if (item.text !== "") {
+                                const newText = truncateTextAndRoundToWords(item.text, charactersLeftToRemove, undefined, true);
+                                if (newText === "" && item.ended) {
+                                    const emptySegmentTokenUsage = chatWrapper.generateModelResponseText([{...item, text: ""}], true)
+                                        .tokenize(tokenizer, "trimLeadingSpace").length;
+
+                                    historyItem.response.splice(t, 1);
+                                    t--;
+                                    charactersLeftToRemove -= item.text.length + emptySegmentTokenUsage * estimatedCharactersPerToken;
+                                } else {
+                                    charactersLeftToRemove -= item.text.length - newText.length;
+                                    item.text = newText;
+                                }
+                            }
+                        } else
+                            void (item satisfies never);
                     }
+
+                    removeEmptySegmentsFromModelResponse(historyItem.response);
 
                     if (historyItem.response.length === 0) {
                         // if the model response is removed from the history,

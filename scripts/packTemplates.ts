@@ -26,7 +26,7 @@ async function packTemplate(templateName: string) {
     const templateDirectory = path.join(projectTemplatesDirectory, templateName);
     const gitignorePath = path.join(templateDirectory, ".gitignore");
     const ig = (await fs.pathExists(gitignorePath))
-        ? ignore().add(await fs.readFile(gitignorePath, "utf-8"))
+        ? ignore().add(await fs.readFile(gitignorePath, "utf8"))
         : ignore();
 
     const files: PackagedFileEntry[] = [];
@@ -62,7 +62,7 @@ async function packDirectory({
                 files, ig, currentPath: packItemPath, templateDirectory
             });
         } else {
-            const fileContent = await fs.readFile(itemPath, "utf-8");
+            const fileContent = await fs.readFile(itemPath, "utf8");
             const packItem: PackagedFileEntry = {
                 path: packItemPath,
                 content: fileContent

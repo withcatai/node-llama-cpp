@@ -30,7 +30,9 @@ import {
 import {defineChatSessionFunction} from "./evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
     LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatLoadAndCompleteUserMessageOptions,
-    type LLamaChatContextShiftOptions, type LlamaChatResponse, type LlamaChatResponseFunctionCall, type LlamaChatLoadAndCompleteUserResponse
+    type LLamaChatContextShiftOptions, type LlamaChatResponse, type LlamaChatResponseFunctionCall,
+    type LlamaChatLoadAndCompleteUserResponse, type LlamaChatResponseChunk, type LlamaChatResponseTextChunk,
+    type LlamaChatResponseSegmentChunk, type LlamaChatResponseSegment
 } from "./evaluator/LlamaChat/LlamaChat.js";
 import {
     LlamaChatSessionPromptCompletionEngine, type LLamaChatPromptCompletionEngineOptions
@@ -44,6 +46,7 @@ import {UnsupportedError} from "./utils/UnsupportedError.js";
 import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
 import {ChatWrapper} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
+import {DeepSeekChatWrapper} from "./chatWrappers/DeepSeekChatWrapper.js";
 import {Llama3_2LightweightChatWrapper} from "./chatWrappers/Llama3_2LightweightChatWrapper.js";
 import {Llama3_1ChatWrapper} from "./chatWrappers/Llama3_1ChatWrapper.js";
 import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
@@ -59,11 +62,10 @@ import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappe
 import {
     JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
 } from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
-import {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     resolvableChatWrapperTypeNames, type ResolvableChatWrapperTypeName, specializedChatWrapperTypeNames,
     type SpecializedChatWrapperTypeName, templateChatWrapperTypeNames, type TemplateChatWrapperTypeName, resolveChatWrapper,
-    type ResolveChatWrapperOptions, type BuiltInChatWrapperType, chatWrappers
+    type ResolveChatWrapperOptions, type ResolveChatWrapperWithModelOptions, type BuiltInChatWrapperType, chatWrappers
 } from "./chatWrappers/utils/resolveChatWrapper.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {
@@ -87,11 +89,11 @@ import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
 import {
-    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctions, type ChatModelResponse,
-    type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
-    type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, type LLamaContextualRepeatPenalty,
-    type ChatWrapperSettings, type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState,
-    type ChatWrapperGenerateInitialHistoryOptions
+    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelSegmentType, type ChatModelSegment, type ChatModelFunctions,
+    type ChatModelResponse, type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
+    type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, isChatModelResponseSegment,
+    type LLamaContextualRepeatPenalty, type ChatWrapperSettings, type ChatWrapperSettingsSegment,
+    type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState, type ChatWrapperGenerateInitialHistoryOptions
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
@@ -109,6 +111,8 @@ import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js
 import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
 import {type OverridesObject} from "./utils/OverridesObject.js";
 import type {LlamaClasses} from "./utils/getLlamaClasses.js";
+import type {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
+import type {TemplateChatWrapperSegmentsOptions} from "./chatWrappers/generic/utils/templateSegmentOptionsToChatWrapperSettings.js";
 
 
 export {
@@ -175,6 +179,10 @@ export {
     type LlamaChatResponse,
     type LlamaChatResponseFunctionCall,
     type LlamaChatLoadAndCompleteUserResponse,
+    type LlamaChatResponseChunk,
+    type LlamaChatResponseTextChunk,
+    type LlamaChatResponseSegmentChunk,
+    type LlamaChatResponseSegment,
     LlamaChatSessionPromptCompletionEngine,
     type LLamaChatPromptCompletionEngineOptions,
     LlamaCompletion,
@@ -189,10 +197,12 @@ export {
     DisposedError,
     ChatWrapper,
     type ChatWrapperSettings,
+    type ChatWrapperSettingsSegment,
     type ChatWrapperGenerateContextStateOptions,
     type ChatWrapperGeneratedContextState,
     type ChatWrapperGenerateInitialHistoryOptions,
     EmptyChatWrapper,
+    DeepSeekChatWrapper,
     Llama3_2LightweightChatWrapper,
     Llama3_1ChatWrapper,
     Llama3ChatWrapper,
@@ -210,9 +220,11 @@ export {
     type JinjaTemplateChatWrapperOptions,
     type JinjaTemplateChatWrapperOptionsConvertMessageFormat,
     type ChatHistoryFunctionCallMessageTemplate,
+    type TemplateChatWrapperSegmentsOptions,
     resolveChatWrapper,
     type BuiltInChatWrapperType,
     type ResolveChatWrapperOptions,
+    type ResolveChatWrapperWithModelOptions,
     resolvableChatWrapperTypeNames,
     type ResolvableChatWrapperTypeName,
     specializedChatWrapperTypeNames,
@@ -240,6 +252,8 @@ export {
     getModuleVersion,
     type ChatHistoryItem,
     type ChatModelFunctionCall,
+    type ChatModelSegmentType,
+    type ChatModelSegment,
     type ChatModelFunctions,
     type ChatModelResponse,
     type ChatSessionModelFunction,
@@ -250,6 +264,7 @@ export {
     type Tokenizer,
     type Detokenizer,
     isChatModelResponseFunctionCall,
+    isChatModelResponseSegment,
     type GbnfJsonSchema,
     type GbnfJsonSchemaToType,
     type GbnfJsonSchemaImmutableType,

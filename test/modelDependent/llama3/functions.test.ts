@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {defineChatSessionFunction, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
+import {defineChatSessionFunction, Llama3ChatWrapper, LlamaChatSession, LlamaJsonSchemaGrammar} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
@@ -206,6 +206,7 @@ describe("llama 3", () => {
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence()
             });
+            expect(chatSession.chatWrapper).to.be.instanceof(Llama3ChatWrapper);
 
             const fruitPrices: Record<string, {USD: number, EUR: number}> = {
                 "apple": {

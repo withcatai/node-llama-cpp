@@ -1,11 +1,13 @@
 import {
-    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatWrapperCheckModelCompatibilityParams,
-    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings
+    ChatHistoryItem, ChatModelFunctionCall, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType,
+    ChatWrapperCheckModelCompatibilityParams, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
+    ChatWrapperGenerateInitialHistoryOptions, ChatWrapperSettings, isChatModelResponseSegment
 } from "./types.js";
 import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {defaultChatSystemPrompt} from "./config.js";
+import {getChatWrapperSegmentDefinition} from "./utils/getChatWrapperSegmentDefinition.js";
 
 export abstract class ChatWrapper {
     public static defaultSettings: ChatWrapperSettings = {
@@ -140,6 +142,9 @@ export abstract class ChatWrapper {
     public generateModelResponseText(modelResponse: ChatModelResponse["response"], useRawCall: boolean = true): LlamaText {
         const res: LlamaText[] = [];
         const pendingFunctionCalls: ChatModelFunctionCall[] = [];
+        const segmentStack: ChatModelSegmentType[] = [];
+        let lastSegmentEndedWithoutSuffix: boolean = false;
+        let needsToAddSegmentReminder = false;
 
         const addFunctionCalls = () => {
             if (pendingFunctionCalls.length === 0)
@@ -147,12 +152,59 @@ export abstract class ChatWrapper {
 
             res.push(this.generateFunctionCallsAndResults(pendingFunctionCalls, useRawCall));
             pendingFunctionCalls.length = 0;
+            needsToAddSegmentReminder = true;
+        };
+
+        const addSegmentReminderIfNeeded = () => {
+            if (lastSegmentEndedWithoutSuffix && segmentStack.length === 0 && this.settings.segments?.closeAllSegments != null) {
+                lastSegmentEndedWithoutSuffix = false;
+                res.push(LlamaText(this.settings.segments.closeAllSegments));
+            } else if (needsToAddSegmentReminder && segmentStack.length > 0 && this.settings.segments?.reiterateStackAfterFunctionCalls) {
+                for (const segmentType of segmentStack) {
+                    const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, segmentType);
+                    if (segmentDefinition == null)
+                        continue;
+
+                    res.push(LlamaText(segmentDefinition.prefix));
+                }
+            }
         };
 
         for (const response of modelResponse) {
             if (typeof response === "string") {
                 addFunctionCalls();
+                addSegmentReminderIfNeeded();
+
                 res.push(LlamaText(response));
+                continue;
+            } else if (isChatModelResponseSegment(response)) {
+                addFunctionCalls();
+
+                if (response.raw != null && useRawCall)
+                    res.push(LlamaText.fromJSON(response.raw));
+                else {
+                    const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, response.segmentType);
+
+                    res.push(
+                        LlamaText([
+                            (segmentStack.length > 0 && segmentStack.at(-1) === response.segmentType)
+                                ? ""
+                                : segmentDefinition?.prefix ?? "",
+                            response.text,
+                            response.ended
+                                ? (segmentDefinition?.suffix ?? "")
+                                : ""
+                        ])
+                    );
+
+                    lastSegmentEndedWithoutSuffix = response.ended && segmentDefinition?.suffix == null;
+
+                    if (!response.ended)
+                        segmentStack.push(response.segmentType);
+                    else if (segmentStack.at(-1) === response.segmentType)
+                        segmentStack.pop();
+                }
+
                 continue;
             }
 
@@ -163,6 +215,7 @@ export abstract class ChatWrapper {
         }
 
         addFunctionCalls();
+        addSegmentReminderIfNeeded();
 
         return LlamaText(res);
     }

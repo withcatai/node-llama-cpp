@@ -702,91 +702,107 @@ export class LlamaCompletion {
                 yieldEogToken: true
             }));
 
+            const pendingPartialTokens: Token[] = [];
             for await (const token of evaluationIterator) {
                 ensureNotAborted();
                 generatedTokens++;
 
-                const tokens = [token];
+                const tokens = pendingPartialTokens.length === 0
+                    ? [token]
+                    : [...pendingPartialTokens, token];
                 const text = model.detokenize([token]);
-                const queuedTokenRelease = streamRegulator.addChunk({tokens, text});
 
-                if (text.endsWith(UNKNOWN_UNICODE_CHAR) || (
-                    (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && text.trim() === ""
-                ) || (
-                    text === "" && locksToReleaseOnValidGeneration.length > 0 && !model.isSpecialToken(token)
-                )) {
-                    locksToReleaseOnValidGeneration.push(queuedTokenRelease.createTextIndexLock(0));
-                } else {
-                    while (locksToReleaseOnValidGeneration.length > 0)
-                        locksToReleaseOnValidGeneration.shift()!.dispose();
-                }
-
-                stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
-                customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
-
-                if (model.isEogToken(token) || extraEosTokens.has(token))
-                    queuedTokenRelease.createTokenIndexLock(0);
-
-                pushAll(pendingTokens, streamRegulator.popFreeChunkTokens());
-
-                if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
-                    model.isEogToken(token) || extraEosTokens.has(token)
+                if (pendingPartialTokens.length === 0 &&
+                    text.endsWith(UNKNOWN_UNICODE_CHAR) &&
+                    !model.isSpecialToken(token) &&
+                    !model.isEogToken(token)
                 ) {
-                    const triggeredStops = stopGenerationDetector.hasTriggeredStops
-                        ? stopGenerationDetector.getTriggeredStops()
-                        : customStopGenerationTriggersDetector.getTriggeredStops();
-                    const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
+                    pendingPartialTokens.push(token);
+                    continue;
+                } else {
+                    pendingPartialTokens.length = 0;
 
-                    const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
-                        triggeredStops,
-                        partiallyFreeTokens,
-                        model.tokenizer
-                    );
-                    pushAll(pendingTokens, queuedTokensBeforeStopTrigger);
+                    const queuedTokenRelease = streamRegulator.addChunk({tokens, text});
 
-                    const {firstRemainingGenerationAfterStop} = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
-
-                    if (pendingTokens.length > 0) {
-                        onToken?.(pendingTokens.slice());
-                        onTextChunk?.(model.detokenize(pendingTokens, false, res));
+                    if (text.endsWith(UNKNOWN_UNICODE_CHAR) || (
+                        (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix) && text.trim() === ""
+                    ) || (
+                        text === "" && locksToReleaseOnValidGeneration.length > 0 && !model.isSpecialToken(token)
+                    )) {
+                        locksToReleaseOnValidGeneration.push(queuedTokenRelease.createTextIndexLock(0));
+                    } else {
+                        while (locksToReleaseOnValidGeneration.length > 0)
+                            locksToReleaseOnValidGeneration.shift()!.dispose();
                     }
 
-                    pushAll(res, pendingTokens);
-                    pendingTokens.length = 0;
+                    stopGenerationDetector.recordGeneration({text, tokens, queuedTokenRelease});
+                    customStopGenerationTriggersDetector.recordGeneration({text, tokens, queuedTokenRelease});
 
-                    let modelResponse = model.detokenize(res);
+                    if (model.isEogToken(token) || extraEosTokens.has(token))
+                        queuedTokenRelease.createTokenIndexLock(0);
 
-                    if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
-                        modelResponse = modelResponse.trimEnd();
+                    pushAll(pendingTokens, streamRegulator.popFreeChunkTokens());
 
-                    const isEogToken = model.isEogToken(token) || extraEosTokens.has(token);
+                    if (stopGenerationDetector.hasTriggeredStops || customStopGenerationTriggersDetector.hasTriggeredStops ||
+                        model.isEogToken(token) || extraEosTokens.has(token)
+                    ) {
+                        const triggeredStops = stopGenerationDetector.hasTriggeredStops
+                            ? stopGenerationDetector.getTriggeredStops()
+                            : customStopGenerationTriggersDetector.getTriggeredStops();
+                        const partiallyFreeTokens = streamRegulator.getPartiallyFreeChunk(model.tokenizer);
 
-                    if (isEogToken || stopGenerationDetector.hasTriggeredStops)
+                        const queuedTokensBeforeStopTrigger = getQueuedTokensBeforeStopTrigger(
+                            triggeredStops,
+                            partiallyFreeTokens,
+                            model.tokenizer
+                        );
+                        pushAll(pendingTokens, queuedTokensBeforeStopTrigger);
+
+                        const {firstRemainingGenerationAfterStop} =
+                            StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
+
+                        if (pendingTokens.length > 0) {
+                            onToken?.(pendingTokens.slice());
+                            onTextChunk?.(model.detokenize(pendingTokens, false, res));
+                        }
+
+                        pushAll(res, pendingTokens);
+                        pendingTokens.length = 0;
+
+                        let modelResponse = model.detokenize(res);
+
+                        if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
+                            modelResponse = modelResponse.trimEnd();
+
+                        const isEogToken = model.isEogToken(token) || extraEosTokens.has(token);
+
+                        if (isEogToken || stopGenerationDetector.hasTriggeredStops)
+                            return {
+                                response: modelResponse,
+                                metadata: {
+                                    remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
+                                    stopReason: isEogToken
+                                        ? "eogToken"
+                                        : "stopGenerationTrigger"
+                                }
+                            };
+
                         return {
                             response: modelResponse,
                             metadata: {
                                 remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                                stopReason: isEogToken
-                                    ? "eogToken"
-                                    : "stopGenerationTrigger"
+                                stopReason: "customStopTrigger",
+                                customStopTrigger: triggeredStops[0]!.stopTrigger
                             }
                         };
+                    }
 
-                    return {
-                        response: modelResponse,
-                        metadata: {
-                            remainingGenerationAfterStop: firstRemainingGenerationAfterStop,
-                            stopReason: "customStopTrigger",
-                            customStopTrigger: triggeredStops[0]!.stopTrigger
-                        }
-                    };
-                }
-
-                if (pendingTokens.length > 0) {
-                    onToken?.(pendingTokens.slice());
-                    onTextChunk?.(model.detokenize(pendingTokens, false, res));
-                    pushAll(res, pendingTokens);
-                    pendingTokens.length = 0;
+                    if (pendingTokens.length > 0) {
+                        onToken?.(pendingTokens.slice());
+                        onTextChunk?.(model.detokenize(pendingTokens, false, res));
+                        pushAll(res, pendingTokens);
+                        pendingTokens.length = 0;
+                    }
                 }
 
                 if (maxTokens != null && maxTokens > 0 && generatedTokens >= maxTokens) {

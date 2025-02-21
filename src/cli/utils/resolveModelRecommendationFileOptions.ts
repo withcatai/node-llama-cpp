@@ -18,7 +18,7 @@ export type ModelURI = (
 
 export type ModelRecommendation = {
     name: string,
-    abilities: ("code" | "chat" | "complete" | "infill" | "functionCalling")[],
+    abilities: ("code" | "chat" | "complete" | "infill" | "functionCalling" | "reasoning")[],
     description?: string,
 
     /**

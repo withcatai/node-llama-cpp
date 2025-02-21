@@ -66,7 +66,29 @@ const res = await llamaChat.generateResponse(chatHistory, {
     }
 });
 
+const fullResponse = res.fullResponse
+    .map((item) => {
+        if (typeof item === "string")
+            return item;
+        else if (item.type === "segment") {
+            let res = "";
+            if (item.startTime != null)
+                res += ` [segment start: ${item.segmentType}] `;
+
+            res += item.text;
+
+            if (item.endTime != null)
+                res += ` [segment end: ${item.segmentType}] `;
+
+            return res;
+        }
+
+        return "";
+    })
+    .join("");
+
 console.log("AI: " + res.response);
+console.log("Full response:", fullResponse);
 ```
 
 Now, let's say we want to ask the model a follow-up question based on the previous response.
@@ -169,6 +191,7 @@ const res2 = await llamaChat.generateResponse(chatHistory, {
 });
 
 console.log("AI: " + res2.response);
+console.log("Full response:", res2.fullResponse);
 ```
 
 ## Handling Function Calling {#function-calling}
@@ -270,8 +293,31 @@ while (true) {
     lastContextShiftMetadata = res.lastEvaluation.contextShiftMetadata;
 
     // print the text the model generated before calling functions
-    if (res.response !== "")
+    if (res.response !== "") {
+        const fullResponse = res.fullResponse
+            .map((item) => {
+                if (typeof item === "string")
+                    return item;
+                else if (item.type === "segment") {
+                    let res = "";
+                    if (item.startTime != null)
+                        res += ` [segment start: ${item.segmentType}] `;
+    
+                    res += item.text;
+    
+                    if (item.endTime != null)
+                        res += ` [segment end: ${item.segmentType}] `;
+    
+                    return res;
+                }
+    
+                return "";
+            })
+            .join("");
+        
         console.log("AI: " + res.response);
+        console.log("Full response:", fullResponse);
+    }
 
     // when there are no function calls,
     // it means the model has finished generating the response

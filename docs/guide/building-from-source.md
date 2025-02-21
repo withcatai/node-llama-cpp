@@ -172,7 +172,7 @@ or pass the code snippet that is printed after the build finishes.
 Every new release of `node-llama-cpp` ships with the latest release of `llama.cpp` that was available at the time of the release,
 so relying on the latest version of `node-llama-cpp` should be enough for most use cases.
 
-However, you may want to download a newer release of `llama.cpp` ([`llama.cpp` releases](https://github.com/ggerganov/llama.cpp/releases))
+However, you may want to download a newer release of `llama.cpp` ([`llama.cpp` releases](https://github.com/ggml-org/llama.cpp/releases))
 and build it from source to get the latest features and bug fixes before a new version of `node-llama-cpp` is released.
 
 A new release may contain breaking changes, so it won't necessarily work properly or even compile at all, so do this with caution.
@@ -182,7 +182,7 @@ You can do this by specifying the `--release` option with the release tag you wa
 npx --no node-llama-cpp source download --release "b1350"
 ```
 
-> You can find the release tag on the [`llama.cpp` releases page](https://github.com/ggerganov/llama.cpp/releases):
+> You can find the release tag on the [`llama.cpp` releases page](https://github.com/ggml-org/llama.cpp/releases):
 
 You can also opt to download the latest release available:
 ```shell

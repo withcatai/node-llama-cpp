@@ -135,7 +135,7 @@ watch -d "npx --no node-llama-cpp inspect gpu"
 ```
 
 ## Vulkan Caveats
-[At the moment](https://github.com/ggerganov/llama.cpp/issues/7575),
+[At the moment](https://github.com/ggml-org/llama.cpp/issues/7575),
 Vulkan doesn't work well when using multiple contexts at the same time,
 so it's recommended to use a single context with Vulkan,
 and to manually dispose a context (using [`.dispose()`](../api/classes/LlamaContext.md#dispose)) before creating a new one.

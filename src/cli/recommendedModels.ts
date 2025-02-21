@@ -1,6 +1,81 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "DeepSeek R1 Distill Qwen 7B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 7 billion parameters version of the model - a fine tuned Qwen 2.5 7B base model with distillation from the 671B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q8_0",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q6_K",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q5_K_M",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q5_K_S",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "DeepSeek R1 Distill Qwen 14B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 14 billion parameters version of the model - a fine tuned Qwen 2.5 14B base model with distillation from the 671B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q8_0",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q6_K",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q5_K_M",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q5_K_S",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "DeepSeek R1 Distill Qwen 32B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 32 billion parameters version of the model - a fine tuned Qwen 2.5 32B base model with distillation from the 671B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q8_0",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q6_K",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q5_K_M",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q5_K_S",
+        "hf:mradermacher/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "DeepSeek R1 Distill Llama 8B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, even though it's based on Llama 3.1.\n" +
+        "This is the 8 billion parameters version of the model - a fine tuned Llama 3.1 8B base model with distillation from the 671B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-8B-GGUF:Q8_0",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-8B-GGUF:Q6_K",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-8B-GGUF:Q5_K_M",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-8B-GGUF:Q5_K_S",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-8B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "DeepSeek R1 Distill Llama 70B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with support for function calling.\n" +
+        "This model is censored, even though it's based on Llama 3.3.\n" +
+        "This is the 70 billion parameters version of the model - a fine tuned Llama 3.3 70B base model with distillation from the 671B DeepSeek R1 version.",
+
+    fileOptions: [
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF/DeepSeek-R1-Distill-Llama-70B.Q8_0.gguf.part1of2",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF/DeepSeek-R1-Distill-Llama-70B.Q6_K.gguf.part1of2",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q5_K_M",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q5_K_S",
+        "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q4_K_M"
+    ]
+}, {
     name: "Llama 3.1 8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +
@@ -10,17 +85,6 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q8_0",
         "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q6_K",
         "hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M"
-    ]
-}, {
-    name: "Phi 4 14B",
-    abilities: ["chat", "complete", "functionCalling"],
-    description: "Phi 4 model was created by Microsoft and is optimized for complex reasoning in areas such as math.",
-
-    fileOptions: [
-        "hf:mradermacher/phi-4-GGUF:Q8_0",
-        "hf:mradermacher/phi-4-GGUF:Q6_K",
-        "hf:mradermacher/phi-4-GGUF:Q4_K_M",
-        "hf:mradermacher/phi-4-GGUF:Q4_K_S"
     ]
 }, {
     name: "Llama 3.1 70B",
@@ -45,6 +109,17 @@ export const recommendedModels: ModelRecommendation[] = [{
     fileOptions: [
         "hf:mradermacher/Meta-Llama-3.1-405B-Instruct-GGUF/Meta-Llama-3.1-405B-Instruct.Q3_K_L.gguf.part1of5",
         "hf:mradermacher/Meta-Llama-3.1-405B-Instruct-GGUF/Meta-Llama-3.1-405B-Instruct.Q3_K_M.gguf.part1of4"
+    ]
+}, {
+    name: "Phi 4 14B",
+    abilities: ["chat", "complete", "functionCalling"],
+    description: "Phi 4 model was created by Microsoft and is optimized for complex reasoning in areas such as math.",
+
+    fileOptions: [
+        "hf:mradermacher/phi-4-GGUF:Q8_0",
+        "hf:mradermacher/phi-4-GGUF:Q6_K",
+        "hf:mradermacher/phi-4-GGUF:Q4_K_M",
+        "hf:mradermacher/phi-4-GGUF:Q4_K_S"
     ]
 }, {
     name: "Mistral Nemo 12B",

@@ -39,8 +39,8 @@ export class LlamaGrammar {
     /**
      * > GBNF files are supported.
      * > More info here: [
-     * github:ggerganov/llama.cpp:grammars/README.md
-     * ](https://github.com/ggerganov/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
+     * github:ggml-org/llama.cpp:grammars/README.md
+     * ](https://github.com/ggml-org/llama.cpp/blob/f5fe98d11bdf9e7797bcfb05c0c3601ffc4b9d26/grammars/README.md)
      *
      * Prefer to create a new instance of this class by using `llama.createGrammar(...)`.
      * @deprecated Use `llama.createGrammar(...)` instead.

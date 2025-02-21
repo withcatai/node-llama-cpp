@@ -143,6 +143,7 @@ export default tseslint.config({
     },
     rules: {
         "no-constant-condition": ["warn"],
+        "import/named": ["off"],
         "@typescript-eslint/explicit-module-boundary-types": ["off"],
         "@typescript-eslint/ban-ts-comment": ["off"],
         "@typescript-eslint/no-explicit-any": ["off"],

@@ -562,6 +562,15 @@ html.blog-page .vp-doc>div>hr:first-of-type {
     display: none;
 }
 
+@media (min-width: 960px) {
+    html.blog-index .VPDoc:not(.has-sidebar)>.container>.content,
+    html.blog-page .VPDoc:not(.has-sidebar)>.container>.content {
+        max-width: 896px;
+        padding-left: 0px;
+        padding-right: 0px;
+    }
+}
+
 /*#VPContent {*/
 /*    background-image: radial-gradient(1200px 380px at 50% 0%, color-mix(in srgb, var(--vp-c-brand-1) 32%, transparent), transparent 64%);*/
 /*}*/

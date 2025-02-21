@@ -169,6 +169,10 @@ describe("Llama3_1ChatWrapper", () => {
           - Only call one function at a time
           - Put the entire function call reply on one line
           - Always add your sources when using search results to answer the user query
+          - After calling a function, the result will appear afterwards and is only visible to you
+          - To make information visible to the user, you must include it in your response
+          - Do not tell the user about the functions you are using
+          - Only call functions when needed
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",

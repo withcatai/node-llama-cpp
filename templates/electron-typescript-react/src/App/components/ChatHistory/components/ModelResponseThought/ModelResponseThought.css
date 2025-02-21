@@ -1,0 +1,162 @@
+.appChatHistory > .message.model > .responseThought {
+    padding: 0px 8px;
+
+    transition: margin-bottom 0.3s var(--transition-easing);
+
+    &.active {
+        margin-bottom: 8px;
+
+        > .header {
+            > .summary {
+                opacity: 1;
+
+                > .title {
+                    opacity: 0.6;
+                    font-weight: bold;
+                    --animation-mask-transparency-color: rgb(0 0 0 / 48%);
+
+                    animation-play-state: running;
+                }
+
+                > .chevron {
+                    opacity: 0.48;
+                }
+            }
+        }
+    }
+
+    &.open {
+        > .header {
+            > .summary {
+                > .chevron {
+                    transform: rotate(90deg);
+                }
+            }
+        }
+    }
+
+    > .header {
+        border: none;
+        background-color: transparent;
+        display: flex;
+        flex-direction: column;
+        padding: 0px;
+        user-select: none;
+        outline: solid 2px transparent;
+        border-radius: 4px;
+        outline-offset: 4px;
+        align-self: flex-start;
+        max-width: 100%;
+
+        &:focus-visible {
+            outline: solid 2px Highlight;
+        }
+
+        &:hover > .summary {
+            opacity: 1;
+        }
+
+        > .summary {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            opacity: 0.64;
+
+            transition: opacity 0.3s var(--transition-easing);
+
+            > .title {
+                --animation-mask-transparency-color: rgb(0 0 0 / 100%);
+                transition: font-weight 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing), --animation-mask-transparency-color 0.3s var(--transition-easing), margin-bottom 0.3s var(--transition-easing);
+                mask: linear-gradient(
+                    to right,
+                    var(--animation-mask-transparency-color) 34%,
+                    black,
+                    var(--animation-mask-transparency-color) 66%
+                ) content-box 0 0 / 300% 100% no-repeat;
+                animation: thinking-animation 2s infinite ease-in-out;
+                animation-play-state: paused;
+            }
+
+            > .chevron {
+                flex-shrink: 0;
+
+                width: 20px;
+                height: 20px;
+                margin: -4px;
+                margin-inline-start: 0px;
+                opacity: 0.64;
+
+                transform-origin: 56% 56%;
+                transition: transform 0.2s var(--transition-easing), opacity 0.3s var(--transition-easing);
+            }
+        }
+
+        > .excerpt {
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            justify-content: end;
+            justify-self: flex-start;
+            mask: linear-gradient(to right, transparent, black 48px);
+            max-width: 360px;
+            opacity: 0.24;
+            font-size: 14px;
+            margin-top: 2px;
+            user-select: none;
+            padding-inline-end: 24px;
+
+            interpolate-size: allow-keywords;
+            transition: height 0.5s var(--transition-easing), opacity 0.3s 0.2s var(--transition-easing);
+
+            &.hide {
+                height: 0px;
+                opacity: 0;
+                transition-delay: 0s, 0s;
+            }
+        }
+    }
+
+    > .content {
+        margin-top: 16px;
+        margin-bottom: 24px;
+        opacity: 0.64;
+        padding-left: 24px;
+        position: relative;
+        overflow: clip;
+
+        interpolate-size: allow-keywords;
+        transition: height 0.5s var(--transition-easing), margin-bottom 0.5s var(--transition-easing), opacity 0.3s 0.2s var(--transition-easing);
+
+        &:before {
+            content: "";
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background-color: var(--message-blockquote-border-color);
+            inset-inline-start: 0px;
+        }
+
+        &.hide {
+            height: 0px;
+            margin-bottom: 0px;
+            opacity: 0;
+            transition-delay: 0s, 0s;
+        }
+    }
+}
+
+@keyframes thinking-animation {
+    0% {
+        mask-position: 100% 100%;
+    }
+
+    100% {
+        mask-position: 0 100%;
+    }
+}
+
+@property --animation-mask-transparency-color {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: transparent;
+}

@@ -1,0 +1,48 @@
+.appChatHistory > .message.model {
+    align-self: flex-start;
+    margin-inline-end: 48px;
+    padding-inline-start: 18px;
+    word-break: break-word;
+    max-width: calc(100% - 48px);
+    box-sizing: border-box;
+    min-height: fit-content;
+    interpolate-size: allow-keywords;
+
+    transition: min-height 0.5s var(--transition-easing), max-height 0.5s var(--transition-easing);
+
+    &:hover + .buttons {
+        opacity: 1;
+    }
+
+    &:last-child {
+        margin-bottom: 0px;
+        min-height: calc(50svh);
+
+        @starting-style {
+            min-height: 0px;
+        }
+    }
+
+    > .text {
+        padding: 0px 6px;
+    }
+
+    > .buttons {
+        display: flex;
+        flex-direction: row;
+        padding: 12px 0px 8px 0px;
+        opacity: 0.6;
+        justify-self: flex-start;
+
+        transition: opacity 0.1s ease-in-out;
+
+        &:hover,
+        &:focus-visible {
+            opacity: 1;
+        }
+
+        &[inert] {
+            opacity: 0;
+        }
+    }
+}

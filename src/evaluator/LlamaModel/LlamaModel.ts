@@ -433,7 +433,7 @@ export class LlamaModel {
      * Recommended for debugging purposes only.
      *
      * > **Note:** there may be additional spaces around special tokens that were not present in the original text - this is not a bug,
-     * this is [how the tokenizer is supposed to work](https://github.com/ggerganov/llama.cpp/pull/7697#issuecomment-2144003246).
+     * this is [how the tokenizer is supposed to work](https://github.com/ggml-org/llama.cpp/pull/7697#issuecomment-2144003246).
      *
      * Defaults to `false`.
      * @param [lastTokens] - the last few tokens that preceded the tokens to detokenize.

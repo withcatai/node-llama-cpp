@@ -76,7 +76,12 @@ export function InputRow({
         } else if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
             if (inputRef.current != null && autocompleteText !== "") {
-                setInputValue(inputRef.current.value + autocompleteText);
+                const newlineIndex = autocompleteText.indexOf("\n");
+                const textToAccept = newlineIndex <= 0
+                    ? autocompleteText
+                    : autocompleteText.slice(0, newlineIndex);
+
+                setInputValue(inputRef.current.value + textToAccept);
                 inputRef.current.scrollTop = inputRef.current.scrollHeight;
                 onPromptInput?.(inputRef.current.value);
             }
@@ -84,6 +89,14 @@ export function InputRow({
             resizeInput();
         }
     }, [submitPrompt, setInputValue, onPromptInput, resizeInput, autocompleteText]);
+
+    const previewAutocompleteText = useMemo(() => {
+        const lines = autocompleteText.split("\n");
+        if (lines.length <= 1 || lines[1]!.trim() === "")
+            return lines[0]!;
+
+        return autocompleteText;
+    }, [autocompleteText]);
 
     return <div className={classNames("appInputRow", disabled && "disabled")}>
         <div className="inputContainer">
@@ -105,7 +118,7 @@ export function InputRow({
             <div className="autocomplete" ref={autocompleteRef}>
                 <div className={classNames("content", autocompleteText === "" && "hide")}>
                     <div className="currentText" ref={autocompleteCurrentTextRef} />
-                    <div className="completion">{autocompleteText}</div>
+                    <div className="completion">{previewAutocompleteText}</div>
                     <div className="pressTab">Tab</div>
                 </div>
             </div>

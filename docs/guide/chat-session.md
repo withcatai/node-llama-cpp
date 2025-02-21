@@ -100,8 +100,9 @@ const a1 = await session.prompt(q1, {
         process.stdout.write(chunk);
     }
 });
-
 ```
+
+> To stream `thought` segment, see [Stream Response Segments](#stream-response-segments)
 
 ## Repeat Penalty Customization {#repeat-penalty}
 You can see all the possible options of the [`prompt`](../api/classes/LlamaChatSession.md#prompt) function [here](../api/type-aliases/LLamaChatPromptOptions.md).
@@ -682,7 +683,7 @@ to make the model follow a certain direction in its response.
 ```typescript
 import {fileURLToPath} from "url";
 import path from "path";
-import {getLlama, LlamaChatSession, GeneralChatWrapper} from "node-llama-cpp";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -692,8 +693,7 @@ const model = await llama.loadModel({
 });
 const context = await model.createContext();
 const session = new LlamaChatSession({
-    contextSequence: context.getSequence(),
-    chatWrapper: new GeneralChatWrapper()
+    contextSequence: context.getSequence()
 });
 
 
@@ -704,4 +704,116 @@ const a1 = await session.prompt(q1, {
     responsePrefix: "The weather today is"
 });
 console.log("AI: " + a1);
+```
+
+## Stop Response Generation {#stop-response-generation}
+To stop the generation of the current response, without removing the existing partial generation from the chat history,
+you can use the [`stopOnAbortSignal`](../api/type-aliases/LLamaChatPromptOptions.md#stoponabortsignal) option
+to configure what happens when the given [`signal`](../api/type-aliases/LLamaChatPromptOptions.md#signal) is aborted.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+
+const abortController = new AbortController();
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+let response = "";
+
+const a1 = await session.prompt(q1, {
+    // stop the generation, instead of cancelling it
+    stopOnAbortSignal: true,
+    
+    signal: abortController.signal,
+    onTextChunk(chunk) {
+        response += chunk;
+        
+        if (response.length >= 10)
+            abortController.abort();
+    }
+});
+console.log("AI: " + a1);
+```
+
+
+## Stream Response Segments {#stream-response-segments}
+The raw model response is automatically segmented into different types of segments.
+The main response is not segmented, but other kinds of sections, like thoughts (chain of thought), are segmented.
+
+To stream response segments you can use the [`onResponseChunk`](../api/type-aliases/LLamaChatPromptOptions.md#onresponsechunk) option.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "DeepSeek-R1-Distill-Qwen-14B.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+process.stdout.write("AI: ");
+const a1 = await session.promptWithMeta(q1, {
+    onResponseChunk(chunk) {
+        const isThoughtSegment = chunk.type === "segment" &&
+            chunk.segmentType === "thought";
+        
+        if (chunk.type === "segment" && chunk.segmentStartTime != null)
+            process.stdout.write(` [segment start: ${chunk.segmentType}] `);
+
+        process.stdout.write(chunk.text);
+
+        if (chunk.type === "segment" && chunk.segmentEndTime != null)
+            process.stdout.write(` [segment end: ${chunk.segmentType}] `);
+    }
+});
+
+const fullResponse = a1.response
+    .map((item) => {
+        if (typeof item === "string")
+            return item;
+        else if (item.type === "segment") {
+            const isThoughtSegment = item.segmentType === "thought";
+            let res = "";
+            
+            if (item.startTime != null)
+                res += ` [segment start: ${item.segmentType}] `;
+
+            res += item.text;
+
+            if (item.endTime != null)
+                res += ` [segment end: ${item.segmentType}] `;
+
+            return res;
+        }
+
+        return "";
+    })
+    .join("");
+
+console.log("Full response: " + fullResponse);
 ```
