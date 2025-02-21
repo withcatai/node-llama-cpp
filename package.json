@@ -110,6 +110,7 @@
     "local",
     "catai",
     "mistral",
+    "deepseek",
     "typescript",
     "lora",
     "batching",

@@ -16,10 +16,9 @@ if (typeof document !== "undefined")
     document?.documentElement.classList.toggle("theme-transition", themeTransitionEnabled);
 
 function updateIsBlogPage() {
-    document?.documentElement.classList.toggle(
-        "blog-page",
-        route.path !== "/blog/" && route.path.startsWith("/blog/")
-    );
+    const blogIndex = route.path === "/blog/";
+    document?.documentElement.classList.toggle("blog-page", !blogIndex && route.path.startsWith("/blog/"));
+    document?.documentElement.classList.toggle("blog-index", blogIndex);
 }
 
 watch(() => route.path, updateIsBlogPage);

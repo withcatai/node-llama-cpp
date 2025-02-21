@@ -9,6 +9,7 @@ import LatestVersionHomeBadge from "../components/LatestVersionHomeBadge/LatestV
 import CommentsSection from "../components/CommentsSection/CommentsSection.vue";
 import {NolebaseGitChangelogPlugin} from "@nolebase/vitepress-plugin-git-changelog/client";
 import LayoutContainer from "./LayoutContainer.vue";
+import YouTubePlayer from "../components/YouTubePlayer/YouTubePlayer.vue";
 
 import "./style.css";
 import "@nolebase/vitepress-plugin-git-changelog/client/style.css";
@@ -18,9 +19,9 @@ import type {EnhanceAppContext} from "vitepress";
 export default {
     extends: Theme,
     Layout: () => {
-        const text = "v3.0 is here!";
-        const link = "/blog/v3";
-        const hideDate = new Date("2025-01-01T00:00:00Z");
+        const text = "DeepSeek R1 is here!";
+        const link = "/blog/v3.6-deepseek-r1";
+        const hideDate = new Date("2025-06-01T00:00:00Z");
 
         return h(LayoutContainer, null, h(Theme.Layout, null, {
             "home-hero-info-before": () => h(LatestVersionHomeBadge, {
@@ -35,6 +36,7 @@ export default {
         }));
     },
     enhanceApp({app, router, siteData}: EnhanceAppContext) {
+        app.component("YouTubePlayer", YouTubePlayer);
         app.use(TwoslashFloatingVue);
         app.use(NolebaseGitChangelogPlugin, {
             displayAuthorsInsideCommitLine: true,
