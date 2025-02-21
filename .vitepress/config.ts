@@ -226,7 +226,10 @@ export default defineConfig({
                 const coverImage = await ensureLocalImage(pageData.frontmatter.image, "cover", {
                     baseDestLocation: imageDir.split("/")
                 });
-                head.push(["meta", {property: "og:image", content: resolveHref(coverImage.urlPath.absolute, true)}]);
+                const imageUrl = resolveHref(coverImage.urlPath.absolute, true);
+                head.push(["meta", {property: "og:image", content: imageUrl}]);
+                head.push(["meta", {property: "twitter:image", content: imageUrl}]);
+                head.push(["meta", {property: "twitter:card", content: "summary_large_image"}]);
             } else if (typeof pageData.frontmatter.image === "object") {
                 const coverImage = typeof pageData.frontmatter.image.url === "string"
                     ? await ensureLocalImage(pageData.frontmatter.image.url, "cover", {
@@ -234,11 +237,21 @@ export default defineConfig({
                     })
                     : undefined;
 
-                if (typeof pageData.frontmatter.image.url === "string")
+                if (typeof pageData.frontmatter.image.url === "string") {
+                    const imageUrl = resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true);
                     head.push(["meta", {
                         property: "og:image",
-                        content: resolveHref(coverImage?.urlPath.absolute ?? pageData.frontmatter.image.url, true)
+                        content: imageUrl
                     }]);
+                    head.push(["meta", {
+                        property: "twitter:image",
+                        content: imageUrl
+                    }]);
+                    head.push(["meta", {
+                        property: "twitter:card",
+                        content: "summary_large_image"
+                    }]);
+                }
 
                 if (pageData.frontmatter.image.width != null)
                     head.push(["meta", {
@@ -691,10 +704,17 @@ export default defineConfig({
                             "/_blog/": {
                                 text: "Blog",
                                 link: "/blog/",
-                                items: blogPosts.map((post) => ({
-                                    text: post.frontmatter.title,
-                                    link: post.url
-                                }))
+                                items: blogPosts
+                                    .filter((post) => {
+                                        const hasCoverImage = typeof post.frontmatter?.image === "string" ||
+                                            typeof post.frontmatter?.image?.url === "string";
+
+                                        return !hasCoverImage;
+                                    })
+                                    .map((post) => ({
+                                        text: post.frontmatter.title,
+                                        link: post.url
+                                    }))
                             }
                         }
                     }
