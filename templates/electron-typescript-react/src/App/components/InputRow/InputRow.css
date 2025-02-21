@@ -82,12 +82,14 @@
                     display: inline;
                     white-space: pre-wrap;
                     word-break: break-word;
+                    unicode-bidi: normal;
                 }
 
                 > .completion {
                     display: inline;
                     white-space: pre-wrap;
                     word-break: break-word;
+                    unicode-bidi: normal;
                 }
 
                 > .pressTab {

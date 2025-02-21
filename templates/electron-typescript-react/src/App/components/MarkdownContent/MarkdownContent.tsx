@@ -18,7 +18,7 @@ const md = markdownit({
     }
 });
 
-export function MarkdownContent({children, inline = false, className}: MarkdownContentProps) {
+export function MarkdownContent({children, inline = false, dir, className}: MarkdownContentProps) {
     const divRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
@@ -34,11 +34,13 @@ export function MarkdownContent({children, inline = false, className}: MarkdownC
     return <div
         className={className}
         ref={divRef}
+        dir={dir}
     />;
 }
 
 type MarkdownContentProps = {
     className?: string,
     inline?: boolean,
+    dir?: string,
     children: string
 };

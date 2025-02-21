@@ -36,7 +36,13 @@ export function ModelResponseThought({text, active, duration}: ModelResponseThou
                 <div className="title">{title}</div>
                 <RightChevronIconSVG className="chevron" />
             </span>
-            <MarkdownContent className={classNames("excerpt", isOpen && "hide")} inline>{text.slice(-excerptLength)}</MarkdownContent>
+            <MarkdownContent
+                className={classNames("excerpt", isOpen && "hide")}
+                dir="auto"
+                inline
+            >
+                {text.slice(-excerptLength)}
+            </MarkdownContent>
         </button>
         <MessageMarkdown className={classNames("content", !isOpen && "hide")} activeDot={active}>{text}</MessageMarkdown>
     </div>;
