@@ -11,7 +11,10 @@ const props = withDefaults(defineProps<{
 
 const url = computed(() => {
     const res = new URL(`https://www.youtube.com/embed/${props.id}`);
-    res.searchParams.set("origin", location.origin);
+
+    if (typeof location !== "undefined")
+        res.searchParams.set("origin", location.origin);
+
     res.searchParams.set("autoplay", props.autoplay ? "1" : "0");
     res.searchParams.set("controls", props.controls ? "1" : "0");
     res.searchParams.set("playsinline", "1");
