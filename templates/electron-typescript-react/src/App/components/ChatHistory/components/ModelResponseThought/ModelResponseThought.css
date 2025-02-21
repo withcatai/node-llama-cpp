@@ -121,6 +121,7 @@
         margin-bottom: 24px;
         opacity: 0.64;
         padding-left: 24px;
+        justify-self: flex-start;
         position: relative;
         overflow: clip;
 
@@ -133,7 +134,7 @@
             width: 4px;
             height: 100%;
             background-color: var(--message-blockquote-border-color);
-            inset-inline-start: 0px;
+            left: 0px;
         }
 
         &.hide {

@@ -30,6 +30,10 @@
         margin-bottom: 0px;
     }
 
+    * {
+        unicode-bidi: plaintext;
+    }
+
     h2 {
         margin: 16px 0px;
         padding-top: 24px;
