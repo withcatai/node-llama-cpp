@@ -164,7 +164,7 @@ export class LlamaChatSessionPromptCompletionEngine {
                     return this._restartCompletion(completionCache);
             })
             .catch((err) => {
-                if (currentAbortSignal.aborted && err === currentAbortSignal.reason)
+                if ((currentAbortSignal.aborted && err === currentAbortSignal.reason) || err instanceof DOMException)
                     return;
 
                 console.error(getConsoleLogPrefix(false, false), err);
