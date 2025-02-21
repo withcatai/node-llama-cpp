@@ -114,7 +114,7 @@ const dateText = new Date(props.date).toLocaleDateString("en-US", {
                 align-self: start;
                 background-repeat: no-repeat;
                 background-size: cover;
-                --max-height: 256px;
+                --max-height: 320px;
             }
         }
 
