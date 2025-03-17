@@ -9,7 +9,7 @@ Trying to use `node-llama-cpp` on a renderer process will crash the application.
 
 You can scaffold an example Electron app that uses `node-llama-cpp` with complete configuration for packaging and distribution by running the following command:
 ```shell
-npm create node-llama-cpp@latest --template electron-typescript-react
+npm create node-llama-cpp@latest -- --template electron-typescript-react
 ```
 
 ::: tip
