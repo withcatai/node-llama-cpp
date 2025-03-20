@@ -410,7 +410,7 @@ getFruitPrice({name: "banana"}) result: {name: "banana", price: "$4"};
 ```
 
 ## Troubleshooting {#troubleshooting}
-### Function Calling Issues With [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md) {#jinja-function-calling-issues}
+### Function Calling Issues With [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md) {#troubleshoot-jinja-function-calling-issues}
 If function calling doesn't work well (or at all) with a model you're trying to use,
 and the [chat wrapper](./chat-wrapper.md) used by your [`LlamaChatSession`](../api/classes/LlamaChatSession.md)
 is a [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md)
