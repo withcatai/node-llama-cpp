@@ -583,7 +583,7 @@ Napi::Value AddonContext::DisposeSequence(const Napi::CallbackInfo& info) {
 
     int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
 
-    bool result = llama_kv_cache_seq_rm(ctx, sequenceId, -1, -1);
+    bool result = llama_kv_self_seq_rm(ctx, sequenceId, -1, -1);
 
     if (!result) {
         Napi::Error::New(info.Env(), "Failed to dispose sequence").ThrowAsJavaScriptException();
@@ -602,7 +602,7 @@ Napi::Value AddonContext::RemoveTokenCellsFromSequence(const Napi::CallbackInfo&
     int32_t startPos = info[1].As<Napi::Number>().Int32Value();
     int32_t endPos = info[2].As<Napi::Number>().Int32Value();
 
-    bool result = llama_kv_cache_seq_rm(ctx, sequenceId, startPos, endPos);
+    bool result = llama_kv_self_seq_rm(ctx, sequenceId, startPos, endPos);
 
     return Napi::Boolean::New(info.Env(), result);
 }
@@ -617,7 +617,7 @@ Napi::Value AddonContext::ShiftSequenceTokenCells(const Napi::CallbackInfo& info
     int32_t endPos = info[2].As<Napi::Number>().Int32Value();
     int32_t shiftDelta = info[3].As<Napi::Number>().Int32Value();
 
-    llama_kv_cache_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
+    llama_kv_self_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
 
     return info.Env().Undefined();
 }
