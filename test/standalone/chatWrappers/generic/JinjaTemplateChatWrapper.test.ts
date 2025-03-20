@@ -532,114 +532,60 @@ describe("JinjaTemplateChatWrapper", () => {
         });
         const {contextText, stopGenerationTriggers} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
         expect(stopGenerationTriggers).toMatchInlineSnapshot(`
           [
-            LlamaText [
-              {
-                "type": "specialToken",
-                "value": "EOS",
-              },
-            ],
-            LlamaText [
-              {
-                "type": "specialTokensText",
-                "value": " ",
-              },
-              {
-                "type": "specialToken",
-                "value": "EOS",
-              },
-            ],
+            LlamaText([
+              new SpecialToken("EOS"),
+            ]),
+            LlamaText([
+              new SpecialTokensText(" "),
+              new SpecialToken("EOS"),
+            ]),
           ]
         `);
 
         const {contextText: contextText2} = chatWrapper.generateContextState({chatHistory: conversationHistory2});
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": " ",
-            },
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+            new SpecialTokensText(" "),
+            new SpecialToken("EOS"),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "I'm good, how are you?",
-          ]
+          ])
         `);
 
         const {contextText: contextText3} = chatWrapper.generateContextState({chatHistory: conversationHistory});
@@ -653,114 +599,60 @@ describe("JinjaTemplateChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!
 
           ",
-          ]
+          ])
         `);
 
         const {contextText: contextText4} = chatWrapper.generateContextState({chatHistory: conversationHistory3});
 
-        expect(contextText4.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText4).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": " ",
-            },
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+            new SpecialTokensText(" "),
+            new SpecialToken("EOS"),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST]",
-            },
-          ]
+            new SpecialTokensText(" [/INST]"),
+          ])
         `);
     });
 
@@ -770,16 +662,10 @@ describe("JinjaTemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "### System message
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -788,12 +674,9 @@ describe("JinjaTemplateChatWrapper", () => {
           ----
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST]",
-            },
+            new SpecialTokensText(" [/INST]"),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -803,16 +686,10 @@ describe("JinjaTemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "### System message
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -821,12 +698,9 @@ describe("JinjaTemplateChatWrapper", () => {
           ----
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -837,16 +711,10 @@ describe("JinjaTemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "### System message
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -855,12 +723,9 @@ describe("JinjaTemplateChatWrapper", () => {
           ----
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -871,47 +736,29 @@ describe("JinjaTemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: [conversationHistory[0]!, ...conversationHistory]});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
           <<SYS>>
-          ",
-            },
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -924,13 +771,10 @@ describe("JinjaTemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "<<SYS>>
-          ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("<<SYS>>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -972,43 +816,25 @@ describe("JinjaTemplateChatWrapper", () => {
 
           Calling any of the provided functions can be done like this:
           ||call: getSomeInfo",
-            {
-              "type": "specialTokensText",
-              "value": "(",
-            },
+            new SpecialTokensText("("),
             "{"someKey": "someValue"}",
-            {
-              "type": "specialTokensText",
-              "value": ")",
-            },
+            new SpecialTokensText(")"),
             "
 
           Note that the || prefix is mandatory.
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
           After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
-            {
-              "type": "specialTokensText",
-              "value": "
+            new SpecialTokensText("
           <</SYS>>
 
-          ",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+          "),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -1025,16 +851,10 @@ describe("JinjaTemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "### System message
 
           The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.
@@ -1084,33 +904,15 @@ describe("JinjaTemplateChatWrapper", () => {
           ----
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello![[call: func2({"message": "Hello", "feeling": "good", "words": 1})]] [[result: {"yes": true, "message": "ok"}]]",
-            {
-              "type": "specialTokensText",
-              "value": " ",
-            },
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+            new SpecialTokensText(" "),
+            new SpecialToken("EOS"),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST]",
-            },
-          ]
+            new SpecialTokensText(" [/INST]"),
+          ])
         `);
     });
 
@@ -1127,16 +929,10 @@ describe("JinjaTemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "### System message
 
           The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.
@@ -1187,36 +983,18 @@ describe("JinjaTemplateChatWrapper", () => {
           ----
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST] ",
-            },
+            new SpecialTokensText(" [/INST] "),
             "Hello!
           Call function: func2 with params {"message": "Hello", "feeling": "good", "words": 1}.
           Function result: {"yes": true, "message": "ok"}
           ",
-            {
-              "type": "specialTokensText",
-              "value": " ",
-            },
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST] ",
-            },
+            new SpecialTokensText(" "),
+            new SpecialToken("EOS"),
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST] "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": " [/INST]",
-            },
-          ]
+            new SpecialTokensText(" [/INST]"),
+          ])
         `);
     });
 
@@ -1259,69 +1037,42 @@ describe("JinjaTemplateChatWrapper", () => {
                 "call": {
                   "emptyCallParamsPlaceholder": {},
                   "optionalPrefixSpace": true,
-                  "paramsPrefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "", "arguments": ",
-                    },
-                  ],
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "{"name": "",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}",
-                    },
-                  ],
+                  "paramsPrefix": LlamaText([
+                    new SpecialTokensText("", "arguments": "),
+                  ]),
+                  "prefix": LlamaText([
+                    new SpecialTokensText("{"name": ""),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}"),
+                  ]),
                 },
                 "parallelism": {
                   "call": {
-                    "betweenCalls": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": ", ",
-                      },
-                    ],
-                    "sectionPrefix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "[TOOL_CALLS][",
-                      },
-                    ],
-                    "sectionSuffix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "]",
-                      },
-                      {
-                        "type": "specialToken",
-                        "value": "EOS",
-                      },
-                    ],
+                    "betweenCalls": LlamaText([
+                      new SpecialTokensText(", "),
+                    ]),
+                    "sectionPrefix": LlamaText([
+                      new SpecialTokensText("[TOOL_CALLS]["),
+                    ]),
+                    "sectionSuffix": LlamaText([
+                      new SpecialTokensText("]"),
+                      new SpecialToken("EOS"),
+                    ]),
                   },
                   "result": {
-                    "betweenResults": LlamaText [],
-                    "sectionPrefix": LlamaText [],
-                    "sectionSuffix": LlamaText [],
+                    "betweenResults": LlamaText([]),
+                    "sectionPrefix": LlamaText([]),
+                    "sectionSuffix": LlamaText([]),
                   },
                 },
                 "result": {
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "[TOOL_RESULTS]{"content": ",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}[/TOOL_RESULTS]",
-                    },
-                  ],
+                  "prefix": LlamaText([
+                    new SpecialTokensText("[TOOL_RESULTS]{"content": "),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}[/TOOL_RESULTS]"),
+                  ]),
                 },
               }
             `);
@@ -1332,62 +1083,26 @@ describe("JinjaTemplateChatWrapper", () => {
             });
 
             expect(contextText).toMatchInlineSnapshot(`
-              LlamaText [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[INST]",
-                },
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("[INST]"),
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST]",
-                },
+                new SpecialTokensText("[/INST]"),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "[TOOL_CALLS][{"name": "",
-                },
+                new SpecialTokensText("[TOOL_CALLS][{"name": ""),
                 "func2",
-                {
-                  "type": "specialTokensText",
-                  "value": "", "arguments": ",
-                },
+                new SpecialTokensText("", "arguments": "),
                 "{"message": "Hello", "feeling": "good", "words": 1}",
-                {
-                  "type": "specialTokensText",
-                  "value": "}]",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[TOOL_RESULTS]{"content": ",
-                },
+                new SpecialTokensText("}]"),
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[TOOL_RESULTS]{"content": "),
                 ""{\\"yes\\": true, \\"message\\": \\"ok\\"}"",
-                {
-                  "type": "specialTokensText",
-                  "value": "}[/TOOL_RESULTS]",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "func1"}}, {"type": "function", "function": {"name": "func2", "parameters": {"type": "object", "properties": {"message": {"type": "string"}, "feeling": {"enum": ["good", "bad"]}, "words": {"type": "number"}}}}}, {"type": "function", "function": {"name": "func3", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}}}}, {"type": "function", "function": {"name": "func4", "description": "Some description here", "parameters": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "boolean"}, {"type": "number"}, {"type": "null"}, {"type": "object", "properties": {"message": {"type": "string"}}}, {"type": "array", "items": {"type": "string"}}], "items": {"enum": ["1", -6]}, "minItems": 8}}}, {"type": "function", "function": {"name": "func5", "description": "Some description here", "parameters": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "boolean"}, {"type": "number"}], "maxItems": 3}}}, {"type": "function", "function": {"name": "func6", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}, "minItems": 2}}}, {"type": "function", "function": {"name": "func7", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}}}, {"type": "function", "function": {"name": "func8", "parameters": {"type": "object", "properties": {"message": {"description": "The main message", "type": "string"}, "feeling": {"description": "The feeling", "enum": ["good", "bad"]}, "words": {"description": "The number of words.\\nFor example, 6", "type": "number"}}}}}][/AVAILABLE_TOOLS][INST]",
-                },
+                new SpecialTokensText("}[/TOOL_RESULTS]"),
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "func1"}}, {"type": "function", "function": {"name": "func2", "parameters": {"type": "object", "properties": {"message": {"type": "string"}, "feeling": {"enum": ["good", "bad"]}, "words": {"type": "number"}}}}}, {"type": "function", "function": {"name": "func3", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}}}}, {"type": "function", "function": {"name": "func4", "description": "Some description here", "parameters": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "boolean"}, {"type": "number"}, {"type": "null"}, {"type": "object", "properties": {"message": {"type": "string"}}}, {"type": "array", "items": {"type": "string"}}], "items": {"enum": ["1", -6]}, "minItems": 8}}}, {"type": "function", "function": {"name": "func5", "description": "Some description here", "parameters": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "boolean"}, {"type": "number"}], "maxItems": 3}}}, {"type": "function", "function": {"name": "func6", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}, "minItems": 2}}}, {"type": "function", "function": {"name": "func7", "description": "Some description here", "parameters": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}}}, {"type": "function", "function": {"name": "func8", "parameters": {"type": "object", "properties": {"message": {"description": "The main message", "type": "string"}, "feeling": {"description": "The feeling", "enum": ["good", "bad"]}, "words": {"description": "The number of words.\\nFor example, 6", "type": "number"}}}}}][/AVAILABLE_TOOLS][INST]"),
                 "How are you?",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST]",
-                },
-              ]
+                new SpecialTokensText("[/INST]"),
+              ])
             `);
         });
 
@@ -1401,69 +1116,42 @@ describe("JinjaTemplateChatWrapper", () => {
                 "call": {
                   "emptyCallParamsPlaceholder": {},
                   "optionalPrefixSpace": true,
-                  "paramsPrefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "", "arguments": ",
-                    },
-                  ],
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "{"name": "",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}",
-                    },
-                  ],
+                  "paramsPrefix": LlamaText([
+                    new SpecialTokensText("", "arguments": "),
+                  ]),
+                  "prefix": LlamaText([
+                    new SpecialTokensText("{"name": ""),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}"),
+                  ]),
                 },
                 "parallelism": {
                   "call": {
-                    "betweenCalls": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": ", ",
-                      },
-                    ],
-                    "sectionPrefix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "[TOOL_CALLS][",
-                      },
-                    ],
-                    "sectionSuffix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "]",
-                      },
-                      {
-                        "type": "specialToken",
-                        "value": "EOS",
-                      },
-                    ],
+                    "betweenCalls": LlamaText([
+                      new SpecialTokensText(", "),
+                    ]),
+                    "sectionPrefix": LlamaText([
+                      new SpecialTokensText("[TOOL_CALLS]["),
+                    ]),
+                    "sectionSuffix": LlamaText([
+                      new SpecialTokensText("]"),
+                      new SpecialToken("EOS"),
+                    ]),
                   },
                   "result": {
-                    "betweenResults": LlamaText [],
-                    "sectionPrefix": LlamaText [],
-                    "sectionSuffix": LlamaText [],
+                    "betweenResults": LlamaText([]),
+                    "sectionPrefix": LlamaText([]),
+                    "sectionSuffix": LlamaText([]),
                   },
                 },
                 "result": {
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "[TOOL_RESULTS]{"content": ",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}[/TOOL_RESULTS]",
-                    },
-                  ],
+                  "prefix": LlamaText([
+                    new SpecialTokensText("[TOOL_RESULTS]{"content": "),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}[/TOOL_RESULTS]"),
+                  ]),
                 },
               }
             `);
@@ -1474,15 +1162,9 @@ describe("JinjaTemplateChatWrapper", () => {
             });
 
             expect(contextText).toMatchInlineSnapshot(`
-              LlamaText [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[INST]",
-                },
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("[INST]"),
                 "### System message
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -1491,39 +1173,18 @@ describe("JinjaTemplateChatWrapper", () => {
               ----
 
               Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST]",
-                },
+                new SpecialTokensText("[/INST]"),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}}][/AVAILABLE_TOOLS][INST]",
-                },
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}}][/AVAILABLE_TOOLS][INST]"),
                 "What is the time?",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST][TOOL_CALLS][{"name": "getTime", "arguments": {"hours": "24", "seconds": true}, "id": "fc_3_0000"}]",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[TOOL_RESULTS]{"content": ",
-                },
+                new SpecialTokensText("[/INST][TOOL_CALLS][{"name": "getTime", "arguments": {"hours": "24", "seconds": true}, "id": "fc_3_0000"}]"),
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[TOOL_RESULTS]{"content": "),
                 ""22:00:00"",
-                {
-                  "type": "specialTokensText",
-                  "value": ", "call_id": "fc_3_0000"}[/TOOL_RESULTS]",
-                },
+                new SpecialTokensText(", "call_id": "fc_3_0000"}[/TOOL_RESULTS]"),
                 "I'm good, how are you?",
-              ]
+              ])
             `);
         });
 
@@ -1537,69 +1198,42 @@ describe("JinjaTemplateChatWrapper", () => {
                 "call": {
                   "emptyCallParamsPlaceholder": {},
                   "optionalPrefixSpace": true,
-                  "paramsPrefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "", "arguments": ",
-                    },
-                  ],
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "{"name": "",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}",
-                    },
-                  ],
+                  "paramsPrefix": LlamaText([
+                    new SpecialTokensText("", "arguments": "),
+                  ]),
+                  "prefix": LlamaText([
+                    new SpecialTokensText("{"name": ""),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}"),
+                  ]),
                 },
                 "parallelism": {
                   "call": {
-                    "betweenCalls": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": ", ",
-                      },
-                    ],
-                    "sectionPrefix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "[TOOL_CALLS][",
-                      },
-                    ],
-                    "sectionSuffix": LlamaText [
-                      {
-                        "type": "specialTokensText",
-                        "value": "]",
-                      },
-                      {
-                        "type": "specialToken",
-                        "value": "EOS",
-                      },
-                    ],
+                    "betweenCalls": LlamaText([
+                      new SpecialTokensText(", "),
+                    ]),
+                    "sectionPrefix": LlamaText([
+                      new SpecialTokensText("[TOOL_CALLS]["),
+                    ]),
+                    "sectionSuffix": LlamaText([
+                      new SpecialTokensText("]"),
+                      new SpecialToken("EOS"),
+                    ]),
                   },
                   "result": {
-                    "betweenResults": LlamaText [],
-                    "sectionPrefix": LlamaText [],
-                    "sectionSuffix": LlamaText [],
+                    "betweenResults": LlamaText([]),
+                    "sectionPrefix": LlamaText([]),
+                    "sectionSuffix": LlamaText([]),
                   },
                 },
                 "result": {
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "[TOOL_RESULTS]{"content": ",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}[/TOOL_RESULTS]",
-                    },
-                  ],
+                  "prefix": LlamaText([
+                    new SpecialTokensText("[TOOL_RESULTS]{"content": "),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("}[/TOOL_RESULTS]"),
+                  ]),
                 },
               }
             `);
@@ -1610,15 +1244,9 @@ describe("JinjaTemplateChatWrapper", () => {
             });
 
             expect(contextText).toMatchInlineSnapshot(`
-              LlamaText [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[INST]",
-                },
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("[INST]"),
                 "### System message
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
@@ -1627,38 +1255,17 @@ describe("JinjaTemplateChatWrapper", () => {
               ----
 
               Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST]",
-                },
+                new SpecialTokensText("[/INST]"),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}}][/AVAILABLE_TOOLS][INST]",
-                },
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}}][/AVAILABLE_TOOLS][INST]"),
                 "What is the time?",
-                {
-                  "type": "specialTokensText",
-                  "value": "[/INST][TOOL_CALLS][{"name": "getTime", "arguments": {"hours": "24", "seconds": true}, "id": "fc_3_0000"}]",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "[TOOL_RESULTS]{"content": ",
-                },
+                new SpecialTokensText("[/INST][TOOL_CALLS][{"name": "getTime", "arguments": {"hours": "24", "seconds": true}, "id": "fc_3_0000"}]"),
+                new SpecialToken("EOS"),
+                new SpecialTokensText("[TOOL_RESULTS]{"content": "),
                 ""22:00:00"",
-                {
-                  "type": "specialTokensText",
-                  "value": ", "call_id": "fc_3_0000"}[/TOOL_RESULTS]",
-                },
-              ]
+                new SpecialTokensText(", "call_id": "fc_3_0000"}[/TOOL_RESULTS]"),
+              ])
             `);
         });
 
@@ -1672,49 +1279,28 @@ describe("JinjaTemplateChatWrapper", () => {
                 "call": {
                   "emptyCallParamsPlaceholder": {},
                   "optionalPrefixSpace": true,
-                  "paramsPrefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "", "parameters": ",
-                    },
-                  ],
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "{"name": "",
-                    },
-                  ],
+                  "paramsPrefix": LlamaText([
+                    new SpecialTokensText("", "parameters": "),
+                  ]),
+                  "prefix": LlamaText([
+                    new SpecialTokensText("{"name": ""),
+                  ]),
                   "suffix": "",
                 },
                 "result": {
-                  "prefix": LlamaText [
-                    {
-                      "type": "specialTokensText",
-                      "value": "}",
-                    },
-                    {
-                      "type": "specialToken",
-                      "value": "EOT",
-                    },
-                    {
-                      "type": "specialTokensText",
-                      "value": "<|start_header_id|>ipython<|end_header_id|>
+                  "prefix": LlamaText([
+                    new SpecialTokensText("}"),
+                    new SpecialToken("EOT"),
+                    new SpecialTokensText("<|start_header_id|>ipython<|end_header_id|>
 
-              ",
-                    },
-                  ],
-                  "suffix": LlamaText [
-                    {
-                      "type": "specialToken",
-                      "value": "EOT",
-                    },
-                    {
-                      "type": "specialTokensText",
-                      "value": "<|start_header_id|>assistant<|end_header_id|>
+              "),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialToken("EOT"),
+                    new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                    },
-                  ],
+              "),
+                  ]),
                 },
               }
             `);
@@ -1725,28 +1311,17 @@ describe("JinjaTemplateChatWrapper", () => {
             });
 
             expect(contextText).toMatchInlineSnapshot(`
-              LlamaText [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
               Environment: ipython
               Cutting Knowledge Date: December 2023
               Today Date: 26 Jul 2024
 
-              ",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+              "),
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
               Given the following functions, please respond with a JSON for a function call with its proper arguments that best answers the given prompt.
 
@@ -1924,71 +1499,34 @@ describe("JinjaTemplateChatWrapper", () => {
                   }
               }
 
-              ",
-                },
+              "),
                 "Hi there!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "{"name": "",
-                },
+                new SpecialTokensText("{"name": ""),
                 "func2",
-                {
-                  "type": "specialTokensText",
-                  "value": "", "parameters": ",
-                },
+                new SpecialTokensText("", "parameters": "),
                 "{"message": "Hello", "feeling": "good", "words": 1}",
-                {
-                  "type": "specialTokensText",
-                  "value": "}",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>ipython<|end_header_id|>
+                new SpecialTokensText("}"),
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>ipython<|end_header_id|>
 
-              ",
-                },
+              "),
                 "{"yes": true, "message": "ok"}",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+              "),
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "How are you?",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-              ]
+                new SpecialToken("EOT"),
+              ])
             `);
         });
     });

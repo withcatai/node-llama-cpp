@@ -12,7 +12,11 @@ export default defineConfig({
                 maxThreads: 1
             }
         },
-        snapshotSerializers: ["./test/utils/helpers/llamaTextSerializer.ts"],
+        snapshotSerializers: [
+            "./test/utils/helpers/llamaTextSerializer.ts",
+            "./test/utils/helpers/SpecialTokensTextSerializer.ts",
+            "./test/utils/helpers/SpecialTokenSerializer.ts"
+        ],
         setupFiles: ["./test/utils/helpers/testSetup.ts"]
     }
 });

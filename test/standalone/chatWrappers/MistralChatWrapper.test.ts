@@ -59,26 +59,17 @@ describe("MistralChatWrapper", () => {
         const chatWrapper = new MistralChatWrapper();
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST]",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST]"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "[/INST]",
-            },
+            new SpecialTokensText("[/INST]"),
             "Hello!",
-          ]
+          ])
         `);
 
         const chatWrapper2 = new MistralChatWrapper();
@@ -87,59 +78,29 @@ describe("MistralChatWrapper", () => {
             availableFunctions: conversationHistory2Functions
         });
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST]",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST]"),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "[/INST]",
-            },
+            new SpecialTokensText("[/INST]"),
             "Hello!",
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[AVAILABLE_TOOLS]",
-            },
+            new SpecialToken("EOS"),
+            new SpecialTokensText("[AVAILABLE_TOOLS]"),
             "[{"type": "function", "function": {"name": "getTime", "description": "Retrieve the current time", "parameters": {"type": "object", "properties": {"hours": {"enum": ["24", "12"]}, "seconds": {"type": "boolean"}}}}}]",
-            {
-              "type": "specialTokensText",
-              "value": "[/AVAILABLE_TOOLS][INST]",
-            },
+            new SpecialTokensText("[/AVAILABLE_TOOLS][INST]"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           What is the time?",
-            {
-              "type": "specialTokensText",
-              "value": "[/INST][TOOL_CALLS]",
-            },
+            new SpecialTokensText("[/INST][TOOL_CALLS]"),
             "[{"name": "getTime", "arguments": {"hours": "24", "seconds": true}}]",
-            {
-              "type": "specialToken",
-              "value": "EOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[TOOL_RESULTS]",
-            },
+            new SpecialToken("EOS"),
+            new SpecialTokensText("[TOOL_RESULTS]"),
             "{"name": "getTime", "content": "22:00:00"}",
-            {
-              "type": "specialTokensText",
-              "value": "[/TOOL_RESULTS]",
-            },
+            new SpecialTokensText("[/TOOL_RESULTS]"),
             "I'm good, how are you?",
-          ]
+          ])
         `);
 
         const chatWrapper3 = new MistralChatWrapper();
@@ -154,50 +115,32 @@ describe("MistralChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST]",
-            },
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST]"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "[/INST]",
-            },
+            new SpecialTokensText("[/INST]"),
             "Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "[INST]",
-            },
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("[INST]"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "[/INST]",
-            },
+            new SpecialTokensText("[/INST]"),
             "Hello!
 
           ",
-          ]
+          ])
         `);
     });
 });
