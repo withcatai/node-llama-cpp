@@ -408,3 +408,42 @@ getFruitPrice({name: "banana"}) result: {name: "banana", price: "$4"};
 
 
 ```
+
+## Troubleshooting {#troubleshooting}
+### Function Calling Issues With [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md) {#jinja-function-calling-issues}
+If function calling doesn't work well (or at all) with a model you're trying to use,
+and the [chat wrapper](./chat-wrapper.md) used by your [`LlamaChatSession`](../api/classes/LlamaChatSession.md)
+is a [`JinjaTemplateChatWrapper`](../api/classes/JinjaTemplateChatWrapper.md)
+(you can check that by accessing [`.chatWrapper`](../api/classes/LlamaChatSession.md#chatwrapper)),
+you can try to force it to not use the function calling template defined in the Jinja template.
+
+Doing this can help you achieve better function calling performance with some models.
+
+To do this, create your [`LlamaChatSession`](../api/classes/LlamaChatSession.md) like this:
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+
+// ---cut---
+import {LlamaChatSession, resolveChatWrapper} from "node-llama-cpp";
+
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    chatWrapper: resolveChatWrapper(model, {
+        customWrapperSettings: {
+            jinjaTemplate: {
+                functionCallMessageTemplate: "noJinja"
+            }
+        }
+    })
+});
+```
