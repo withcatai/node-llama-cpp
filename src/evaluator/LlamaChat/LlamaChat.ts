@@ -23,6 +23,7 @@ import {resolveLastTokens} from "../../utils/resolveLastTokens.js";
 import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
+import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -2209,8 +2210,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 if (functionDefinition == null)
                     throw new Error(`Function "${this.functionEvaluationFunctionName}" is not provided in the functions object`);
                 else if (functionDefinition.params == null) {
-                    params = undefined;
-                    paramsText = "";
+                    const emptyCallParamsPlaceholder = this.chatWrapper.settings?.functions?.call?.emptyCallParamsPlaceholder;
+                    if (emptyCallParamsPlaceholder !== undefined && emptyCallParamsPlaceholder !== "") {
+                        params = structuredClone(emptyCallParamsPlaceholder);
+                        paramsText = jsonDumps(params);
+                        pushAll(this.currentFunctionCallCurrentPartTokens, this.llamaChat.model.tokenize(paramsText));
+                    } else {
+                        params = undefined;
+                        paramsText = "";
+                    }
                 } else {
                     const functionParamsGenerationDoneDetector = new StopGenerationDetector();
 
