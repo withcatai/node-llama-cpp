@@ -133,7 +133,7 @@ describe("MistralChatWrapper", () => {
               "type": "specialTokensText",
               "value": "[TOOL_RESULTS]",
             },
-            "[{"name": "getTime", "content": "22:00:00"}]",
+            "{"name": "getTime", "content": "22:00:00"}",
             {
               "type": "specialTokensText",
               "value": "[/TOOL_RESULTS]",

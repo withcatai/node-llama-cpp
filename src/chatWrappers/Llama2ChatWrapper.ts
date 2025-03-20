@@ -115,10 +115,10 @@ export class Llama2ChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             {addSpaceBeforeEos: false},
             {addSpaceBeforeEos: true}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+        ];
     }
 }

@@ -154,10 +154,10 @@ export class FalconChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             {},
             {allowSpecialTokensInTitles: true}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+        ];
     }
 }

@@ -348,14 +348,14 @@ export class DeepSeekChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
-            {},
-            {keepOnlyLastThought: true},
-            {functionCallingSyntax: "simplified"},
-            {functionCallingSyntax: "simplified", keepOnlyLastThought: true},
-            {functionCallingSyntax: "original"},
-            {functionCallingSyntax: "original", keepOnlyLastThought: true}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+            [undefined, {}, {functionCallMessageTemplate: "noJinja"}],
+            [undefined, {keepOnlyLastThought: true}, {functionCallMessageTemplate: "noJinja"}],
+            [undefined, {functionCallingSyntax: "simplified"}, {functionCallMessageTemplate: "noJinja"}],
+            [undefined, {functionCallingSyntax: "simplified", keepOnlyLastThought: true}, {functionCallMessageTemplate: "noJinja"}],
+            [undefined, {functionCallingSyntax: "original"}, {functionCallMessageTemplate: "noJinja"}],
+            [undefined, {functionCallingSyntax: "original", keepOnlyLastThought: true}, {functionCallMessageTemplate: "noJinja"}]
+        ];
     }
 }

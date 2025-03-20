@@ -8,6 +8,7 @@ import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/Cha
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {defaultChatSystemPrompt} from "./config.js";
 import {getChatWrapperSegmentDefinition} from "./utils/getChatWrapperSegmentDefinition.js";
+import type {JinjaTemplateChatWrapperOptions} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
 
 export abstract class ChatWrapper {
     public static defaultSettings: ChatWrapperSettings = {
@@ -17,13 +18,15 @@ export abstract class ChatWrapper {
                 optionalPrefixSpace: true,
                 prefix: "||call: ",
                 paramsPrefix: LlamaText(new SpecialTokensText("(")),
-                suffix: LlamaText(new SpecialTokensText(")"))
+                suffix: LlamaText(new SpecialTokensText(")")),
+                emptyCallParamsPlaceholder: ""
             },
             result: {
                 prefix: LlamaText(new SpecialTokensText("\n"), "||result: "),
                 suffix: LlamaText(new SpecialTokensText("\n"))
             }
-        }
+        },
+        segments: {}
     };
 
     public abstract readonly wrapperName: string;
@@ -102,13 +105,16 @@ export abstract class ChatWrapper {
     }
 
     public generateFunctionCall(name: string, params: any): LlamaText {
+        const emptyCallParamsPlaceholder = this.settings.functions.call.emptyCallParamsPlaceholder;
         return LlamaText([
             this.settings.functions.call.prefix,
             name,
             this.settings.functions.call.paramsPrefix,
             (
                 params === undefined
-                    ? ""
+                    ? (emptyCallParamsPlaceholder === undefined || emptyCallParamsPlaceholder === "")
+                        ? ""
+                        : jsonDumps(emptyCallParamsPlaceholder)
                     : jsonDumps(params)
             ),
             this.settings.functions.call.suffix
@@ -139,7 +145,7 @@ export abstract class ChatWrapper {
         ]);
     }
 
-    public generateModelResponseText(modelResponse: ChatModelResponse["response"], useRawCall: boolean = true): LlamaText {
+    public generateModelResponseText(modelResponse: ChatModelResponse["response"], useRawValues: boolean = true): LlamaText {
         const res: LlamaText[] = [];
         const pendingFunctionCalls: ChatModelFunctionCall[] = [];
         const segmentStack: ChatModelSegmentType[] = [];
@@ -150,7 +156,7 @@ export abstract class ChatWrapper {
             if (pendingFunctionCalls.length === 0)
                 return;
 
-            res.push(this.generateFunctionCallsAndResults(pendingFunctionCalls, useRawCall));
+            res.push(this.generateFunctionCallsAndResults(pendingFunctionCalls, useRawValues));
             pendingFunctionCalls.length = 0;
             needsToAddSegmentReminder = true;
         };
@@ -180,11 +186,10 @@ export abstract class ChatWrapper {
             } else if (isChatModelResponseSegment(response)) {
                 addFunctionCalls();
 
-                if (response.raw != null && useRawCall)
+                const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, response.segmentType);
+                if (response.raw != null && useRawValues)
                     res.push(LlamaText.fromJSON(response.raw));
-                else {
-                    const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, response.segmentType);
-
+                else
                     res.push(
                         LlamaText([
                             (segmentStack.length > 0 && segmentStack.at(-1) === response.segmentType)
@@ -197,12 +202,15 @@ export abstract class ChatWrapper {
                         ])
                     );
 
-                    lastSegmentEndedWithoutSuffix = response.ended && segmentDefinition?.suffix == null;
+                lastSegmentEndedWithoutSuffix = response.ended && segmentDefinition?.suffix == null;
 
-                    if (!response.ended)
-                        segmentStack.push(response.segmentType);
-                    else if (segmentStack.at(-1) === response.segmentType)
-                        segmentStack.pop();
+                if (!response.ended && segmentStack.at(-1) !== response.segmentType)
+                    segmentStack.push(response.segmentType);
+                else if (response.ended && segmentStack.at(-1) === response.segmentType) {
+                    segmentStack.pop();
+
+                    if (segmentStack.length === 0 && segmentDefinition?.suffix == null && this.settings.segments?.closeAllSegments != null)
+                        res.push(LlamaText(this.settings.segments.closeAllSegments));
                 }
 
                 continue;
@@ -277,9 +285,7 @@ export abstract class ChatWrapper {
     }
 
     /** @internal */
-    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): (
-        Array<Record<string | symbol, any> | [testConfig: Record<string | symbol, any>, applyConfig: Record<string | symbol, any>]>
-    ) {
+    public static _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [{}] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
     }
 
@@ -295,11 +301,7 @@ export type ChatWrapperJinjaMatchConfiguration<T extends typeof ChatWrapper> = A
     FirstItemOfTupleOrFallback<ConstructorParameters<T>, object> |
     [
         testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
-        applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>
-    ] |
-    [
-        testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
         applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
-        testJinjaParameters: Record<string, any>
+        testJinjaChatWrapperOptions?: JinjaTemplateChatWrapperOptions
     ]
 >;
