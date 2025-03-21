@@ -443,6 +443,8 @@ jobs:
         run: npm run dev:setup:downloadAllTestModels
 
       - name: Run model dependent tests
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: npm run test:modelDependent
 
   release:

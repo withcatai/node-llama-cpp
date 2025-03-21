@@ -13,7 +13,9 @@ describe("functionary", () => {
                 modelPath,
                 checkTensors: true
             });
-            const context = await model.createContext();
+            const context = await model.createContext({
+                contextSize: 2048
+            });
             const chatSession = new LlamaChatSession({
                 contextSequence: context.getSequence()
             });
