@@ -389,7 +389,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: ubuntu-24.04-arm
+    runs-on: macos-13
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
