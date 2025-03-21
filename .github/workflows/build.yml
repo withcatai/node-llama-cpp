@@ -433,19 +433,28 @@ jobs:
         run: node ./dist/cli/cli.js inspect gpu
 
       - name: Cache models
-        id: cache-test-models
-        uses: actions/cache@v4
+        id: cache-restore-test-models
+        uses: actions/cache/restore@v4
         with:
           path: "test/.models/**.gguf"
           key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
 
       - name: Download models or ensure all models are downloaded
+        id: download-all-test-models
         run: npm run dev:setup:downloadAllTestModels
 
       - name: Run model dependent tests
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: npm run test:modelDependent
+
+      - name: Save cached models
+        id: cache-save-test-models
+        if: steps.download-all-test-models.outcome == 'success' && always()
+        uses: actions/cache/save@v4
+        with:
+          path: "test/.models/**.gguf"
+          key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
 
   release:
     name: Release
