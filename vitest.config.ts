@@ -7,9 +7,10 @@ export default defineConfig({
         minWorkers: 1,
         maxConcurrency: 1,
         poolOptions: {
-            threads: {
-                minThreads: 1,
-                maxThreads: 1
+            forks: {
+                minForks: 1,
+                maxForks: 1,
+                singleFork: true
             }
         },
         snapshotSerializers: [
