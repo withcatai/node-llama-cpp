@@ -13,7 +13,7 @@ afterAll(async () => {
         llamaPromise = null;
         await (await temp).dispose();
     }
-});
+}, 1000 * 60 * 10);
 
 export async function getTestLlama() {
     if (llamaPromise != null)
