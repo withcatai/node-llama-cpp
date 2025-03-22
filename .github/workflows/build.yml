@@ -188,7 +188,7 @@ jobs:
           
           const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
           
-          const nodeVersion = latestNodeVersions.get(18);
+          const nodeVersion = latestNodeVersions.get(20);
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
           
           if (nodeVersion == null || windowsOnArmNodeVersion == null) {
