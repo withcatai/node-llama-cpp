@@ -104,64 +104,40 @@ describe("TemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "SYS: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("SYS: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!",
-          ]
+          ])
         `);
 
         const {contextText: contextText2} = chatWrapper.generateContextState({chatHistory: conversationHistory2});
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "SYS: ",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("SYS: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model: ",
-            },
+            new SpecialTokensText("
+          model: "),
             "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "I'm good, how are you?",
-          ]
+          ])
         `);
 
         const {contextText: contextText3} = chatWrapper.generateContextState({chatHistory: conversationHistory});
@@ -175,82 +151,52 @@ describe("TemplateChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "SYS: ",
-            },
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("SYS: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "SYS: ",
-            },
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("SYS: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!
 
           ",
-          ]
+          ])
         `);
 
         const {contextText: contextText4} = chatWrapper.generateContextState({chatHistory: conversationHistory3});
 
-        expect(contextText4.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "SYS: 
-          user: ",
-            },
+        expect(contextText4).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("SYS: 
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model: ",
-            },
+            new SpecialTokensText("
+          model: "),
             "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": "
-          ",
-            },
-          ]
+            new SpecialTokensText("
+          "),
+          ])
         `);
     });
 
@@ -265,27 +211,18 @@ describe("TemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "BEGIN system: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("BEGIN system: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -300,27 +237,18 @@ describe("TemplateChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "system: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("system: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -338,12 +266,9 @@ describe("TemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "system: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("system: "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -361,34 +286,22 @@ describe("TemplateChatWrapper", () => {
 
           Calling any of the provided functions can be done like this:
           ||call: getSomeInfo",
-            {
-              "type": "specialTokensText",
-              "value": "(",
-            },
+            new SpecialTokensText("("),
             "{"someKey": "someValue"}",
-            {
-              "type": "specialTokensText",
-              "value": ")",
-            },
+            new SpecialTokensText(")"),
             "
 
           Note that the || prefix is mandatory.
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
           After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model:",
-            },
+            new SpecialTokensText("
+          model:"),
             "Hello!",
-          ]
+          ])
         `);
     });
 
@@ -410,12 +323,9 @@ describe("TemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "system: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("system: "),
             "The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.
           To fulfill a request, the assistant calls relevant functions in advance when needed before responding to the request, and does not tell the user prior to calling a function.
           Provided functions:
@@ -435,30 +345,18 @@ describe("TemplateChatWrapper", () => {
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
           After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model: ",
-            },
+            new SpecialTokensText("
+          model: "),
             "Hello![[call: func2({"message": "Hello", "feeling": "good", "words": 1})]] [[result: {"yes": true, "message": "ok"}]]",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": "
-          ",
-            },
-          ]
+            new SpecialTokensText("
+          "),
+          ])
         `);
     });
 
@@ -480,12 +378,9 @@ describe("TemplateChatWrapper", () => {
             availableFunctions: exampleFunctions
         });
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialTokensText",
-              "value": "system: ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialTokensText("system: "),
             "The assistant calls the provided functions as needed to retrieve information instead of relying on existing knowledge.
           To fulfill a request, the assistant calls relevant functions in advance when needed before responding to the request, and does not tell the user prior to calling a function.
           Provided functions:
@@ -506,33 +401,21 @@ describe("TemplateChatWrapper", () => {
           The assistant does not inform the user about using functions and does not explain anything before calling a function.
           After calling a function, the raw result appears afterwards and is not part of the conversation.
           To make information be part of the conversation, the assistant paraphrases and repeats the information without the function syntax.",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "
-          model: ",
-            },
+            new SpecialTokensText("
+          model: "),
             "Hello!
           Call function: func2 with params {"message": "Hello", "feeling": "good", "words": 1}.
           Function result: {"yes": true, "message": "ok"}
           ",
-            {
-              "type": "specialTokensText",
-              "value": "
-          user: ",
-            },
+            new SpecialTokensText("
+          user: "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": "
-          ",
-            },
-          ]
+            new SpecialTokensText("
+          "),
+          ])
         `);
     });
 });

@@ -204,7 +204,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                         : LlamaText([
                                             new SpecialTokensText(">>>all\n"),
                                             response,
-                                            (isLastItem && isLastResponse)
+                                            (!isLastResponse || isLastItem)
                                                 ? LlamaText([])
                                                 : new SpecialToken("EOT")
                                         ])
@@ -726,12 +726,12 @@ export class FunctionaryChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             {variation: "v3"},
             {variation: "v2.llama3"},
             {variation: "v2"}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+        ];
     }
 }
 

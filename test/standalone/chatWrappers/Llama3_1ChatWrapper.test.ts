@@ -59,18 +59,12 @@ describe("Llama3_1ChatWrapper", () => {
         const chatWrapper = new Llama3_1ChatWrapper({todayDate});
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-          ",
-            },
+          "),
             "Cutting Knowledge Date: December 2023
           Today Date: 26 Jul 2024
 
@@ -81,29 +75,17 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hello!",
-          ]
+          ])
         `);
 
         const chatWrapper2 = new Llama3_1ChatWrapper({todayDate});
@@ -112,18 +94,12 @@ describe("Llama3_1ChatWrapper", () => {
             availableFunctions: conversationHistory2Functions
         });
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-          ",
-            },
+          "),
             "Cutting Knowledge Date: December 2023
           Today Date: 26 Jul 2024
 
@@ -148,20 +124,11 @@ describe("Llama3_1ChatWrapper", () => {
 
           Here is an example,
           ",
-            {
-              "type": "specialTokensText",
-              "value": "<function=",
-            },
+            new SpecialTokensText("<function="),
             "example_function_name",
-            {
-              "type": "specialTokensText",
-              "value": ">",
-            },
+            new SpecialTokensText(">"),
             "{"example_name": "example_value"}",
-            {
-              "type": "specialTokensText",
-              "value": "</function>",
-            },
+            new SpecialTokensText("</function>"),
             "
 
           Reminder:
@@ -176,75 +143,39 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hello!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-          ",
-            },
+          "),
             "What is the time?",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          <function=",
-            },
+          <function="),
             "getTime",
-            {
-              "type": "specialTokensText",
-              "value": ">",
-            },
+            new SpecialTokensText(">"),
             "{"hours": "24", "seconds": true}",
-            {
-              "type": "specialTokensText",
-              "value": "</function><|eom_id|>
+            new SpecialTokensText("</function><|eom_id|>
           <|start_header_id|>ipython<|end_header_id|>
 
-          ",
-            },
+          "),
             ""22:00:00"",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          ",
-            },
+          "),
             "I'm good, how are you?",
-          ]
+          ])
         `);
 
         const chatWrapper3 = new Llama3_1ChatWrapper({todayDate});
@@ -259,18 +190,12 @@ describe("Llama3_1ChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-          ",
-            },
+          "),
             "Cutting Knowledge Date: December 2023
           Today Date: 26 Jul 2024
 
@@ -281,43 +206,25 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>system<|end_header_id|>
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-          ",
-            },
+          "),
             "Cutting Knowledge Date: December 2023
           Today Date: 26 Jul 2024
 
@@ -328,31 +235,19 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>user<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hi there!",
-            {
-              "type": "specialToken",
-              "value": "EOT",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<|start_header_id|>assistant<|end_header_id|>
+            new SpecialToken("EOT"),
+            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-          ",
-            },
+          "),
             "Hello!
 
           ",
-          ]
+          ])
         `);
     });
 });

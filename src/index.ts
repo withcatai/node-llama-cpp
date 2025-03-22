@@ -47,6 +47,7 @@ import {InsufficientMemoryError} from "./utils/InsufficientMemoryError.js";
 import {ChatWrapper} from "./ChatWrapper.js";
 import {EmptyChatWrapper} from "./chatWrappers/EmptyChatWrapper.js";
 import {DeepSeekChatWrapper} from "./chatWrappers/DeepSeekChatWrapper.js";
+import {QwenChatWrapper} from "./chatWrappers/QwenChatWrapper.js";
 import {Llama3_2LightweightChatWrapper} from "./chatWrappers/Llama3_2LightweightChatWrapper.js";
 import {Llama3_1ChatWrapper} from "./chatWrappers/Llama3_1ChatWrapper.js";
 import {Llama3ChatWrapper} from "./chatWrappers/Llama3ChatWrapper.js";
@@ -203,6 +204,7 @@ export {
     type ChatWrapperGenerateInitialHistoryOptions,
     EmptyChatWrapper,
     DeepSeekChatWrapper,
+    QwenChatWrapper,
     Llama3_2LightweightChatWrapper,
     Llama3_1ChatWrapper,
     Llama3ChatWrapper,

@@ -19,7 +19,9 @@ console.log(chalk.yellow("Loading model..."));
 const model = await llama.loadModel({modelPath});
 
 console.log(chalk.yellow("Creating context..."));
-const context = await model.createContext();
+const context = await model.createContext({
+    contextSize: {max: 8096} // omit this for a longer context size, but increased memory usage
+});
 
 const session = new LlamaChatSession({
     contextSequence: context.getSequence()

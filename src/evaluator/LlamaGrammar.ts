@@ -94,7 +94,11 @@ export class LlamaGrammar {
             const grammar = await fs.readFile(grammarFile, "utf8");
             return new LlamaGrammar(llama, {
                 grammar,
-                stopGenerationTriggers: [LlamaText(["\n".repeat(10)])], // this is a workaround for the model not stopping to generate text,
+                stopGenerationTriggers: [LlamaText(["\n".repeat(
+                    (type === "json" || type === "json_arr")
+                        ? 4
+                        : 10
+                )])], // this is a workaround for the model not stopping to generate text,
                 trimWhitespaceSuffix: true
             });
         }

@@ -139,65 +139,35 @@ describe("FunctionaryChatWrapper", () => {
             const chatWrapper = new FunctionaryChatWrapper({variation: "v2.llama3"});
             const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-            expect(contextText.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+            expect(contextText).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hi there!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "How are you?",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "I'm good, how are you?",
-              ]
+              ])
             `);
 
             const chatWrapper2 = new FunctionaryChatWrapper({variation: "v2.llama3"});
@@ -206,18 +176,12 @@ describe("FunctionaryChatWrapper", () => {
                 availableFunctions: functions
             });
 
-            expect(contextText2.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+            expect(contextText2).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "// Supported function definitions that should be called when necessary.
               namespace functions {
 
@@ -244,134 +208,65 @@ describe("FunctionaryChatWrapper", () => {
               }) => any;
 
               } // namespace functions",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "The assistant calls functions with appropriate input when necessary. The assistant writes <|stop|> when finished answering.",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hi there!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Role a dice twice and tell me the total result",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|reserved_special_token_249|>",
-                },
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|reserved_special_token_249|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              ",
-                },
+                new SpecialTokensText("
+              "),
                 "{"min": 1, "max": 6}",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|reserved_special_token_249|>",
-                },
+                new SpecialTokensText("<|reserved_special_token_249|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              ",
-                },
+                new SpecialTokensText("
+              "),
                 "{"min": 1, "max": 6}",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>tool<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>tool<|end_header_id|>
 
-              name=",
-                },
+              name="),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              ",
-                },
+                new SpecialTokensText("
+              "),
                 "3",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>tool<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>tool<|end_header_id|>
 
-              name=",
-                },
+              name="),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              ",
-                },
+                new SpecialTokensText("
+              "),
                 "4",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "The total result of rolling the dice twice is 3 + 4 = 7.",
-              ]
+              ])
             `);
 
             const chatWrapper3 = new FunctionaryChatWrapper({variation: "v2.llama3"});
@@ -386,136 +281,70 @@ describe("FunctionaryChatWrapper", () => {
                 ]
             });
 
-            expect(contextText3.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+            expect(contextText3).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hi there!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "How are you?",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "I'm good, how are you?",
-              ]
+              ])
             `);
 
-            expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>system<|end_header_id|>
+            expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|start_header_id|>system<|end_header_id|>
 
-              ",
-                },
+              "),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hi there!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "Hello!",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>user<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
 
-              ",
-                },
+              "),
                 "How are you?",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
+              "),
                 "I'm good, how are you?",
-                {
-                  "type": "specialToken",
-                  "value": "EOT",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|start_header_id|>assistant<|end_header_id|>
+                new SpecialToken("EOT"),
+                new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
 
-              ",
-                },
-              ]
+              "),
+              ])
             `);
         });
     });
@@ -525,53 +354,35 @@ describe("FunctionaryChatWrapper", () => {
             const chatWrapper = new FunctionaryChatWrapper({variation: "v2"});
             const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-            expect(contextText.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|from|>system
+            expect(contextText).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
+                new SpecialTokensText("<|stop|>
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "How are you?",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "I'm good, how are you?",
-              ]
+              ])
             `);
 
             const chatWrapper2 = new FunctionaryChatWrapper({variation: "v2"});
@@ -580,18 +391,12 @@ describe("FunctionaryChatWrapper", () => {
                 availableFunctions: functions
             });
 
-            expect(contextText2.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|from|>system
+            expect(contextText2).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "// Supported function definitions that should be called when necessary.
               namespace functions {
 
@@ -618,108 +423,66 @@ describe("FunctionaryChatWrapper", () => {
               }) => any;
 
               } // namespace functions",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "The assistant calls functions with appropriate input when necessary. The assistant writes <|stop|> when finished answering.",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
+                new SpecialTokensText("<|stop|>
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Role a dice twice and tell me the total result",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
-              <|recipient|>",
-                },
+              <|recipient|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              <|content|>",
-                },
+                new SpecialTokensText("
+              <|content|>"),
                 "{"min": 1, "max": 6}",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
-              <|recipient|>",
-                },
+              <|recipient|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              <|content|>",
-                },
+                new SpecialTokensText("
+              <|content|>"),
                 "{"min": 1, "max": 6}",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
-              <|from|>",
-                },
+                new SpecialTokensText("<|stop|>
+              <|from|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "3",
-                {
-                  "type": "specialTokensText",
-                  "value": "
-              <|from|>",
-                },
+                new SpecialTokensText("
+              <|from|>"),
                 "getRandomNumber",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "4",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "The total result of rolling the dice twice is 3 + 4 = 7.",
-              ]
+              ])
             `);
 
             const chatWrapper3 = new FunctionaryChatWrapper({variation: "v2"});
@@ -734,109 +497,70 @@ describe("FunctionaryChatWrapper", () => {
                 ]
             });
 
-            expect(contextText3.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|from|>system
+            expect(contextText3).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
+                new SpecialTokensText("<|stop|>
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "How are you?",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "I'm good, how are you?",
-              ]
+              ])
             `);
 
-            expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-              [
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "<|from|>system
+            expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+              LlamaText([
+                new SpecialToken("BOS"),
+                new SpecialTokensText("<|from|>system
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "Hello!",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
+                new SpecialTokensText("<|stop|>
               <|from|>user
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "How are you?",
-                {
-                  "type": "specialTokensText",
-                  "value": "
+                new SpecialTokensText("
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
+              <|content|>"),
                 "I'm good, how are you?",
-                {
-                  "type": "specialTokensText",
-                  "value": "<|stop|>
+                new SpecialTokensText("<|stop|>
               <|from|>assistant
               <|recipient|>all
-              <|content|>",
-                },
-              ]
+              <|content|>"),
+              ])
             `);
         });
     });

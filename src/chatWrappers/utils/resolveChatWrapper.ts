@@ -17,14 +17,15 @@ import {MistralChatWrapper} from "../MistralChatWrapper.js";
 import {Tokenizer} from "../../types.js";
 import {includesText} from "../../utils/includesText.js";
 import {LlamaModel} from "../../evaluator/LlamaModel/LlamaModel.js";
+import {QwenChatWrapper} from "../QwenChatWrapper.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
-    "general", "deepSeek", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary", "chatML",
-    "falconChat", "gemma"
+    "general", "deepSeek", "qwen", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary",
+    "chatML", "falconChat", "gemma"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -43,6 +44,7 @@ export type ResolvableChatWrapperTypeName = (typeof resolvableChatWrapperTypeNam
 export const chatWrappers = Object.freeze({
     "general": GeneralChatWrapper,
     "deepSeek": DeepSeekChatWrapper,
+    "qwen": QwenChatWrapper,
     "llama3.1": Llama3_1ChatWrapper,
     "llama3.2-lightweight": Llama3_2LightweightChatWrapper,
     "llama3": Llama3ChatWrapper,
@@ -110,7 +112,9 @@ export type ResolveChatWrapperWithModelOptions = {
     type?: "auto" | SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName,
 
     customWrapperSettings?: {
-        [wrapper in keyof typeof chatWrappers]?: ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
+        [wrapper in keyof typeof chatWrappers]?: typeof JinjaTemplateChatWrapper extends (typeof chatWrappers)[wrapper]
+            ? Partial<ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]>
+            : ConstructorParameters<(typeof chatWrappers)[wrapper]>[0]
     },
 
     /**
@@ -182,6 +186,7 @@ export function resolveChatWrapper(
     if (options instanceof LlamaModel)
         return resolveChatWrapper({
             ...(modelOptions ?? {}),
+            customWrapperSettings: modelOptions?.customWrapperSettings as ResolveChatWrapperOptions["customWrapperSettings"],
             bosString: options.tokens.bosString,
             filename: options.filename,
             fileInfo: options.fileInfo,
@@ -236,6 +241,7 @@ export function resolveChatWrapper(
                 } else {
                     try {
                         return new JinjaTemplateChatWrapper({
+                            tokenizer,
                             ...(customWrapperSettings?.jinjaTemplate ?? {}),
                             template: jinjaTemplate
                         });
@@ -261,6 +267,7 @@ export function resolveChatWrapper(
 
     if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
         const jinjaTemplateChatWrapperOptions: JinjaTemplateChatWrapperOptions = {
+            tokenizer,
             ...(customWrapperSettings?.jinjaTemplate ?? {}),
             template: modelJinjaTemplate
         };
@@ -292,7 +299,7 @@ export function resolveChatWrapper(
                 const applyConfig = testConfigurationOrPair instanceof Array
                     ? (testConfigurationOrPair[1]! ?? {})
                     : testConfigurationOrPair;
-                const additionalJinjaParameters = testConfigurationOrPair instanceof Array
+                const additionalJinjaOptions = testConfigurationOrPair instanceof Array
                     ? testConfigurationOrPair[2]!
                     : undefined;
 
@@ -307,12 +314,13 @@ export function resolveChatWrapper(
                 const chatWrapper = new (Wrapper as any)(testChatWrapperSettings);
 
                 const jinjaTemplateChatWrapperOptionsWithAdditionalParameters: JinjaTemplateChatWrapperOptions = {
+                    ...(additionalJinjaOptions ?? {}),
                     ...jinjaTemplateChatWrapperOptions,
-                    additionalRenderParameters: additionalJinjaParameters == null
+                    additionalRenderParameters: additionalJinjaOptions?.additionalRenderParameters == null
                         ? jinjaTemplateChatWrapperOptions.additionalRenderParameters
                         : {
                             ...(jinjaTemplateChatWrapperOptions.additionalRenderParameters ?? {}),
-                            ...additionalJinjaParameters
+                            ...additionalJinjaOptions.additionalRenderParameters
                         }
                 };
 

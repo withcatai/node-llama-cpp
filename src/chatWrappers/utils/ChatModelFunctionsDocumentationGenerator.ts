@@ -184,4 +184,32 @@ export class ChatModelFunctionsDocumentationGenerator {
         return functionsLines;
     }
     /* eslint-enable @stylistic/max-len */
+
+    public getQwenFunctionSignatures({documentParams = true}: {documentParams?: boolean} = {}) {
+        return this._convertToJinjaTools({documentParams})
+            .map((tool) => jsonDumps(tool))
+            .join("\n");
+    }
+
+    /** @internal */
+    private _convertToJinjaTools({documentParams = true}: {documentParams?: boolean} = {}) {
+        const chatModelFunctions = this.chatModelFunctions;
+
+        if (!this.hasAnyFunctions || chatModelFunctions == null)
+            return [];
+
+        return [...Object.entries(chatModelFunctions)]
+            .map(([functionName, functionDefinition]) => {
+                return {
+                    type: "function",
+                    function: {
+                        name: functionName,
+                        description: functionDefinition.description,
+                        parameters: documentParams
+                            ? functionDefinition.params
+                            : undefined
+                    }
+                };
+            });
+    }
 }

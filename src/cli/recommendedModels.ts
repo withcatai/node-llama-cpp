@@ -76,6 +76,20 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q4_K_M"
     ]
 }, {
+    name: "QwQ 32B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "QwQ model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "Its performance is comparable to DeepSeek R1 671B.",
+
+    fileOptions: [
+        "hf:Qwen/QwQ-32B-GGUF:Q8_0",
+        "hf:Qwen/QwQ-32B-GGUF:Q6_K",
+        "hf:Qwen/QwQ-32B-GGUF:Q5_K_M",
+        "hf:Qwen/QwQ-32B-GGUF:Q4_K_M"
+    ]
+}, {
     name: "Llama 3.1 8B",
     abilities: ["chat", "complete", "functionCalling"],
     description: "Llama 3.1 model was created by Meta and is optimized for an assistant-like chat use cases, with support for function calling.\n" +

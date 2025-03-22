@@ -35,10 +35,10 @@ export class AlpacaChatWrapper extends GeneralChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             {},
             {allowSpecialTokensInTitles: true}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+        ];
     }
 }

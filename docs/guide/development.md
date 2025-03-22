@@ -79,6 +79,15 @@ lldb node -- ./node_modules/.bin/vite-node ./src/cli/cli.ts chat <path-to-a-mode
 After it finishes loading, type `run` (or `process launch` if `run` fails) and press Enter for the execution of `node` to start.
 When the process crashes, you'll get a stack trace in the terminal.
 
+#### Finding Process Crash Stack Trace for Native Code (Linux) {#native-crash-stack-trace-linux}
+To get the stack trace of a crash stemming in `llama.cpp` or the bindings, run `node` with `gdb`:
+```shell
+gdb --args node ./node_modules/.bin/vite-node ./src/cli/cli.ts chat <path-to-a-model-file-on-your-computer>
+```
+
+After it finishes loading, type `run` and press Enter for the execution of `node` to start.
+When the process crashes, type `bt full` and press Enter to see the stack trace.
+
 ### Updating the Documentation
 All the documentation is written in Markdown files in the `docs` directory.
 To see the changes you made to the documentation, run the following command:

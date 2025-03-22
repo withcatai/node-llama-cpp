@@ -583,7 +583,7 @@ Napi::Value AddonContext::DisposeSequence(const Napi::CallbackInfo& info) {
 
     int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
 
-    bool result = llama_kv_cache_seq_rm(ctx, sequenceId, -1, -1);
+    bool result = llama_kv_self_seq_rm(ctx, sequenceId, -1, -1);
 
     if (!result) {
         Napi::Error::New(info.Env(), "Failed to dispose sequence").ThrowAsJavaScriptException();
@@ -602,7 +602,7 @@ Napi::Value AddonContext::RemoveTokenCellsFromSequence(const Napi::CallbackInfo&
     int32_t startPos = info[1].As<Napi::Number>().Int32Value();
     int32_t endPos = info[2].As<Napi::Number>().Int32Value();
 
-    bool result = llama_kv_cache_seq_rm(ctx, sequenceId, startPos, endPos);
+    bool result = llama_kv_self_seq_rm(ctx, sequenceId, startPos, endPos);
 
     return Napi::Boolean::New(info.Env(), result);
 }
@@ -617,7 +617,7 @@ Napi::Value AddonContext::ShiftSequenceTokenCells(const Napi::CallbackInfo& info
     int32_t endPos = info[2].As<Napi::Number>().Int32Value();
     int32_t shiftDelta = info[3].As<Napi::Number>().Int32Value();
 
-    llama_kv_cache_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
+    llama_kv_self_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
 
     return info.Env().Undefined();
 }
@@ -639,6 +639,7 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     }
 
     int32_t inputTokensLength = info[0].As<Napi::Number>().Int32Value();
+    int32_t maxVectorSize = (info.Length() > 1 && info[1].IsNumber()) ? info[1].As<Napi::Number>().Int32Value() : 0;
 
     if (inputTokensLength <= 0) {
         Napi::Error::New(info.Env(), "Invalid input tokens length").ThrowAsJavaScriptException();
@@ -650,15 +651,16 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
         embeddings = llama_get_embeddings_ith(ctx, inputTokensLength - 1);
-
-        if (embeddings == NULL) {
-            Napi::Error::New(info.Env(), std::string("Failed to get embeddings for token ") + std::to_string(inputTokensLength - 1)).ThrowAsJavaScriptException();
-            return info.Env().Undefined();
-        }
     }
 
-    Napi::Float64Array result = Napi::Float64Array::New(info.Env(), n_embd);
-    for (size_t i = 0; i < n_embd; ++i) {
+    if (embeddings == NULL) {
+        Napi::Error::New(info.Env(), std::string("Failed to get embeddings for token ") + std::to_string(inputTokensLength - 1)).ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    size_t resultSize = maxVectorSize == 0 ? n_embd : std::min(n_embd, maxVectorSize);
+    Napi::Float64Array result = Napi::Float64Array::New(info.Env(), resultSize);
+    for (size_t i = 0; i < resultSize; i++) {
         result[i] = embeddings[i];
     }
 

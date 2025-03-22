@@ -143,7 +143,7 @@ export type AddonContext = {
     // startPos in inclusive, endPos is exclusive
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
-    getEmbedding(inputTokensLength: number): Float64Array,
+    getEmbedding(inputTokensLength: number, maxVectorSize?: number): Float64Array,
     getStateSize(): number,
     getThreads(): number,
     setThreads(threads: number): void,
