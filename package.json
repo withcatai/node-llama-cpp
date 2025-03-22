@@ -42,7 +42,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "prepare": "node -e \"process.env.CI !== 'true' && console.log(require('husky').default())\"",
+    "prepare": "node --experimental-require-module -e \"process.env.CI !== 'true' && console.log(require('husky').default())\"",
     "postinstall": "cd templates && npm install",
     "postversion": "vite-node scripts/postVersion.ts",
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
