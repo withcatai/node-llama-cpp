@@ -197,7 +197,7 @@ export class LlamaRankingContext {
                 break; // only generate one token to get embeddings
             }
 
-            const embedding = this._llamaContext._ctx.getEmbedding(input.length);
+            const embedding = this._llamaContext._ctx.getEmbedding(input.length, 1);
             if (embedding.length === 0)
                 return 0;
 
