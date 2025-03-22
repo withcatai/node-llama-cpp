@@ -127,7 +127,8 @@ export default tseslint.config({
             ]
         }],
         "@stylistic/no-trailing-spaces": ["off"],
-        "@stylistic/no-multi-spaces": ["warn"]
+        "@stylistic/no-multi-spaces": ["warn"],
+        "@stylistic/generator-star-spacing": ["off"]
     }
 }, {
     files: ["**/**.{,c,m}ts"],
