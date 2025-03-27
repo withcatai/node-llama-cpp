@@ -638,6 +638,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
         return LlamaLogLevel.log;
     else if (level === LlamaLogLevel.info && message.startsWith("load_backend: loaded "))
         return LlamaLogLevel.log;
+    else if (level === LlamaLogLevel.warn && message.startsWith("make_cpu_buft_list: disabling extra buffer types"))
+        return LlamaLogLevel.info;
 
     return level;
 }

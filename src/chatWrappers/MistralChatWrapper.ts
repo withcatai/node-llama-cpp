@@ -14,47 +14,57 @@ import {chunkChatItems} from "./utils/chunkChatItems.js";
 export class MistralChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Mistral";
 
-    public override readonly settings: ChatWrapperSettings = {
-        supportsSystemMessages: true,
-        functions: {
-            call: {
-                optionalPrefixSpace: true,
-                prefix: '{"name": "',
-                paramsPrefix: '", "arguments": ',
-                suffix: "}"
-            },
-            result: {
-                prefix: '{"name": "{{functionName}}", "content": ',
-                suffix: "}"
-            },
-            parallelism: {
-                call: {
-                    sectionPrefix: LlamaText(new SpecialTokensText("[TOOL_CALLS]"), "["),
-                    betweenCalls: ", ",
-                    sectionSuffix: LlamaText("]", new SpecialToken("EOS"))
-                },
-                result: {
-                    sectionPrefix: LlamaText(new SpecialTokensText("[TOOL_RESULTS]"), "["),
-                    betweenResults: ", ",
-                    sectionSuffix: LlamaText("]", new SpecialTokensText("[/TOOL_RESULTS]"))
-                }
-            }
-        }
-    };
+    public override readonly settings: ChatWrapperSettings;
 
     /** @internal */ private readonly _addSpaceBeforeEos: boolean;
+    /** @internal */ private readonly _stringifyFunctionCallResult: boolean;
 
-    public constructor({
-        addSpaceBeforeEos = false
-    }: {
+    public constructor(options: {
         /**
          * Default to `true`
          */
-        addSpaceBeforeEos?: boolean
+        addSpaceBeforeEos?: boolean,
+
+        /** @internal */
+        _noFunctionNameInResult?: boolean,
+
+        /** @internal */
+        _stringifyFunctionCallResult?: boolean
     } = {}) {
         super();
+        const {
+            addSpaceBeforeEos = false,
+            _noFunctionNameInResult = false,
+            _stringifyFunctionCallResult = false
+        } = options;
 
         this._addSpaceBeforeEos = addSpaceBeforeEos;
+        this._stringifyFunctionCallResult = _stringifyFunctionCallResult;
+        this.settings = {
+            supportsSystemMessages: true,
+            functions: {
+                call: {
+                    optionalPrefixSpace: true,
+                    prefix: '{"name": "',
+                    paramsPrefix: '", "arguments": ',
+                    suffix: "}",
+                    emptyCallParamsPlaceholder: {}
+                },
+                result: {
+                    prefix: _noFunctionNameInResult
+                        ? LlamaText(new SpecialTokensText("[TOOL_RESULTS]"), '{"content": ')
+                        : LlamaText(new SpecialTokensText("[TOOL_RESULTS]"), '{"name": "{{functionName}}", "content": '),
+                    suffix: LlamaText("}", new SpecialTokensText("[/TOOL_RESULTS]"))
+                },
+                parallelism: {
+                    call: {
+                        sectionPrefix: LlamaText(new SpecialTokensText("[TOOL_CALLS]"), "["),
+                        betweenCalls: ", ",
+                        sectionSuffix: LlamaText("]", new SpecialToken("EOS"))
+                    }
+                }
+            }
+        };
     }
 
     public override addAvailableFunctionsSystemMessageToHistory(history: readonly ChatHistoryItem[]) {
@@ -148,6 +158,13 @@ export class MistralChatWrapper extends ChatWrapper {
         }];
     }
 
+    public override generateFunctionCallResult(functionName: string, functionParams: any, result: any) {
+        if (this._stringifyFunctionCallResult && result !== undefined)
+            return super.generateFunctionCallResult(functionName, functionParams, jsonDumps(result));
+
+        return super.generateFunctionCallResult(functionName, functionParams, result);
+    }
+
     /** @internal */
     private _generateAvailableToolsText({
         availableFunctions,
@@ -215,10 +232,14 @@ export class MistralChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
-            {addSpaceBeforeEos: false},
-            {addSpaceBeforeEos: true}
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+            [{addSpaceBeforeEos: false, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true}, {addSpaceBeforeEos: false}],
+            [{addSpaceBeforeEos: true, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true}, {addSpaceBeforeEos: true}],
+            [{addSpaceBeforeEos: false, _noFunctionNameInResult: true}, {addSpaceBeforeEos: false}],
+            [{addSpaceBeforeEos: true, _noFunctionNameInResult: true}, {addSpaceBeforeEos: true}],
+            [{addSpaceBeforeEos: false}, {addSpaceBeforeEos: false}],
+            [{addSpaceBeforeEos: true}, {addSpaceBeforeEos: true}]
+        ];
     }
 }

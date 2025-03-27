@@ -26,7 +26,16 @@ export type ChatWrapperSettings = {
             readonly optionalPrefixSpace: boolean,
             readonly prefix: string | LlamaText,
             readonly paramsPrefix: string | LlamaText,
-            readonly suffix: string | LlamaText
+            readonly suffix: string | LlamaText,
+
+            /**
+             * The value to use when the function has no arguments.
+             *
+             * Will be stringified using `jsonDumps`.
+             *
+             * Defaults to `""`.
+             */
+            readonly emptyCallParamsPlaceholder?: object | string | number | boolean | null
         },
 
         readonly result: {

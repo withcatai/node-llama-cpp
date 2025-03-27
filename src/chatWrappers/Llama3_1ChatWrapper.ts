@@ -341,15 +341,19 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
     }
 
     /** @internal */
-    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate() {
+    public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
-            {},
-            [{todayDate: null}, {}],
-            [{cuttingKnowledgeDate: null}, {}],
-            [{noToolInstructions: true}, {}],
-            [{todayDate: null, cuttingKnowledgeDate: null}, {}],
-            [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
-            [{todayDate: new Date("2024-07-26T00:00:00"), cuttingKnowledgeDate: null, noToolInstructions: true}, {}],
+            [{}, undefined, {functionCallMessageTemplate: "noJinja"}],
+            [{todayDate: null}, {}, {functionCallMessageTemplate: "noJinja"}],
+            [{cuttingKnowledgeDate: null}, {}, {functionCallMessageTemplate: "noJinja"}],
+            [{noToolInstructions: true}, {}, {functionCallMessageTemplate: "noJinja"}],
+            [{todayDate: null, cuttingKnowledgeDate: null}, {}, {functionCallMessageTemplate: "noJinja"}],
+            [{todayDate: null, cuttingKnowledgeDate: null, noToolInstructions: true}, {}, {functionCallMessageTemplate: "noJinja"}],
+            [
+                {todayDate: new Date("2024-07-26T00:00:00"), cuttingKnowledgeDate: null, noToolInstructions: true},
+                {},
+                {functionCallMessageTemplate: "noJinja"}
+            ],
 
             [
                 {
@@ -358,7 +362,10 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                     noToolInstructions: true
                 },
                 {cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z")},
-                {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)}
+                {
+                    additionalRenderParameters: {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)},
+                    functionCallMessageTemplate: "noJinja"
+                }
             ],
 
             [
@@ -369,9 +376,12 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                     _specialTokensTextForPreamble: true
                 },
                 {cuttingKnowledgeDate: new Date("2023-12-01T00:00:00Z")},
-                {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)}
+                {
+                    additionalRenderParameters: {"date_string": formatDate(new Date("2024-07-26T00:00:00"), undefined)},
+                    functionCallMessageTemplate: "noJinja"
+                }
             ]
-        ] satisfies ChatWrapperJinjaMatchConfiguration<typeof this>;
+        ];
     }
 }
 

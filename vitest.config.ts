@@ -7,12 +7,17 @@ export default defineConfig({
         minWorkers: 1,
         maxConcurrency: 1,
         poolOptions: {
-            threads: {
-                minThreads: 1,
-                maxThreads: 1
+            forks: {
+                minForks: 1,
+                maxForks: 1,
+                singleFork: true
             }
         },
-        snapshotSerializers: ["./test/utils/helpers/llamaTextSerializer.ts"],
+        snapshotSerializers: [
+            "./test/utils/helpers/llamaTextSerializer.ts",
+            "./test/utils/helpers/SpecialTokensTextSerializer.ts",
+            "./test/utils/helpers/SpecialTokenSerializer.ts"
+        ],
         setupFiles: ["./test/utils/helpers/testSetup.ts"]
     }
 });

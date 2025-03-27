@@ -188,7 +188,7 @@ jobs:
           
           const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
           
-          const nodeVersion = latestNodeVersions.get(18);
+          const nodeVersion = latestNodeVersions.get(20);
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
           
           if (nodeVersion == null || windowsOnArmNodeVersion == null) {
@@ -389,7 +389,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: ubuntu-24.04
+    runs-on: macos-13
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
@@ -412,10 +412,16 @@ jobs:
           name: llama.cpp
           path: llama
 
-      - name: Install dependencies on Ubuntu
+#      - name: Install dependencies on Ubuntu
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install ninja-build cmake
+
+      - name: Install dependencies on macOS
+        if: matrix.config.name == 'macOS'
         run: |
-          sudo apt-get update
-          sudo apt-get install ninja-build cmake
+          brew install cmake ninja
+          alias make=cmake
 
       - name: Install modules
         run: npm ci
@@ -427,17 +433,28 @@ jobs:
         run: node ./dist/cli/cli.js inspect gpu
 
       - name: Cache models
-        id: cache-test-models
-        uses: actions/cache@v4
+        id: cache-restore-test-models
+        uses: actions/cache/restore@v4
         with:
           path: "test/.models/**.gguf"
           key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
 
       - name: Download models or ensure all models are downloaded
+        id: download-all-test-models
         run: npm run dev:setup:downloadAllTestModels
 
       - name: Run model dependent tests
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: npm run test:modelDependent
+
+      - name: Save cached models
+        id: cache-save-test-models
+        if: steps.download-all-test-models.outcome == 'success' && always()
+        uses: actions/cache/save@v4
+        with:
+          path: "test/.models/**.gguf"
+          key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
 
   release:
     name: Release

@@ -22,8 +22,8 @@
     "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.1.1",
-    "birpc": "^2.0.19",
+    "@fontsource-variable/inter": "^5.2.5",
+    "birpc": "^2.2.0",
     "classnames": "^2.5.1",
     "highlight.js": "^11.11.1",
     "lifecycle-utils": "^2.0.0",
@@ -32,30 +32,30 @@
     "pretty-ms": "^9.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "semver": "^7.7.0"
+    "semver": "^7.7.1"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "^3.0.1",
+    "@stylistic/eslint-plugin": "^4.2.0",
     "@types/markdown-it": "^14.1.2",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
     "@types/semver": "^7.5.8",
     "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^34.0.2",
+    "electron": "^35.0.3",
     "electron-builder": "^25.1.8",
-    "eslint": "^9.19.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint": "^9.23.0",
+    "eslint-import-resolver-typescript": "^4.2.2",
     "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-jsdoc": "^50.6.3",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.18",
+    "eslint-plugin-jsdoc": "^50.6.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
     "rimraf": "^6.0.1",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "^8.22.0",
-    "vite": "^6.0.11",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.27.0",
+    "vite": "^6.2.2",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "zx": "^8.3.1"
+    "zx": "^8.4.1"
   },
   "overrides": {
     "electron-builder": {

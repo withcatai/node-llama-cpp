@@ -61,10 +61,11 @@ export function parseFunctionCallMessageTemplate(
 }
 
 /**
- * Template format for how functions can be called by the model and how their results are fed to the model after the function call.
- * Consists of an array with two elements:
- * 1. The function call template.
- * 2. The function call result template.
+ * Template format for how functions can be called by the model and how their results are fed to the model after function calls.
+ *
+ * Consists of an object with two properties:
+ * 1. **`call`**: The function call template.
+ * 2. **`result`**: The function call result template.
  *
  * For example:
  * ```ts

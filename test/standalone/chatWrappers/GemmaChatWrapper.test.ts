@@ -35,74 +35,50 @@ describe("GemmaChatWrapper", () => {
         const chatWrapper = new GemmaChatWrapper();
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<start_of_turn>user
-          ",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<start_of_turn>user
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           ---
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>model
-          ",
-            },
+          "),
             "Hello!",
-          ]
+          ])
         `);
 
         const {contextText: contextText2} = chatWrapper.generateContextState({chatHistory: conversationHistory2});
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<start_of_turn>user
-          ",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<start_of_turn>user
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           ---
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>model
-          ",
-            },
+          "),
             "Hello!",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>user
-          ",
-            },
+          "),
             "How are you?",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>model
-          ",
-            },
+          "),
             "I'm good, how are you?",
-          ]
+          ])
         `);
 
         const {contextText: contextText3} = chatWrapper.generateContextState({chatHistory: conversationHistory});
@@ -116,60 +92,42 @@ describe("GemmaChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<start_of_turn>user
-          ",
-            },
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<start_of_turn>user
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           ---
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>model
-          ",
-            },
+          "),
             "Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
-            {
-              "type": "specialTokensText",
-              "value": "<start_of_turn>user
-          ",
-            },
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
+            new SpecialTokensText("<start_of_turn>user
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
           ---
 
           Hi there!",
-            {
-              "type": "specialTokensText",
-              "value": "<end_of_turn>
+            new SpecialTokensText("<end_of_turn>
           <start_of_turn>model
-          ",
-            },
+          "),
             "Hello!
 
           ",
-          ]
+          ])
         `);
     });
 });

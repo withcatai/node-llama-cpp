@@ -35,12 +35,9 @@ describe("GeneralChatWrapper", () => {
         const chatWrapper = new GeneralChatWrapper();
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -49,18 +46,15 @@ describe("GeneralChatWrapper", () => {
 
           ### Assistant
           Hello!",
-          ]
+          ])
         `);
 
         const chatWrapper2 = new GeneralChatWrapper();
         const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -75,7 +69,7 @@ describe("GeneralChatWrapper", () => {
 
           ### Assistant
           I'm good, how are you?",
-          ]
+          ])
         `);
 
         const chatWrapper3 = new GeneralChatWrapper();
@@ -90,12 +84,9 @@ describe("GeneralChatWrapper", () => {
             ]
         });
 
-        expect(contextText3.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText3).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -104,15 +95,12 @@ describe("GeneralChatWrapper", () => {
 
           ### Assistant
           Hello!",
-          ]
+          ])
         `);
 
-        expect(contextText3WithOpenModelResponse.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText3WithOpenModelResponse).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -124,7 +112,7 @@ describe("GeneralChatWrapper", () => {
 
           ### Assistant
           ",
-          ]
+          ])
         `);
     });
 
@@ -135,12 +123,9 @@ describe("GeneralChatWrapper", () => {
         });
         const {contextText} = chatWrapper.generateContextState({chatHistory: conversationHistory});
 
-        expect(contextText.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -149,7 +134,7 @@ describe("GeneralChatWrapper", () => {
 
           ### Response
           Hello!",
-          ]
+          ])
         `);
 
         const chatWrapper2 = new GeneralChatWrapper({
@@ -158,12 +143,9 @@ describe("GeneralChatWrapper", () => {
         });
         const {contextText: contextText2} = chatWrapper2.generateContextState({chatHistory: conversationHistory2});
 
-        expect(contextText2.values).toMatchInlineSnapshot(`
-          [
-            {
-              "type": "specialToken",
-              "value": "BOS",
-            },
+        expect(contextText2).toMatchInlineSnapshot(`
+          LlamaText([
+            new SpecialToken("BOS"),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.
 
@@ -178,7 +160,7 @@ describe("GeneralChatWrapper", () => {
 
           ### Response
           I'm good, how are you?",
-          ]
+          ])
         `);
     });
 });

@@ -26,14 +26,14 @@ describe("utils", () => {
             expect(isLlamaText(text4)).to.eql(true);
 
             expect(text1).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi there!",
-              ]
+              ])
             `);
             expect(text2).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi there!",
-              ]
+              ])
             `);
 
             expect(text1.toJSON()).toMatchInlineSnapshot('"Hi there!"');
@@ -49,17 +49,11 @@ describe("utils", () => {
                 new SpecialToken("EOS")
             ]);
             expect(text).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-              ]
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
+              ])
             `);
         });
 
@@ -68,16 +62,10 @@ describe("utils", () => {
                 ""
             ]);
             expect(text.values.length).to.eql(0);
-            expect(text).toMatchInlineSnapshot(`
-              LlamaText []
-            `);
+            expect(text).toMatchInlineSnapshot("LlamaText([])");
             expect(text.toJSON()).toMatchInlineSnapshot('""');
-            expect(LlamaText.fromJSON("")).toMatchInlineSnapshot(`
-              LlamaText []
-            `);
-            expect(LlamaText.fromJSON([""])).toMatchInlineSnapshot(`
-              LlamaText []
-            `);
+            expect(LlamaText.fromJSON("")).toMatchInlineSnapshot("LlamaText([])");
+            expect(LlamaText.fromJSON([""])).toMatchInlineSnapshot("LlamaText([])");
         });
 
         test("sub texts flattening", async () => {
@@ -93,18 +81,12 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text1).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 "there!",
-              ]
+              ])
             `);
 
             const text2 = LlamaText([
@@ -119,14 +101,11 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text2).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text text2",
-                },
+                new SpecialTokensText("Special text text2"),
                 "there!",
-              ]
+              ])
             `);
 
             const text3 = LlamaText([
@@ -140,14 +119,11 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text3).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi Hello ",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
+                new SpecialTokensText("Special text"),
                 "there! there!",
-              ]
+              ])
             `);
 
             const text4 = LlamaText([
@@ -163,14 +139,11 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text4).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hi Hello ",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
+                new SpecialTokensText("Special text"),
                 "there! there!",
-              ]
+              ])
             `);
 
             const text5 = LlamaText([
@@ -185,14 +158,11 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text5).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello ",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
+                new SpecialTokensText("Special text"),
                 "there! there!",
-              ]
+              ])
             `);
 
             const text6 = LlamaText([
@@ -206,13 +176,10 @@ describe("utils", () => {
                 "there!"
             ]);
             expect(text6).toMatchInlineSnapshot(`
-              LlamaText [
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
+              LlamaText([
+                new SpecialTokensText("Special text"),
                 "there! there!",
-              ]
+              ])
             `);
         });
 
@@ -314,27 +281,15 @@ describe("utils", () => {
 
             const text3 = text1.concat(text2);
             expect(text3).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " HiHello1 there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special1 text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
+                new SpecialTokensText("Special1 text"),
+                new SpecialToken("BOS"),
                 " Hi1",
-              ]
+              ])
             `);
         });
 
@@ -353,18 +308,12 @@ describe("utils", () => {
                 return value;
             });
             expect(text2).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!6",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi6",
-              ]
+              ])
             `);
         });
 
@@ -377,65 +326,35 @@ describe("utils", () => {
             ]);
 
             expect(text1.joinValues("||")).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!||",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
+                new SpecialTokensText("Special text"),
                 "||",
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialToken("EOS"),
                 "|| Hi",
-              ]
+              ])
             `);
 
             expect(text1.joinValues(new SpecialTokensText("||"))).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "||Special text||",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "||",
-                },
+                new SpecialTokensText("||Special text||"),
+                new SpecialToken("EOS"),
+                new SpecialTokensText("||"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(text1.joinValues(new SpecialToken("BOS"))).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "BOS",
-                },
+                new SpecialToken("BOS"),
+                new SpecialTokensText("Special text"),
+                new SpecialToken("BOS"),
+                new SpecialToken("EOS"),
+                new SpecialToken("BOS"),
                 " Hi",
-              ]
+              ])
             `);
         });
 
@@ -448,18 +367,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -470,18 +383,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -493,18 +400,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -516,18 +417,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -539,18 +434,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -562,18 +451,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -586,18 +469,12 @@ describe("utils", () => {
                     " Hi"
                 ]).trimStart()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
         });
 
@@ -610,18 +487,12 @@ describe("utils", () => {
                     " Hi   "
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -632,18 +503,12 @@ describe("utils", () => {
                     " Hi\n"
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -655,18 +520,12 @@ describe("utils", () => {
                     " "
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -678,18 +537,12 @@ describe("utils", () => {
                     " "
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -701,18 +554,12 @@ describe("utils", () => {
                     "\n"
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -724,18 +571,12 @@ describe("utils", () => {
                     " "
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
 
             expect(
@@ -748,18 +589,12 @@ describe("utils", () => {
                     new SpecialTokensText(" ")
                 ]).trimEnd()
             ).toMatchInlineSnapshot(`
-              LlamaText [
+              LlamaText([
                 "Hello there!",
-                {
-                  "type": "specialTokensText",
-                  "value": "Special text",
-                },
-                {
-                  "type": "specialToken",
-                  "value": "EOS",
-                },
+                new SpecialTokensText("Special text"),
+                new SpecialToken("EOS"),
                 " Hi",
-              ]
+              ])
             `);
         });
 
