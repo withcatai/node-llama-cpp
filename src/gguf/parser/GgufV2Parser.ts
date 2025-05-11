@@ -7,7 +7,7 @@ import {
 import {GgufMetadata} from "../types/GgufMetadataTypes.js";
 import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {convertMetadataKeyValueRecordToNestedObject} from "../utils/convertMetadataKeyValueRecordToNestedObject.js";
-import {promisableLoop, Promisable, transformPromisable, transformPromisables} from "../../utils/transformPromisable.js";
+import {promisableLoop, Promisable, transformPromisable, transformPromisablesInOrder} from "../../utils/transformPromisable.js";
 import {noDirectSubNestingGGufMetadataKeys} from "../consts.js";
 import {Writable} from "../../utils/utilTypes.js";
 
@@ -85,10 +85,10 @@ export class GgufV2Parser {
         }
 
         if (type === GgufValueType.Array) {
-            const arrayTypePromisable = this._fileReader.readUint32(readOffset);
-            const arrayLengthPromisable = this._fileReader.readUint64(readOffset);
-
-            return transformPromisables([arrayTypePromisable, arrayLengthPromisable], ([arrayType, arrayLength]) => {
+            return transformPromisablesInOrder([
+                () => this._fileReader.readUint32(readOffset),
+                () => this._fileReader.readUint64(readOffset)
+            ], ([arrayType, arrayLength]) => {
                 const arrayValues: MetadataValue[] = [];
                 let i = 0;
 
@@ -115,11 +115,14 @@ export class GgufV2Parser {
     protected async _readRawHeader(readOffset: GgufReadOffset) {
         const initialOffset = readOffset.offset;
 
-        const tensorCountPromisable = this._fileReader.readUint64(readOffset);
-        const metadataKVCountPromisable = transformPromisable(this._fileReader.readUint64(readOffset), Number);
+        const tensorCountAndMetadataKVCountPromisable = transformPromisablesInOrder([
+            () => this._fileReader.readUint64(readOffset),
+            () => transformPromisable(this._fileReader.readUint64(readOffset), Number)
+        ]);
 
-        const tensorCount = tensorCountPromisable instanceof Promise ? await tensorCountPromisable : tensorCountPromisable;
-        const metadataKVCount = metadataKVCountPromisable instanceof Promise ? await metadataKVCountPromisable : metadataKVCountPromisable;
+        const [tensorCount, metadataKVCount] = tensorCountAndMetadataKVCountPromisable instanceof Promise
+            ? await tensorCountAndMetadataKVCountPromisable
+            : tensorCountAndMetadataKVCountPromisable;
 
         const metadata: MetadataKeyValueRecord = {};
 
@@ -127,10 +130,10 @@ export class GgufV2Parser {
         return promisableLoop({
             condition: () => i < metadataKVCount,
             callback: () => {
-                const keyResultPromisable = this._readStringValue(readOffset);
-                const valueTypePromisable = this._fileReader.readUint32(readOffset);
-
-                return transformPromisables([keyResultPromisable, valueTypePromisable], ([keyResult, valueType]) => {
+                return transformPromisablesInOrder([
+                    () => this._readStringValue(readOffset),
+                    () => this._fileReader.readUint32(readOffset)
+                ], ([keyResult, valueType]) => {
                     return transformPromisable(this._readGgufValue(valueType, readOffset), (value) => {
                         metadata[keyResult] = value;
                     });
@@ -153,11 +156,12 @@ export class GgufV2Parser {
         return promisableLoop({
             condition: () => i < BigInt(tensorCount),
             callback: () => {
-                const namePromisable = this._readStringValue(readOffset);
-                const dimensionsNumberPromisable = this._fileReader.readUint32(readOffset);
                 const dimensions: (number | bigint)[] = [];
 
-                return transformPromisables([namePromisable, dimensionsNumberPromisable], ([name, dimensionsNumber]) => {
+                return transformPromisablesInOrder([
+                    () => this._readStringValue(readOffset),
+                    () => this._fileReader.readUint32(readOffset)
+                ], ([name, dimensionsNumber]) => {
                     let d = 0;
                     return promisableLoop({
                         condition: () => d < dimensionsNumber,
@@ -168,10 +172,10 @@ export class GgufV2Parser {
                         },
                         afterthought: () => void d++,
                         returnValue: () => {
-                            const ggmlTypePromisable = this._fileReader.readUint32(readOffset);
-                            const offsetPromisable = this._fileReader.readUint64(readOffset);
-
-                            return transformPromisables([ggmlTypePromisable, offsetPromisable], ([ggmlType, offset]) => {
+                            return transformPromisablesInOrder([
+                                () => this._fileReader.readUint32(readOffset),
+                                () => this._fileReader.readUint64(readOffset)
+                            ], ([ggmlType, offset]) => {
                                 tensorInfo.push({
                                     name,
                                     dimensions,

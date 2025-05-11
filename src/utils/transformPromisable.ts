@@ -93,4 +93,52 @@ export function promisableLoop<R>({
     return iterate();
 }
 
+/**
+ * Calls the given getters in order, and when a promise is encountered, waits for it to resolve before continuing.
+ * The result is transformed using the transformer function.
+ *
+ * This is used as a performance optimization to avoid adding many microtasks to the event loop,
+ * which makes reading from buffers significantly faster.
+ * @param getters - An array of functions that return values or promises
+ * @param transformer - The transformer function that takes the promisable values and transforms them into the result of this function
+ */
+export function transformPromisablesInOrder<
+    const T extends (() => Promisable<any>)[],
+    const R = {readonly [Index in keyof T]: Awaited<ReturnType<T[Index]>>;}
+>(
+    getters: T,
+    transformer: (
+        values: {readonly [Index in keyof T]: Awaited<ReturnType<T[Index]>>;}
+    ) => Promisable<R> = ((values) => values as R)
+): Promisable<R> {
+    let i = 0;
+    const res: any[] = [];
+    let skipPushingValue = true;
+
+    function iterate(currentValue: any): Promisable<R> {
+        if (skipPushingValue)
+            skipPushingValue = false;
+        else
+            res.push(currentValue);
+
+        while (i < getters.length) {
+            const getter = getters[i];
+            if (getter == null)
+                break;
+
+            i++;
+
+            const value = getter();
+            if (value instanceof Promise)
+                return value.then(iterate);
+
+            res.push(value);
+        }
+
+        return transformer(res as {[Index in keyof T]: Awaited<ReturnType<T[Index]>>;});
+    }
+
+    return iterate(undefined);
+}
+
 export type Promisable<T> = T | Promise<T>;
