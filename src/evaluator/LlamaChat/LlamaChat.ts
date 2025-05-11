@@ -3073,7 +3073,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
             if (this._segmentsStackSet.has(type)) {
                 // `currentType` suffix is already handled above
-                if (type === currentType && handleDetector(suffix, "pop", type))
+                if (type !== currentType && handleDetector(suffix, "pop", type))
                     return;
             } else
                 suffix?.clearInProgressStops();
