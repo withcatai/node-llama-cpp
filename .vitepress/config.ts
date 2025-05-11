@@ -470,8 +470,6 @@ export default defineConfig({
             }
         },
         sidebar: {
-            "/api/": getApiReferenceSidebar(),
-
             "/guide/": [{
                 text: "Guide",
                 base: "/guide",
@@ -550,7 +548,9 @@ export default defineConfig({
                         ]
                     }
                 ]
-            }]
+            }],
+
+            "/api/": getApiReferenceSidebar()
         },
         socialLinks: [
             {icon: "npm", link: "https://www.npmjs.com/package/node-llama-cpp"},
