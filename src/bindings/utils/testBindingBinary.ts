@@ -273,7 +273,14 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 const gpuType = binding.getGpuType();
                 void (gpuType as BuildGpu satisfies typeof gpuType);
                 if (gpuType !== message.gpu)
-                    throw new Error(`Binary GPU type mismatch. Expected: ${message.gpu}, got: ${gpuType}`);
+                    throw new Error(
+                        "Binary GPU type mismatch. " +
+                        `Expected: ${message.gpu}, got: ${gpuType}. ` + (
+                            message.gpu === "cuda"
+                                ? "May be due to a linker issue, ensure you don't have multiple conflicting CUDA installations."
+                                : "May be due to a linker issue, ensure the native dependencies are not broken."
+                        )
+                    );
 
                 binding.ensureGpuDeviceIsSupported();
 
