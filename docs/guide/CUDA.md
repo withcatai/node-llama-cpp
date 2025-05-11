@@ -114,6 +114,33 @@ set NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=%CUDA_PATH%
 
 Then run the build command again to check whether setting the `CMAKE_GENERATOR_TOOLSET` cmake option fixed the issue.
 
+### Fix the `forward compatibility was attempted on non supported HW` Error {#fix-cuda-forward-compatibility}
+This error usually happens when the CUDA version you have installed on your machine is older than the CUDA version used in the prebuilt binaries supplied by `node-llama-cpp`.
+
+To resolve this issue, you can either [update your CUDA installation](https://developer.nvidia.com/cuda-downloads) to the latest version (recommended) or [build `node-llama-cpp` on your machine](#building) against the CUDA version you have installed.
+
+### Fix the `Binary GPU type mismatch. Expected: cuda, got: false` Error {#fix-cuda-gpu-type-mismatch}
+This error usually happens when you have multiple conflicting CUDA versions installed on your machine.
+
+To fix it, uninstall older CUDA versions and restart your machine (important).
+
+:::: details Check which CUDA libraries are picked up by `node-llama-cpp`'s prebuilt binaries on your machine
+
+Run this command inside of your project:
+
+::: code-group
+```shell [Linux]
+ldd ./node_modules/@node-llama-cpp/linux-x64-cuda/bins/linux-x64-cuda/libggml-cuda.so
+```
+
+```cmd [Windows]
+"C:\Program Files\Git\usr\bin\ldd.exe" node_modules\@node-llama-cpp\win-x64-cuda\bins\win-x64-cuda\ggml-cuda.dll
+```
+:::
+
+::::
+
+
 ## Using `node-llama-cpp` With CUDA
 It's recommended to use [`getLlama`](../api/functions/getLlama) without specifying a GPU type,
 so it'll detect the available GPU types and use the best one automatically.
