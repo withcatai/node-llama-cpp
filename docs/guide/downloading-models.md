@@ -76,7 +76,7 @@ You can reference models using a URI instead of their full download URL when usi
 When downloading a model from a URI, the model files will be prefixed with a corresponding adaptation of the URI.
 
 To reference a model from Hugging Face, you can use one of these schemes:
-* `hf:<user>/<model>:<quant>` (`#<quant>` is optional, [but recommended](#hf-scheme-specify-quant))
+* `hf:<user>/<model>:<quant>` (`:<quant>` is optional, [but recommended](#hf-scheme-specify-quant))
 * `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
 
 Here are example usages of the Hugging Face URI scheme:
