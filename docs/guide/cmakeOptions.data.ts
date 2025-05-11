@@ -90,6 +90,8 @@ function parseCmakeOptions(cmakeListsTxt: string, optionFilter: ((key: string) =
             }
         } else if (option.defaultValue === "${BUILD_SHARED_LIBS_DEFAULT}")
             option.defaultValue = htmlEscapeWithCodeMarkdown("`OFF` on MinGW, `ON` otherwise");
+        else if (option.key === "LLAMA_CURL")
+            option.defaultValue = htmlEscapeWithCodeMarkdown("`OFF`");
         else
             option.defaultValue = htmlEscapeWithCodeMarkdown(
                 option.defaultValue != null

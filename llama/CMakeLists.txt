@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.19)
 
 if (NLC_CURRENT_PLATFORM STREQUAL "win-x64" OR NLC_CURRENT_PLATFORM STREQUAL "win-arm64")
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -69,6 +69,9 @@ include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 add_subdirectory("llama.cpp")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
+
+# This is needed to use methods in "llama-grammar.h" and "unicode.h"
+target_include_directories(llama PUBLIC "./llama.cpp/src")
 
 unset(GPU_INFO_HEADERS)
 unset(GPU_INFO_SOURCES)

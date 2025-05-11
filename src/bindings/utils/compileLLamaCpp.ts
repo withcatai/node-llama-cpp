@@ -130,6 +130,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
+                if (!cmakeCustomOptions.has("LLAMA_CURL"))
+                    cmakeCustomOptions.set("LLAMA_CURL", "OFF");
+
                 if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))
                     cmakeCustomOptions.set("GGML_OPENMP", "OFF");
 
