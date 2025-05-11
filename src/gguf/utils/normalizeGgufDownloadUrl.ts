@@ -1,7 +1,11 @@
-export function normalizeGgufDownloadUrl(url: string) {
+import {ModelDownloadEndpoints, resolveHuggingFaceEndpoint} from "../../utils/modelDownloadEndpoints.js";
+
+export function normalizeGgufDownloadUrl(url: string, endpoints?: ModelDownloadEndpoints) {
     const parsedUrl = new URL(url);
 
-    if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+    if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co" ||
+        parsedUrl.hostname === (new URL(resolveHuggingFaceEndpoint(endpoints))).hostname
+    ) {
         const pathnameParts = parsedUrl.pathname.split("/");
 
         if (pathnameParts.length > 3 && pathnameParts[3] === "blob") {

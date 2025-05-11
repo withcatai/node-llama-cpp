@@ -2,7 +2,8 @@ import retry from "async-retry";
 import {withLock} from "lifecycle-utils";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {defaultExtraAllocationSize, ggufDefaultFetchRetryOptions} from "../consts.js";
-import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "../../utils/modelFileAccesTokens.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "../../utils/modelFileAccessTokens.js";
+import {ModelDownloadEndpoints} from "../../utils/modelDownloadEndpoints.js";
 import {GgufFileReader} from "./GgufFileReader.js";
 
 type GgufFetchFileReaderOptions = {
@@ -10,7 +11,8 @@ type GgufFetchFileReaderOptions = {
     retryOptions?: retry.Options,
     headers?: Record<string, string>,
     signal?: AbortSignal,
-    tokens?: ModelFileAccessTokens
+    tokens?: ModelFileAccessTokens,
+    endpoints?: ModelDownloadEndpoints
 };
 
 export class GgufNetworkFetchFileReader extends GgufFileReader {
@@ -18,15 +20,17 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
     public readonly retryOptions: retry.Options;
     public readonly headers: Record<string, string>;
     public readonly tokens?: ModelFileAccessTokens;
+    public readonly endpoints?: ModelDownloadEndpoints;
     private readonly _signal?: AbortSignal;
     private _tryHeaders: Record<string, string>[] | undefined = undefined;
 
-    public constructor({url, retryOptions = ggufDefaultFetchRetryOptions, headers, tokens, signal}: GgufFetchFileReaderOptions) {
+    public constructor({url, retryOptions = ggufDefaultFetchRetryOptions, headers, tokens, endpoints, signal}: GgufFetchFileReaderOptions) {
         super();
         this.url = url;
         this.retryOptions = retryOptions;
         this.headers = headers ?? {};
         this.tokens = tokens;
+        this.endpoints = endpoints;
         this._signal = signal;
     }
 
@@ -88,7 +92,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
 
     private async _fetchByteRange(start: number, length: number): Promise<Buffer> {
         if (this._tryHeaders == null)
-            this._tryHeaders = await resolveModelFileAccessTokensTryHeaders(this.url, this.tokens, this.headers);
+            this._tryHeaders = await resolveModelFileAccessTokensTryHeaders(this.url, this.tokens, this.endpoints, this.headers);
 
         const headersToTry = [this.headers, ...this._tryHeaders];
 

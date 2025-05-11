@@ -1,8 +1,9 @@
 import retry from "async-retry";
 import {isUrl} from "../utils/isUrl.js";
-import {ModelFileAccessTokens} from "../utils/modelFileAccesTokens.js";
+import {ModelFileAccessTokens} from "../utils/modelFileAccessTokens.js";
 import {getAuthorizationHeader, isModelUri, parseModelUri, resolveParsedModelUri} from "../utils/parseModelUri.js";
 import {Writable} from "../utils/utilTypes.js";
+import {ModelDownloadEndpoints} from "../utils/modelDownloadEndpoints.js";
 import {parseGguf} from "./parser/parseGguf.js";
 import {GgufNetworkFetchFileReader} from "./fileReaders/GgufNetworkFetchFileReader.js";
 import {GgufFsFileReader} from "./fileReaders/GgufFsFileReader.js";
@@ -28,7 +29,8 @@ export async function readGgufFileInfo(pathOrUri: string, {
     fetchHeaders = {},
     spliceSplitFiles = true,
     signal,
-    tokens
+    tokens,
+    endpoints
 }: {
     /**
      * Whether to read the tensor info from the file's header.
@@ -71,22 +73,32 @@ export async function readGgufFileInfo(pathOrUri: string, {
 
     signal?: AbortSignal,
 
-    tokens?: ModelFileAccessTokens
+    /**
+     * Tokens to use to access the remote model file.
+     */
+    tokens?: ModelFileAccessTokens,
+
+    /**
+     * Configure the URLs used for resolving model URIs.
+     * @see [Model URIs](https://node-llama-cpp.withcat.ai/guide/downloading-models#model-uris)
+     */
+    endpoints?: ModelDownloadEndpoints
 } = {}) {
     const useNetworkReader = sourceType === "network" || (sourceType == null && (isUrl(pathOrUri) || isModelUri(pathOrUri)));
 
     async function createFileReader(pathOrUri: string) {
         if (useNetworkReader) {
-            const parsedModelUri = await resolveParsedModelUri(parseModelUri(pathOrUri), {
-                tokens, signal,
+            const parsedModelUri = await resolveParsedModelUri(parseModelUri(pathOrUri, undefined, endpoints), {
+                tokens, endpoints, signal,
                 authorizationHeader: getAuthorizationHeader(fetchHeaders)
             });
             return new GgufNetworkFetchFileReader({
-                url: parsedModelUri?.resolvedUrl ?? normalizeGgufDownloadUrl(pathOrUri),
+                url: parsedModelUri?.resolvedUrl ?? normalizeGgufDownloadUrl(pathOrUri, endpoints),
                 retryOptions: fetchRetryOptions,
                 headers: fetchHeaders,
                 signal,
-                tokens
+                tokens,
+                endpoints
             });
         } else if (sourceType === "filesystem" || sourceType == null) {
             return new GgufFsFileReader({

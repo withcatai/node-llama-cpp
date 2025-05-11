@@ -5,7 +5,8 @@ import {cliModelsDirectory} from "../config.js";
 import {getReadablePath} from "../cli/utils/getReadablePath.js";
 import {resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
 import {resolveModelDestination} from "./resolveModelDestination.js";
-import {ModelFileAccessTokens} from "./modelFileAccesTokens.js";
+import {ModelFileAccessTokens} from "./modelFileAccessTokens.js";
+import {ModelDownloadEndpoints} from "./modelDownloadEndpoints.js";
 import {createModelDownloader} from "./createModelDownloader.js";
 import {genericFilePartNumber} from "./parseModelUri.js";
 import {isFilePartText} from "./parseModelFileName.js";
@@ -82,6 +83,12 @@ export type ResolveModelFileOptions = {
      * Tokens to use to access the remote model file when downloading.
      */
     tokens?: ModelFileAccessTokens,
+
+    /**
+     * Configure the URLs used for resolving model URIs.
+     * @see [Model URIs](https://node-llama-cpp.withcat.ai/guide/downloading-models#model-uris)
+     */
+    endpoints?: ModelDownloadEndpoints,
 
     /**
      * The signal to use to cancel a download.
@@ -169,6 +176,7 @@ export async function resolveModelFile(
         deleteTempFileOnCancel = true,
         parallel = 4,
         tokens,
+        endpoints,
         signal
     } = typeof optionsOrDirectory === "string"
         ? {directory: optionsOrDirectory}
@@ -181,7 +189,7 @@ export async function resolveModelFile(
     if (download === false)
         resolvedVerify = false;
 
-    const resolvedModelDestination = resolveModelDestination(uriOrPath);
+    const resolvedModelDestination = resolveModelDestination(uriOrPath, undefined, endpoints);
 
     if (resolvedModelDestination.type === "file") {
         const resolvedFilePath = path.resolve(resolvedDirectory, uriOrPath);
@@ -202,7 +210,7 @@ export async function resolveModelFile(
         else
             pushAll(expectedFileNames, resolvedModelDestination.parsedUri.possibleFullFilenames);
     } else if (expectedFileNames.length === 0 && resolvedModelDestination.type === "url") {
-        const enforcedParsedUrl = resolveModelDestination(uriOrPath, true);
+        const enforcedParsedUrl = resolveModelDestination(uriOrPath, true, endpoints);
         if (enforcedParsedUrl != null && enforcedParsedUrl.type === "uri") {
             if (enforcedParsedUrl.parsedUri.type === "resolved")
                 expectedFileNames.push(enforcedParsedUrl.parsedUri.fullFilename);
@@ -249,7 +257,8 @@ export async function resolveModelFile(
         fileName: fileName || undefined,
         parallelDownloads: parallel,
         onProgress,
-        tokens
+        tokens,
+        endpoints
     });
 
     if (foundExpectedFilePath != null && downloader.totalFiles === 1 && await fs.pathExists(downloader.entrypointFilePath)) {

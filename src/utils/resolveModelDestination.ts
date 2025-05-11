@@ -2,6 +2,7 @@ import path from "path";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {parseModelUri, ParsedModelUri, resolveParsedModelUri, getAuthorizationHeader} from "./parseModelUri.js";
 import {isUrl} from "./isUrl.js";
+import {ModelDownloadEndpoints} from "./modelDownloadEndpoints.js";
 
 export type ResolveModelDestination = {
     type: "url",
@@ -16,8 +17,10 @@ export type ResolveModelDestination = {
     path: string
 };
 
-export function resolveModelDestination(modelDestination: string, convertUrlToUri: boolean = false): ResolveModelDestination {
-    const parsedUri = parseModelUri(modelDestination, convertUrlToUri);
+export function resolveModelDestination(
+    modelDestination: string, convertUrlToUri: boolean = false, endpoints?: ModelDownloadEndpoints
+): ResolveModelDestination {
+    const parsedUri = parseModelUri(modelDestination, convertUrlToUri, endpoints);
 
     if (parsedUri != null) {
         return {
@@ -31,7 +34,7 @@ export function resolveModelDestination(modelDestination: string, convertUrlToUr
     } else if (isUrl(modelDestination)) {
         return {
             type: "url",
-            url: normalizeGgufDownloadUrl(modelDestination)
+            url: normalizeGgufDownloadUrl(modelDestination, endpoints)
         };
     }
 
