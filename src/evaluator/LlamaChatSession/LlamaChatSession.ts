@@ -8,7 +8,8 @@ import {appendUserMessageToChatHistory} from "../../utils/appendUserMessageToCha
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
 import {
-    LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse, LlamaChatResponseFunctionCall, LlamaChatResponseChunk
+    LlamaChat, LLamaChatContextShiftOptions, LlamaChatResponse, LlamaChatResponseFunctionCall, LlamaChatResponseChunk,
+    LlamaChatResponseFunctionCallParamsChunk
 } from "../LlamaChat/LlamaChat.js";
 import {EvaluationPriority} from "../LlamaContext/types.js";
 import {TokenBias} from "../TokenBias.js";
@@ -197,12 +198,29 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     grammar?: LlamaGrammar,
     functions?: never,
     documentFunctionParams?: never,
-    maxParallelFunctionCalls?: never
+    maxParallelFunctionCalls?: never,
+    onFunctionCallParamsChunk?: never
 } | {
     grammar?: never,
     functions?: Functions | ChatSessionModelFunctions,
     documentFunctionParams?: boolean,
-    maxParallelFunctionCalls?: number
+    maxParallelFunctionCalls?: number,
+
+    /**
+     * Called as the model generates function calls with the generated parameters chunk for each function call.
+     *
+     * Useful for streaming the generated function call parameters as they're being generated.
+     * Only useful in specific use cases,
+     * such as showing the generated textual file content as it's being generated (note that doing this requires parsing incomplete JSON).
+     *
+     * The constructed text from all the params chunks of a given function call can be parsed as a JSON object,
+     * according to the function parameters schema.
+     *
+     * Each function call has its own `callIndex` you can use to distinguish between them.
+     *
+     * Only relevant when using function calling (via passing the `functions` option).
+     */
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
 });
 
 export type LLamaChatCompletePromptOptions = {
@@ -424,6 +442,7 @@ export class LlamaChatSession {
             onTextChunk,
             onToken,
             onResponseChunk,
+            onFunctionCallParamsChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -445,8 +464,10 @@ export class LlamaChatSession {
             functions: functions as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
+            onFunctionCallParamsChunk: onFunctionCallParamsChunk as undefined,
 
-            onTextChunk, onToken, onResponseChunk, signal, stopOnAbortSignal, maxTokens, temperature, minP, topK, topP, seed, grammar,
+            onTextChunk, onToken, onResponseChunk, signal, stopOnAbortSignal, maxTokens,
+            temperature, minP, topK, topP, seed, grammar,
             trimWhitespaceSuffix, responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
 
@@ -464,6 +485,7 @@ export class LlamaChatSession {
         onTextChunk,
         onToken,
         onResponseChunk,
+        onFunctionCallParamsChunk,
         signal,
         stopOnAbortSignal = false,
         maxTokens,
@@ -500,6 +522,7 @@ export class LlamaChatSession {
             let newContextWindowChatHistory = lastEvaluation?.contextWindow == null
                 ? undefined
                 : appendUserMessageToChatHistory(lastEvaluation?.contextWindow, prompt);
+            let previousFunctionCalls: number = 0;
 
             const resolvedResponsePrefix = (responsePrefix != null && responsePrefix !== "")
                 ? responsePrefix
@@ -553,6 +576,14 @@ export class LlamaChatSession {
                         onTextChunk: safeEventCallback(onTextChunk),
                         onToken: safeEventCallback(onToken),
                         onResponseChunk: safeEventCallback(onResponseChunk),
+                        onFunctionCallParamsChunk: onFunctionCallParamsChunk == null
+                            ? undefined
+                            : safeEventCallback((chunk) => onFunctionCallParamsChunk?.({
+                                callIndex: previousFunctionCalls + chunk.callIndex,
+                                functionName: chunk.functionName,
+                                paramsChunk: chunk.paramsChunk,
+                                done: chunk.done
+                            })),
                         signal: abortController.signal,
                         stopOnAbortSignal,
                         repeatPenalty,
@@ -675,6 +706,7 @@ export class LlamaChatSession {
                                 });
 
                                 startNewChunk = false;
+                                previousFunctionCalls++;
                             }
 
                             lastEvaluation.cleanHistory = newChatHistory;

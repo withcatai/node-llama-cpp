@@ -32,7 +32,7 @@ import {
     LlamaChat, type LlamaChatOptions, type LLamaChatGenerateResponseOptions, type LLamaChatLoadAndCompleteUserMessageOptions,
     type LLamaChatContextShiftOptions, type LlamaChatResponse, type LlamaChatResponseFunctionCall,
     type LlamaChatLoadAndCompleteUserResponse, type LlamaChatResponseChunk, type LlamaChatResponseTextChunk,
-    type LlamaChatResponseSegmentChunk, type LlamaChatResponseSegment
+    type LlamaChatResponseSegmentChunk, type LlamaChatResponseFunctionCallParamsChunk, type LlamaChatResponseSegment
 } from "./evaluator/LlamaChat/LlamaChat.js";
 import {
     LlamaChatSessionPromptCompletionEngine, type LLamaChatPromptCompletionEngineOptions
@@ -109,7 +109,7 @@ import {
     type GgufMetadataBloom, type GgufMetadataFalcon, type GgufMetadataMamba, isGgufMetadataOfArchitectureType
 } from "./gguf/types/GgufMetadataTypes.js";
 import {GgmlType, type GgufTensorInfo} from "./gguf/types/GgufTensorInfoTypes.js";
-import {type ModelFileAccessTokens} from "./utils/modelFileAccesTokens.js";
+import {type ModelFileAccessTokens} from "./utils/modelFileAccessTokens.js";
 import {type OverridesObject} from "./utils/OverridesObject.js";
 import type {LlamaClasses} from "./utils/getLlamaClasses.js";
 import type {ChatHistoryFunctionCallMessageTemplate} from "./chatWrappers/generic/utils/chatHistoryFunctionCallMessageTemplate.js";
@@ -183,6 +183,7 @@ export {
     type LlamaChatResponseChunk,
     type LlamaChatResponseTextChunk,
     type LlamaChatResponseSegmentChunk,
+    type LlamaChatResponseFunctionCallParamsChunk,
     type LlamaChatResponseSegment,
     LlamaChatSessionPromptCompletionEngine,
     type LLamaChatPromptCompletionEngineOptions,
