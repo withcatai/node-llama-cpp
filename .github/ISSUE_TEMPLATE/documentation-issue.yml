@@ -3,6 +3,8 @@ description: Documentation is unclear or otherwise insufficient.
 labels:
   - requires triage
   - documentation
+title: "docs: "
+type: "Documentation"
 body:
   - type: markdown
     attributes:
