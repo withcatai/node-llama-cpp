@@ -230,26 +230,26 @@ describe("utils", () => {
         });
 
         test("Hugging Face simple URI is resolved 2", async () => {
-            const parsedModelUri = parseModelUri("hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_L");
+            const parsedModelUri = parseModelUri("hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_M");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
               {
                 "baseFilename": "Meta-Llama-3.1-70B-Instruct",
                 "filePrefix": "hf_bartowski_",
                 "possibleFullFilenames": [
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_L.gguf",
-                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_L-00001-of-{:
+                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_M.gguf",
+                  "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_M-00001-of-{:
               {number}
               :}.gguf",
                 ],
                 "resolveDetails": {
                   "model": "Meta-Llama-3.1-70B-Instruct-GGUF",
-                  "tag": "Q5_K_L",
+                  "tag": "Q5_K_M",
                   "type": "hf",
                   "user": "bartowski",
                 },
                 "type": "unresolved",
-                "uri": "hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_L",
+                "uri": "hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_M",
               }
             `);
 
@@ -257,11 +257,11 @@ describe("utils", () => {
             expect(resolvedUri).toMatchInlineSnapshot(`
               {
                 "filePrefix": "hf_bartowski_",
-                "filename": "Meta-Llama-3.1-70B-Instruct.Q5_K_L-00001-of-00002.gguf",
-                "fullFilename": "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_L-00001-of-00002.gguf",
-                "resolvedUrl": "https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf?download=true",
+                "filename": "Meta-Llama-3.1-70B-Instruct.Q5_K_M-00001-of-00002.gguf",
+                "fullFilename": "hf_bartowski_Meta-Llama-3.1-70B-Instruct.Q5_K_M-00001-of-00002.gguf",
+                "resolvedUrl": "https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q5_K_M/Meta-Llama-3.1-70B-Instruct-Q5_K_M-00001-of-00002.gguf?download=true",
                 "type": "resolved",
-                "uri": "hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_L",
+                "uri": "hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_M",
               }
             `);
         });

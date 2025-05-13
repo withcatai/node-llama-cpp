@@ -227,10 +227,8 @@ export const recommendedModels: ModelRecommendation[] = [{
     fileOptions: [
         "hf:bartowski/gemma-2-9b-it-GGUF:Q6_K_L",
         "hf:bartowski/gemma-2-9b-it-GGUF:Q6_K",
-        "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_L",
         "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_M",
         "hf:bartowski/gemma-2-9b-it-GGUF:Q5_K_S",
-        "hf:bartowski/gemma-2-9b-it-GGUF:Q4_K_L",
         "hf:bartowski/gemma-2-9b-it-GGUF:Q4_K_M"
     ]
 }, {
@@ -258,10 +256,8 @@ export const recommendedModels: ModelRecommendation[] = [{
     fileOptions: [
         "hf:bartowski/gemma-2-27b-it-GGUF:Q6_K_L",
         "hf:bartowski/gemma-2-27b-it-GGUF:Q6_K",
-        "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_L",
         "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_M",
         "hf:bartowski/gemma-2-27b-it-GGUF:Q5_K_S",
-        "hf:bartowski/gemma-2-27b-it-GGUF:Q4_K_L",
         "hf:bartowski/gemma-2-27b-it-GGUF:Q4_K_M"
     ]
 }, {
