@@ -6,13 +6,13 @@ const __filename = fileURLToPath(import.meta.url);
 
 describe("utils", () => {
     describe("parseModelUri", () => {
-        test("File path is not resolved", async () => {
+        test("File path is not resolved", () => {
             const parsedModelUri = parseModelUri(__filename);
 
             expect(parsedModelUri).to.eql(null);
         });
 
-        test("URL is not resolved by default", async () => {
+        test("URL is not resolved by default", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
             );
@@ -20,7 +20,7 @@ describe("utils", () => {
             expect(parsedModelUri).to.eql(null);
         });
 
-        test("Hugging Face URL is resolved", async () => {
+        test("Hugging Face URL is resolved", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf",
                 true
@@ -38,7 +38,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URL is resolved 2", async () => {
+        test("Hugging Face URL is resolved 2", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf?download=true",
                 true
@@ -56,7 +56,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URL is resolved 3", async () => {
+        test("Hugging Face URL is resolved 3", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/blob/main/Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf",
                 true
@@ -74,7 +74,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URL is resolved 4", async () => {
+        test("Hugging Face URL is resolved 4", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf?download=true",
                 true
@@ -92,7 +92,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URL is resolved 5", async () => {
+        test("Hugging Face URL is resolved 5", () => {
             const parsedModelUri = parseModelUri(
                 "https://huggingface.co/mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/blob/main/Meta-Llama-3.1-70B-Instruct.Q8_0.gguf.part1of2",
                 true
@@ -110,7 +110,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URI is resolved", async () => {
+        test("Hugging Face URI is resolved", () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -125,7 +125,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URI is resolved 2", async () => {
+        test("Hugging Face URI is resolved 2", () => {
             const parsedModelUri = parseModelUri("hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct-Q5_K_L/Meta-Llama-3.1-70B-Instruct-Q5_K_L-00001-of-00002.gguf");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -140,7 +140,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face URI is resolved 3", async () => {
+        test("Hugging Face URI is resolved 3", () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF/Meta-Llama-3.1-70B-Instruct.Q8_0.gguf.part1of2");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -155,7 +155,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved", async () => {
+        test("Hugging Face simple URI is resolved", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -192,7 +192,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved - lowercase quant", async () => {
+        test("Hugging Face simple URI is resolved - lowercase quant", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF:q4_k_m");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -229,7 +229,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved 2", async () => {
+        test("Hugging Face simple URI is resolved 2", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:bartowski/Meta-Llama-3.1-70B-Instruct-GGUF:Q5_K_M");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -266,7 +266,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved 3", async () => {
+        test("Hugging Face simple URI is resolved 3", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -307,7 +307,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved 4", async () => {
+        test("Hugging Face simple URI is resolved 4", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:Q8_0");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -339,7 +339,7 @@ describe("utils", () => {
             }
         });
 
-        test("Hugging Face simple URI is resolved 5", async () => {
+        test("Hugging Face simple URI is resolved 5", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
@@ -380,7 +380,7 @@ describe("utils", () => {
             `);
         });
 
-        test("Hugging Face simple URI is resolved 6", async () => {
+        test("Hugging Face simple URI is resolved 6", {timeout: 1000 * 10}, async () => {
             const parsedModelUri = parseModelUri("hf:mradermacher/Meta-Llama-3.1-70B-Instruct-GGUF:invalid");
 
             expect(parsedModelUri).toMatchInlineSnapshot(`
