@@ -89,7 +89,7 @@ describe("llama 3.2", () => {
                   }
                 `);
 
-                await contextSequence1.loadStateFromFile(stateFile1Path);
+                await contextSequence1.loadStateFromFile(stateFile1Path, {acceptRisk: true});
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
                 expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot();
 
@@ -166,7 +166,7 @@ describe("llama 3.2", () => {
                     contextSequence: contextSequence2
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
-                await contextSequence2.loadStateFromFile(stateFile1Path);
+                await contextSequence2.loadStateFromFile(stateFile1Path, {acceptRisk: true});
 
                 const res2 = await chatSession2.prompt("What did I tell you to remember?", {maxTokens: 20});
                 expect(res2).to.toMatchInlineSnapshot('"You told me to remember that "locks are not doors"."');
@@ -228,7 +228,7 @@ describe("llama 3.2", () => {
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
                 try {
-                    await contextSequence2.loadStateFromFile(stateFile1Path);
+                    await contextSequence2.loadStateFromFile(stateFile1Path, {acceptRisk: true});
                     expect.unreachable("Should have thrown an error");
                 } catch (err) {
                     expect(err).toMatchInlineSnapshot("[Error: Failed to load state from file. Current context sequence size may be smaller that the state of the file]");
@@ -286,7 +286,7 @@ describe("llama 3.2", () => {
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
                 try {
-                    await contextSequence2.loadStateFromFile(stateFile1Path);
+                    await contextSequence2.loadStateFromFile(stateFile1Path, {acceptRisk: true});
                     expect.unreachable("Should have thrown an error");
                 } catch (err) {
                     expect(err).toMatchInlineSnapshot("[Error: Failed to load state from file. Current context sequence size may be smaller that the state of the file]");

@@ -1,3 +1,4 @@
+import path from "path";
 import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
@@ -1579,9 +1580,14 @@ export class LlamaContextSequence {
 
     /**
      * Save the current context sequence evaluation state to a file.
+     * @see [Saving and restoring a context sequence evaluation state](
+     * https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state
+     * )
      */
-    public async saveStateToFile(path: string) {
+    public async saveStateToFile(filePath: string) {
         this._ensureNotDisposed();
+
+        const resolvedPath = path.resolve(process.cwd(), filePath);
 
         const evaluatorLock = await acquireLock(this._lock, "evaluate");
         const contextLock = await acquireLock(this._context, "context");
@@ -1589,7 +1595,11 @@ export class LlamaContextSequence {
         try {
             this._ensureNotDisposed();
 
-            const fileSize = await this._context._ctx.saveSequenceStateToFile(path, this._sequenceId, Uint32Array.from(this.contextTokens));
+            const fileSize = await this._context._ctx.saveSequenceStateToFile(
+                resolvedPath,
+                this._sequenceId,
+                Uint32Array.from(this.contextTokens)
+            );
             return {fileSize};
         } finally {
             contextLock.dispose();
@@ -1603,9 +1613,24 @@ export class LlamaContextSequence {
      * Trying to load a state file with a longer context size than the current sequence's context size will fail and throw an error.
      *
      * You must ensure that the file was created from the exact same model, otherwise, using this function may crash the process.
+     * @see [Saving and restoring a context sequence evaluation state](
+     * https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state
+     * )
      */
-    public async loadStateFromFile(path: string) {
+    public async loadStateFromFile(filePath: string, acceptRisk: {
+        /**
+         * Loading a state file created using a different model may crash the process.
+         *
+         * You must accept this risk to use this feature.
+         */
+        acceptRisk: true
+    }) {
+        if (!acceptRisk.acceptRisk)
+            throw new Error("The `acceptRisk` option must be set to `true` to use this feature");
+
         this._ensureNotDisposed();
+
+        const resolvedPath = path.resolve(process.cwd(), filePath);
 
         const evaluatorLock = await acquireLock(this._lock, "evaluate");
         const contextLock = await acquireLock(this._context, "context");
@@ -1622,7 +1647,7 @@ export class LlamaContextSequence {
             this._contextTokens = [];
 
             const tokens = Array.from(
-                await this._context._ctx.loadSequenceStateFromFile(path, this._sequenceId, this.contextSize)
+                await this._context._ctx.loadSequenceStateFromFile(resolvedPath, this._sequenceId, this.contextSize)
             ) as Token[];
 
             if (tokens.length > this.contextSize) {

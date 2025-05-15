@@ -446,6 +446,87 @@ console.log("AI: " + a2);
 ```
 :::
 
+:::: details Saving and restoring a context sequence evaluation state {#save-and-restore-with-context-sequence-state}
+You can also save and restore the context sequence evaluation state to avoid re-evaluating the chat history
+when you load it on a new context sequence.
+
+Please note that context sequence state files can get very large (109MB for only 1K tokens).
+Using this feature is only recommended when the chat history is very long and you plan to load it often,
+or when the evaluation is too slow due to hardware limitations.
+
+::: warning
+When loading a context sequence state from a file,
+always ensure that the model used to create the context sequence is exactly the same as the one used to save the state file.
+
+Loading a state file created from a different model can crash the process,
+thus you have to pass `{acceptRisk: true}` to the [`loadStateFromFile`](../api/classes/LlamaContextSequence.md#loadstatefromfile) method to use it.
+
+Use with caution.
+:::
+
+::: code-group
+```typescript [Save chat history and context sequence state]
+import {fileURLToPath} from "url";
+import path from "path";
+import fs from "fs/promises";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const contextSequence = context.getSequence();
+const session = new LlamaChatSession({contextSequence});
+
+
+const q1 = "Hi there, how are you?";
+console.log("User: " + q1);
+
+const a1 = await session.prompt(q1);
+console.log("AI: " + a1);
+
+const chatHistory = session.getChatHistory();// [!code highlight]
+await Promise.all([// [!code highlight]
+    contextSequence.saveStateToFile("state.bin"),// [!code highlight]
+    fs.writeFile("chatHistory.json", JSON.stringify(chatHistory), "utf8")// [!code highlight]
+]);// [!code highlight]
+```
+:::
+
+::: code-group
+```typescript [Restore chat history and context sequence state]
+import {fileURLToPath} from "url";
+import path from "path";
+import fs from "fs/promises";
+import {getLlama, LlamaChatSession} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// ---cut---
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const contextSequence = context.getSequence();
+const session = new LlamaChatSession({contextSequence});
+
+await contextSequence.loadStateFromFile("state.bin", {acceptRisk: true});// [!code highlight]
+const chatHistory = JSON.parse(await fs.readFile("chatHistory.json", "utf8"));// [!code highlight]
+session.setChatHistory(chatHistory);// [!code highlight]
+
+const q2 = "Summarize what you said";
+console.log("User: " + q2);
+
+const a2 = await session.prompt(q2);
+console.log("AI: " + a2);
+```
+:::
+
+::::
+
 ## Prompt Without Updating Chat History {#prompt-without-updating-chat-history}
 Prompt without saving the prompt to the chat history.
 
