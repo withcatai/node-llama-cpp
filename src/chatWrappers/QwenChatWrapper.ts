@@ -1,7 +1,8 @@
 import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
-    ChatModelFunctions, ChatWrapperCheckModelCompatibilityParams, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
-    ChatWrapperSettings, isChatModelResponseSegment
+    ChatModelFunctions, ChatModelResponse, ChatModelSegment, ChatWrapperCheckModelCompatibilityParams,
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings, isChatModelResponseFunctionCall,
+    isChatModelResponseSegment
 } from "../types.js";
 import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 import {GgufArchitectureType} from "../gguf/types/GgufMetadataTypes.js";
@@ -12,40 +13,9 @@ export class QwenChatWrapper extends ChatWrapper {
     public readonly wrapperName: string = "Qwen";
 
     public readonly keepOnlyLastThought: boolean;
+    public readonly thoughts: "auto" | "discourage";
 
-    public override readonly settings: ChatWrapperSettings = {
-        supportsSystemMessages: true,
-        functions: {
-            call: {
-                optionalPrefixSpace: true,
-                prefix: LlamaText("\n", new SpecialTokensText("<tool_call>"), '\n{"name": "'),
-                paramsPrefix: '", "arguments": ',
-                suffix: LlamaText("}\n", new SpecialTokensText("</tool_call>")),
-                emptyCallParamsPlaceholder: {}
-            },
-            result: {
-                prefix: LlamaText(new SpecialTokensText("\n<tool_response>\n")),
-                suffix: LlamaText(new SpecialTokensText("\n</tool_response>"))
-            },
-            parallelism: {
-                call: {
-                    sectionPrefix: "",
-                    sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n"))
-                },
-                result: {
-                    sectionPrefix: LlamaText(new SpecialTokensText("<|im_start|>user")),
-                    sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n<|im_start|>assistant\n"))
-                }
-            }
-        },
-        segments: {
-            reiterateStackAfterFunctionCalls: true,
-            thought: {
-                prefix: LlamaText(new SpecialTokensText("<think>")),
-                suffix: LlamaText(new SpecialTokensText("</think>"))
-            }
-        }
-    };
+    public override readonly settings: ChatWrapperSettings;
 
     public constructor(options: {
         /**
@@ -55,15 +25,70 @@ export class QwenChatWrapper extends ChatWrapper {
          *
          * Defaults to `true`.
          */
-        keepOnlyLastThought?: boolean
+        keepOnlyLastThought?: boolean,
+
+        /**
+         * Control the usage of thoughts in the model responses.
+         *
+         * Defaults to `"auto"`.
+         */
+        thoughts?: "auto" | "discourage",
+
+        /** @internal */
+        _lineBreakBeforeFunctionCallPrefix?: boolean
     } = {}) {
         super();
 
         const {
-            keepOnlyLastThought = true
+            keepOnlyLastThought = true,
+            thoughts = "auto",
+            _lineBreakBeforeFunctionCallPrefix = false
         } = options;
 
         this.keepOnlyLastThought = keepOnlyLastThought;
+        this.thoughts = thoughts;
+
+        this.settings = {
+            supportsSystemMessages: true,
+            functions: {
+                call: {
+                    optionalPrefixSpace: true,
+                    prefix: LlamaText([
+                        _lineBreakBeforeFunctionCallPrefix
+                            ? "\n"
+                            : "",
+                        new SpecialTokensText("<tool_call>"), '\n{"name": "'
+                    ]),
+                    paramsPrefix: '", "arguments": ',
+                    suffix: LlamaText("}\n", new SpecialTokensText("</tool_call>")),
+                    emptyCallParamsPlaceholder: {}
+                },
+                result: {
+                    prefix: LlamaText(new SpecialTokensText("\n<tool_response>\n")),
+                    suffix: LlamaText(new SpecialTokensText("\n</tool_response>"))
+                },
+                parallelism: {
+                    call: {
+                        sectionPrefix: "",
+                        betweenCalls: _lineBreakBeforeFunctionCallPrefix
+                            ? ""
+                            : "\n",
+                        sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n"))
+                    },
+                    result: {
+                        sectionPrefix: LlamaText(new SpecialTokensText("<|im_start|>user")),
+                        sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n<|im_start|>assistant\n"))
+                    }
+                }
+            },
+            segments: {
+                reiterateStackAfterFunctionCalls: true,
+                thought: {
+                    prefix: LlamaText(new SpecialTokensText("<think>")),
+                    suffix: LlamaText(new SpecialTokensText("</think>"))
+                }
+            }
+        };
     }
 
     public override generateContextState({
@@ -115,14 +140,18 @@ export class QwenChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 flush();
 
+                const transformedModelResponse = (this.thoughts === "discourage" && isLastItem)
+                    ? discourageThoughtsInModelResponse(item.response)
+                    : item.response;
+
                 currentAggregateFocus = null;
                 modelTexts.push(
                     this.generateModelResponseText(
                         (this.keepOnlyLastThought && !isLastItem)
-                            ? item.response.filter((response) => (
+                            ? transformedModelResponse.filter((response) => (
                                 !isChatModelResponseSegment(response) || response.segmentType !== "thought"
                             ))
-                            : item.response
+                            : transformedModelResponse
                     )
                 );
             } else
@@ -204,13 +233,44 @@ export class QwenChatWrapper extends ChatWrapper {
     /** @internal */
     public static override _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
         const architecture = options.fileInfo?.metadata.general.architecture;
-        return architecture == null || architecture === GgufArchitectureType.qwen2;
+        return (
+            architecture == null ||
+            architecture === GgufArchitectureType.qwen2 ||
+            architecture === GgufArchitectureType.qwen2moe ||
+            architecture === GgufArchitectureType.qwen2vl ||
+            architecture === GgufArchitectureType.qwen3 ||
+            architecture === GgufArchitectureType.qwen3moe
+        );
     }
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
-            [undefined, {}, {_requireFunctionCallSettingsExtraction: true}]
+            [{}, {}, {_requireFunctionCallSettingsExtraction: true}],
+            [{_lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}]
         ];
     }
+}
+
+function discourageThoughtsInModelResponse(response: ChatModelResponse["response"]) {
+    const emptyThought: ChatModelSegment = {
+        type: "segment",
+        segmentType: "thought",
+        ended: true,
+        text: "\n\n",
+        raw: LlamaText(new SpecialTokensText("<think>\n\n</think>\n\n")).toJSON()
+    };
+    const res: ChatModelResponse["response"] = [...response];
+
+    for (let i = res.length - 1; i >= 0; i--) {
+        const item = res[i];
+
+        if (isChatModelResponseFunctionCall(item)) {
+            res.splice(i + 1, 0, emptyThought);
+            return res;
+        }
+    }
+
+    res.unshift(emptyThought);
+    return res;
 }
