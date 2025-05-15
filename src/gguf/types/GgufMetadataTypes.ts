@@ -305,10 +305,11 @@ export type GgufMetadataDefaultArchitectureType = {
     readonly expert_used_count?: number,
     readonly pooling_type?: GgufMetadataArchitecturePoolingType,
     readonly logit_scale?: number,
+    readonly token_shift_count?: number,
 
     readonly attention?: {
         readonly head_count?: number,
-        readonly head_count_kv?: number,
+        readonly head_count_kv?: number | number[],
         readonly max_alibi_bias?: number,
         readonly clamp_kqv?: number,
         readonly layer_norm_epsilon?: number,
@@ -335,6 +336,10 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly inner_size?: number,
         readonly state_size?: number,
         readonly time_step_rank?: number
+    },
+
+    readonly wkv?: {
+        readonly head_size?: number
     }
 };
 

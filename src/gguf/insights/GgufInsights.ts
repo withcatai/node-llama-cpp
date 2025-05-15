@@ -454,21 +454,41 @@ export class GgufInsights {
         const nHead = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
         const nEmbd = this._ggufFileInfo.architectureMetadata.embedding_length ?? 0;
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
-        const nHeadKv = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
-        const modelNEmbdKGqa = nEmbdHeadK * nHeadKv;
+        const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
+        const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+
+        const nHeadKvArray = Array(layers).fill(nHead);
+        if (Array.isArray(nHeadKv)) {
+            for (let i = 0; i < layers; i++) {
+                if (nHeadKv[i] !== 0)
+                    nHeadKvArray[i] = nHeadKv[i];
+            }
+        } else
+            nHeadKvArray.fill(nHeadKv);
 
         const ssmDConv = this._ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
         const ssmDInner = this._ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
-        const modelNEmbdKS = (ssmDConv > 0 ? (ssmDConv - 1) : 0) * ssmDInner;
-
-        const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
-        const modelNEmbdVGqa = nEmbdHeadV * nHeadKv;
+        const modelNEmbdKS = (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0) !== 0
+            ? (this._ggufFileInfo.architectureMetadata.token_shift_count ?? 0) * nEmbd
+            : (ssmDConv > 0 ? (ssmDConv - 1) : 0) * ssmDInner;
 
         const ssmDState = this._ggufFileInfo.architectureMetadata.ssm?.state_size ?? 0;
-        const modelNEmbdVS = ssmDState * ssmDInner;
+        const modelNEmbdVS = (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0) !== 0
+            ? nEmbd * (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0)
+            : ssmDState * ssmDInner;
 
-        const totalNEmbdKGqa = modelNEmbdKGqa + modelNEmbdKS;
-        const totalNEmbdVGqa = modelNEmbdVGqa + modelNEmbdVS;
+        let totalElementsK = 0;
+        let totalElementsV = 0;
+        for (let i = 0; i < nHeadKvArray.length; i++) {
+            const nEmbdKGqa = nEmbdHeadK * nHeadKvArray[i]!;
+            const nEmbdVGqa = nEmbdHeadV * nHeadKvArray[i]!;
+
+            const totalNEmbdKGqa = nEmbdKGqa + modelNEmbdKS;
+            const totalNEmbdVGqa = nEmbdVGqa + modelNEmbdVS;
+
+            totalElementsK += totalNEmbdKGqa * contextSize;
+            totalElementsV += totalNEmbdVGqa * contextSize;
+        }
 
         const keyTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
             // if `type_k` of `llama_context_params` changes to be configurable in `LlamaContext`,
@@ -481,10 +501,10 @@ export class GgufInsights {
             ? this._llama._consts.ggmlTypeF32Size
             : this._llama._consts.ggmlTypeF16Size;
 
-        const keyTensorsSize = layers * totalNEmbdKGqa * contextSize * keyTypeSize;
-        const valueTensorsSize = layers * totalNEmbdVGqa * contextSize * valueTypeSize;
-
-        return keyTensorsSize + valueTensorsSize;
+        return (
+            (totalElementsK * keyTypeSize) +
+            (totalElementsV * valueTypeSize)
+        );
     }
 
     /**
