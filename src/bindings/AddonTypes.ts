@@ -149,6 +149,8 @@ export type AddonContext = {
     setThreads(threads: number): void,
     printTimings(): void,
     ensureDraftContextIsCompatibleForSpeculative(draftContext: AddonContext): void,
+    saveSequenceStateToFile(filePath: string, sequenceId: number, tokens: Uint32Array): Promise<number>,
+    loadSequenceStateFromFile(filePath: string, sequenceId: number, maxContextSize: number): Promise<Uint32Array>,
     setLora(lora: AddonModelLora, scale: number): void
 };
 

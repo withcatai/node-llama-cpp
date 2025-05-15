@@ -1145,7 +1145,6 @@ export class LlamaContextSequence {
 
     /**
      * Clear the history of the sequence.
-     * If `prependBos` was enabled, the BOS token will be prepended to the sequence again.
      */
     public async clearHistory() {
         this._ensureNotDisposed();
@@ -1575,6 +1574,68 @@ export class LlamaContextSequence {
         } finally {
             evaluatorLock.dispose();
             void withLock(sampler, "sample", sampler.asyncDispose);
+        }
+    }
+
+    /**
+     * Save the current context sequence evaluation state to a file.
+     */
+    public async saveStateToFile(path: string) {
+        this._ensureNotDisposed();
+
+        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        const contextLock = await acquireLock(this._context, "context");
+
+        try {
+            this._ensureNotDisposed();
+
+            const fileSize = await this._context._ctx.saveSequenceStateToFile(path, this._sequenceId, Uint32Array.from(this.contextTokens));
+            return {fileSize};
+        } finally {
+            contextLock.dispose();
+            evaluatorLock.dispose();
+        }
+    }
+
+    /**
+     * Load a context sequence evaluation state from a file.
+     *
+     * Trying to load a state file with a longer context size than the current sequence's context size will fail and throw an error.
+     *
+     * You must ensure that the file was created from the exact same model, otherwise, using this function may crash the process.
+     */
+    public async loadStateFromFile(path: string) {
+        this._ensureNotDisposed();
+
+        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        const contextLock = await acquireLock(this._context, "context");
+
+        try {
+            this._ensureNotDisposed();
+
+            this._tokenPredictorOwner = {};
+            await this._abortTokenPredictor(true);
+            this._ensureNotDisposed();
+
+            this._loadedTokenPredictions.length = 0;
+            this._nextTokenIndex = 0;
+            this._contextTokens = [];
+
+            const tokens = Array.from(
+                await this._context._ctx.loadSequenceStateFromFile(path, this._sequenceId, this.contextSize)
+            ) as Token[];
+
+            if (tokens.length > this.contextSize) {
+                this._context._ctx.disposeSequence(this._sequenceId);
+                throw new Error("The given state file is too large for the current context size");
+            }
+
+            this._contextTokens = tokens;
+            this._nextTokenIndex = tokens.length;
+            this._loadedTokenPredictions.length = 0;
+        } finally {
+            contextLock.dispose();
+            evaluatorLock.dispose();
         }
     }
 

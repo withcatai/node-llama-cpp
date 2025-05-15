@@ -44,6 +44,9 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value GetThreads(const Napi::CallbackInfo& info);
         Napi::Value SetThreads(const Napi::CallbackInfo& info);
 
+        Napi::Value SaveSequenceStateToFile(const Napi::CallbackInfo& info);
+        Napi::Value LoadSequenceStateFromFile(const Napi::CallbackInfo& info);
+
         Napi::Value PrintTimings(const Napi::CallbackInfo& info);
         Napi::Value EnsureDraftContextIsCompatibleForSpeculative(const Napi::CallbackInfo& info);
 

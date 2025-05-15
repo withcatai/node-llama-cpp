@@ -702,6 +702,143 @@ Napi::Value AddonContext::SetThreads(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+class AddonContextSaveSequenceStateToFileWorker : public Napi::AsyncWorker {
+    public:
+        AddonContext* context;
+        std::string filepath;
+        llama_seq_id sequenceId;
+        std::vector<llama_token> tokens;
+        size_t savedFileSize = 0;
+
+        AddonContextSaveSequenceStateToFileWorker(const Napi::CallbackInfo& info, AddonContext* context)
+            : Napi::AsyncWorker(info.Env(), "AddonContextSaveSequenceStateToFileWorker"),
+              context(context),
+              deferred(Napi::Promise::Deferred::New(info.Env())) {
+            context->Ref();
+
+            filepath = info[0].As<Napi::String>().Utf8Value();
+            sequenceId = info[1].As<Napi::Number>().Int32Value();
+            Napi::Uint32Array inputTokens = info[2].As<Napi::Uint32Array>();
+
+            tokens.resize(inputTokens.ElementLength());
+            for (size_t i = 0; i < tokens.size(); i++) {
+                tokens[i] = inputTokens[i];
+            }
+        }
+        ~AddonContextSaveSequenceStateToFileWorker() {
+            context->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                savedFileSize = llama_state_seq_save_file(context->ctx, filepath.c_str(), sequenceId, tokens.data(), tokens.size());
+                if (savedFileSize == 0) {
+                    SetError("Failed to save state to file");
+                    return;
+                }
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_state_seq_save_file\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Napi::Number::New(Env(), savedFileSize));
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+Napi::Value AddonContext::SaveSequenceStateToFile(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    AddonContextSaveSequenceStateToFileWorker* worker = new AddonContextSaveSequenceStateToFileWorker(info, this);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
+class AddonContextLoadSequenceStateFromFileWorker : public Napi::AsyncWorker {
+    public:
+        AddonContext* context;
+        std::string filepath;
+        llama_seq_id sequenceId;
+        size_t maxContextSize;
+        std::vector<llama_token> tokens;
+
+        AddonContextLoadSequenceStateFromFileWorker(const Napi::CallbackInfo& info, AddonContext* context)
+            : Napi::AsyncWorker(info.Env(), "AddonContextLoadSequenceStateFromFileWorker"),
+              context(context),
+              deferred(Napi::Promise::Deferred::New(info.Env())) {
+            context->Ref();
+
+            filepath = info[0].As<Napi::String>().Utf8Value();
+            sequenceId = info[1].As<Napi::Number>().Int32Value();
+            maxContextSize = info[2].As<Napi::Number>().Uint32Value();
+
+            tokens.resize(maxContextSize);
+        }
+        ~AddonContextLoadSequenceStateFromFileWorker() {
+            context->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                size_t tokenCount = 0;
+                const size_t fileSize = llama_state_seq_load_file(context->ctx, filepath.c_str(), sequenceId, tokens.data(), tokens.size(), &tokenCount);
+                if (fileSize == 0) {
+                    SetError("Failed to load state from file. Current context sequence size may be smaller that the state of the file");
+                    return;
+                }
+
+                tokens.resize(tokenCount);
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_state_seq_load_file\"");
+            }
+        }
+        void OnOK() {
+            size_t tokenCount = tokens.size();
+            Napi::Uint32Array result = Napi::Uint32Array::New(Env(), tokenCount);
+
+            for (size_t i = 0; i < tokenCount; i++) {
+                result[i] = tokens[i];
+            }
+
+            deferred.Resolve(result);
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+Napi::Value AddonContext::LoadSequenceStateFromFile(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    AddonContextLoadSequenceStateFromFileWorker* worker = new AddonContextLoadSequenceStateFromFileWorker(info, this);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
 Napi::Value AddonContext::PrintTimings(const Napi::CallbackInfo& info) {
     llama_perf_context_print(ctx);
     llama_perf_context_reset(ctx);
@@ -797,6 +934,8 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("setThreads", &AddonContext::SetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),
                 InstanceMethod("ensureDraftContextIsCompatibleForSpeculative", &AddonContext::EnsureDraftContextIsCompatibleForSpeculative),
+                InstanceMethod("saveSequenceStateToFile", &AddonContext::SaveSequenceStateToFile),
+                InstanceMethod("loadSequenceStateFromFile", &AddonContext::LoadSequenceStateFromFile),
                 InstanceMethod("setLora", &AddonContext::SetLora),
                 InstanceMethod("dispose", &AddonContext::Dispose),
             }
