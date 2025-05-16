@@ -122,5 +122,6 @@ export const documentationPageUrls = {
         RosettaIllegalHardwareInstruction: documentationUrl + "/guide/troubleshooting#illegal-hardware-instruction"
     }
 } as const;
+export const newGithubIssueUrl = "https://github.com/withcatai/node-llama-cpp/issues";
 export const recommendedBaseDockerImage = "node:20";
 export const minAllowedContextSizeInCalculations = 24;

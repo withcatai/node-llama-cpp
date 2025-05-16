@@ -3,9 +3,11 @@ import {fileURLToPath} from "url";
 import {createRequire} from "module";
 import path from "path";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
-import {runningInElectron} from "../../utils/runtime.js";
+import {runningInBun, runningInElectron} from "../../utils/runtime.js";
 import {BuildGpu, LlamaLogLevel} from "../types.js";
 import {LlamaLogLevelToAddonLogLevel} from "../Llama.js";
+import {newGithubIssueUrl} from "../../config.js";
+import {getPlatform} from "./getPlatform.js";
 import type {BindingModule} from "../AddonTypes.js";
 
 const require = createRequire(import.meta.url);
@@ -31,6 +33,28 @@ export async function testBindingBinary(
         );
 
         return true;
+    }
+
+    try {
+        const runningInsideSnapOnLinux = getPlatform() === "linux" && process.env.SNAP != null;
+        if (runningInsideSnapOnLinux && !runningInBun && !runningInElectron) {
+            const nodeSea = await import("node:sea");
+            if (nodeSea.isSea()) {
+                console.warn(
+                    getConsoleLogPrefix() +
+                    "node SEA is detected, so testing a binding binary with the current system prior to importing it cannot be done.\n" +
+                    getConsoleLogPrefix() +
+                    "Assuming the test passed with the risk that the process may crash due to an incompatible binary.\n" +
+                    getConsoleLogPrefix() +
+                    "If this is an issue in your case, " +
+                    "please open an issue on GitHub with the details of the environment where this happens: " + newGithubIssueUrl
+                );
+
+                return true;
+            }
+        }
+    } catch (err) {
+        // do nothing
     }
 
     async function getForkFunction() {
