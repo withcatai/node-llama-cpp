@@ -46,6 +46,7 @@ export type LlamaOptions = {
      * - **`false`**: Disable any GPU support and only use the CPU.
      *
      * `"auto"` by default.
+     * @see Use the `getLlamaGpuTypes` function to get the available GPU types (from the above list) for the current machine at runtime.
      */
     gpu?: "auto" | LlamaGpuType | {
         type: "auto",

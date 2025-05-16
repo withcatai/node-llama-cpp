@@ -1,6 +1,7 @@
 import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
 import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/getLlama.js";
+import {getLlamaGpuTypes} from "./bindings/utils/getLlamaGpuTypes.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {
     type LlamaGpuType, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType
@@ -119,6 +120,7 @@ import type {TemplateChatWrapperSegmentsOptions} from "./chatWrappers/generic/ut
 export {
     Llama,
     getLlama,
+    getLlamaGpuTypes,
     type LlamaOptions,
     type LastBuildOptions,
     type LlamaGpuType,
