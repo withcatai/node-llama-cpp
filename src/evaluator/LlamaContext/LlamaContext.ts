@@ -1580,9 +1580,8 @@ export class LlamaContextSequence {
 
     /**
      * Save the current context sequence evaluation state to a file.
-     * @see [Saving and restoring a context sequence evaluation state](
-     * https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state
-     * )
+     * @see [Saving and restoring a context sequence evaluation state
+     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
      */
     public async saveStateToFile(filePath: string) {
         this._ensureNotDisposed();
@@ -1613,9 +1612,8 @@ export class LlamaContextSequence {
      * Trying to load a state file with a longer context size than the current sequence's context size will fail and throw an error.
      *
      * You must ensure that the file was created from the exact same model, otherwise, using this function may crash the process.
-     * @see [Saving and restoring a context sequence evaluation state](
-     * https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state
-     * )
+     * @see [Saving and restoring a context sequence evaluation state
+     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
      */
     public async loadStateFromFile(filePath: string, acceptRisk: {
         /**
