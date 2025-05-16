@@ -11,7 +11,7 @@ installationCommand='bash -c "$(curl -fsSL https://raw.githubusercontent.com/wit
 
 defaultRepo="withcatai/node-llama-cpp"
 targetFolder="$HOME/workspace/test-node-llama-cpp"
-nodejsVersion="21"
+nodejsVersion="20"
 
 
 colorYellow=$'\e[33m'
