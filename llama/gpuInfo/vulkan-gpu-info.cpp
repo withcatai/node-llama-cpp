@@ -66,7 +66,6 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
                         features2.pNext = &vk11Features;
 
                         vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
-                        VkPhysicalDeviceFeatures2 device_features2;
 
                         if (!vk11Features.storageBuffer16BitAccess) {
                             *checkSupported = false;
