@@ -279,7 +279,10 @@ function findMaxValidValue<T>({
     let bestValue: null | {value: number, result: T} = null;
 
     for (let value = maxValue; value >= minValue;) {
-        const result = test(value);
+        const result: T | null = (bestValue != null && value === bestValue.value)
+            ? bestValue.result
+            : test(value);
+
         if (result != null) {
             if (bestValue == null || value >= bestValue.value) {
                 bestValue = {value: value, result: result};
