@@ -11,6 +11,14 @@ export default defineConfig({
                 minForks: 1,
                 maxForks: 1,
                 singleFork: true
+
+                // uncomment for profiling
+                // execArgv: [
+                //     "--cpu-prof",
+                //     "--cpu-prof-dir=test-runner-profile",
+                //     "--heap-prof",
+                //     "--heap-prof-dir=test-runner-profile"
+                // ]
             }
         },
         snapshotSerializers: [

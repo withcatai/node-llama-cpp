@@ -17,6 +17,7 @@ node_modules
 /test/.temp
 /temp
 /coverage
+/test-runner-profile
 
 /llama/compile_commands.json
 /llama/llama.cpp
