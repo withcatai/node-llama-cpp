@@ -457,15 +457,6 @@ export class GgufInsights {
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
 
-        const nHeadKvArray = Array(layers).fill(nHead);
-        if (Array.isArray(nHeadKv)) {
-            for (let i = 0; i < layers; i++) {
-                if (nHeadKv[i] !== 0)
-                    nHeadKvArray[i] = nHeadKv[i];
-            }
-        } else
-            nHeadKvArray.fill(nHeadKv);
-
         const ssmDConv = this._ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
         const ssmDInner = this._ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
         const modelNEmbdKS = (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0) !== 0
@@ -479,9 +470,15 @@ export class GgufInsights {
 
         let totalElementsK = 0;
         let totalElementsV = 0;
-        for (let i = 0; i < nHeadKvArray.length; i++) {
-            const nEmbdKGqa = nEmbdHeadK * nHeadKvArray[i]!;
-            const nEmbdVGqa = nEmbdHeadV * nHeadKvArray[i]!;
+        for (let i = 0; i < layers; i++) {
+            const nHeadKvArrayItem: number = (typeof nHeadKv === "number")
+                ? nHeadKv
+                : nHeadKv[i] !== 0
+                    ? nHeadKv[i]
+                    : nHead;
+
+            const nEmbdKGqa = nEmbdHeadK * nHeadKvArrayItem;
+            const nEmbdVGqa = nEmbdHeadV * nHeadKvArrayItem;
 
             const totalNEmbdKGqa = nEmbdKGqa + modelNEmbdKS;
             const totalNEmbdVGqa = nEmbdVGqa + modelNEmbdVS;
