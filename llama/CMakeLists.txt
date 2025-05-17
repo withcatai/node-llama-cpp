@@ -4,6 +4,14 @@ if (NLC_CURRENT_PLATFORM STREQUAL "win-x64" OR NLC_CURRENT_PLATFORM STREQUAL "wi
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
+if (NLC_CURRENT_PLATFORM STREQUAL "win-x64")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL" CACHE STRING "" FORCE)
+    else()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "" FORCE)
+    endif()
+endif()
+
 if (NLC_TARGET_PLATFORM STREQUAL "win-arm64" AND (CMAKE_GENERATOR STREQUAL "Ninja" OR CMAKE_GENERATOR STREQUAL "Ninja Multi-Config") AND NOT MINGW)
     if(NLC_CURRENT_PLATFORM STREQUAL "win-x64")
         include("./profiles/llvm.win32.host-x64.target-arm64.cmake")
