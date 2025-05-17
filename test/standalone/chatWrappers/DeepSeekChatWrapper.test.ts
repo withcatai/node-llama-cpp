@@ -66,7 +66,7 @@ describe("DeepSeekChatWrapper", () => {
             text: "What is the time?"
         }, {
             type: "model",
-            response: ["I'll fet some information for you", {
+            response: ["I'll fetch some information for you", {
                 type: "functionCall",
                 name: "getTime",
                 description: "Retrieve the current time",
@@ -270,7 +270,7 @@ describe("DeepSeekChatWrapper", () => {
             new SpecialTokensText("<｜end▁of▁sentence｜><｜User｜>"),
             "What is the time?",
             new SpecialTokensText("<｜Assistant｜>"),
-            "I'll fet some information for you",
+            "I'll fetch some information for you",
             new SpecialTokensText("<function="),
             "getTime",
             new SpecialTokensText(">"),

@@ -239,22 +239,81 @@ function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmb
 }) {
     const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
 
-    for (let contextSize = maxContextSize; contextSize >= minAllowedContextSizeInCalculations; contextSize--) {
-        const contextVram = ggufInsights.estimateContextResourceRequirements({
-            contextSize,
-            batchSize: getDefaultContextBatchSize({contextSize, sequences: 1}),
-            modelGpuLayers: gpuLayers,
-            sequences: 1,
-            isEmbeddingContext,
-            flashAttention
-        }).gpuVram;
-
-        if (contextVram <= vram)
-            return {
+    return findMaxValidValue({
+        maxValue: maxContextSize,
+        minValue: minAllowedContextSizeInCalculations,
+        minStep: 1,
+        test(contextSize) {
+            const contextVram = ggufInsights.estimateContextResourceRequirements({
                 contextSize,
-                vram: contextVram
-            };
+                batchSize: getDefaultContextBatchSize({contextSize, sequences: 1}),
+                modelGpuLayers: gpuLayers,
+                sequences: 1,
+                isEmbeddingContext,
+                flashAttention
+            }).gpuVram;
+
+            if (contextVram <= vram)
+                return {
+                    contextSize,
+                    vram: contextVram
+                };
+
+            return null;
+        }
+    });
+}
+
+function findMaxValidValue<T>({
+    maxValue,
+    minValue,
+    minStep = 1,
+    test
+}: {
+    maxValue: number,
+    minValue: number,
+    minStep?: number,
+    test(value: number): T | null
+}): T | null {
+    let step = -Math.max(minStep, Math.floor((maxValue - minValue) / 4));
+    let bestValue: null | {value: number, result: T} = null;
+
+    for (let value = maxValue; value >= minValue;) {
+        const result: T | null = (bestValue != null && value === bestValue.value)
+            ? bestValue.result
+            : test(value);
+
+        if (result != null) {
+            if (bestValue == null || value >= bestValue.value) {
+                bestValue = {value: value, result: result};
+
+                if (step === -minStep)
+                    break;
+                else if (step < 0)
+                    step = Math.max(minStep, Math.floor(-step / 2));
+            }
+        } else if (bestValue != null && value < bestValue.value) {
+            value = bestValue.value;
+            step = Math.max(minStep, Math.floor(Math.abs(step) / 2));
+            continue;
+        } else if (step > 0)
+            step = -Math.max(minStep, Math.floor(step / 2));
+
+        if (value === minValue && step === -minStep)
+            break;
+
+        value += step;
+        if (value < minValue) {
+            value = minValue;
+            step = Math.max(minStep, Math.floor(Math.abs(step) / 2));
+        } else if (value > maxValue) {
+            value = maxValue;
+            step = -Math.max(minStep, Math.floor(Math.abs(step) / 2));
+        }
     }
+
+    if (bestValue != null)
+        return bestValue.result;
 
     return null;
 }

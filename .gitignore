@@ -14,8 +14,10 @@ node_modules
 /.vitepress/.cache
 /test/.models
 /test/temp
+/test/.temp
 /temp
 /coverage
+/test-runner-profile
 
 /llama/compile_commands.json
 /llama/llama.cpp

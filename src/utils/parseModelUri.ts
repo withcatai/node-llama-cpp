@@ -4,7 +4,8 @@ import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} f
 import {createSplitPartFilename, getGgufSplitPartsInfo} from "../gguf/utils/resolveSplitGgufParts.js";
 import {ggufQuantNames} from "../gguf/utils/ggufQuantNames.js";
 import {isUrl} from "./isUrl.js";
-import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccessTokens.js";
+import {isHuggingFaceUrl, ModelDownloadEndpoints, resolveHuggingFaceEndpoint} from "./modelDownloadEndpoints.js";
 import {parseModelFileName} from "./parseModelFileName.js";
 
 const defaultHuggingFaceBranch = "main";
@@ -36,23 +37,26 @@ export type ResolvedParsedModelUri = {
     fullFilename: string
 };
 
-export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolean = false): ParsedModelUri | null {
+export function parseModelUri(
+    urlOrUri: string, convertUrlToSupportedUri: boolean = false, endpoints?: ModelDownloadEndpoints
+): ParsedModelUri | null {
     if (urlOrUri.startsWith("hf://"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("hf://".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf://".length), urlOrUri, endpoints);
     else if (urlOrUri.startsWith("huggingface://"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface://".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface://".length), urlOrUri, endpoints);
     else if (urlOrUri.startsWith("hf:"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("hf:".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf:".length), urlOrUri, endpoints);
     else if (urlOrUri.startsWith("huggingface:"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface:".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface:".length), urlOrUri, endpoints);
     else if (urlOrUri.startsWith("hf.co/"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("hf.co/".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("hf.co/".length), urlOrUri, endpoints);
     else if (urlOrUri.startsWith("huggingface.co/"))
-        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface.co/".length), urlOrUri);
+        return parseHuggingFaceUriContent(urlOrUri.slice("huggingface.co/".length), urlOrUri, endpoints);
 
     if (isUrl(urlOrUri)) {
         const parsedUrl = new URL(urlOrUri);
-        if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+
+        if (isHuggingFaceUrl(parsedUrl.href, endpoints)) {
             const pathnameParts = parsedUrl.pathname.split("/");
             const slashes = pathnameParts.length - 1;
             const [, user, model] = pathnameParts;
@@ -60,14 +64,15 @@ export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolea
             if (slashes === 2 && user != null && model != null) {
                 return parseHuggingFaceUriContent([
                     decodeURIComponent(user), "/", decodeURIComponent(model)
-                ].join(""), urlOrUri);
+                ].join(""), urlOrUri, endpoints);
             }
         }
     }
 
     if (convertUrlToSupportedUri && isUrl(urlOrUri)) {
-        const parsedUrl = new URL(normalizeGgufDownloadUrl(urlOrUri));
-        if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+        const parsedUrl = new URL(normalizeGgufDownloadUrl(urlOrUri, endpoints));
+
+        if (isHuggingFaceUrl(parsedUrl.href, endpoints)) {
             const pathnameParts = parsedUrl.pathname.split("/");
             const [, user, model, resolve, branch, ...pathParts] = pathnameParts;
             const filePath = pathParts.join("/");
@@ -83,7 +88,7 @@ export function parseModelUri(urlOrUri: string, convertUrlToSupportedUri: boolea
                     branch !== defaultHuggingFaceBranch
                         ? `#${decodeURIComponent(branch)}`
                         : ""
-                ].join(""), urlOrUri);
+                ].join(""), urlOrUri, endpoints);
             }
         }
     }
@@ -101,16 +106,17 @@ export function isModelUri(modelUri: string) {
 
 export async function resolveParsedModelUri(
     modelUri: ParsedModelUri,
-    options?: {tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string}
+    options?: {tokens?: ModelFileAccessTokens, endpoints?: ModelDownloadEndpoints, signal?: AbortSignal, authorizationHeader?: string}
 ): Promise<ResolvedParsedModelUri>;
 export async function resolveParsedModelUri(
     modelUri: ParsedModelUri | undefined | null,
-    options?: {tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string}
+    options?: {tokens?: ModelFileAccessTokens, endpoints?: ModelDownloadEndpoints, signal?: AbortSignal, authorizationHeader?: string}
 ): Promise<ResolvedParsedModelUri | undefined | null>;
 export async function resolveParsedModelUri(
     modelUri: ParsedModelUri | undefined | null,
-    {tokens, signal, authorizationHeader}: {
+    {tokens, endpoints, signal, authorizationHeader}: {
         tokens?: ModelFileAccessTokens,
+        endpoints?: ModelDownloadEndpoints,
         signal?: AbortSignal,
         authorizationHeader?: string
     } = {}
@@ -131,6 +137,7 @@ export async function resolveParsedModelUri(
         modelTag,
         fullUri: modelUri.uri,
         tokens,
+        endpoints,
         signal,
         authorizationHeader
     });
@@ -159,7 +166,7 @@ export async function resolveParsedModelUri(
         : resolvedBaseFilename;
 
     const resolvedUrl = normalizeGgufDownloadUrl([
-        "https://huggingface.co/", encodeURIComponent(modelUri.resolveDetails.user),
+        resolveHuggingFaceEndpoint(endpoints), encodeURIComponent(modelUri.resolveDetails.user),
         "/", encodeURIComponent(modelUri.resolveDetails.model),
         "/resolve/", encodeURIComponent(defaultHuggingFaceBranch), "/",
         filename
@@ -167,7 +174,7 @@ export async function resolveParsedModelUri(
             .map((item) => encodeURIComponent(item))
             .join("/"),
         "?download=true"
-    ].join(""));
+    ].join(""), endpoints);
 
     return {
         type: "resolved",
@@ -184,22 +191,22 @@ export function getAuthorizationHeader(headers?: Record<string, string>): string
 }
 
 async function fetchHuggingFaceModelManifest({
-    user, model, modelTag, fullUri, tokens, signal, authorizationHeader
+    user, model, modelTag, fullUri, tokens, endpoints, signal, authorizationHeader
 }: {
     user: string, model: string, modelTag: string,
-    fullUri: string, tokens?: ModelFileAccessTokens, signal?: AbortSignal, authorizationHeader?: string
+    fullUri: string, tokens?: ModelFileAccessTokens, endpoints?: ModelDownloadEndpoints, signal?: AbortSignal, authorizationHeader?: string
 }): Promise<{
     rfilename: string,
     size: number
 }> {
     const manifestUrl = [
-        "https://huggingface.co/v2/", encodeURIComponent(user),
+        resolveHuggingFaceEndpoint(endpoints), "v2/", encodeURIComponent(user),
         "/", encodeURIComponent(model),
         "/manifests/", encodeURIComponent(modelTag)
     ].join("");
     const headersToTry = [
         {},
-        await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens)
+        await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens, endpoints)
     ];
 
     while (headersToTry.length > 0) {
@@ -254,7 +261,7 @@ async function fetchHuggingFaceModelManifest({
     throw new Error(`Failed to fetch manifest for ${JSON.stringify(fullUri)}: no more headers to try`);
 }
 
-function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUri {
+function parseHuggingFaceUriContent(uri: string, fullUri: string, endpoints: ModelDownloadEndpoints | undefined): ParsedModelUri {
     const [user, model, ...pathParts] = uri.split("/");
     let rest = pathParts.join("/");
 
@@ -329,11 +336,11 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string): ParsedModelUr
         throw new Error(`Invalid Hugging Face URI: ${fullUri}`);
 
     const resolvedUrl = normalizeGgufDownloadUrl([
-        "https://huggingface.co/", encodeURIComponent(user),
+        resolveHuggingFaceEndpoint(endpoints), encodeURIComponent(user),
         "/", encodeURIComponent(model),
         "/resolve/", encodeURIComponent(branch),
         "/", filePath, "?download=true"
-    ].join(""));
+    ].join(""), endpoints);
 
     const filename = resolveModelFilenameFromUrl(resolvedUrl)!;
     const filePrefix = buildHuggingFaceFilePrefix(user, model, branch, filePathParts.slice(0, -1), filename);

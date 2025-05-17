@@ -391,3 +391,85 @@ console.log(
     newTokens
 );
 ```
+
+### Save and Restore State {#save-and-restore-state}
+You can save the evaluation state of a context sequence to then later load it back.
+
+This is useful for avoiding the evaluation of tokens that you've already evaluated in the past.
+
+::: warning
+When loading a context sequence state from a file,
+always ensure that the model used to create the context sequence is exactly the same as the one used to save the state file.
+
+Loading a state file created from a different model can crash the process,
+thus you have to pass `{acceptRisk: true}` to the [`loadStateFromFile`](../api/classes/LlamaContextSequence.md#loadstatefromfile) method to use it.
+
+Use with caution.
+:::
+
+::: code-group
+```typescript [Save state]
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const sequence = context.getSequence();
+
+const input = "The best way to";
+const tokens = model.tokenize(input);
+await sequence.evaluateWithoutGeneratingNewTokens(tokens);
+
+console.log(
+    "Current state:",
+    model.detokenize(sequence.contextTokens, true),
+    sequence.contextTokens
+);
+
+await sequence.saveStateToFile("state.bin");// [!code highlight]
+```
+:::
+
+::: code-group
+```typescript [Load state]
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, Token} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// ---cut---
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const sequence = context.getSequence();
+
+await sequence.loadStateFromFile("state.bin", {acceptRisk: true});// [!code highlight]
+
+console.log(
+    "Loaded state:",
+    model.detokenize(sequence.contextTokens, true),
+    sequence.contextTokens
+);
+
+const input = " find";
+const inputTokens = model.tokenize(input);
+const maxTokens = 10;
+const res: Token[] = [];
+for await (const token of sequence.evaluate(inputTokens)) {
+    res.push(token);
+
+    if (res.length >= maxTokens)
+        break;
+}
+
+console.log("Result:", model.detokenize(res));
+```
+:::

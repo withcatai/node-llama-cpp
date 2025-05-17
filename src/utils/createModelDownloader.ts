@@ -7,7 +7,8 @@ import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/reso
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {cliModelsDirectory, isCI} from "../config.js";
 import {safeEventCallback} from "./safeEventCallback.js";
-import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccesTokens.js";
+import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccessTokens.js";
+import {ModelDownloadEndpoints} from "./modelDownloadEndpoints.js";
 import {pushAll} from "./pushAll.js";
 import {resolveModelDestination} from "./resolveModelDestination.js";
 import {getAuthorizationHeader, resolveParsedModelUri} from "./parseModelUri.js";
@@ -19,7 +20,7 @@ export type ModelDownloaderOptions = ({
      *
      * The supported URI schemes are:
      * - **HTTP:** `https://`, `http://`
-     * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`#<quant>` is optional, but recommended)
+     * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`:<quant>` is optional, but recommended)
      * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
      */
     modelUri: string
@@ -67,7 +68,16 @@ export type ModelDownloaderOptions = ({
      */
     parallelDownloads?: number,
 
+    /**
+     * Tokens to use to access the remote model file when downloading.
+     */
     tokens?: ModelFileAccessTokens,
+
+    /**
+     * Configure the URLs used for resolving model URIs.
+     * @see [Model URIs](https://node-llama-cpp.withcat.ai/guide/downloading-models#model-uris)
+     */
+    endpoints?: ModelDownloadEndpoints,
 
     /** @internal */
     _showUriResolvingProgress?: boolean
@@ -89,7 +99,7 @@ export type ModelDownloaderOptions = ({
  *
  * The supported URI schemes are:
  * - **HTTP:** `https://`, `http://`
- * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`#<quant>` is optional, but recommended)
+ * - **Hugging Face:** `hf:<user>/<model>:<quant>` (`:<quant>` is optional, but recommended)
  * - **Hugging Face:** `hf:<user>/<model>/<file-path>#<branch>` (`#<branch>` is optional)
  * @example
  * ```typescript
@@ -206,6 +216,7 @@ export class ModelDownloader {
     /** @internal */ private readonly _showCliProgress: boolean;
     /** @internal */ private readonly _onProgress?: ModelDownloaderOptions["onProgress"];
     /** @internal */ private readonly _tokens?: ModelFileAccessTokens;
+    /** @internal */ private readonly _endpoints?: ModelDownloadEndpoints;
     /** @internal */ public readonly _deleteTempFileOnCancel: boolean;
     /** @internal */ private readonly _skipExisting: boolean;
     /** @internal */ private readonly _parallelDownloads: number;
@@ -223,7 +234,7 @@ export class ModelDownloader {
     }) {
         const {
             dirPath = cliModelsDirectory, headers, showCliProgress = false, onProgress, deleteTempFileOnCancel = true,
-            skipExisting = true, parallelDownloads = 4, tokens
+            skipExisting = true, parallelDownloads = 4, tokens, endpoints
         } = options;
 
         this._modelUrl = resolvedModelUrl;
@@ -236,6 +247,7 @@ export class ModelDownloader {
         this._skipExisting = skipExisting;
         this._parallelDownloads = parallelDownloads;
         this._tokens = tokens;
+        this._endpoints = endpoints;
 
         this._onDownloadProgress = this._onDownloadProgress.bind(this);
     }
@@ -352,7 +364,10 @@ export class ModelDownloader {
         if (this._tokens == null)
             return;
 
-        pushAll(this._tryHeaders, await resolveModelFileAccessTokensTryHeaders(this._modelUrl, this._tokens, this._headers));
+        pushAll(
+            this._tryHeaders,
+            await resolveModelFileAccessTokensTryHeaders(this._modelUrl, this._tokens, this._endpoints, this._headers)
+        );
     }
 
     /** @internal */
@@ -455,7 +470,7 @@ export class ModelDownloader {
             resolvedModelUrl: string,
             resolvedFileName?: string
         }> {
-            const resolvedModelDestination = resolveModelDestination(resolvedModelUri!);
+            const resolvedModelDestination = resolveModelDestination(resolvedModelUri!, undefined, options.endpoints);
 
             if (resolvedModelDestination.type == "file")
                 return {
@@ -482,11 +497,13 @@ export class ModelDownloader {
                 }, () => {
                     return resolveParsedModelUri(resolvedModelDestination.parsedUri, {
                         tokens: options.tokens,
+                        endpoints: options.endpoints,
                         authorizationHeader: getAuthorizationHeader(options.headers)
                     });
                 })
                 : await resolveParsedModelUri(resolvedModelDestination.parsedUri, {
                     tokens: options.tokens,
+                    endpoints: options.endpoints,
                     authorizationHeader: getAuthorizationHeader(options.headers)
                 });
 

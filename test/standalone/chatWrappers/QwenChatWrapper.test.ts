@@ -66,7 +66,7 @@ describe("QwenChatWrapper", () => {
             text: "What is the time?"
         }, {
             type: "model",
-            response: ["I'll fet some information for you", {
+            response: ["I'll fetch some information for you", {
                 type: "functionCall",
                 name: "getTime",
                 description: "Retrieve the current time",
@@ -187,10 +187,7 @@ describe("QwenChatWrapper", () => {
             "What is the time?",
             new SpecialTokensText("<|im_end|>
           <|im_start|>assistant
-          "),
-            "
-          ",
-            new SpecialTokensText("<tool_call>"),
+          <tool_call>"),
             "
           {"name": "getTime", "arguments": {"hours": "24", "seconds": true}}
           ",
@@ -310,8 +307,7 @@ describe("QwenChatWrapper", () => {
             new SpecialTokensText("<|im_end|>
           <|im_start|>assistant
           "),
-            "I'll fet some information for you
-          ",
+            "I'll fetch some information for you",
             new SpecialTokensText("<tool_call>"),
             "
           {"name": "getTime", "arguments": {"hours": "24", "seconds": true}}

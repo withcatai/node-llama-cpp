@@ -43,16 +43,16 @@ describe("bgeReranker", () => {
             expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.01798620996209156");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
+                0.000013674009084599736,
+                0.000013674009084599736,
+                0.000013674009084599736,
                 0.003684239899435989,
-                0.00001670142184809518,
+                0.000013674009084599736,
                 0.01798620996209156,
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
+                0.000013674009084599736,
+                0.000013674009084599736,
+                0.00002039908727992137,
+                0.000013674009084599736,
               ]
             `);
         });
@@ -94,16 +94,16 @@ describe("bgeReranker", () => {
             expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.01798620996209156");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
+                0.000013674009084599736,
+                0.000013674009084599736,
+                0.000013674009084599736,
                 0.003684239899435989,
-                0.00001670142184809518,
+                0.000013674009084599736,
                 0.01798620996209156,
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
-                0.00001670142184809518,
+                0.000013674009084599736,
+                0.000013674009084599736,
+                0.00002039908727992137,
+                0.000013674009084599736,
               ]
             `);
         });
@@ -156,27 +156,27 @@ describe("bgeReranker", () => {
                 },
                 {
                   "document": "Not all the things that shine are made of gold",
-                  "score": 0.00001670142184809518,
+                  "score": 0.00002039908727992137,
                 },
                 {
                   "document": "I love eating pizza with extra cheese",
-                  "score": 0.00001670142184809518,
+                  "score": 0.000013674009084599736,
                 },
                 {
                   "document": "Dogs love to play fetch with their owners",
-                  "score": 0.00001670142184809518,
+                  "score": 0.000013674009084599736,
                 },
                 {
                   "document": "The sky is clear and blue today",
-                  "score": 0.00001670142184809518,
+                  "score": 0.000013674009084599736,
                 },
                 {
                   "document": "Cleaning the house is a good way to keep it tidy",
-                  "score": 0.00001670142184809518,
+                  "score": 0.000013674009084599736,
                 },
                 {
                   "document": "A warm cup of tea is perfect for a cold winter day",
-                  "score": 0.00001670142184809518,
+                  "score": 0.000013674009084599736,
                 },
               ]
             `);
@@ -196,7 +196,7 @@ function simplifySortedRanks<const T extends {document: string, score: number}[]
 }
 
 function simplifyScore(score: number) {
-    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.2).toFixed(1)));
+    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.4).toFixed(1)));
 }
 
 function roundToPrecision(value: number, precision: number): number {

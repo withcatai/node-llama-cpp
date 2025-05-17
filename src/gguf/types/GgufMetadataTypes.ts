@@ -1,5 +1,7 @@
 export const enum GgufArchitectureType {
     llama = "llama",
+    llama4 = "llama4",
+    deci = "deci",
     falcon = "falcon",
     grok = "grok",
     gpt2 = "gpt2",
@@ -11,14 +13,19 @@ export const enum GgufArchitectureType {
     refact = "refact",
     bert = "bert",
     nomicBert = "nomic-bert",
+    nomicBertMoe = "nomic-bert-moe",
     jinaBertV2 = "jina-bert-v2",
     bloom = "bloom",
     stablelm = "stablelm",
     qwen = "qwen",
     qwen2 = "qwen2",
     qwen2moe = "qwen2moe",
+    qwen2vl = "qwen2vl",
+    qwen3 = "qwen3",
+    qwen3moe = "qwen3moe",
     phi2 = "phi2",
     phi3 = "phi3",
+    phimoe = "phimoe",
     plamo = "plamo",
     codeshell = "codeshell",
     orion = "orion",
@@ -27,18 +34,22 @@ export const enum GgufArchitectureType {
     minicpm3 = "minicpm3",
     gemma = "gemma",
     gemma2 = "gemma2",
+    gemma3 = "gemma3",
     starcoder2 = "starcoder2",
     mamba = "mamba",
     xverse = "xverse",
     commandR = "command-r",
+    cohere2 = "cohere2",
     dbrx = "dbrx",
     olmo = "olmo",
     olmo2 = "olmo2",
     olmoe = "olmoe",
     openelm = "openelm",
     arctic = "arctic",
+    deepseek = "deepseek",
     deepseek2 = "deepseek2",
     chatglm = "chatglm",
+    glm4 = "glm4",
     bitnet = "bitnet",
     t5 = "t5",
     t5encoder = "t5encoder",
@@ -46,9 +57,15 @@ export const enum GgufArchitectureType {
     nemotron = "nemotron",
     exaone = "exaone",
     rwkv6 = "rwkv6",
+    rwkv6qwen2 = "rwkv6qwen2",
+    rwkv7 = "rwkv7",
+    arwkv7 = "arwkv7",
     granite = "granite",
     granitemoe = "granitemoe",
     chameleon = "chameleon",
+    wavtokenizerDec = "wavtokenizer-dec",
+    plm = "plm",
+    bailingmoe = "bailingmoe",
     unknown = "(unknown)"
 }
 
@@ -224,11 +241,11 @@ export const enum GgufMetadataTokenizerTokenType {
 export type GgufMetadataTokenizer = {
     readonly ggml: {
         readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | string,
-        readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" | "mpt" |
-            "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" | "jina-v2-code" |
-            "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" | "viking" |
-            "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "chameleon" | "minerva-7b" | "megrez" |
-            "gpt-4o" | string,
+        readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" |
+            "pixtral" | "mpt" | "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" |
+            "jina-v2-code" | "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" |
+            "viking" | "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "chameleon" | "minerva-7b" |
+            "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | string,
         readonly tokens: readonly string[],
         readonly token_type: GgufMetadataTokenizerTokenType[],
         readonly token_type_count?: number,
@@ -288,10 +305,11 @@ export type GgufMetadataDefaultArchitectureType = {
     readonly expert_used_count?: number,
     readonly pooling_type?: GgufMetadataArchitecturePoolingType,
     readonly logit_scale?: number,
+    readonly token_shift_count?: number,
 
     readonly attention?: {
         readonly head_count?: number,
-        readonly head_count_kv?: number,
+        readonly head_count_kv?: number | number[],
         readonly max_alibi_bias?: number,
         readonly clamp_kqv?: number,
         readonly layer_norm_epsilon?: number,
@@ -318,6 +336,10 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly inner_size?: number,
         readonly state_size?: number,
         readonly time_step_rank?: number
+    },
+
+    readonly wkv?: {
+        readonly head_size?: number
     }
 };
 

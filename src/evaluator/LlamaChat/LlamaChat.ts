@@ -105,6 +105,37 @@ export type LlamaChatResponseSegmentChunk = {
     segmentEndTime?: Date
 };
 
+export type LlamaChatResponseFunctionCallParamsChunk = {
+    /**
+     * Each different function call has a different `callIndex`.
+     *
+     * When the previous function call has finished being generated, the `callIndex` of the next one will increment.
+     *
+     * Use this value to distinguish between different function calls.
+     */
+    callIndex: number,
+
+    /**
+     * The name of the function being called
+     */
+    functionName: string,
+
+    /**
+     * A chunk of the generated text used for the function call parameters.
+     *
+     * Collect all the chunks together to construct the full function call parameters.
+     *
+     * After the function call is finished, the entire constructed params text can be parsed as a JSON object,
+     * according to the function parameters schema.
+     */
+    paramsChunk: string,
+
+    /**
+     * When this is `true`, the current chunk is the last chunk in the generation of the current function call parameters.
+     */
+    done: boolean
+};
+
 export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
     /**
      * Called as the model generates the main response with the generated text chunk.
@@ -247,13 +278,30 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          * A number between `0` (exclusive) and `1` (inclusive).
          */
         minimumOverlapPercentageToPreventContextShift?: number
-    }
+    },
+
+    /**
+     * Called as the model generates function calls with the generated parameters chunk for each function call.
+     *
+     * Useful for streaming the generated function call parameters as they're being generated.
+     * Only useful in specific use cases,
+     * such as showing the generated textual file content as it's being generated (note that doing this requires parsing incomplete JSON).
+     *
+     * The constructed text from all the params chunks of a given function call can be parsed as a JSON object,
+     * according to the function parameters schema.
+     *
+     * Each function call has its own `callIndex` you can use to distinguish between them.
+     *
+     * Only relevant when using function calling (via passing the `functions` option).
+     */
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
     documentFunctionParams?: never,
     maxParallelFunctionCalls?: never,
-    onFunctionCall?: never
+    onFunctionCall?: never,
+    onFunctionCallParamsChunk?: never
 } | {
     grammar?: never,
     functions?: Functions | ChatModelFunctions,
@@ -261,7 +309,8 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     maxParallelFunctionCalls?: number,
     onFunctionCall?: (
         functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>
-    ) => void
+    ) => void,
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
 });
 
 export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatModelFunctions | undefined = undefined> = {
@@ -465,6 +514,7 @@ export class LlamaChat {
             onTextChunk,
             onToken,
             onResponseChunk,
+            onFunctionCallParamsChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -501,6 +551,7 @@ export class LlamaChat {
                 onTextChunk,
                 onToken,
                 onResponseChunk,
+                onFunctionCallParamsChunk,
                 signal,
                 stopOnAbortSignal,
                 maxTokens,
@@ -1433,6 +1484,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly onTextChunk: LLamaChatGenerateResponseOptions<Functions>["onTextChunk"];
     private readonly onToken: LLamaChatGenerateResponseOptions<Functions>["onToken"];
     private readonly onResponseChunk: LLamaChatGenerateResponseOptions<Functions>["onResponseChunk"];
+    private readonly onFunctionCallParamsChunk: LLamaChatGenerateResponseOptions<Functions>["onFunctionCallParamsChunk"];
     private readonly signal: LLamaChatGenerateResponseOptions<Functions>["signal"];
     private readonly stopOnAbortSignal: LLamaChatGenerateResponseOptions<Functions>["stopOnAbortSignal"];
     public readonly maxTokens: LLamaChatGenerateResponseOptions<Functions>["maxTokens"];
@@ -1531,6 +1583,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             onTextChunk,
             onToken,
             onResponseChunk,
+            onFunctionCallParamsChunk,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -1563,6 +1616,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.onTextChunk = safeEventCallback(onTextChunk);
         this.onToken = safeEventCallback(onToken);
         this.onResponseChunk = safeEventCallback(onResponseChunk);
+        this.onFunctionCallParamsChunk = safeEventCallback(onFunctionCallParamsChunk);
         this.signal = signal;
         this.stopOnAbortSignal = stopOnAbortSignal;
         this.maxTokens = maxTokens;
@@ -2238,13 +2292,32 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                         .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
 
-                    for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
-                        pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
+                    if (this.currentFunctionCallCurrentPartTokens.length > 0)
+                        this.onFunctionCallParamsChunk?.({
+                            callIndex: this.resFunctionCalls.length,
+                            functionName: this.functionEvaluationFunctionName,
+                            paramsChunk: this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens, false, lastPartTokens),
+                            done: false
+                        });
 
+                    for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
                         functionParamsGenerationDoneDetector.recordGeneration({
                             text: this.currentText,
                             tokens: this.currentTokens
                         });
+
+                        this.onFunctionCallParamsChunk?.({
+                            callIndex: this.resFunctionCalls.length,
+                            functionName: this.functionEvaluationFunctionName,
+                            paramsChunk: this.llamaChat.model.detokenize(
+                                tokens,
+                                false,
+                                resolveLastTokens([lastPartTokens, this.currentFunctionCallCurrentPartTokens])
+                            ),
+                            done: functionParamsGenerationDoneDetector.hasTriggeredStops
+                        });
+
+                        pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                         if (functionParamsGenerationDoneDetector.hasTriggeredStops)
                             break;
@@ -3073,7 +3146,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
             if (this._segmentsStackSet.has(type)) {
                 // `currentType` suffix is already handled above
-                if (type === currentType && handleDetector(suffix, "pop", type))
+                if (type !== currentType && handleDetector(suffix, "pop", type))
                     return;
             } else
                 suffix?.clearInProgressStops();

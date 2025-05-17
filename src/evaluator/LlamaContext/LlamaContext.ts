@@ -1,3 +1,4 @@
+import path from "path";
 import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
@@ -1145,7 +1146,6 @@ export class LlamaContextSequence {
 
     /**
      * Clear the history of the sequence.
-     * If `prependBos` was enabled, the BOS token will be prepended to the sequence again.
      */
     public async clearHistory() {
         this._ensureNotDisposed();
@@ -1575,6 +1575,90 @@ export class LlamaContextSequence {
         } finally {
             evaluatorLock.dispose();
             void withLock(sampler, "sample", sampler.asyncDispose);
+        }
+    }
+
+    /**
+     * Save the current context sequence evaluation state to a file.
+     * @see [Saving and restoring a context sequence evaluation state
+     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
+     */
+    public async saveStateToFile(filePath: string) {
+        this._ensureNotDisposed();
+
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+
+        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        const contextLock = await acquireLock(this._context, "context");
+
+        try {
+            this._ensureNotDisposed();
+
+            const fileSize = await this._context._ctx.saveSequenceStateToFile(
+                resolvedPath,
+                this._sequenceId,
+                Uint32Array.from(this.contextTokens)
+            );
+            return {fileSize};
+        } finally {
+            contextLock.dispose();
+            evaluatorLock.dispose();
+        }
+    }
+
+    /**
+     * Load a context sequence evaluation state from a file.
+     *
+     * Trying to load a state file with a longer context size than the current sequence's context size will fail and throw an error.
+     *
+     * You must ensure that the file was created from the exact same model, otherwise, using this function may crash the process.
+     * @see [Saving and restoring a context sequence evaluation state
+     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
+     */
+    public async loadStateFromFile(filePath: string, acceptRisk: {
+        /**
+         * Loading a state file created using a different model may crash the process.
+         *
+         * You must accept this risk to use this feature.
+         */
+        acceptRisk: true
+    }) {
+        if (!acceptRisk.acceptRisk)
+            throw new Error("The `acceptRisk` option must be set to `true` to use this feature");
+
+        this._ensureNotDisposed();
+
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+
+        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        const contextLock = await acquireLock(this._context, "context");
+
+        try {
+            this._ensureNotDisposed();
+
+            this._tokenPredictorOwner = {};
+            await this._abortTokenPredictor(true);
+            this._ensureNotDisposed();
+
+            this._loadedTokenPredictions.length = 0;
+            this._nextTokenIndex = 0;
+            this._contextTokens = [];
+
+            const tokens = Array.from(
+                await this._context._ctx.loadSequenceStateFromFile(resolvedPath, this._sequenceId, this.contextSize)
+            ) as Token[];
+
+            if (tokens.length > this.contextSize) {
+                this._context._ctx.disposeSequence(this._sequenceId);
+                throw new Error("The given state file is too large for the current context size");
+            }
+
+            this._contextTokens = tokens;
+            this._nextTokenIndex = tokens.length;
+            this._loadedTokenPredictions.length = 0;
+        } finally {
+            contextLock.dispose();
+            evaluatorLock.dispose();
         }
     }
 

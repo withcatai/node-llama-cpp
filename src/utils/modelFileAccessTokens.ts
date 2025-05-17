@@ -3,6 +3,7 @@ import path from "path";
 import os from "os";
 import fs from "fs-extra";
 import {isUrl} from "./isUrl.js";
+import {isHuggingFaceUrl, ModelDownloadEndpoints} from "./modelDownloadEndpoints.js";
 
 export type ModelFileAccessTokens = {
     huggingFace?: string
@@ -11,6 +12,7 @@ export type ModelFileAccessTokens = {
 export async function resolveModelFileAccessTokensTryHeaders(
     modelUrl: string,
     tokens?: ModelFileAccessTokens,
+    endpoints?: ModelDownloadEndpoints,
     baseHeaders?: Record<string, string>
 ) {
     const res: Record<string, string>[] = [];
@@ -18,10 +20,9 @@ export async function resolveModelFileAccessTokensTryHeaders(
     if (tokens == null || !isUrl(modelUrl))
         return res;
 
-    const parsedUrl = new URL(modelUrl);
     const {huggingFace} = tokens;
 
-    if (parsedUrl.hostname === "huggingface.co" || parsedUrl.hostname === "hf.co") {
+    if (isHuggingFaceUrl(modelUrl, endpoints)) {
         const hfToken = resolveHfToken(huggingFace);
 
         res.push({

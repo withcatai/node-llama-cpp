@@ -316,4 +316,5 @@ Explore the [API reference](../api/functions/getLlama.md) to learn more about th
 and use the search bar (press <kbd class="doc-kbd">/</kbd>) to find documentation for a specific topic or API.
 
 Check out the [roadmap](https://github.com/orgs/withcatai/projects/1) to see what's coming next,<br/>
+visit the [awesome list](./awesome.md) to find great projects that use `node-llama-cpp`,<br/>
 and consider [sponsoring `node-llama-cpp`](https://github.com/sponsors/giladgd) to accelerate the development of new features.

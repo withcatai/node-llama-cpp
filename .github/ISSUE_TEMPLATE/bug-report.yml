@@ -3,6 +3,8 @@ description: Report a reproducible bug
 labels:
   - requires triage
   - bug
+title: "bug: "
+type: "Bug"
 body:
   - type: markdown
     attributes:

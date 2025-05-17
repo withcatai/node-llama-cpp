@@ -46,6 +46,7 @@ export type LlamaOptions = {
      * - **`false`**: Disable any GPU support and only use the CPU.
      *
      * `"auto"` by default.
+     * @see Use the `getLlamaGpuTypes` function to get the available GPU types (from the above list) for the current machine at runtime.
      */
     gpu?: "auto" | LlamaGpuType | {
         type: "auto",
@@ -155,7 +156,22 @@ export type LlamaOptions = {
      *
      * The default can be set using the `NODE_LLAMA_CPP_DEBUG` environment variable.
      */
-    debug?: boolean
+    debug?: boolean,
+
+    /**
+     * Loads existing binaries without loading the `llama.cpp` backend,
+     * and then disposes the returned `Llama` instance right away before returning it.
+     *
+     * Useful for performing a fast and efficient test to check whether the given configuration can be loaded.
+     * Can be used for determining which GPU types the current machine supports before actually using them.
+     *
+     * Enabling this option implies that `build: "never"` and `skipDownload: true`.
+     *
+     * The returned `Llama` instance will be disposed and cannot be used.
+     *
+     * Defaults to `false`.
+     */
+    dryRun?: boolean
 };
 
 export type LastBuildOptions = {
@@ -230,7 +246,22 @@ export type LastBuildOptions = {
      *
      * The default can be set using the `NODE_LLAMA_CPP_DEBUG` environment variable.
      */
-    debug?: boolean
+    debug?: boolean,
+
+    /**
+     * Loads existing binaries without loading the `llama.cpp` backend,
+     * and then disposes the returned `Llama` instance right away before returning it.
+     *
+     * Useful for performing a fast and efficient test to check whether the given configuration can be loaded.
+     * Can be used for determining which GPU types the current machine supports before actually using them.
+     *
+     * Enabling this option implies that `build: "never"` and `skipDownload: true`.
+     *
+     * The returned `Llama` instance will be disposed and cannot be used.
+     *
+     * Defaults to `false`.
+     */
+    dryRun?: boolean
 };
 
 export const getLlamaFunctionName = "getLlama";
@@ -277,6 +308,7 @@ export async function getLlama(type: "lastBuild", lastBuildOptions?: LastBuildOp
 export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOptions?: LastBuildOptions) {
     if (options === "lastBuild") {
         const lastBuildInfo = await getLastBuildInfo();
+        const dryRun = lastBuildOptions?.dryRun ?? false;
         const getLlamaOptions: LlamaOptions = {
             logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppLogLevel,
             logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
@@ -286,7 +318,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             maxThreads: lastBuildOptions?.maxThreads,
             vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
             ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
-            debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
+            debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
+            dryRun
         };
 
         if (lastBuildInfo == null)
@@ -302,7 +335,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                 const binding = loadBindingModule(resolvedBindingPath);
                 const buildMetadata = await getLocalBuildBinaryBuildMetadata(lastBuildInfo.folderName);
 
-                return await Llama._create({
+                const res = await Llama._create({
                     bindings: binding,
                     bindingPath: resolvedBindingPath,
                     buildType: "localBuild",
@@ -312,8 +345,14 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     maxThreads: lastBuildOptions?.maxThreads,
                     vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
                     ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
-                    debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode
+                    debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
+                    skipLlamaInit: dryRun
                 });
+
+                if (dryRun)
+                    await res.dispose();
+
+                return res;
             } catch (err) {
                 console.error(getConsoleLogPrefix() + "Failed to load last build. Error:", err);
                 console.info(getConsoleLogPrefix() + "Falling back to default binaries");
@@ -339,7 +378,8 @@ export async function getLlamaForOptions({
     maxThreads,
     vramPadding = defaultLlamaVramPadding,
     ramPadding = defaultLlamaRamPadding,
-    debug = defaultLlamaCppDebugMode
+    debug = defaultLlamaCppDebugMode,
+    dryRun = false
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
     skipLlamaInit = false,
@@ -363,6 +403,13 @@ export async function getLlamaForOptions({
     if (vramPadding == null) vramPadding = defaultLlamaVramPadding;
     if (ramPadding == null) ramPadding = defaultLlamaRamPadding;
     if (debug == null) debug = defaultLlamaCppDebugMode;
+    if (dryRun == null) dryRun = false;
+
+    if (dryRun) {
+        build = "never";
+        skipDownload = true;
+        skipLlamaInit = true;
+    }
 
     const clonedLlamaCppRepoReleaseInfo = await getClonedLlamaCppRepoReleaseInfo();
     let canUsePrebuiltBinaries = (build === "forceRebuild" || !usePrebuiltBinaries)
@@ -404,7 +451,8 @@ export async function getLlamaForOptions({
                     maxThreads,
                     vramPadding,
                     ramPadding,
-                    debug
+                    debug,
+                    dryRun
                 });
             } catch (err) {
                 return await getLlamaForOptions({
@@ -420,7 +468,8 @@ export async function getLlamaForOptions({
                     maxThreads,
                     vramPadding,
                     ramPadding,
-                    debug
+                    debug,
+                    dryRun
                 });
             }
         } else
@@ -469,8 +518,12 @@ export async function getLlamaForOptions({
                 pipeBinaryTestErrorLogs
             });
 
-            if (llama != null)
+            if (llama != null) {
+                if (dryRun)
+                    await llama.dispose();
+
                 return llama;
+            }
         }
     }
 
@@ -511,8 +564,9 @@ export async function getLlamaForOptions({
             llamaCpp: llamaCppInfo
         };
 
+        let llama: Llama | undefined = undefined;
         try {
-            return await buildAndLoadLlamaBinary({
+            llama = await buildAndLoadLlamaBinary({
                 buildOptions,
                 skipDownload,
                 logLevel,
@@ -539,6 +593,13 @@ export async function getLlamaForOptions({
 
             if (isLastItem)
                 throw err;
+        }
+
+        if (llama != null) {
+            if (dryRun)
+                await llama.dispose();
+
+            return llama;
         }
     }
 

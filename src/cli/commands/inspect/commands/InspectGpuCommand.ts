@@ -165,6 +165,7 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
 
 async function getLlamaForGpu(gpu: BuildGpu) {
     try {
+        // if you're reading this line, then you're probably looking for the `dryRun` option on `getLlama`
         return await getLlamaForOptions({
             gpu: gpu,
             build: "never",

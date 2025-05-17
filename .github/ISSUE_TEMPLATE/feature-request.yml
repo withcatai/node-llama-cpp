@@ -3,6 +3,8 @@ description: Suggest an new idea for this project
 labels:
   - requires triage
   - new feature
+title: "feat: "
+type: "Feature"
 body:
   - type: markdown
     attributes:

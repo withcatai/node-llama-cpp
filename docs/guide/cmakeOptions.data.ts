@@ -90,6 +90,12 @@ function parseCmakeOptions(cmakeListsTxt: string, optionFilter: ((key: string) =
             }
         } else if (option.defaultValue === "${BUILD_SHARED_LIBS_DEFAULT}")
             option.defaultValue = htmlEscapeWithCodeMarkdown("`OFF` on MinGW, `ON` otherwise");
+        else if (option.defaultValue === "${GGML_CUDA_GRAPHS_DEFAULT}")
+            option.defaultValue = htmlEscapeWithCodeMarkdown("`ON`");
+        else if (option.defaultValue === "${GGML_NATIVE_DEFAULT}")
+            option.defaultValue = htmlEscapeWithCodeMarkdown("`OFF` when building for a different architecture,\n`ON` otherwise");
+        else if (option.key === "LLAMA_CURL")
+            option.defaultValue = htmlEscapeWithCodeMarkdown("`OFF`");
         else
             option.defaultValue = htmlEscapeWithCodeMarkdown(
                 option.defaultValue != null

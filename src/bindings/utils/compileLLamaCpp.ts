@@ -130,6 +130,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
+                if (!cmakeCustomOptions.has("LLAMA_CURL"))
+                    cmakeCustomOptions.set("LLAMA_CURL", "OFF");
+
                 if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))
                     cmakeCustomOptions.set("GGML_OPENMP", "OFF");
 
@@ -461,6 +464,15 @@ async function applyResultDirFixes(resultDirPath: string, tempDirPath: string) {
 
         await fs.remove(tempDirPath);
     }
+
+    // the vulkan-shaders-gen binary is not needed at runtime
+    const vulkanShadersGenBinary = path.join(
+        resultDirPath,
+        getPlatform() === "win"
+            ? "vulkan-shaders-gen.exe"
+            : "vulkan-shaders-gen"
+    );
+    await fs.remove(vulkanShadersGenBinary);
 }
 
 async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
