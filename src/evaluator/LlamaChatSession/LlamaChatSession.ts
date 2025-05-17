@@ -193,18 +193,7 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     /**
      * Custom stop triggers to stop the generation of the response when any of the provided triggers are found.
      */
-    customStopTriggers?: (LlamaText | string | (string | Token)[])[]
-} & ({
-    grammar?: LlamaGrammar,
-    functions?: never,
-    documentFunctionParams?: never,
-    maxParallelFunctionCalls?: never,
-    onFunctionCallParamsChunk?: never
-} | {
-    grammar?: never,
-    functions?: Functions | ChatSessionModelFunctions,
-    documentFunctionParams?: boolean,
-    maxParallelFunctionCalls?: number,
+    customStopTriggers?: (LlamaText | string | (string | Token)[])[],
 
     /**
      * Called as the model generates function calls with the generated parameters chunk for each function call.
@@ -220,6 +209,18 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      *
      * Only relevant when using function calling (via passing the `functions` option).
      */
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
+} & ({
+    grammar?: LlamaGrammar,
+    functions?: never,
+    documentFunctionParams?: never,
+    maxParallelFunctionCalls?: never,
+    onFunctionCallParamsChunk?: never
+} | {
+    grammar?: never,
+    functions?: Functions | ChatSessionModelFunctions,
+    documentFunctionParams?: boolean,
+    maxParallelFunctionCalls?: number,
     onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
 });
 
@@ -462,12 +463,13 @@ export class LlamaChatSession {
         const {responseText} = await this.promptWithMeta<Functions>(prompt, {
             // this is a workaround to allow passing both `functions` and `grammar`
             functions: functions as undefined,
+            grammar: grammar as undefined,
             documentFunctionParams: documentFunctionParams as undefined,
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
             onFunctionCallParamsChunk: onFunctionCallParamsChunk as undefined,
 
             onTextChunk, onToken, onResponseChunk, signal, stopOnAbortSignal, maxTokens,
-            temperature, minP, topK, topP, seed, grammar,
+            temperature, minP, topK, topP, seed,
             trimWhitespaceSuffix, responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
 

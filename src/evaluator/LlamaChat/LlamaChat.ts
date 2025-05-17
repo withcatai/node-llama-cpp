@@ -278,22 +278,7 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          * A number between `0` (exclusive) and `1` (inclusive).
          */
         minimumOverlapPercentageToPreventContextShift?: number
-    }
-} & ({
-    grammar?: LlamaGrammar,
-    functions?: never,
-    documentFunctionParams?: never,
-    maxParallelFunctionCalls?: never,
-    onFunctionCall?: never,
-    onFunctionCallParamsChunk?: never
-} | {
-    grammar?: never,
-    functions?: Functions | ChatModelFunctions,
-    documentFunctionParams?: boolean,
-    maxParallelFunctionCalls?: number,
-    onFunctionCall?: (
-        functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>
-    ) => void,
+    },
 
     /**
      * Called as the model generates function calls with the generated parameters chunk for each function call.
@@ -309,6 +294,22 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
      *
      * Only relevant when using function calling (via passing the `functions` option).
      */
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
+} & ({
+    grammar?: LlamaGrammar,
+    functions?: never,
+    documentFunctionParams?: never,
+    maxParallelFunctionCalls?: never,
+    onFunctionCall?: never,
+    onFunctionCallParamsChunk?: never
+} | {
+    grammar?: never,
+    functions?: Functions | ChatModelFunctions,
+    documentFunctionParams?: boolean,
+    maxParallelFunctionCalls?: number,
+    onFunctionCall?: (
+        functionCall: LlamaChatResponseFunctionCall<Functions extends ChatModelFunctions ? Functions : ChatModelFunctions>
+    ) => void,
     onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
 });
 
