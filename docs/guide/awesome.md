@@ -15,6 +15,9 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
 * [Manzoni](https://manzoni.app/) ([GitHub](https://github.com/gems-platforms/manzoni-app)) - a text editor running local LLMs
   <br /><DataBadge title="License" content="AGPL-3.0"/>
 
+* [Clippy](https://felixrieseberg.github.io/clippy/) ([GitHub](https://github.com/felixrieseberg/clippy)) - Clippy, resurrected from the 1990s, now with some AI
+  <br /><DataBadge title="License" content="MIT"/>
+
 
 ## Proprietary
 * [BashBuddy](https://bashbuddy.run) ([GitHub](https://github.com/wosherco/bashbuddy)) - write bash commands with natural language
