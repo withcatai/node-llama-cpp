@@ -1,6 +1,74 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "Qwen 3 32B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 32 billion parameters version of the model.\n" +
+        "Its performance is comparable and even surpasses DeepSeek R1 and GPT-o1.",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-32B-GGUF:Q8_0",
+        "hf:Qwen/Qwen3-32B-GGUF:Q6_K",
+        "hf:Qwen/Qwen3-32B-GGUF:Q5_K_M",
+        "hf:Qwen/Qwen3-32B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3 14B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high compared to its size.\n" +
+        "This is the 14 billion parameters version of the model.",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-14B-GGUF:Q8_0",
+        "hf:Qwen/Qwen3-14B-GGUF:Q6_K",
+        "hf:Qwen/Qwen3-14B-GGUF:Q5_K_M",
+        "hf:Qwen/Qwen3-14B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3 8B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high compared to its size.\n" +
+        "This is the 8 billion parameters version of the model.",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-8B-GGUF:Q8_0",
+        "hf:Qwen/Qwen3-8B-GGUF:Q6_K",
+        "hf:Qwen/Qwen3-8B-GGUF:Q5_K_M",
+        "hf:Qwen/Qwen3-8B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3 4B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high compared to its size.\n" +
+        "This is the 4 billion parameters version of the model, and is suitable for simpler tasks and can run on lower-end hardware, as well as be very fast on higher-end hardware.",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-4B-GGUF:Q8_0",
+        "hf:Qwen/Qwen3-4B-GGUF:Q6_K",
+        "hf:Qwen/Qwen3-4B-GGUF:Q5_K_M",
+        "hf:Qwen/Qwen3-4B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3 0.6B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high compared to its size.\n" +
+        "This is the 0.6B billion parameters version of the model and is suitable for very simple tasks and can run on very resource-constraint hardware.\n",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-0.6B-GGUF:Q8_0"
+    ]
+}, {
     name: "DeepSeek R1 Distill Qwen 7B",
     abilities: ["chat", "complete", "functionCalling", "reasoning"],
     description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
@@ -74,6 +142,23 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q5_K_M",
         "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q5_K_S",
         "hf:mradermacher/DeepSeek-R1-Distill-Llama-70B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3 30B A3B MoE",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
+        "This version of the model utilizes a Mixture of Experts architecture, with only 3B active parameters, thus making it very fast.\n" +
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This is the 30 billion parameters Mixtures of Experts (MoE) version of the model.\n" +
+        "Its performance is comparable and even surpasses DeepSeek V3 and GPT-4o.",
+
+    fileOptions: [
+        "hf:Qwen/Qwen3-30B-A3B-GGUF:Q8_0",
+        "hf:Qwen/Qwen3-30B-A3B-GGUF:Q6_K",
+        "hf:Qwen/Qwen3-30B-A3B-GGUF:Q5_K_M",
+        "hf:Qwen/Qwen3-30B-A3B-GGUF:Q4_K_M"
     ]
 }, {
     name: "QwQ 32B",
