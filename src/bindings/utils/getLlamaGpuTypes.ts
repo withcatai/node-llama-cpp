@@ -15,11 +15,17 @@ import {getPlatform} from "./getPlatform.js";
  * as some of them are inadvisable for the current machine (like CUDA on an x64 Mac machine).
  */
 export async function getLlamaGpuTypes(include: "supported" | "allValid"): Promise<LlamaGpuType[]> {
-    if (include === "supported")
-        return await getGpuTypesToUseForOption("auto");
-
     const platform = getPlatform();
     const arch = process.arch;
+
+    if (include === "supported") {
+        const gpuTypes = new Set(await getGpuTypesToUseForOption("auto"));
+
+        if (platform === "win" && arch !== "x64")
+            gpuTypes.delete("vulkan"); // no Vulkan prebuilt binary yet due to incomplete support for arm64
+
+        return [...gpuTypes];
+    }
 
     const res: LlamaGpuType[] = [];
 
