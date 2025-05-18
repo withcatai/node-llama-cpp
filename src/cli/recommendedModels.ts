@@ -62,7 +62,7 @@ export const recommendedModels: ModelRecommendation[] = [{
     abilities: ["chat", "complete", "functionCalling", "reasoning"],
     description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
         "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
-        "This model is censored, but its responses quality on many topics is extremely high compared to its size.\n" +
+        "This model is censored, but its responses quality on many topics is very high compared to its small size.\n" +
         "This is the 0.6B billion parameters version of the model and is suitable for very simple tasks and can run on very resource-constraint hardware.\n",
 
     fileOptions: [
@@ -150,7 +150,7 @@ export const recommendedModels: ModelRecommendation[] = [{
         "It's optimized for an assistant-like chat use cases, with native support for function calling.\n" +
         "This version of the model utilizes a Mixture of Experts architecture, with only 3B active parameters, thus making it very fast.\n" +
         "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
-        "This model is censored, but its responses quality on many topics is extremely high.\n" +
+        "This model is censored, but its responses quality on many topics is high compared to its high generation speed.\n" +
         "This is the 30 billion parameters Mixtures of Experts (MoE) version of the model.\n" +
         "Its performance is comparable and even surpasses DeepSeek V3 and GPT-4o.",
 
