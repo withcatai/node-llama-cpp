@@ -122,7 +122,7 @@ export async function interactivelyAskForModel({
 
                         const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
                             flashAttention: flashAttention && ggufInsights?.flashAttentionSupported,
-                            swaFullCache: swaFullCache,
+                            swaFullCache,
                             useMmap
                         });
 

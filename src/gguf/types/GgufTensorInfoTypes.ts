@@ -6,7 +6,7 @@ export type GgufTensorInfo = {
 
     /**
      * Adjusted offset relative to the file.
-     * 
+     *
      * Added by the GGUF parser - not part of the file's metadata.
      */
     readonly fileOffset: number | bigint,
@@ -49,5 +49,15 @@ export const enum GgmlType {
     I16 = 25,
     I32 = 26,
     I64 = 27,
-    F64 = 28
+    F64 = 28,
+    IQ1_M = 29,
+    BF16 = 30,
+    Q4_0_4_4 = 31,
+    Q4_0_4_8 = 32,
+    Q4_0_8_8 = 33,
+    TQ1_0 = 34,
+    TQ2_0 = 35,
+    IQ4_NL_4_4 = 36,
+    IQ4_NL_4_8 = 37,
+    IQ4_NL_8_8 = 38,
 }
