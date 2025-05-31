@@ -15,7 +15,7 @@ export type GgufInsightsResourceRequirements = {
 export class GgufInsights {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ private readonly _modelSize: number;
-    /** @internal */ private _totalLayers: number | null = null;
+    /** @internal */ private _totalFileLayers: number | null = null;
     /** @internal */ private readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
 
@@ -71,13 +71,8 @@ export class GgufInsights {
     }
 
     public get totalLayers() {
-        if (this._totalLayers != null)
-            return this._totalLayers;
-
         const outputLayers = 1;
-        this._totalLayers = this._getFileLayers() + outputLayers;
-
-        return this._totalLayers;
+        return this._getTotalFileLayers() + outputLayers;
     }
 
     public get modelSize() {
@@ -133,6 +128,23 @@ export class GgufInsights {
         return false;
     }
 
+    /**
+     * The size of the SWA (Sliding Window Attention).
+     *
+     * When `undefined`, the model does not use sliding window attention.
+     */
+    public get swaSize() {
+        const slidingWindow = this._ggufFileInfo?.architectureMetadata?.attention?.sliding_window;
+        if (slidingWindow == null || slidingWindow <= 0)
+            return undefined;
+
+        const trainContextSize = this.trainContextSize;
+        if (trainContextSize != null && slidingWindow >= trainContextSize)
+            return undefined;
+
+        return slidingWindow;
+    }
+
     public estimateModelResourceRequirements({
         gpuLayers, useMmap = this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
     }: {
@@ -152,72 +164,72 @@ export class GgufInsights {
      * The estimation for the graph overhead memory will be improved in the future to be more precise, but it's good enough for now.
      */
     public estimateContextResourceRequirements({
-        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false
+        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false,
+        swaFullCache = false
     }: {
         contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        flashAttention?: boolean, includeGraphOverhead?: boolean
+        flashAttention?: boolean, includeGraphOverhead?: boolean, swaFullCache?: boolean
     }): GgufInsightsResourceRequirements {
         if (sequences == null) sequences = getDefaultContextSequences();
         if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
 
-        const actualContextSize = contextSize * sequences;
-
-        const totalLayers = this.totalLayers;
-        const finalGpuLayers = Math.max(0, Math.min(modelGpuLayers ?? totalLayers, totalLayers));
-        const finalCpuLayers = totalLayers - finalGpuLayers;
         const llmData = this._ggufFileInfo.architectureMetadata;
+        const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
+        const slidingWindow = this.swaSize ?? 0;
+        const usingSWA = !swaFullCache && slidingWindow > 0 && slidingWindow < contextSize &&
+            (this.trainContextSize == null || slidingWindow < this.trainContextSize);
+        const swaPattern = getSwaPatternForArchitecture(this._ggufFileInfo.metadata?.general?.architecture);
+        const nonSwaPercent = swaPattern <= 1
+            ? 1
+            : (1 / (swaPattern + (flashAttention ? -0.5 : -1)));
+
+        // source: `llama_kv_cache_unified::get_padding` in `llama-kv-cache.cpp`
+        const kvCachePadding = flashAttention
+            ? 256
+            : 32;
+        const actualContextSize = sequences * contextSize;
+        const kvSize = usingSWA
+            ? (
+                (1 - nonSwaPercent) * Math.min(actualContextSize, ggmlPad(sequences * slidingWindow + batchSize, kvCachePadding)) +
+                nonSwaPercent * actualContextSize
+            )
+            : actualContextSize;
+
+        const totalFileLayers = this._getTotalFileLayers();
+        const finalGpuLayers = Math.max(0, Math.min(modelGpuLayers ?? totalFileLayers, totalFileLayers));
+        const finalCpuLayers = totalFileLayers - finalGpuLayers;
+        const usingGpu = finalGpuLayers !== 0;
 
         const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer?.ggml?.tokens?.length ?? 0;
-        const logitsSize = vocabularySize * batchSize;
-        const embedSize = isEmbeddingContext
-            ? (llmData.embedding_length ?? 0) * batchSize
-            : 0;
+        const embeddingSize = llmData.embedding_length ?? 0;
 
         const sizeTBytes = 8; // sizeof(size_t)
         const floatBytes = 4; // sizeof(float)
         const uint32TBytes = 4; // sizeof(uint32_t)
         const int32TBytes = 4; // sizeof(int32_t)
 
-        // source: `llama_state_get_size` in `llama.cpp`
-        const sRngSize = sizeTBytes;
-        const sRng = 64 * 1024; // LLAMA_MAX_RNG_STATE
-        const sNOutputs = sizeTBytes;
-        const sNOutputPos = batchSize * int32TBytes;
-        const sLogitsSize = sizeTBytes;
-        const sLogits = logitsSize * floatBytes;
-        const sEmbeddingSize = sizeTBytes;
-        const sEmbedding = embedSize * floatBytes;
-        const sKvBufSize = sizeTBytes;
-        const sKvHead = uint32TBytes;
-        const sKvSize = uint32TBytes;
-        const sKvUsed = uint32TBytes;
-        const sKv = 2 * int32TBytes * modelGpuLayers * this._llama._consts.ggmlTensorOverhead;
-        const sKvCell = this._llama._consts.llamaPosSize + sizeTBytes + this._llama._consts.llamaSeqIdSize;
-        const kvSelfLength = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
-            ? Math.max(1, sequences)
-            : actualContextSize;
-        const sKvCells = kvSelfLength * sKvCell;
+        const estimateOutput = (nOutputs: number) => {
+            // source: `llama_context::output_reserve` in `llama-context.cpp`
+            const nOutputsMax = Math.max(batchSize, nOutputs);
 
-        const overheadMemory = (
-            sRngSize +
-            sRng +
-            sNOutputs +
-            sNOutputPos +
-            sLogitsSize +
-            sLogits +
-            sEmbeddingSize +
-            sEmbedding +
-            sKvBufSize +
-            sKvHead +
-            sKvSize +
-            sKvUsed +
-            sKv +
-            sKvCells
-        );
+            const isT5 = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.t5;
+            const hasLogits = isT5 || !isEmbeddingContext;
+            const hasEmbd = isT5 || isEmbeddingContext;
 
-        // Estimates the memory allocated by `ggml_backend_sched_reserve` in `llama_new_context_with_model` in `llama.cpp`.
-        // If you read this line and have better insights on how to estimate this memory, please open a PR to improve it :)
-        const estimateGraphOverheadMemory = () => {
+            const logitsSize = hasLogits
+                ? (vocabularySize * nOutputsMax)
+                : 0;
+            const embdSize = hasEmbd
+                ? (embeddingSize * nOutputsMax)
+                : 0;
+            const outputBufferSize = (logitsSize + embdSize) * floatBytes;
+
+            const outputIdsArr = int32TBytes * batchSize;
+
+            return outputBufferSize + outputIdsArr;
+        };
+
+        const estimateGraphOverheadMemory = (): number => {
             const s1MB = Math.pow(1024, 2);
             const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
 
@@ -234,23 +246,23 @@ export class GgufInsights {
                 if (expertCount > 0) {
                     const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
-                    return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (actualContextSize * headCount));
+                    return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
                 }
 
-                return int32TBytes * batchSize * (embeddingLength + (actualContextSize * headCount));
+                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen2) {
                 if (modelGpuLayers === this.totalLayers) {
                     defaultCalculationAdjustment -= (s1MB * 340) * (
                         this.trainContextSize == null
                             ? 1
-                            : actualContextSize / this.trainContextSize
+                            : kvSize / this.trainContextSize
                     );
                 } else {
                     defaultCalculationAdjustment -= (s1MB * 250) + (
                         (s1MB * 50) * (
                             this.trainContextSize == null
                                 ? 1
-                                : actualContextSize / this.trainContextSize
+                                : kvSize / this.trainContextSize
                         )
                     );
                 }
@@ -263,7 +275,7 @@ export class GgufInsights {
                         (s1MB * 270) * (
                             this.trainContextSize == null
                                 ? 1
-                                : actualContextSize / this.trainContextSize
+                                : kvSize / this.trainContextSize
                         )
                     );
                 } else {
@@ -271,21 +283,21 @@ export class GgufInsights {
                         (s1MB * 150) * (
                             this.trainContextSize == null
                                 ? 1
-                                : Math.max(0, (1 - (actualContextSize / this.trainContextSize)))
+                                : Math.max(0, (1 - (kvSize / this.trainContextSize)))
                         )
                     );
                 }
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.stablelm) {
                 const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
 
-                return (int32TBytes * batchSize * actualContextSize * headCount) - (50 * s1MB);
+                return (int32TBytes * batchSize * kvSize * headCount) - (50 * s1MB);
 
                 // if (modelGpuLayers === this.totalLayers) {
                 //     defaultCalculationAdjustment += -(s1MB * 20) + (
                 //         (s1MB * 250) * (
                 //             this.trainContextSize == null
                 //                 ? 1
-                //                 : actualContextSize / this.trainContextSize
+                //                 : kvSize / this.trainContextSize
                 //         )
                 //     );
                 // } else {
@@ -293,7 +305,7 @@ export class GgufInsights {
                 //         (s1MB * 300) * (
                 //             this.trainContextSize == null
                 //                 ? 1
-                //                 : actualContextSize / this.trainContextSize
+                //                 : kvSize / this.trainContextSize
                 //         )
                 //     );
                 // }
@@ -312,37 +324,49 @@ export class GgufInsights {
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.phi3) {
                 // magic numbers for estimation. will be improved in the future
-                return (totalElements * 123 * (actualContextSize / 4096)) + defaultCalculationAdjustment;
+                return (totalElements * 123 * (kvSize / 4096)) + defaultCalculationAdjustment;
             }
 
             // magic numbers for estimation. will be improved in the future
-            return (totalElements * 77.655 * (actualContextSize / 4096)) + defaultCalculationAdjustment;
+            return (totalElements * 77.655 * (kvSize / 4096)) + defaultCalculationAdjustment;
         };
+
+        const gpuKVCacheSize = usingGpu
+            ? this._estimateKvMemorySizeInBytes(
+                kvSize,
+                finalGpuLayers < totalFileLayers
+                    ? (finalGpuLayers + 1)
+                    : finalGpuLayers
+            )
+            : 0;
+        const cpuKVCacheSize = this._estimateKvMemorySizeInBytes(kvSize, finalCpuLayers);
+
+        // source: `llama_context::graph_max_nodes` in `llama-context.cpp`
+        const maxNodes = Math.max(65536, 5 * tensorInfo.length);
+        const cpuNodes = 5 * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
+        const gpuNodes = maxNodes - cpuNodes;
+
+        const gpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * gpuNodes) +
+            this._llama._bindings.getGgmlGraphOverheadCustom(gpuNodes, false);
+        const cpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * cpuNodes) +
+            this._llama._bindings.getGgmlGraphOverheadCustom(cpuNodes, false);
 
         const graphOverheadMemory = (flashAttention || !includeGraphOverhead)
             ? 0
             : estimateGraphOverheadMemory();
-
-        const usingGpu = finalGpuLayers !== 0;
-
-        const cpuRam = (
-            !usingGpu
-                ? (overheadMemory + graphOverheadMemory)
-                : 0
-        ) +
-            this._estimateKvMemorySizeInBytes(actualContextSize, finalCpuLayers);
-        const gpuVram = usingGpu
-            ? (
-                overheadMemory +
-                graphOverheadMemory +
-                this._estimateKvMemorySizeInBytes(
-                    actualContextSize,
-                    finalGpuLayers < totalLayers
-                        ? (finalGpuLayers + 1)
-                        : finalGpuLayers
-                )
-            )
+        const graphOverheadGpuSize = usingGpu
+            ? Math.round(graphOverheadMemory * (finalGpuLayers / totalFileLayers))
             : 0;
+        const graphOverheadCpuSize = graphOverheadMemory - graphOverheadGpuSize;
+
+        const outputBufferSize = estimateOutput(sequences);
+
+        const gpuVram = gpuKVCacheSize + gpuComputeBufferSize + graphOverheadGpuSize + (
+            usingGpu
+                ? outputBufferSize
+                : 0
+        );
+        const cpuRam = cpuKVCacheSize + cpuComputeBufferSize + graphOverheadCpuSize + outputBufferSize;
 
         return {
             cpuRam,
@@ -449,7 +473,7 @@ export class GgufInsights {
     }
 
     /** @internal */
-    public _estimateKvMemorySizeInBytes(contextSize: number, layers: number) {
+    public _estimateKvMemorySizeInBytes(kvSize: number, layers: number) {
         // source: `llama_kv_cache_init` in `llama.cpp`
         const nHead = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
         const nEmbd = this._ggufFileInfo.architectureMetadata.embedding_length ?? 0;
@@ -483,8 +507,8 @@ export class GgufInsights {
             const totalNEmbdKGqa = nEmbdKGqa + modelNEmbdKS;
             const totalNEmbdVGqa = nEmbdVGqa + modelNEmbdVS;
 
-            totalElementsK += totalNEmbdKGqa * contextSize;
-            totalElementsV += totalNEmbdVGqa * contextSize;
+            totalElementsK += totalNEmbdKGqa * kvSize;
+            totalElementsV += totalNEmbdVGqa * kvSize;
         }
 
         const keyTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
@@ -502,6 +526,16 @@ export class GgufInsights {
             (totalElementsK * keyTypeSize) +
             (totalElementsV * valueTypeSize)
         );
+    }
+
+    /** @internal */
+    private _getTotalFileLayers() {
+        if (this._totalFileLayers != null)
+            return this._totalFileLayers;
+
+        this._totalFileLayers = this._getFileLayers();
+
+        return this._totalFileLayers;
     }
 
     /**
@@ -717,4 +751,26 @@ function isTokenEmbedLayer(layerName: string) {
     const [firstPart] = layerName.split(".");
 
     return firstPart === "token_embd";
+}
+
+function ggmlPad(value: number, padding: number): number {
+    return ((value + padding - 1) & ~(padding - 1));
+}
+
+function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): number {
+    // source: `llama_model::load_hparams` in `llama-model.cpp` - calls to `hparams.set_swa_pattern`
+    switch (architecture) {
+        case GgufArchitectureType.llama4:
+            return 4;
+        case GgufArchitectureType.phi3:
+            return 1;
+        case GgufArchitectureType.gemma2:
+            return 2;
+        case GgufArchitectureType.gemma3:
+            return 6;
+        case GgufArchitectureType.cohere2:
+            return 4;
+    }
+
+    return 1;
 }

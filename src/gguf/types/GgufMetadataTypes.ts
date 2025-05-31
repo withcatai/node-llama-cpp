@@ -316,6 +316,7 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly layer_norm_rms_epsilon?: number,
         readonly key_length?: number,
         readonly value_length?: number,
+        readonly sliding_window?: number,
         readonly causal?: boolean
     },
 

@@ -73,6 +73,19 @@ Napi::Value addonGetTypeSizeForGgmlType(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), typeSize);
 }
 
+Napi::Value addonGetGgmlGraphOverheadCustom(const Napi::CallbackInfo& info) {
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsBoolean()) {
+        return Napi::Number::New(info.Env(), 0);
+    }
+
+    const size_t size = info[0].As<Napi::Number>().Uint32Value();
+    const bool grads = info[1].As<Napi::Boolean>().Value();
+
+    const auto graphOverhead = ggml_graph_overhead_custom(size, grads);
+
+    return Napi::Number::New(info.Env(), graphOverhead);
+}
+
 Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
     Napi::Object consts = Napi::Object::New(info.Env());
     consts.Set("ggmlMaxDims", Napi::Number::New(info.Env(), GGML_MAX_DIMS));
@@ -231,6 +244,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getMathCores", addonGetMathCores),
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
+        Napi::PropertyDescriptor::Function("getGgmlGraphOverheadCustom", addonGetGgmlGraphOverheadCustom),
         Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),

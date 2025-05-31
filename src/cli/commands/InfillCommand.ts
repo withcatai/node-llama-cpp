@@ -34,6 +34,7 @@ type InfillCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    swaFullCache?: boolean,
     threads?: number,
     temperature: number,
     minP: number,
@@ -128,6 +129,12 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("swaFullCache", {
+                alias: "noSwa",
+                type: "boolean",
+                default: false,
+                description: "Disable SWA (Sliding Window Attention) on supported models"
             })
             .option("threads", {
                 type: "number",
@@ -245,7 +252,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
-        flashAttention, threads, temperature, minP, topK,
+        flashAttention, swaFullCache, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
         debug, meter, timing, noMmap, printTimings
@@ -253,7 +260,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
         try {
             await RunInfill({
                 modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-                threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
+                swaFullCache, threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
             });
@@ -268,7 +275,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 async function RunInfill({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-    threads, temperature, minP, topK, topP, seed, gpuLayers,
+    swaFullCache, threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, meter, timing, noMmap, printTimings
 }: InfillCommand) {
@@ -296,11 +303,13 @@ async function RunInfill({
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
+        swaFullCache,
         useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
+            swaFullCache,
             useMmap,
             consoleTitle: "Draft model file"
         })
@@ -353,6 +362,7 @@ async function RunInfill({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
@@ -386,6 +396,7 @@ async function RunInfill({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);

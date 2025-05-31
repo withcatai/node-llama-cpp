@@ -60,6 +60,7 @@ export async function interactivelyAskForModel({
     allowLocalModels = true,
     downloadIntent = true,
     flashAttention = false,
+    swaFullCache = false,
     useMmap
 }: {
     llama: Llama,
@@ -67,6 +68,7 @@ export async function interactivelyAskForModel({
     allowLocalModels?: boolean,
     downloadIntent?: boolean,
     flashAttention?: boolean,
+    swaFullCache?: boolean,
     useMmap?: boolean
 }): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
@@ -120,6 +122,7 @@ export async function interactivelyAskForModel({
 
                         const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
                             flashAttention: flashAttention && ggufInsights?.flashAttentionSupported,
+                            swaFullCache: swaFullCache,
                             useMmap
                         });
 
@@ -292,7 +295,9 @@ export async function interactivelyAskForModel({
                 },
                 items: options,
                 renderItem(item, focused, rerender) {
-                    return renderSelectionItem(item, focused, rerender, activeInteractionController.signal, llama, flashAttention, useMmap);
+                    return renderSelectionItem(
+                        item, focused, rerender, activeInteractionController.signal, llama, flashAttention, swaFullCache, useMmap
+                    );
                 },
                 canFocusItem(item) {
                     return item.type === "recommendedModel" || item.type === "localModel" || item.type === "action";
@@ -408,7 +413,7 @@ async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string |
 
 function renderSelectionItem(
     item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean,
-    useMmap?: boolean
+    swaFullCache: boolean, useMmap?: boolean
 ) {
     if (item.type === "localModel") {
         let modelText = item.title instanceof Function
@@ -435,6 +440,7 @@ function renderSelectionItem(
                     rerenderOption: rerender,
                     llama,
                     flashAttention,
+                    swaFullCache,
                     useMmap
                 });
             }
@@ -557,13 +563,14 @@ function renderRecommendedModelTechnicalInfo(
 }
 
 async function selectFileForModelRecommendation({
-    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention, useMmap
+    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention, swaFullCache, useMmap
 }: {
     recommendedModelOption: ModelOption & {type: "recommendedModel"},
     llama: Llama,
     abortSignal: AbortSignal,
     rerenderOption(): void,
     flashAttention: boolean,
+    swaFullCache: boolean,
     useMmap?: boolean
 }) {
     try {
@@ -586,6 +593,7 @@ async function selectFileForModelRecommendation({
 
                 const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
                     flashAttention,
+                    swaFullCache,
                     useMmap
                 });
 

@@ -32,7 +32,8 @@ type InspectEstimateCommand = {
     gpuLayers?: number | "max",
     contextSize?: number | "train",
     embedding?: boolean,
-    noMmap?: boolean
+    noMmap?: boolean,
+    swaFullCache?: boolean
 };
 
 export const InspectEstimateCommand: CommandModule<object, InspectEstimateCommand> = {
@@ -115,10 +116,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 type: "boolean",
                 default: false,
                 description: "Disable mmap (memory-mapped file) usage"
+            })
+            .option("swaFullCache", {
+                alias: "noSwa",
+                type: "boolean",
+                default: false,
+                description: "Disable SWA (Sliding Window Attention) on supported models"
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap, swaFullCache
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
         if (gpuLayers === -2) gpuLayers = "max";
@@ -181,7 +188,8 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 targetContextSize: contextSize,
                 targetGpuLayers: gpuLayers,
                 embeddingContext: embedding,
-                useMmap
+                useMmap,
+                swaFullCache
             });
         }
 

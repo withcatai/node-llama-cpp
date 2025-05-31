@@ -45,6 +45,7 @@ type ChatCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    swaFullCache?: boolean,
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
@@ -161,6 +162,12 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("swaFullCache", {
+                alias: "noSwa",
+                type: "boolean",
+                default: false,
+                description: "Disable SWA (Sliding Window Attention) on supported models"
             })
             .option("noTrimWhitespace", {
                 type: "boolean",
@@ -308,7 +315,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
-        promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention,
+        promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, swaFullCache,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory,
@@ -317,7 +324,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, flashAttention, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed,
+                batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads,
+                temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter,
                 timing, noMmap, printTimings
@@ -333,7 +341,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
-    contextSize, batchSize, flashAttention, noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
+    contextSize, batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
+    jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, noHistory, environmentFunctions, tokenPredictionDraftModel,
     tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
@@ -363,11 +372,13 @@ async function RunChat({
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
+        swaFullCache,
         useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
+            swaFullCache,
             useMmap,
             consoleTitle: "Draft model file"
         })
@@ -413,6 +424,7 @@ async function RunChat({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
@@ -446,6 +458,7 @@ async function RunChat({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
