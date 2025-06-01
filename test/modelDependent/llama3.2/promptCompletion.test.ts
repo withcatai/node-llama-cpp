@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {LlamaChatSession} from "../../../src/index.js";
+import {LlamaChatSession, resolveChatWrapper} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 import {LlamaText} from "../../../src/utils/LlamaText.js";
@@ -20,16 +20,30 @@ describe("llama 3.2", () => {
                 contextSize: 4096
             });
             const chatSession = new LlamaChatSession({
-                contextSequence: context.getSequence()
+                contextSequence: context.getSequence(),
+                chatWrapper: resolveChatWrapper(model, {
+                    customWrapperSettings: {
+                        "llama3.2-lightweight": {
+                            todayDate: new Date("2025-01-01T00:00:00Z")
+                        }
+                    }
+                })
             });
             const chatSession2 = new LlamaChatSession({
-                contextSequence: context2.getSequence()
+                contextSequence: context2.getSequence(),
+                chatWrapper: resolveChatWrapper(model, {
+                    customWrapperSettings: {
+                        "llama3.2-lightweight": {
+                            todayDate: new Date("2025-01-01T00:00:00Z")
+                        }
+                    }
+                })
             });
 
             const promptCompletion = await chatSession.completePrompt("Hi there!", {
                 maxTokens: 50
             });
-            expect(promptCompletion).toMatchInlineSnapshot("\" I're looking for a new phone case. I want one that is waterproof and has a good camera.\"");
+            expect(promptCompletion).toMatchInlineSnapshot("\" I'm looking for a new phone case. I need a case that can protect your phone from scratches and drops.\"");
             expect(LlamaText.fromTokens(model.tokenizer, chatSession.sequence.contextTokens)).toMatchInlineSnapshot(`
               LlamaText([
                 new SpecialToken("BOS"),
@@ -40,7 +54,7 @@ describe("llama 3.2", () => {
 
               Cutting Knowledge Date: December 2023",
                 new SpecialToken("NL"),
-                "Today Date: 29 May 2025
+                "Today Date: 1 Jan 2025
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
@@ -50,7 +64,7 @@ describe("llama 3.2", () => {
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
-              Hi there! I're looking for a new phone case. I want one that is waterproof and has a good camera.",
+              Hi there! I'm looking for a new phone case. I need a case that can protect your phone from scratches and drops.",
               ])
             `);
 
@@ -68,7 +82,7 @@ describe("llama 3.2", () => {
 
               Cutting Knowledge Date: December 2023",
                 new SpecialToken("NL"),
-                "Today Date: 29 May 2025
+                "Today Date: 1 Jan 2025
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",

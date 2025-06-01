@@ -359,16 +359,14 @@ export class GgufInsights {
 
         const outputBufferSize = estimateOutput(sequences);
 
-        const gpuVram = gpuKVCacheSize + gpuComputeBufferSize + graphOverheadGpuSize + (
-            usingGpu
-                ? outputBufferSize
-                : 0
-        );
+        const gpuVram = gpuKVCacheSize + gpuComputeBufferSize + graphOverheadGpuSize + outputBufferSize;
         const cpuRam = cpuKVCacheSize + cpuComputeBufferSize + graphOverheadCpuSize + outputBufferSize;
 
         return {
             cpuRam,
-            gpuVram
+            gpuVram: usingGpu
+                ? gpuVram
+                : 0
         };
     }
 
