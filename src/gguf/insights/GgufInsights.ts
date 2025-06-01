@@ -203,9 +203,7 @@ export class GgufInsights {
         const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer?.ggml?.tokens?.length ?? 0;
         const embeddingSize = llmData.embedding_length ?? 0;
 
-        const sizeTBytes = 8; // sizeof(size_t)
         const floatBytes = 4; // sizeof(float)
-        const uint32TBytes = 4; // sizeof(uint32_t)
         const int32TBytes = 4; // sizeof(int32_t)
 
         const estimateOutput = (nOutputs: number) => {
