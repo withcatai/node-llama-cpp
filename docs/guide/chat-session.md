@@ -898,3 +898,58 @@ const fullResponse = a1.response
 
 console.log("Full response: " + fullResponse);
 ```
+
+## Set Thinking Budget {#thinking-budget}
+You can set a thinking budget to limit the number of tokens a thinking model can spend on [thought segments](#stream-response-segments).
+```typescript
+import {
+    getLlama, LlamaChatSession, resolveModelFile, Token
+} from "node-llama-cpp";
+
+const modelPath = await resolveModelFile("hf:Qwen/Qwen3-14B-GGUF:Q4_K_M");
+
+const llama = await getLlama();
+const model = await llama.loadModel({modelPath});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence()
+});
+
+
+const q1 = "Where do llamas come from?";
+console.log("User: " + q1);
+
+const maxThoughtTokens = 100;
+
+let responseTokens = 0;
+let thoughtTokens = 0;
+
+process.stdout.write("AI: ");
+const response = await session.prompt(q1, {
+    budgets: {
+        thoughtTokens: maxThoughtTokens
+    },
+    onResponseChunk(chunk) {
+        const isThoughtSegment = chunk.type === "segment" &&
+            chunk.segmentType === "thought";
+
+        if (chunk.type === "segment" && chunk.segmentStartTime != null)
+            process.stdout.write(` [segment start: ${chunk.segmentType}] `);
+
+        process.stdout.write(chunk.text);
+
+        if (chunk.type === "segment" && chunk.segmentEndTime != null)
+            process.stdout.write(` [segment end: ${chunk.segmentType}] `);
+
+        if (isThoughtSegment)
+            thoughtTokens += chunk.tokens.length;
+        else
+            responseTokens += chunk.tokens.length;
+    }
+});
+
+console.log("Response: " + response);
+
+console.log("Response tokens: " + responseTokens);
+console.log("Thought tokens: " + thoughtTokens);
+```

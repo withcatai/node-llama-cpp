@@ -393,6 +393,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.n_threads = std::max(cpu_get_num_math(), 1);
     context_params.n_threads_batch = context_params.n_threads;
     context_params.no_perf = true;
+    context_params.swa_full = false;
 
     if (info.Length() > 1 && info[1].IsObject()) {
         Napi::Object options = info[1].As<Napi::Object>();
@@ -432,6 +433,10 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
 
         if (options.Has("performanceTracking")) {
             context_params.no_perf = !(options.Get("performanceTracking").As<Napi::Boolean>().Value());
+        }
+
+        if (options.Has("swaFullCache")) {
+            context_params.swa_full = options.Get("swaFullCache").As<Napi::Boolean>().Value();
         }
     }
 }
@@ -619,6 +624,19 @@ Napi::Value AddonContext::ShiftSequenceTokenCells(const Napi::CallbackInfo& info
     llama_kv_self_seq_add(ctx, sequenceId, startPos, endPos, shiftDelta);
 
     return info.Env().Undefined();
+}
+Napi::Value AddonContext::GetSequenceKvCacheMinPosition(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+
+
+    const auto minPosition = llama_kv_self_seq_pos_min(ctx, sequenceId);
+
+    return Napi::Number::New(info.Env(), minPosition);
 }
 Napi::Value AddonContext::DecodeBatch(const Napi::CallbackInfo& info) {
     AddonContextDecodeBatchWorker* worker = new AddonContextDecodeBatchWorker(info.Env(), this);
@@ -926,6 +944,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("disposeSequence", &AddonContext::DisposeSequence),
                 InstanceMethod("removeTokenCellsFromSequence", &AddonContext::RemoveTokenCellsFromSequence),
                 InstanceMethod("shiftSequenceTokenCells", &AddonContext::ShiftSequenceTokenCells),
+                InstanceMethod("getSequenceKvCacheMinPosition", &AddonContext::GetSequenceKvCacheMinPosition),
                 InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),

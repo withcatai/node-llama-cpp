@@ -41,7 +41,8 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate(
     return removeUndefinedFields({
         thought: tryMatchPrefixSuffixPair([
             ["<think>", "</think>"], // DeepSeek, QwQ
-            ["<thought>", "</thought>"] // EXAONE Deep
+            ["<thought>", "</thought>"], // EXAONE Deep
+            ["<|START_THINKING|>", "<|END_THINKING|>"] // Command R7B
         ])
     });
 }

@@ -209,7 +209,19 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      *
      * Only relevant when using function calling (via passing the `functions` option).
      */
-    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void
+    onFunctionCallParamsChunk?: (chunk: LlamaChatResponseFunctionCallParamsChunk) => void,
+
+    /**
+     * Set the maximum number of tokens that the model is allowed to spend on various segmented responses.
+     */
+    budgets?: {
+        /**
+         * Budget for thought tokens.
+         *
+         * Defaults to `Infinity`.
+         */
+        thoughtTokens?: number
+    }
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
@@ -445,6 +457,7 @@ export class LlamaChatSession {
             onToken,
             onResponseChunk,
             onFunctionCallParamsChunk,
+            budgets,
             signal,
             stopOnAbortSignal = false,
             maxTokens,
@@ -469,7 +482,7 @@ export class LlamaChatSession {
             maxParallelFunctionCalls: maxParallelFunctionCalls as undefined,
             onFunctionCallParamsChunk: onFunctionCallParamsChunk as undefined,
 
-            onTextChunk, onToken, onResponseChunk, signal, stopOnAbortSignal, maxTokens,
+            onTextChunk, onToken, onResponseChunk, budgets, signal, stopOnAbortSignal, maxTokens,
             temperature, minP, topK, topP, seed,
             trimWhitespaceSuffix, responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
@@ -489,6 +502,7 @@ export class LlamaChatSession {
         onToken,
         onResponseChunk,
         onFunctionCallParamsChunk,
+        budgets,
         signal,
         stopOnAbortSignal = false,
         maxTokens,
@@ -589,6 +603,10 @@ export class LlamaChatSession {
                                 paramsChunk: chunk.paramsChunk,
                                 done: chunk.done
                             })),
+                        budgets: {
+                            includeCurrentResponse: true,
+                            thoughtTokens: budgets?.thoughtTokens
+                        },
                         signal: abortController.signal,
                         stopOnAbortSignal,
                         repeatPenalty,

@@ -135,8 +135,8 @@ export enum GgufFileType {
     MOSTLY_Q4_0_4_4 = 33, // deprecated
     MOSTLY_Q4_0_4_8 = 34, // deprecated
     MOSTLY_Q4_0_8_8 = 35, // deprecated
-    MOSTLY_TQ1_0 = 36, // deprecated
-    MOSTLY_TQ2_0 = 37 // deprecated
+    MOSTLY_TQ1_0 = 36,
+    MOSTLY_TQ2_0 = 37
 }
 
 
@@ -316,6 +316,7 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly layer_norm_rms_epsilon?: number,
         readonly key_length?: number,
         readonly value_length?: number,
+        readonly sliding_window?: number,
         readonly causal?: boolean
     },
 
