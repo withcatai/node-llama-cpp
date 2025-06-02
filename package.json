@@ -210,6 +210,7 @@
     "stdout-update": "^4.0.1",
     "strip-ansi": "^7.1.0",
     "validate-npm-package-name": "^6.0.0",
+    "vitepress-plugin-llms": "^1.3.4",
     "which": "^5.0.0",
     "yargs": "^17.7.2"
   },

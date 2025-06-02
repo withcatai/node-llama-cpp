@@ -12,11 +12,13 @@ import {rehype} from "rehype";
 import sharp from "sharp";
 import {GitChangelog, GitChangelogMarkdownSection} from "@nolebase/vitepress-plugin-git-changelog/vite";
 import {buildEndGenerateOpenGraphImages} from "@nolebase/vitepress-plugin-og-image/vitepress";
+import llmstxt from "vitepress-plugin-llms";
 import {Resvg, initWasm as initResvgWasm, type ResvgRenderOptions} from "@resvg/resvg-wasm";
 import {BlogPageInfoPlugin} from "./config/BlogPageInfoPlugin.js";
-import {getApiReferenceSidebar} from "./config/apiReferenceSidebar.js";
 import {ensureLocalImage} from "./utils/ensureLocalImage.js";
 import {getExcerptFromMarkdownFile} from "./utils/getExcerptFromMarkdownFile.js";
+import {getVitepressSidebar, getVitepressSidebarWithBlog} from "./config/sidebar.js";
+import {getBlogPosts} from "./config/getBlogPosts.js";
 import type {Element as HastElement, Parent} from "hast";
 
 import type {Node as UnistNode} from "unist";
@@ -365,6 +367,12 @@ export default defineConfig({
             }) as VitepressPlugin,
             BlogPageInfoPlugin({
                 include: (id) => id.includes(path.sep + "blog" + path.sep) && !id.endsWith(path.sep + "blog" + path.sep + "index.md")
+            }),
+            llmstxt({
+                ignoreFiles: ["index.md"],
+                domain: resolveHref("/test").slice(0, -"/test".length) || undefined,
+                excludeBlog: false,
+                sidebar: () => getVitepressSidebarWithBlog(true, false)
             })
         ],
         build: {
@@ -435,6 +443,9 @@ export default defineConfig({
                     text: "GitHub Discussions",
                     link: "https://github.com/withcatai/node-llama-cpp/discussions"
                 }, {
+                    text: "Awesome List",
+                    link: "/guide/awesome"
+                }, {
                     text: "Contribute",
                     link: "/guide/contributing"
                 },
@@ -469,100 +480,14 @@ export default defineConfig({
                 }
             }
         },
-        sidebar: {
-            "/guide/": [{
-                text: "Guide",
-                base: "/guide",
-                items: [
-                    {text: "Getting Started", link: "/"},
-                    {text: "Chat Session", link: "/chat-session"},
-                    {text: "Chat Wrapper", link: "/chat-wrapper"},
-                    {text: "Grammar", link: "/grammar"},
-                    {text: "Function Calling", link: "/function-calling"},
-                    {text: "Embedding", link: "/embedding"},
-                    {text: "Text Completion", link: "/text-completion"},
-                    {text: "Choosing a Model", link: "/choosing-a-model"},
-                    {text: "Downloading Models", link: "/downloading-models"}
-                ]
-            }, {
-                text: "Advanced",
-                base: "/guide",
-                items: [
-                    {text: "Building From Source", link: "/building-from-source"},
-                    {text: "Metal Support", link: "/Metal"},
-                    {text: "CUDA Support", link: "/CUDA"},
-                    {text: "Vulkan Support", link: "/Vulkan"},
-                    {text: "Electron Support", link: "/electron"},
-                    {text: "Using in Docker", link: "/docker"},
-                    {text: "Using Tokens", link: "/tokens"},
-                    {text: "LlamaText", link: "/llama-text"},
-                    {text: "External Chat State", link: "/external-chat-state"},
-                    {text: "Token Bias", link: "/token-bias"},
-                    {text: "Objects Lifecycle", link: "/objects-lifecycle"},
-                    {text: "Chat Context Shift", link: "/chat-context-shift"},
-                    {text: "Batching", link: "/batching"},
-                    {text: "Token Prediction", link: "/token-prediction"},
-                    {text: "Low Level API", link: "/low-level-api"},
-                    {text: "Awesome List", link: "/awesome"},
-                    {text: "Troubleshooting", link: "/troubleshooting"},
-                    {text: "Tips and Tricks", link: "/tips-and-tricks"}
-                ]
-            }, {
-                text: "Contributing",
-                base: "/guide",
-                items: [
-                    {text: "Setting Up a Dev Environment", link: "/development"},
-                    {text: "Pull Request Guidelines", link: "/contributing"}
-                ]
-            }],
-
-            "/cli/": [{
-                text: "CLI",
-                base: "/cli",
-                link: "/",
-                items: [
-                    {text: "Init", link: "/init"},
-                    {text: "Chat", link: "/chat"},
-                    {text: "Pull", link: "/pull"},
-                    {
-                        text: "Source",
-                        link: "/source",
-                        collapsed: true,
-                        items: [
-                            {text: "Download", link: "/source/download"},
-                            {text: "Build", link: "/source/build"},
-                            {text: "Clear", link: "/source/clear"}
-                        ]
-                    },
-                    {text: "Complete", link: "/complete"},
-                    {text: "Infill", link: "/infill"},
-                    {
-                        text: "Inspect",
-                        link: "/inspect",
-                        collapsed: true,
-                        items: [
-                            {text: "GPU", link: "/inspect/gpu"},
-                            {text: "GGUF", link: "/inspect/gguf"},
-                            {text: "Measure", link: "/inspect/measure"},
-                            {text: "Estimate", link: "/inspect/estimate"}
-                        ]
-                    }
-                ]
-            }],
-
-            "/api/": getApiReferenceSidebar()
-        },
+        sidebar: getVitepressSidebar(),
         socialLinks: [
             {icon: "npm", link: "https://www.npmjs.com/package/node-llama-cpp"},
             {icon: "github", link: "https://github.com/withcatai/node-llama-cpp"}
         ]
     },
     async buildEnd(siteConfig) {
-        const blogPosts = await createContentLoader("blog/*.md", {
-            excerpt: true,
-            render: true
-        })
-            .load();
+        const blogPosts = await getBlogPosts(false);
 
         async function loadSvgFontBuffers() {
             const interFontFilesDirectoryPath = path.join(require.resolve("@fontsource/inter"), "..", "files");
@@ -699,24 +624,7 @@ export default defineConfig({
                     ...siteConfig.site,
                     themeConfig: {
                         ...siteConfig.site.themeConfig,
-                        sidebar: {
-                            ...siteConfig.site.themeConfig.sidebar,
-                            "/_blog/": {
-                                text: "Blog",
-                                link: "/blog/",
-                                items: blogPosts
-                                    .filter((post) => {
-                                        const hasCoverImage = typeof post.frontmatter?.image === "string" ||
-                                            typeof post.frontmatter?.image?.url === "string";
-
-                                        return !hasCoverImage;
-                                    })
-                                    .map((post) => ({
-                                        text: post.frontmatter.title,
-                                        link: post.url
-                                    }))
-                            }
-                        }
+                        sidebar: await getVitepressSidebarWithBlog(true, true)
                     }
                 }
             });
@@ -742,22 +650,6 @@ export default defineConfig({
                         : (packageJson.author as undefined | {name?: string})?.name
                 },
                 hub: "https://pubsubhubbub.appspot.com/"
-            });
-
-            blogPosts.sort((a, b) => {
-                const aDate = a.frontmatter.date
-                    ? new Date(a.frontmatter.date)
-                    : null;
-                const bDate = b.frontmatter.date
-                    ? new Date(b.frontmatter.date)
-                    : null;
-
-                if (aDate == null)
-                    return -1;
-                if (bDate == null)
-                    return 1;
-
-                return bDate.getTime() - aDate.getTime();
             });
 
             for (const {url, frontmatter, html, src, excerpt: originalExcerpt} of blogPosts) {
@@ -819,12 +711,6 @@ export default defineConfig({
 
         await addOgImages();
 
-        const indexPageIndex = blogPosts.findIndex((post) => post.url === "/blog/");
-        if (indexPageIndex < 0)
-            throw new Error("Blog index page not found");
-
-        blogPosts.splice(indexPageIndex, 1);
-
         await addBlogRssFeed();
 
         try {
@@ -853,6 +739,11 @@ export default defineConfig({
             path.join(siteConfig.outDir, "logo.preview.avif"),
             24
         );
+
+        await Promise.all([
+            fs.copy(path.join(siteConfig.outDir, "llms.txt"), path.join(siteConfig.outDir, "llms.md")),
+            fs.copy(path.join(siteConfig.outDir, "llms-full.txt"), path.join(siteConfig.outDir, "llms-full.md"))
+        ]);
     }
 });
 
