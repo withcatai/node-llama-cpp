@@ -62,7 +62,7 @@ type ChatCommand = {
     repeatFrequencyPenalty?: number,
     repeatPresencePenalty?: number,
     maxTokens: number,
-    thoughtBudget?: number,
+    reasoningBudget?: number,
     noHistory: boolean,
     environmentFunctions: boolean,
     tokenPredictionDraftModel?: string,
@@ -263,8 +263,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: 0,
                 description: "Maximum number of tokens to generate in responses. Set to `0` to disable. Set to `-1` to set to the context size"
             })
-            .option("thoughtBudget", {
-                alias: ["tb", "thinkingBudget", "reasoningBudget"],
+            .option("reasoningBudget", {
+                alias: ["tb", "thinkingBudget", "thoughtsBudget"],
                 type: "number",
                 default: -1,
                 defaultDescription: "Unlimited",
@@ -326,7 +326,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, swaFullCache,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
-        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, thoughtBudget, noHistory,
+        repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory,
         environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
     }) {
         try {
@@ -335,7 +335,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads,
                 temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-                maxTokens, thoughtBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
+                maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
                 debug, meter, timing, noMmap, printTimings
             });
         } catch (err) {
@@ -352,12 +352,12 @@ async function RunChat({
     contextSize, batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
-    repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, thoughtBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
+    repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
     tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
-    if (thoughtBudget === -1) thoughtBudget = undefined;
+    if (reasoningBudget === -1) reasoningBudget = undefined;
 
     const headers = resolveHeaderFlag(headerArg);
     const trimWhitespace = !noTrimWhitespace;
@@ -696,7 +696,7 @@ async function RunChat({
                 signal: abortController.signal,
                 stopOnAbortSignal: true,
                 budgets: {
-                    thoughtTokens: thoughtBudget
+                    thoughtTokens: reasoningBudget
                 },
                 repeatPenalty: {
                     penalty: repeatPenalty,

@@ -899,8 +899,8 @@ const fullResponse = a1.response
 console.log("Full response: " + fullResponse);
 ```
 
-## Set Thinking Budget {#thinking-budget}
-You can set a thinking budget to limit the number of tokens a thinking model can spend on [thought segments](#stream-response-segments).
+## Set Reasoning Budget {#reasoning-budget}
+You can set a reasoning budget to limit the number of tokens a thinking model can spend on [thought segments](#stream-response-segments).
 ```typescript
 import {
     getLlama, LlamaChatSession, resolveModelFile, Token

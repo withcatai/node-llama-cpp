@@ -4,8 +4,8 @@ import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 
 describe("qwen3 0.6b", () => {
-    describe("thinking budget", () => {
-        test("doesn't exceed thinking budget", {timeout: 1000 * 60 * 60 * 2}, async () => {
+    describe("reasoning budget", () => {
+        test("doesn't exceed reasoning budget", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("Qwen3-0.6B-Q8_0.gguf");
             const llama = await getTestLlama();
 
@@ -22,9 +22,9 @@ describe("qwen3 0.6b", () => {
             const initialChatHistory = chatSession.getChatHistory();
 
             async function promptWithBudget({
-                prompt, maxTokens, thinkingBudget
+                prompt, maxTokens, reasoningBudget
             }: {
-                prompt: string, maxTokens: number, thinkingBudget?: number
+                prompt: string, maxTokens: number, reasoningBudget?: number
             }) {
                 let thoughtTokens = 0;
                 let totalTokens = 0;
@@ -33,7 +33,7 @@ describe("qwen3 0.6b", () => {
                 const {responseText, response} = await chatSession.promptWithMeta(prompt, {
                     maxTokens,
                     budgets: {
-                        thoughtTokens: thinkingBudget
+                        thoughtTokens: reasoningBudget
                     },
                     onResponseChunk(chunk) {
                         if (chunk.type === "segment" && chunk.segmentType === "thought") {
@@ -57,7 +57,7 @@ describe("qwen3 0.6b", () => {
 
             const res1 = await promptWithBudget({
                 prompt: "Where do llamas come from?",
-                thinkingBudget: 10,
+                reasoningBudget: 10,
                 maxTokens: 20
             });
             expect(res1.thoughtTokens).to.be.gt(1);
@@ -67,7 +67,7 @@ describe("qwen3 0.6b", () => {
 
             const res2 = await promptWithBudget({
                 prompt: "Where do llamas come from?",
-                thinkingBudget: 0,
+                reasoningBudget: 0,
                 maxTokens: 20
             });
             expect(res2.thoughtTokens).to.be.eq(0);
@@ -76,7 +76,7 @@ describe("qwen3 0.6b", () => {
 
             const res3 = await promptWithBudget({
                 prompt: "Where do llamas come from?",
-                thinkingBudget: 20,
+                reasoningBudget: 20,
                 maxTokens: 20
             });
             expect(res3.thoughtTokens).to.be.eq(res3.totalTokens);
