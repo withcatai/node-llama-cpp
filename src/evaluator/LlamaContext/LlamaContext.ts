@@ -53,6 +53,7 @@ export class LlamaContext {
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
+    /** @internal */ private readonly _swaFullCache: boolean = false;
     /** @internal */ private readonly _queuedDecodeSequenceIds = new Set<number>();
     /** @internal */ private readonly _queuedDecodes: InternalQueuedDecode[] = [];
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -84,6 +85,7 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule = "nextCycle",
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
+        swaFullCache = _model.defaultContextSwaFullCache,
         performanceTracking = false,
         _embeddings,
         _ranking
@@ -120,15 +122,21 @@ export class LlamaContext {
                 : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1)
         );
         this._performanceTracking = !!performanceTracking;
+        this._swaFullCache = !!swaFullCache;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
-            batchSize: this._batchSize,
+            batchSize: this._batchSize + (
+                (!this._swaFullCache && this.model.fileInsights.swaSize != null && this.model.fileInsights.swaSize > 0)
+                    ? 1 // +1 to handle edge cases with SWA KV cache
+                    : 0
+            ),
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
             threads: this._idealThreads,
             embeddings: _embeddings,
             ranking: _ranking,
-            performanceTracking: this._performanceTracking
+            performanceTracking: this._performanceTracking,
+            swaFullCache: this._swaFullCache
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,
@@ -783,6 +791,7 @@ export class LlamaContext {
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
+        const swaFullCache = options.swaFullCache ?? _model.defaultContextSwaFullCache;
         const loraOptions = typeof options.lora === "string"
             ? {adapters: [{filePath: options.lora}]} satisfies LlamaContextOptions["lora"]
             : options.lora satisfies LlamaContextOptions["lora"];
@@ -799,6 +808,7 @@ export class LlamaContext {
             modelGpuLayers: _model.gpuLayers,
             modelTrainContextSize: _model.trainContextSize,
             flashAttention,
+            swaFullCache,
             getVramState: () => _model._llama._vramOrchestrator.getMemoryState(),
             llamaGpu: _model._llama.gpu,
             ignoreMemorySafetyChecks: options.ignoreMemorySafetyChecks,
@@ -821,10 +831,11 @@ export class LlamaContext {
                 isEmbeddingContext: options._embeddings,
                 modelGpuLayers: _model.gpuLayers,
                 batchSize,
-                flashAttention
+                flashAttention,
+                swaFullCache
             });
 
-            const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention});
+            const context = new LlamaContext({_model}, {...options, contextSize, batchSize, sequences, flashAttention, swaFullCache});
             const contextCreationVramReservation = options.ignoreMemorySafetyChecks
                 ? null
                 : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.gpuVram);
@@ -1036,6 +1047,31 @@ export class LlamaContextSequence {
     }
 
     /**
+     * Get the index of the first token in the KV cache.
+     *
+     * If you remove any tokens from the state that come before this index,
+     * no cached prefix tokens evaluation state will be used for the next evaluation.
+     *
+     * For example, if `stateCellsStartIndex` is `10` and you remove the range `{start: 11, end: 16}`
+     * then the cached state for range `0-10` will be used in the next evaluation,
+     * but if you remove the range `{start: 10, end: 16}` (or `{start: 9, end: 16}`) then the cached state will not be used at all
+     * and will be re-evaluated in the next evaluation.
+     *
+     * This index can be greater than `0` only when SWA (Sliding Window Attention) is used (only on supported models).
+     *
+     * When SWA is used, this index will usually be `Math.max(-1, .nextTokenIndex - .model.fileInsights.swaSize)` or larger.
+     *
+     * When the KV cache is empty, this index will be `-1`.
+     *
+     * You can disable SWA by setting the `swaFullCache` option to `true` when creating a context.
+     */
+    public get stateCellsStartIndex() {
+        this._ensureNotDisposed();
+
+        return this._context._ctx.getSequenceKvCacheMinPosition(this._sequenceId);
+    }
+
+    /**
      * Statistics of token predictions using the sequence's `tokenPredictor`.
      *
      * The statistics change only when token prediction is used in this sequence.
@@ -1177,6 +1213,8 @@ export class LlamaContextSequence {
     ) {
         this._ensureNotDisposed();
 
+        let awaitPromise: Promise<void> | undefined;
+
         await withLock(this._context, "context", async () => {
             this._ensureNotDisposed();
 
@@ -1217,6 +1255,13 @@ export class LlamaContextSequence {
                     ranges.push(range);
                     return ranges;
                 }, [] as ContextTokensDeleteRange[]);
+
+            const minKvCachePosition = (this._contextTokens.length === 0 && this._loadedTokenPredictions.length === 0)
+                ? 0
+                : Math.max(0, this._context._ctx.getSequenceKvCacheMinPosition(this._sequenceId));
+            if (resolvedRanges[0] != null && resolvedRanges[0].start <= minKvCachePosition)
+                // we have to drop the cache and reevaluate the sequence due to missing KV cache
+                deletionSuccessful = false;
 
             const tokenPredictionsToRemove = (resolvedRanges.length > 0 && canRemovePredictionTokens)
                 ? this._loadedTokenPredictions.length
@@ -1273,8 +1318,12 @@ export class LlamaContextSequence {
             this._nextTokenIndex = 0;
             this._context._ctx.disposeSequence(this._sequenceId);
 
-            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
+            // wait for the evaluation outside the "context" lock to avoid deadlocks
+            awaitPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
+
+        if (awaitPromise != null)
+            await awaitPromise;
     }
 
     /**
@@ -1578,12 +1627,13 @@ export class LlamaContextSequence {
         }
     }
 
+    /* eslint-disable @stylistic/max-len */
     /**
      * Save the current context sequence evaluation state to a file.
-     * @see [Saving and restoring a context sequence evaluation state
-     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
+     * @see [Saving and restoring a context sequence evaluation state](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
      */
     public async saveStateToFile(filePath: string) {
+        /* eslint-enable @stylistic/max-len */
         this._ensureNotDisposed();
 
         const resolvedPath = path.resolve(process.cwd(), filePath);
@@ -1606,14 +1656,14 @@ export class LlamaContextSequence {
         }
     }
 
+    /* eslint-disable @stylistic/max-len */
     /**
      * Load a context sequence evaluation state from a file.
      *
      * Trying to load a state file with a longer context size than the current sequence's context size will fail and throw an error.
      *
      * You must ensure that the file was created from the exact same model, otherwise, using this function may crash the process.
-     * @see [Saving and restoring a context sequence evaluation state
-     * ](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
+     * @see [Saving and restoring a context sequence evaluation state](https://node-llama-cpp.withcat.ai/guide/chat-session#save-and-restore-with-context-sequence-state)
      */
     public async loadStateFromFile(filePath: string, acceptRisk: {
         /**
@@ -1623,6 +1673,7 @@ export class LlamaContextSequence {
          */
         acceptRisk: true
     }) {
+        /* eslint-enable @stylistic/max-len */
         if (!acceptRisk.acceptRisk)
             throw new Error("The `acceptRisk` option must be set to `true` to use this feature");
 

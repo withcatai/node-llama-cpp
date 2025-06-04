@@ -32,6 +32,7 @@ type CompleteCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    swaFullCache?: boolean,
     threads?: number,
     temperature: number,
     minP: number,
@@ -118,6 +119,12 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("swaFullCache", {
+                alias: "noSwa",
+                type: "boolean",
+                default: false,
+                description: "Disable SWA (Sliding Window Attention) on supported models"
             })
             .option("threads", {
                 type: "number",
@@ -235,14 +242,14 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
-        flashAttention, threads, temperature, minP, topK,
+        flashAttention, swaFullCache, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
         debug, meter, timing, noMmap, printTimings
     }) {
         try {
             await RunCompletion({
-                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
+                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
                 threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
                 tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
@@ -257,7 +264,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
 
 
 async function RunCompletion({
-    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
     threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, meter, timing, noMmap, printTimings
@@ -286,11 +293,13 @@ async function RunCompletion({
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
+        swaFullCache,
         useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
+            swaFullCache,
             useMmap,
             consoleTitle: "Draft model file"
         })
@@ -329,6 +338,7 @@ async function RunCompletion({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
@@ -362,6 +372,7 @@ async function RunCompletion({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);

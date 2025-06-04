@@ -36,6 +36,8 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value DisposeSequence(const Napi::CallbackInfo& info);
         Napi::Value RemoveTokenCellsFromSequence(const Napi::CallbackInfo& info);
         Napi::Value ShiftSequenceTokenCells(const Napi::CallbackInfo& info);
+        Napi::Value GetSequenceKvCacheMinPosition(const Napi::CallbackInfo& info);
+        Napi::Value GetSequenceKvCacheMaxPosition(const Napi::CallbackInfo& info);
         Napi::Value DecodeBatch(const Napi::CallbackInfo& info);
         Napi::Value SampleToken(const Napi::CallbackInfo& info);
 

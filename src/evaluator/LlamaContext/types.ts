@@ -100,6 +100,22 @@ export type LlamaContextOptions = {
     batching?: BatchingOptions,
 
     /**
+     * When using SWA (Sliding Window Attention) on a supported model,
+     * extend the sliding window size to the current context size (meaning practically disabling SWA).
+     *
+     * Enabling this option will consume more memory on models that support SWA (Sliding Window Attention),
+     * but will allow reusing the evaluation cache of any prefix length of the context sequence state
+     * (instead of just the size of the sliding window when SWA is used).
+     *
+     * This option has no effect on models that do not support SWA (Sliding Window Attention).
+     *
+     * > **Note:** you can check the SWA size using `model.fileInsights.swaSize`.
+     *
+     * Defaults to `false` (inherited from the model option `defaultContextSwaFullCache`);
+     */
+    swaFullCache?: boolean,
+
+    /**
      * Load the provided LoRA adapters onto the context.
      * LoRA adapters are used to modify the weights of a pretrained model to adapt to new tasks or domains
      * without the need for extensive retraining from scratch.

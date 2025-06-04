@@ -65,5 +65,6 @@ async function DebugCmakeOptionsFunction() {
     console.info();
 
     console.info(`${chalk.yellow("CMake options:")} ${prettyPrintObject(llama.cmakeOptions)}`);
+    console.info(`${chalk.yellow("Release:")} ${prettyPrintObject(llama.llamaCppRelease)}`);
 }
 

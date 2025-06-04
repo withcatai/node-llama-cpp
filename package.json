@@ -149,7 +149,7 @@
     "@types/bytes": "^3.1.5",
     "@types/cross-spawn": "^6.0.6",
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "^22.15.17",
+    "@types/node": "^20.17.50",
     "@types/proper-lockfile": "^4.1.4",
     "@types/semver": "^7.7.0",
     "@types/validate-npm-package-name": "^4.0.2",
@@ -178,6 +178,7 @@
     "typescript-eslint": "^8.32.0",
     "vite-node": "^3.1.3",
     "vitepress": "^1.6.3",
+    "vitepress-plugin-llms": "https://pkg.pr.new/vitepress-plugin-llms@51",
     "vitest": "^3.1.3",
     "zx": "^8.5.4"
   },

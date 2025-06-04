@@ -13,9 +13,9 @@ import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
-    targetDirectory = cliModelsDirectory, flashAttention = false, useMmap, consoleTitle = "File"
+    targetDirectory = cliModelsDirectory, flashAttention = false, swaFullCache = false, useMmap, consoleTitle = "File"
 }: {
-    targetDirectory?: string, flashAttention?: boolean, useMmap?: boolean, consoleTitle?: string
+    targetDirectory?: string, flashAttention?: boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string
 } = {}) {
     if (ggufPath == null)
         ggufPath = await interactivelyAskForModel({
@@ -24,6 +24,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             allowLocalModels: true,
             downloadIntent: true,
             flashAttention,
+            swaFullCache,
             useMmap
         });
 

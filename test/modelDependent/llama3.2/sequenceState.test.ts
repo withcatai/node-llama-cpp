@@ -34,10 +34,10 @@ describe("llama 3.2", () => {
                     res1,
                     res2
                 ] = await Promise.all([
-                    chatSession1.prompt("Remember: locks are not doors", {maxTokens: 6}),
+                    chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4}),
                     chatSession2.prompt("Remember: giraffes are not elephants", {maxTokens: 5})
                 ]);
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever phrase.\"");
+                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
                 expect(res2).to.toMatchInlineSnapshot('"I appreciate the reminder."');
 
 
@@ -47,8 +47,8 @@ describe("llama 3.2", () => {
                 test.onTestFinished(() => fs.remove(stateFile1Path));
 
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("105");
-                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.49MB"');
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
+                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot("\"11.27MB\"");
 
 
                 const stateFile2Path = await getTempTestFilePath("state2");
@@ -68,7 +68,7 @@ describe("llama 3.2", () => {
                 expect(contextSequence1TokensState1).toMatchInlineSnapshot(`
                   {
                     "usedInputTokens": 99,
-                    "usedOutputTokens": 6,
+                    "usedOutputTokens": 4,
                   }
                 `);
 
@@ -91,7 +91,7 @@ describe("llama 3.2", () => {
 
                 await contextSequence1.loadStateFromFile(stateFile1Path, {acceptRisk: true});
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("105");
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
 
                 const contextSequence1TokensState3 = contextSequence1.tokenMeter.getState();
                 expect(TokenMeter.diff(contextSequence1TokensState3, contextSequence1TokensState2)).toMatchInlineSnapshot(`

@@ -9,7 +9,7 @@ import {getRamUsageFromUnifiedVram} from "./getRamUsageFromUnifiedVram.js";
 const defaultMaxContextSizeSwapUse = 2048;
 
 export async function resolveContextContextSizeOption({
-    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, flashAttention,
+    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, flashAttention, swaFullCache,
     getVramState, getRamState, getSwapState, ignoreMemorySafetyChecks = false, isEmbeddingContext = false,
     maxContextSizeSwapUse = defaultMaxContextSizeSwapUse
 }: {
@@ -20,6 +20,7 @@ export async function resolveContextContextSizeOption({
     modelGpuLayers: number,
     modelTrainContextSize: number,
     flashAttention: boolean,
+    swaFullCache: boolean,
     getVramState(): Promise<{total: number, free: number, unifiedSize: number}>,
     getRamState(): Promise<{total: number, free: number}>,
     getSwapState(): Promise<{total: number, free: number}>,
@@ -52,6 +53,7 @@ export async function resolveContextContextSizeOption({
             modelGpuLayers: modelGpuLayers,
             sequences,
             flashAttention,
+            swaFullCache,
             isEmbeddingContext
         });
 
@@ -97,6 +99,7 @@ export async function resolveContextContextSizeOption({
                 modelGpuLayers: modelGpuLayers,
                 sequences,
                 flashAttention,
+                swaFullCache,
                 isEmbeddingContext
             });
 
@@ -145,6 +148,7 @@ export async function resolveContextContextSizeOption({
             modelGpuLayers: modelGpuLayers,
             sequences,
             flashAttention,
+            swaFullCache,
             isEmbeddingContext
         });
 

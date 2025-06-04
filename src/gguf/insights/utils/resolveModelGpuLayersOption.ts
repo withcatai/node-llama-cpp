@@ -11,11 +11,11 @@ const fitContextExtraMemoryPaddingPercentage = 0.5;
 
 export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
     ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
-    llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention, useMmap
+    llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention, defaultContextSwaFullCache, useMmap
 }: {
     ggufInsights: GgufInsights, ignoreMemorySafetyChecks?: boolean,
     getVramState(): Promise<{total: number, free: number}>, llamaVramPaddingSize: number, llamaGpu: BuildGpu,
-    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: boolean, useMmap?: boolean
+    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: boolean, defaultContextSwaFullCache: boolean, useMmap?: boolean
 }): Promise<number> {
     if (gpuLayers == null)
         gpuLayers = "auto";
@@ -37,6 +37,7 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
             ggufInsights,
             currentVram: vramState.free,
             defaultContextFlashAttention,
+            defaultContextSwaFullCache,
             useMmap
         });
 
@@ -73,6 +74,7 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
                 ? gpuLayers.max
                 : undefined,
             defaultContextFlashAttention,
+            defaultContextSwaFullCache,
             useMmap
         });
 
@@ -95,6 +97,7 @@ function getBestGpuLayersForFreeVram({
     minGpuLayers,
     maxGpuLayers,
     defaultContextFlashAttention,
+    defaultContextSwaFullCache,
     useMmap
 }: {
     ggufInsights: GgufInsights,
@@ -103,6 +106,7 @@ function getBestGpuLayersForFreeVram({
     minGpuLayers?: number,
     maxGpuLayers?: number,
     defaultContextFlashAttention: boolean,
+    defaultContextSwaFullCache: boolean,
     useMmap?: boolean
 }) {
     return findBestOption({
@@ -123,6 +127,7 @@ function getBestGpuLayersForFreeVram({
                 currentVram: freeVram,
                 fitContext,
                 defaultContextFlashAttention,
+                defaultContextSwaFullCache,
                 useMmap
             });
 
@@ -182,10 +187,10 @@ function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayer
 }
 
 function getVramRequiredForGpuLayers({
-    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = false, useMmap
+    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = false, defaultContextSwaFullCache = false, useMmap
 }: {
     gpuLayers: number, ggufInsights: GgufInsights, currentVram: number, fitContext?: {contextSize?: number, embeddingContext?: boolean},
-    defaultContextFlashAttention: boolean, useMmap?: boolean
+    defaultContextFlashAttention: boolean, defaultContextSwaFullCache: boolean, useMmap?: boolean
 }) {
     const modelVram = ggufInsights.estimateModelResourceRequirements({
         gpuLayers,
@@ -202,7 +207,8 @@ function getVramRequiredForGpuLayers({
             modelGpuLayers: gpuLayers,
             sequences: 1,
             isEmbeddingContext: fitContext.embeddingContext ?? false,
-            flashAttention: defaultContextFlashAttention
+            flashAttention: defaultContextFlashAttention,
+            swaFullCache: defaultContextSwaFullCache
         }).gpuVram;
 
         const totalVram = modelVram + contextVram;
@@ -221,7 +227,8 @@ function getVramRequiredForGpuLayers({
         ggufInsights,
         vram: currentVram - modelVram,
         isEmbeddingContext: fitContext?.embeddingContext ?? false,
-        flashAttention: defaultContextFlashAttention
+        flashAttention: defaultContextFlashAttention,
+        swaFullCache: defaultContextSwaFullCache
     });
 
     if (maxContext == null || modelVram + maxContext.vram > currentVram)
@@ -234,8 +241,8 @@ function getVramRequiredForGpuLayers({
     };
 }
 
-function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention}: {
-    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean
+function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, swaFullCache}: {
+    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean, swaFullCache: boolean
 }) {
     const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
 
@@ -250,7 +257,8 @@ function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmb
                 modelGpuLayers: gpuLayers,
                 sequences: 1,
                 isEmbeddingContext,
-                flashAttention
+                flashAttention,
+                swaFullCache
             }).gpuVram;
 
             if (contextVram <= vram)

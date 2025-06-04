@@ -365,6 +365,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
     return getLlamaForOptions(options ?? {});
 }
 
+// internal
 export async function getLlamaForOptions({
     gpu = defaultLlamaCppGpuSupport,
     logLevel = defaultLlamaCppLogLevel,
