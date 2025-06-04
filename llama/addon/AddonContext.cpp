@@ -638,6 +638,19 @@ Napi::Value AddonContext::GetSequenceKvCacheMinPosition(const Napi::CallbackInfo
 
     return Napi::Number::New(info.Env(), minPosition);
 }
+Napi::Value AddonContext::GetSequenceKvCacheMaxPosition(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    int32_t sequenceId = info[0].As<Napi::Number>().Int32Value();
+
+
+    const auto maxPosition = llama_kv_self_seq_pos_max(ctx, sequenceId);
+
+    return Napi::Number::New(info.Env(), maxPosition);
+}
 Napi::Value AddonContext::DecodeBatch(const Napi::CallbackInfo& info) {
     AddonContextDecodeBatchWorker* worker = new AddonContextDecodeBatchWorker(info.Env(), this);
     worker->Queue();
@@ -945,6 +958,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("removeTokenCellsFromSequence", &AddonContext::RemoveTokenCellsFromSequence),
                 InstanceMethod("shiftSequenceTokenCells", &AddonContext::ShiftSequenceTokenCells),
                 InstanceMethod("getSequenceKvCacheMinPosition", &AddonContext::GetSequenceKvCacheMinPosition),
+                InstanceMethod("getSequenceKvCacheMaxPosition", &AddonContext::GetSequenceKvCacheMaxPosition),
                 InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),

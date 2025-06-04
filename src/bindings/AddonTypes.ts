@@ -146,6 +146,7 @@ export type AddonContext = {
     shiftSequenceTokenCells(sequenceId: number, startPos: number, endPos: number, shiftDelta: number): void,
 
     getSequenceKvCacheMinPosition(sequenceId: number): number,
+    getSequenceKvCacheMaxPosition(sequenceId: number): number,
     getEmbedding(inputTokensLength: number, maxVectorSize?: number): Float64Array,
     getStateSize(): number,
     getThreads(): number,
