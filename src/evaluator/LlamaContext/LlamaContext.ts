@@ -125,7 +125,11 @@ export class LlamaContext {
         this._swaFullCache = !!swaFullCache;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
-            batchSize: this._batchSize,
+            batchSize: this._batchSize + (
+                (!this._swaFullCache && this.model.fileInsights.swaSize != null && this.model.fileInsights.swaSize > 0)
+                    ? 1 // +1 to handle edge cases with SWA KV cache
+                    : 0
+            ),
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
             threads: this._idealThreads,
