@@ -1055,7 +1055,9 @@ export class LlamaContextSequence {
      *
      * This index can be greater than `0` only when SWA (Sliding Window Attention) is used (only on supported models).
      *
-     * When SWA is used, this index will usually be `Math.max(0, .nextTokenIndex - .model.fileInsights.swaSize)` or larger.
+     * When SWA is used, this index will usually be `Math.max(-1, .nextTokenIndex - .model.fileInsights.swaSize)` or larger.
+     *
+     * When the KV cache is empty, this index will be `-1`.
      *
      * You can disable SWA by setting the `swaFullCache` option to `true` when creating a context.
      */
@@ -1207,6 +1209,8 @@ export class LlamaContextSequence {
     ) {
         this._ensureNotDisposed();
 
+        let awaitPromise: Promise<void> | undefined;
+
         await withLock(this._context, "context", async () => {
             this._ensureNotDisposed();
 
@@ -1250,7 +1254,7 @@ export class LlamaContextSequence {
 
             const minKvCachePosition = (this._contextTokens.length === 0 && this._loadedTokenPredictions.length === 0)
                 ? 0
-                : this._context._ctx.getSequenceKvCacheMinPosition(this._sequenceId);
+                : Math.max(0, this._context._ctx.getSequenceKvCacheMinPosition(this._sequenceId));
             if (resolvedRanges[0] != null && resolvedRanges[0].start <= minKvCachePosition)
                 // we have to drop the cache and reevaluate the sequence due to missing KV cache
                 deletionSuccessful = false;
@@ -1310,8 +1314,12 @@ export class LlamaContextSequence {
             this._nextTokenIndex = 0;
             this._context._ctx.disposeSequence(this._sequenceId);
 
-            await this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
+            // wait for the evaluation outside the "context" lock to avoid deadlocks
+            awaitPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
+
+        if (awaitPromise != null)
+            await awaitPromise;
     }
 
     /**

@@ -403,7 +403,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("batchSize")) {
-            context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value();
+            context_params.n_batch = options.Get("batchSize").As<Napi::Number>().Uint32Value() + 1; // +1 to handle edge cases with SWA KV cache
             context_params.n_ubatch = context_params.n_batch; // the batch queue is managed in the JS side, so there's no need for managing it on the C++ side
         }
 
