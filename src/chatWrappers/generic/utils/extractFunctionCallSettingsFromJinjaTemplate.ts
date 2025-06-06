@@ -94,6 +94,22 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             modelMessage2
         ]
     }];
+    const chatHistoryOnlyCall: ChatHistoryItem[] = [...baseChatHistory, {
+        type: "model",
+        response: [
+            {
+                type: "functionCall",
+                name: func1name,
+
+                // convert to number since this will go through JSON.stringify,
+                // and we want to avoid escaping characters in the rendered output
+                params: Number(func1params),
+                result: Number(func1result),
+                startsNewChunk: true
+            },
+            modelMessage2
+        ]
+    }];
     const chatHistory2Calls: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -257,6 +273,17 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         stringifyFunctionResults: stringifyResult,
         combineModelMessageAndToolCalls
     });
+    const renderedOnlyCall = getFirstValidResult([
+        () => renderTemplate({
+            chatHistory: chatHistoryOnlyCall,
+            functions: functions1,
+            additionalParams,
+            stringifyFunctionParams: stringifyParams,
+            stringifyFunctionResults: stringifyResult,
+            combineModelMessageAndToolCalls
+        }),
+        () => undefined
+    ]);
     const rendered2Calls = getFirstValidResult([
         () => renderTemplate({
             chatHistory: chatHistory2Calls,
@@ -411,6 +438,38 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         parallelismResultPrefix
     } = resolveParallelismBetweenSectionsParts(func2ParamsToFunc1Result.text.slice(callSuffixLength, -resultPrefixLength));
 
+    let revivedCallPrefix = reviveSeparatorText(callPrefixText, idToStaticContent, contentIds);
+    const revivedParallelismCallSectionPrefix = removeCommonRevivedPrefix(
+        reviveSeparatorText(parallelismCallPrefix, idToStaticContent, contentIds),
+        !combineModelMessageAndToolCalls
+            ? textBetween2TextualModelResponses
+            : LlamaText()
+    );
+    let revivedParallelismCallBetweenCalls = reviveSeparatorText(parallelismBetweenCallsText, idToStaticContent, contentIds);
+
+    if (revivedParallelismCallSectionPrefix.values.length === 0 && renderedOnlyCall != null) {
+        const userMessage1ToModelMessage1Start = getTextBetweenIds(rendered1Call, userMessage1, modelMessage1);
+        const onlyCallUserMessage1ToFunc1Name = getTextBetweenIds(renderedOnlyCall, userMessage1, func1name);
+
+        if (userMessage1ToModelMessage1Start.text != null && onlyCallUserMessage1ToFunc1Name.text != null) {
+            const onlyCallModelMessagePrefixLength = findCommandStartLength(
+                userMessage1ToModelMessage1Start.text,
+                onlyCallUserMessage1ToFunc1Name.text
+            );
+            const onlyCallCallPrefixText = onlyCallUserMessage1ToFunc1Name.text.slice(onlyCallModelMessagePrefixLength);
+            const revivedOnlyCallCallPrefixText = reviveSeparatorText(onlyCallCallPrefixText, idToStaticContent, contentIds);
+
+            const optionalCallPrefix = removeCommonRevivedSuffix(revivedCallPrefix, revivedOnlyCallCallPrefixText);
+            if (optionalCallPrefix.values.length > 0) {
+                revivedCallPrefix = removeCommonRevivedPrefix(revivedCallPrefix, optionalCallPrefix);
+                revivedParallelismCallBetweenCalls = LlamaText([
+                    optionalCallPrefix,
+                    revivedParallelismCallBetweenCalls
+                ]);
+            }
+        }
+    }
+
     return {
         stringifyParams,
         stringifyResult,
@@ -418,7 +477,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         settings: {
             call: {
                 optionalPrefixSpace: true,
-                prefix: reviveSeparatorText(callPrefixText, idToStaticContent, contentIds),
+                prefix: revivedCallPrefix,
                 paramsPrefix: reviveSeparatorText(callParamsPrefixText, idToStaticContent, contentIds),
                 suffix: reviveSeparatorText(callSuffixText, idToStaticContent, contentIds),
                 emptyCallParamsPlaceholder: {}
@@ -445,13 +504,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             parallelism: {
                 call: {
-                    sectionPrefix: removeCommonRevivedPrefix(
-                        reviveSeparatorText(parallelismCallPrefix, idToStaticContent, contentIds),
-                        !combineModelMessageAndToolCalls
-                            ? textBetween2TextualModelResponses
-                            : LlamaText()
-                    ),
-                    betweenCalls: reviveSeparatorText(parallelismBetweenCallsText, idToStaticContent, contentIds),
+                    sectionPrefix: revivedParallelismCallSectionPrefix,
+                    betweenCalls: revivedParallelismCallBetweenCalls,
                     sectionSuffix: reviveSeparatorText(parallelismCallSuffixText, idToStaticContent, contentIds)
                 },
                 result: {
@@ -524,12 +578,46 @@ function removeCommonRevivedPrefix(target: LlamaText, matchStart: LlamaText) {
         } else if (targetValue instanceof SpecialToken && matchStartValue instanceof SpecialToken) {
             if (targetValue.value === matchStartValue.value)
                 continue;
-        }
+        } else if (LlamaText(targetValue ?? "").compare(LlamaText(matchStartValue ?? "")))
+            continue;
 
         return LlamaText(target.values.slice(commonStartLength));
     }
 
     return LlamaText(target.values.slice(matchStart.values.length));
+}
+
+function removeCommonRevivedSuffix(target: LlamaText, matchEnd: LlamaText) {
+    for (
+        let commonEndLength = 0;
+        commonEndLength < target.values.length && commonEndLength < matchEnd.values.length;
+        commonEndLength++
+    ) {
+        const targetValue = target.values[target.values.length - commonEndLength - 1];
+        const matchEndValue = matchEnd.values[matchEnd.values.length - commonEndLength - 1];
+
+        if (typeof targetValue === "string" && typeof matchEndValue === "string") {
+            if (targetValue === matchEndValue)
+                continue;
+        } else if (targetValue instanceof SpecialTokensText && matchEndValue instanceof SpecialTokensText) {
+            const commonLength = findCommonEndLength(targetValue.value, matchEndValue.value);
+            if (commonLength === targetValue.value.length && commonLength === matchEndValue.value.length)
+                continue;
+
+            return LlamaText([
+                ...target.values.slice(0, target.values.length - commonEndLength - 1),
+                new SpecialTokensText(targetValue.value.slice(0, targetValue.value.length - commonLength))
+            ]);
+        } else if (targetValue instanceof SpecialToken && matchEndValue instanceof SpecialToken) {
+            if (targetValue.value === matchEndValue.value)
+                continue;
+        } else if (LlamaText(targetValue ?? "").compare(LlamaText(matchEndValue ?? "")))
+            continue;
+
+        return LlamaText(target.values.slice(0, target.values.length - commonEndLength - 1));
+    }
+
+    return LlamaText(target.values.slice(0, target.values.length - matchEnd.values.length));
 }
 
 function findCommandStartLength(text1: string, text2: string) {
