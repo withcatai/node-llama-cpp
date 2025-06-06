@@ -671,7 +671,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             return res;
         };
 
-        const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string[]>>) => {
+        const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string>>) => {
             const messageIdsLeft = new Set(messageIds);
 
             for (const part of parts) {

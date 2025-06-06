@@ -3,6 +3,7 @@ import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
+import {Template} from "@huggingface/jinja";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {prettyPrintObject, PrettyPrintObjectOptions} from "../../../../utils/prettyPrintObject.js";
 import {getGgufFileTypeName} from "../../../../gguf/utils/getGgufFileTypeName.js";
@@ -17,6 +18,8 @@ import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
 import {isModelUri} from "../../../../utils/parseModelUri.js";
+
+const chatTemplateKey = ".chatTemplate";
 
 type InspectGgufCommand = {
     modelPath: string,
@@ -54,7 +57,8 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             .option("key", {
                 alias: ["k"],
                 type: "string",
-                description: "A single metadata key to print the value of. If not provided, all metadata will be printed",
+                description: "A single metadata key to print the value of. If not provided, all metadata will be printed. " +
+                    "If the key is `" + chatTemplateKey + "` then the chat template of the model will be formatted and printed.",
                 group: "Optional:"
             })
             .option("noSplice", {
@@ -141,7 +145,9 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
         if (plainJson || outputToJsonFile != null) {
             const getOutputJson = () => {
                 if (key != null) {
-                    const keyValue = getGgufMetadataKeyValue(parsedMetadata.metadata, key);
+                    const keyValue = key === chatTemplateKey
+                        ? tryFormattingJinja(getGgufMetadataKeyValue(parsedMetadata.metadata, "tokenizer.chat_template"))
+                        : getGgufMetadataKeyValue(parsedMetadata.metadata, key);
                     if (keyValue === undefined) {
                         console.log(`Key not found: ${key}`);
                         process.exit(1);
@@ -172,7 +178,9 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 console.info(outputJson);
             }
         } else if (key != null) {
-            const keyValue = getGgufMetadataKeyValue(parsedMetadata.metadata, key);
+            const keyValue = key === chatTemplateKey
+                ? tryFormattingJinja(getGgufMetadataKeyValue(parsedMetadata.metadata, "tokenizer.chat_template"))
+                : getGgufMetadataKeyValue(parsedMetadata.metadata, key);
             if (keyValue === undefined) {
                 console.log(`${chalk.red("Metadata key not found:")} ${key}`);
                 process.exit(1);
@@ -235,5 +243,19 @@ function removeAdditionalTensorInfoFields(tensorInfo?: GgufTensorInfo[]) {
     for (const tensor of tensorInfo) {
         delete (tensor as {fileOffset?: GgufTensorInfo["fileOffset"]}).fileOffset;
         delete (tensor as {filePart?: GgufTensorInfo["filePart"]}).filePart;
+    }
+}
+
+function tryFormattingJinja(template?: string) {
+    if (typeof template !== "string")
+        return template;
+
+    try {
+        const parsedTemplate = new Template(template);
+        return parsedTemplate.format({
+            indent: 4
+        }) ?? template;
+    } catch (err) {
+        return template;
     }
 }

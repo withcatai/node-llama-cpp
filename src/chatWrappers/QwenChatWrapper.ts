@@ -247,7 +247,9 @@ export class QwenChatWrapper extends ChatWrapper {
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             [{}, {}, {_requireFunctionCallSettingsExtraction: true}],
-            [{_lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}]
+            [{_lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}],
+            [{thoughts: "discourage"}, {}, {_requireFunctionCallSettingsExtraction: true}],
+            [{thoughts: "discourage", _lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}]
         ];
     }
 }

@@ -24,6 +24,7 @@ import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
 import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
+import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -721,7 +722,7 @@ export class LlamaChat {
             onTextChunk,
             onToken,
             signal,
-            maxTokens = Math.min(256, Math.ceil(this.context.contextSize / 2)),
+            maxTokens = defaultMaxPreloadTokens(this.sequence),
             temperature,
             minP,
             topK,
