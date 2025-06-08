@@ -84,8 +84,8 @@ export class QwenChatWrapper extends ChatWrapper {
             segments: {
                 reiterateStackAfterFunctionCalls: true,
                 thought: {
-                    prefix: LlamaText(new SpecialTokensText("<think>")),
-                    suffix: LlamaText(new SpecialTokensText("</think>"))
+                    prefix: LlamaText(new SpecialTokensText("<think>\n")),
+                    suffix: LlamaText(new SpecialTokensText("\n</think>"))
                 }
             }
         };

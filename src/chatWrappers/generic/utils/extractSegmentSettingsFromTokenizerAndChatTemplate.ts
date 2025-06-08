@@ -8,6 +8,42 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate(
     function tryMatchPrefixSuffixPair(tryMatchGroups: [prefix: string, suffix: string][]) {
         if (chatTemplate != null) {
             for (const [prefix, suffix] of tryMatchGroups) {
+                if (
+                    (
+                        hasAll(chatTemplate.replaceAll(prefix + "\\n\\n" + suffix, ""), [
+                            prefix + "\\n\\n",
+                            "\\n\\n" + suffix
+                        ])
+                    ) || (
+                        hasAll(chatTemplate.replaceAll(prefix + "\n\n" + suffix, ""), [
+                            prefix + "\n\n",
+                            "\n\n" + suffix
+                        ])
+                    )
+                )
+                    return {
+                        prefix: LlamaText(new SpecialTokensText(prefix + "\n\n")),
+                        suffix: LlamaText(new SpecialTokensText("\n\n" + suffix))
+                    };
+
+                if (
+                    (
+                        hasAll(chatTemplate.replaceAll(prefix + "\\n" + suffix, ""), [
+                            prefix + "\\n",
+                            "\\n" + suffix
+                        ])
+                    ) || (
+                        hasAll(chatTemplate.replaceAll(prefix + "\n" + suffix, ""), [
+                            prefix + "\n",
+                            "\n" + suffix
+                        ])
+                    )
+                )
+                    return {
+                        prefix: LlamaText(new SpecialTokensText(prefix + "\n")),
+                        suffix: LlamaText(new SpecialTokensText("\n" + suffix))
+                    };
+
                 if (chatTemplate.includes(prefix) && chatTemplate.includes(suffix))
                     return {
                         prefix: LlamaText(new SpecialTokensText(prefix)),
@@ -45,4 +81,8 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate(
             ["<|START_THINKING|>", "<|END_THINKING|>"] // Command R7B
         ])
     });
+}
+
+function hasAll(text: string, matches: string[]) {
+    return matches.every((match) => text.includes(match));
 }

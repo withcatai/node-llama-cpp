@@ -41,9 +41,12 @@ describe("qwen3 0.6b", () => {
                 }
             } as const;
 
-            const res = await chatSession.prompt("What is the second word?", {
+            const res = await chatSession.prompt("What is the second word? No yapping, no formatting", {
                 ...promptOptions,
-                maxTokens: 200
+                maxTokens: 250,
+                budgets: {
+                    thoughtTokens: 100
+                }
             });
 
             expect(res.trim()).to.be.eq('The second word is "secret".');
@@ -96,12 +99,15 @@ describe("qwen3 0.6b", () => {
                 }
             } as const;
 
-            const res = await chatSession.prompt("What is the second word?", {
+            const res = await chatSession.prompt("What is the second word? No yapping, no formatting", {
                 ...promptOptions,
-                maxTokens: 205
+                maxTokens: 250,
+                budgets: {
+                    thoughtTokens: 100
+                }
             });
 
-            expect(res.trim()).to.be.eq('The second word is **"secret"**.');
+            expect(res.trim()).to.be.eq('The second word is "secret".');
 
             const res2 = await chatSession.prompt("Explain what this word means", {
                 ...promptOptions,
