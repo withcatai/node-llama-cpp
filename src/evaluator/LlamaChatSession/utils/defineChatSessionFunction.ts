@@ -1,4 +1,4 @@
-import {GbnfJsonSchema, GbnfJsonSchemaToType} from "../../../utils/gbnfJson/types.js";
+import {GbnfJsonDefList, GbnfJsonSchema, GbnfJsonSchemaToType} from "../../../utils/gbnfJson/types.js";
 import {ChatSessionModelFunction} from "../../../types.js";
 
 /**
@@ -9,15 +9,18 @@ import {ChatSessionModelFunction} from "../../../types.js";
  * The handler function can return a Promise, and the return value will be awaited before being returned to the model.
  * @param functionDefinition
  */
-export function defineChatSessionFunction<const Params extends GbnfJsonSchema>({
+export function defineChatSessionFunction<
+    const Params extends GbnfJsonSchema<Defs>,
+    const Defs extends GbnfJsonDefList<Defs>
+>({
     description,
     params,
     handler
 }: {
     description?: string,
-    params?: Readonly<Params>,
-    handler: (params: GbnfJsonSchemaToType<Params>) => Promise<any> | any
-}): ChatSessionModelFunction<Params> {
+    params?: Readonly<Params> & GbnfJsonSchema<Defs>,
+    handler: (params: GbnfJsonSchemaToType<NoInfer<Params>>) => Promise<any> | any
+}): ChatSessionModelFunction<NoInfer<Params>> {
     return {
         description,
         params,

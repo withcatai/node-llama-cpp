@@ -2241,6 +2241,418 @@ describe("grammar for JSON schema", () => {
             });
         });
     });
+
+    describe("definitions and $ref", () => {
+        test("simple", async () => {
+            const llama = await getTestLlama();
+            const grammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "object",
+                properties: {
+                    "message": {
+                        $ref: "#/$defs/messageValue"
+                    },
+                    "numberOfWordsInMessage": {
+                        $ref: "#/$defs/numberOfWordsInMessageValue"
+                    },
+                    "feelingGoodPercentage": {
+                        type: ["number"]
+                    },
+                    "feelingGood": {
+                        $ref: "#/$defs/feeling"
+                    },
+                    "feelingOverall": {
+                        oneOf: [{
+                            $ref: "#/$defs/goodConst"
+                        }, {
+                            $ref: "#/$defs/badConst"
+                        }]
+                    },
+                    "verbsInMessage": {
+                        type: "array",
+                        items: {
+                            $ref: "#/$defs/verb"
+                        }
+                    }
+                },
+                $defs: {
+                    messageValue: {
+                        type: ["string", "null"]
+                    },
+                    numberOfWordsInMessageValue: {
+                        type: "integer"
+                    },
+                    goodConst: {
+                        const: "good"
+                    },
+                    badConst: {
+                        const: "bad"
+                    },
+                    verb: {
+                        type: "string"
+                    },
+                    feeling: {
+                        oneOf: [{
+                            $ref: "#/$defs/goodConst"
+                        }, {
+                            $ref: "#/$defs/badConst"
+                        }]
+                    }
+                }
+            } as const);
+            type schemaType = {
+                "message": string | null,
+                "numberOfWordsInMessage": number,
+                "feelingGoodPercentage": number,
+                "feelingGood": "good" | "bad",
+                "feelingOverall": "good" | "bad",
+                "verbsInMessage": string[]
+            };
+            const exampleValidValue = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", "world"]
+            };
+            const exampleValidValue2 = {
+                "message": null,
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "bad",
+                "feelingOverall": "bad",
+                "verbsInMessage": ["Hello", "world"]
+            };
+            const exampleInvalidValue = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", 10]
+            };
+            const exampleInvalidValue2 = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "average",
+                "verbsInMessage": ["Hello", "world"]
+            };
+            const exampleInvalidValue3 = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", "world", true]
+            };
+            const exampleInvalidValue4 = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", "world", {}]
+            };
+            const exampleInvalidValue5 = {
+                "message": "Hello, world!",
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", "world", null]
+            };
+            const exampleInvalidValue6 = {
+                "message": false,
+                "numberOfWordsInMessage": 3,
+                "feelingGoodPercentage": 0.5,
+                "feelingGood": "good",
+                "feelingOverall": "good",
+                "verbsInMessage": ["Hello", "world"]
+            };
+
+            expect(grammar.grammar).toMatchInlineSnapshot(`
+              "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? def0 comma-whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? def1 comma-whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule comma-whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? def2 comma-whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? def2 comma-whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule0 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
+              string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
+              string-rule ::= "\\"" string-char-rule* "\\""
+              null-rule ::= "null"
+              def0 ::= ( string-rule | null-rule )
+              comma-whitespace-b-1-4-rule ::= "," ([\\n] ("    " | "\\t") | [ ]?)
+              integer-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
+              def1 ::= integer-number-rule
+              fractional-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ("." [0-9]{1,16})? ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
+              def3 ::= "\\"good\\""
+              def4 ::= "\\"bad\\""
+              def2 ::= ( def3 | def4 )
+              comma-whitespace-b-2-4-rule ::= "," ([\\n] (" "{8} | "\\t\\t") | [ ]?)
+              whitespace-b-2-4-rule ::= [\\n] (" "{8} | "\\t\\t") | [ ]?
+              whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
+              rule0 ::= "[" whitespace-b-2-4-rule ( string-rule ( comma-whitespace-b-2-4-rule string-rule )* )? whitespace-b-1-4-rule "]"
+              whitespace-b-0-4-rule ::= [\\n] | [ ]?"
+            `);
+
+            const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
+
+            expectTypeOf(parsedValue).toMatchObjectType<schemaType>();
+            expect(parsedValue).toEqual(exampleValidValue);
+            expect(testGrammar(grammar, exampleValidValue)).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue, "pretty")).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue, "dumps")).to.eql(true);
+
+            const parsedValue2 = grammar.parse(JSON.stringify(exampleValidValue2));
+
+            expectTypeOf(parsedValue2).toMatchObjectType<schemaType>();
+            expect(parsedValue2).toEqual(exampleValidValue2);
+            expect(testGrammar(grammar, exampleValidValue2)).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue2, "pretty")).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue2, "dumps")).to.eql(true);
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected type \"string\" but got \"number\"]");
+                expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue2));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 2 schemas but got \"average\"]");
+                expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue3));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected type \"string\" but got \"boolean\"]");
+                expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue4));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected type \"string\" but got \"object\"]");
+                expect(testGrammar(grammar, exampleInvalidValue4)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue5));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected type \"string\" but got \"null\"]");
+                expect(testGrammar(grammar, exampleInvalidValue5)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue6));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot('[Error: Expected one type of ["string", "null"] but got type "boolean"]');
+                expect(testGrammar(grammar, exampleInvalidValue6)).to.eql(false);
+            }
+        });
+
+        test("recursive references", async () => {
+            const llama = await getTestLlama();
+            const grammar = await llama.createGrammarForJsonSchema({
+                type: "object",
+                properties: {
+                    "message": {
+                        $ref: "#/$defs/messageValue"
+                    }
+                },
+                $defs: {
+                    messageValue: {
+                        oneOf: [{
+                            type: "string"
+                        }, {
+                            type: "number"
+                        }, {
+                            $ref: "#/$defs/feeling"
+                        }]
+                    },
+                    goodConst: {
+                        const: "good"
+                    },
+                    badConst: {
+                        const: "bad"
+                    },
+                    feeling: {
+                        oneOf: [{
+                            $ref: "#/$defs/goodConst"
+                        }, {
+                            $ref: "#/$defs/badConst"
+                        }, {
+                            type: "object",
+                            properties: {
+                                feel: {
+                                    oneOf: [{
+                                        $ref: "#/$defs/goodConst"
+                                    }, {
+                                        $ref: "#/$defs/badConst"
+                                    }]
+                                },
+                                message: {
+                                    $ref: "#/$defs/messageValue"
+                                }
+                            }
+                        }]
+                    }
+                }
+            } as const);
+            type schemaType = {
+                "message": string | number | {
+                    feel: "good" | "bad",
+                    message: schemaType["message"]
+                }
+            };
+            const exampleValidValue = {
+                "message": "Hello, world!"
+            };
+            const exampleValidValue2 = {
+                "message": {
+                    "feel": "good",
+                    "message": {
+                        "feel": "bad",
+                        "message": 6
+                    }
+                }
+            };
+            const exampleInvalidValue = {
+                "message": false
+            };
+            const exampleInvalidValue2 = {
+                "message": {
+                    "feel": "ok",
+                    "message": "Hello, world!"
+                }
+            };
+            const exampleInvalidValue3 = {
+                "message": {
+                    "feel": "good",
+                    "message": {
+                        "feel": "bad",
+                        "message": true
+                    }
+                }
+            };
+            const exampleInvalidValue4 = {
+                "message": {
+                    "feel": "good",
+                    "message": {
+                        "feel": "bad",
+                        "message": {}
+                    }
+                }
+            };
+            const exampleInvalidValue5 = {
+                "message": {
+                    "feel": "good",
+                    "message": {
+                        "feel": "bad",
+                        "message": {
+                            "feel": "good",
+                            "message": {
+                                "feel": "bad",
+                                "message": null
+                            }
+                        }
+                    }
+                }
+            };
+            const exampleInvalidValue6 = {
+                "message": {
+                    "message": "Hello, world!"
+                }
+            };
+
+            expect(grammar.grammar).toMatchInlineSnapshot(`
+              "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? def0 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
+              string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
+              string-rule ::= "\\"" string-char-rule* "\\""
+              fractional-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ("." [0-9]{1,16})? ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
+              def2 ::= "\\"good\\""
+              def3 ::= "\\"bad\\""
+              rule0 ::= ( def2 | def3 )
+              comma-whitespace-no-new-lines-rule ::= "," [ ]?
+              whitespace-no-new-lines-rule ::= [ ]?
+              rule1 ::= "{" whitespace-no-new-lines-rule "\\"feel\\"" ":" [ ]? rule0 comma-whitespace-no-new-lines-rule "\\"message\\"" ":" [ ]? def0 whitespace-no-new-lines-rule "}"
+              def1 ::= ( def2 | def3 | rule1 )
+              def0 ::= ( string-rule | fractional-number-rule | def1 )
+              whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
+              whitespace-b-0-4-rule ::= [\\n] | [ ]?"
+            `);
+
+            const parsedValue = grammar.parse(JSON.stringify(exampleValidValue));
+
+            expectTypeOf<ExpectTypesMatch<typeof parsedValue, schemaType>>().toExtend<true>();
+            expect(parsedValue).toEqual(exampleValidValue);
+            expect(testGrammar(grammar, exampleValidValue)).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue, "pretty")).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue, "dumps")).to.eql(true);
+
+            const parsedValue2 = grammar.parse(JSON.stringify(exampleValidValue2));
+
+            expectTypeOf<ExpectTypesMatch<typeof parsedValue2, schemaType>>().toExtend<true>();
+            expect(parsedValue2).toEqual(exampleValidValue2);
+            expect(testGrammar(grammar, exampleValidValue2)).to.eql(true);
+            // expect(testGrammar(grammar, exampleValidValue2, "pretty")).to.eql(true);
+            expect(testGrammar(grammar, exampleValidValue2, "dumps")).to.eql(true);
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got false]");
+                expect(testGrammar(grammar, exampleInvalidValue)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue2));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got {\"feel\":\"ok\",\"message\":\"Hello, world!\"}]");
+                expect(testGrammar(grammar, exampleInvalidValue2)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue3));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got {\"feel\":\"good\",\"message\":{\"feel\":\"bad\",\"message\":true}}]");
+                expect(testGrammar(grammar, exampleInvalidValue3)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue4));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got {\"feel\":\"good\",\"message\":{\"feel\":\"bad\",\"message\":{}}}]");
+                expect(testGrammar(grammar, exampleInvalidValue4)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue5));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got {\"feel\":\"good\",\"message\":{\"feel\":\"bad\",\"message\":{\"feel\":\"good\",\"message\":{\"feel\":\"bad\",\"message\":null}}}}]");
+                expect(testGrammar(grammar, exampleInvalidValue5)).to.eql(false);
+            }
+
+            try {
+                grammar.parse(JSON.stringify(exampleInvalidValue6));
+                expect.unreachable("Parsing should have failed");
+            } catch (err) {
+                expect(err).toMatchInlineSnapshot("[Error: Expected one of 3 schemas but got {\"message\":\"Hello, world!\"}]");
+                expect(testGrammar(grammar, exampleInvalidValue6)).to.eql(false);
+            }
+        });
+    });
 });
 
 function testGrammar(grammar: LlamaJsonSchemaGrammar<any>, object: any, formattingType: false | "dumps" | "pretty" = false) {
@@ -2251,3 +2663,9 @@ function testGrammar(grammar: LlamaJsonSchemaGrammar<any>, object: any, formatti
 
     return grammar._testText(JSON.stringify(object) + "\n".repeat(4));
 }
+
+type ExpectTypesMatch<T1, T2> = T1 extends T2
+    ? T2 extends T1
+        ? true
+        : false
+    : false;

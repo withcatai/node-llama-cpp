@@ -2,8 +2,9 @@ import {
     GbnfJsonArraySchema, GbnfJsonConstSchema, GbnfJsonEnumSchema, GbnfJsonObjectSchema, GbnfJsonOneOfSchema, GbnfJsonSchema,
     GbnfJsonSchemaImmutableType, GbnfJsonSchemaToType, GbnfJsonBasicStringSchema, GbnfJsonFormatStringSchema, isGbnfJsonArraySchema,
     isGbnfJsonConstSchema, isGbnfJsonEnumSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema, isGbnfJsonBasicStringSchema,
-    isGbnfJsonFormatStringSchema
+    isGbnfJsonFormatStringSchema, isGbnfJsonRefSchema, GbnfJsonRefSchema
 } from "../types.js";
+import {DefScopeDefs, joinDefs} from "./defsScope.js";
 
 
 export function validateObjectAgainstGbnfSchema(object: any, schema: unknown): boolean;
@@ -37,13 +38,20 @@ class TechnicalValidationError extends Error {
     }
 }
 
-function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
-    if (isGbnfJsonArraySchema(schema))
-        return validateArray(object, schema);
+function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(
+    object: any,
+    schema: T,
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): object is GbnfJsonSchemaToType<T> {
+    if (isGbnfJsonRefSchema(schema))
+        return validateRef(object, schema, defs, defScopeDefs);
+    else if (isGbnfJsonArraySchema(schema))
+        return validateArray(object, schema, defs, defScopeDefs);
     else if (isGbnfJsonObjectSchema(schema))
-        return validateObject(object, schema);
+        return validateObject(object, schema, defs, defScopeDefs);
     else if (isGbnfJsonOneOfSchema(schema))
-        return validateOneOf(object, schema);
+        return validateOneOf(object, schema, defs, defScopeDefs);
     else if (isGbnfJsonBasicStringSchema(schema))
         return validateBasicString(object, schema);
     else if (isGbnfJsonFormatStringSchema(schema))
@@ -70,7 +78,39 @@ function validateObjectWithGbnfSchema<T extends GbnfJsonSchema>(object: any, sch
     throw new TechnicalValidationError(`Expected type "${schema.type}" but got "${object === null ? "null" : typeof object}"`);
 }
 
-function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
+function validateRef<T extends GbnfJsonRefSchema<Record<any, any>>>(
+    object: any,
+    schema: T,
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): object is GbnfJsonSchemaToType<T> {
+    const ref = schema.$ref;
+    const referencePrefix = "#/$defs/";
+
+    if (ref == null || !ref.startsWith(referencePrefix)) {
+        // if the $ref is invalid, a warning was already shows when the grammar was generated,
+        // so we don't perform validation on the object as it's considered an "any" type
+        return true;
+    }
+
+    const defName = ref.slice(referencePrefix.length);
+    const def = defs[defName];
+    if (def == null) {
+        // if the $ref points to a non-existing def, a warning was already shows when the grammar was generated,
+        // so we don't perform validation on the object as it's considered an "any" type
+        return true;
+    }
+
+    const currentDefs = defScopeDefs.defScopeDefs.get([defName, def]);
+    return validateObjectWithGbnfSchema(object, def, currentDefs ?? {}, defScopeDefs);
+}
+
+function validateArray<T extends GbnfJsonArraySchema>(
+    object: any,
+    schema: T,
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): object is GbnfJsonSchemaToType<T> {
     if (!(object instanceof Array))
         throw new TechnicalValidationError(`Expected an array but got "${typeof object}"`);
 
@@ -93,27 +133,37 @@ function validateArray<T extends GbnfJsonArraySchema>(object: any, schema: T): o
 
     let res = true;
     let index = 0;
+    const currentDefs = joinDefs(defs, schema.$defs);
+    defScopeDefs.registerDefs(currentDefs);
 
     if (schema.prefixItems != null) {
         for (const item of schema.prefixItems) {
-            res &&= validateObjectWithGbnfSchema(object[index], item);
+            res &&= validateObjectWithGbnfSchema(object[index], item, currentDefs, defScopeDefs);
             index++;
         }
     }
 
     if (schema.items != null) {
         for (; index < object.length; index++)
-            res &&= validateObjectWithGbnfSchema(object[index], schema.items);
+            res &&= validateObjectWithGbnfSchema(object[index], schema.items, currentDefs, defScopeDefs);
     }
 
     return res;
 }
 
-function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
+function validateObject<T extends GbnfJsonObjectSchema>(
+    object: any,
+    schema: T,
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): object is GbnfJsonSchemaToType<T> {
     if (typeof object !== "object" || object === null)
         throw new TechnicalValidationError(`Expected an object but got "${typeof object}"`);
 
     let res = true;
+
+    const currentDefs = joinDefs(defs, schema.$defs);
+    defScopeDefs.registerDefs(currentDefs);
 
     const objectKeys = Object.keys(object);
     const objectKeysSet = new Set(objectKeys);
@@ -131,7 +181,7 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
             throw new TechnicalValidationError(`Unexpected keys: ${extraKeys.map((key) => JSON.stringify(key)).join(", ")}`);
         else if (schema.additionalProperties !== true) {
             for (const key of extraKeys)
-                res &&= validateObjectWithGbnfSchema(object[key], schema.additionalProperties);
+                res &&= validateObjectWithGbnfSchema(object[key], schema.additionalProperties, currentDefs, defScopeDefs);
         }
     }
 
@@ -140,7 +190,7 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
         throw new TechnicalValidationError(`Missing keys: ${missingKeys.map((key) => JSON.stringify(key)).join(", ")}`);
 
     for (const key of schemaKeys)
-        res &&= validateObjectWithGbnfSchema(object[key], schema.properties![key]!);
+        res &&= validateObjectWithGbnfSchema(object[key], schema.properties![key]!, currentDefs, defScopeDefs);
 
     if (schema.additionalProperties != null && schema.additionalProperties !== false) {
         if (objectKeys.length < minProperties) {
@@ -159,10 +209,18 @@ function validateObject<T extends GbnfJsonObjectSchema>(object: any, schema: T):
     return res;
 }
 
-function validateOneOf<T extends GbnfJsonOneOfSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
+function validateOneOf<T extends GbnfJsonOneOfSchema>(
+    object: any,
+    schema: T,
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): object is GbnfJsonSchemaToType<T> {
+    const currentDefs = joinDefs(defs, schema.$defs);
+    defScopeDefs.registerDefs(currentDefs);
+
     for (const item of schema.oneOf) {
         try {
-            return validateObjectWithGbnfSchema(object, item);
+            return validateObjectWithGbnfSchema(object, item, currentDefs, defScopeDefs);
         } catch (err) {
             if (err instanceof TechnicalValidationError)
                 continue;

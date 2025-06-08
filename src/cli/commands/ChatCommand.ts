@@ -529,8 +529,7 @@ async function RunChat({
     });
 
     const grammar = jsonSchemaGrammarFilePath != null
-        ? new LlamaJsonSchemaGrammar(
-            llama,
+        ? await llama.createGrammarForJsonSchema(
             await fs.readJson(
                 path.resolve(process.cwd(), jsonSchemaGrammarFilePath)
             )
