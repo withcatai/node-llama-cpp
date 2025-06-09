@@ -2373,22 +2373,21 @@ describe("grammar for JSON schema", () => {
             };
 
             expect(grammar.grammar).toMatchInlineSnapshot(`
-              "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? def0 comma-whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? def1 comma-whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule comma-whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? def2 comma-whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? def2 comma-whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule0 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
+              "root ::= "{" whitespace-b-1-4-rule "\\"message\\"" ":" [ ]? rule0 comma-whitespace-b-1-4-rule "\\"numberOfWordsInMessage\\"" ":" [ ]? integer-number-rule comma-whitespace-b-1-4-rule "\\"feelingGoodPercentage\\"" ":" [ ]? fractional-number-rule comma-whitespace-b-1-4-rule "\\"feelingGood\\"" ":" [ ]? rule1 comma-whitespace-b-1-4-rule "\\"feelingOverall\\"" ":" [ ]? rule1 comma-whitespace-b-1-4-rule "\\"verbsInMessage\\"" ":" [ ]? rule2 whitespace-b-0-4-rule "}" "\\n\\n\\n\\n" [\\n]*
               string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
               string-rule ::= "\\"" string-char-rule* "\\""
               null-rule ::= "null"
-              def0 ::= ( string-rule | null-rule )
+              rule0 ::= ( string-rule | null-rule )
               comma-whitespace-b-1-4-rule ::= "," ([\\n] ("    " | "\\t") | [ ]?)
               integer-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
-              def1 ::= integer-number-rule
               fractional-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ("." [0-9]{1,16})? ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
-              def3 ::= "\\"good\\""
-              def4 ::= "\\"bad\\""
-              def2 ::= ( def3 | def4 )
+              val0 ::= "\\"good\\""
+              val1 ::= "\\"bad\\""
+              rule1 ::= ( val0 | val1 )
               comma-whitespace-b-2-4-rule ::= "," ([\\n] (" "{8} | "\\t\\t") | [ ]?)
               whitespace-b-2-4-rule ::= [\\n] (" "{8} | "\\t\\t") | [ ]?
               whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
-              rule0 ::= "[" whitespace-b-2-4-rule ( string-rule ( comma-whitespace-b-2-4-rule string-rule )* )? whitespace-b-1-4-rule "]"
+              rule2 ::= "[" whitespace-b-2-4-rule ( string-rule ( comma-whitespace-b-2-4-rule string-rule )* )? whitespace-b-1-4-rule "]"
               whitespace-b-0-4-rule ::= [\\n] | [ ]?"
             `);
 
@@ -2576,14 +2575,15 @@ describe("grammar for JSON schema", () => {
               string-char-rule ::= [^"\\\\\\x7F\\x00-\\x1F] | "\\\\" ["\\\\/bfnrt] | "\\\\u" [0-9a-fA-F]{4}
               string-rule ::= "\\"" string-char-rule* "\\""
               fractional-number-rule ::= "-"? ("0" | [1-9] [0-9]{0,15}) ("." [0-9]{1,16})? ([eE] [-+]? ("0" | [1-9] [0-9]{0,15}))?
-              def2 ::= "\\"good\\""
-              def3 ::= "\\"bad\\""
-              rule0 ::= ( def2 | def3 )
+              val0 ::= "\\"good\\""
+              val1 ::= "\\"bad\\""
+              rule0 ::= ( val0 | val1 )
               comma-whitespace-no-new-lines-rule ::= "," [ ]?
               whitespace-no-new-lines-rule ::= [ ]?
               rule1 ::= "{" whitespace-no-new-lines-rule "\\"feel\\"" ":" [ ]? rule0 comma-whitespace-no-new-lines-rule "\\"message\\"" ":" [ ]? def0 whitespace-no-new-lines-rule "}"
-              def1 ::= ( def2 | def3 | rule1 )
-              def0 ::= ( string-rule | fractional-number-rule | def1 )
+              rule2 ::= ( val0 | val1 | rule1 )
+              rule3 ::= ( string-rule | fractional-number-rule | rule2 )
+              def0 ::= rule3
               whitespace-b-1-4-rule ::= [\\n] ("    " | "\\t") | [ ]?
               whitespace-b-0-4-rule ::= [\\n] | [ ]?"
             `);
