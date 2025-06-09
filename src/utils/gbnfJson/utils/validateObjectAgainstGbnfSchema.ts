@@ -84,6 +84,9 @@ function validateRef<T extends GbnfJsonRefSchema<Record<any, any>>>(
     defs: Record<string, GbnfJsonSchema> = {},
     defScopeDefs: DefScopeDefs = new DefScopeDefs()
 ): object is GbnfJsonSchemaToType<T> {
+    const currentDefs = joinDefs(defs, schema.$defs);
+    defScopeDefs.registerDefs(currentDefs);
+
     const ref = schema.$ref;
     const referencePrefix = "#/$defs/";
 
@@ -94,15 +97,15 @@ function validateRef<T extends GbnfJsonRefSchema<Record<any, any>>>(
     }
 
     const defName = ref.slice(referencePrefix.length);
-    const def = defs[defName];
+    const def = currentDefs[defName];
     if (def == null) {
         // if the $ref points to a non-existing def, a warning was already shows when the grammar was generated,
         // so we don't perform validation on the object as it's considered an "any" type
         return true;
     }
 
-    const currentDefs = defScopeDefs.defScopeDefs.get([defName, def]);
-    return validateObjectWithGbnfSchema(object, def, currentDefs ?? {}, defScopeDefs);
+    const scopeDefs = defScopeDefs.defScopeDefs.get([defName, def]);
+    return validateObjectWithGbnfSchema(object, def, scopeDefs ?? {}, defScopeDefs);
 }
 
 function validateArray<T extends GbnfJsonArraySchema>(

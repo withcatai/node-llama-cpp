@@ -25,7 +25,22 @@ export abstract class GbnfTerminal {
         return this.getGrammar(grammarGenerator);
     }
 
-    public resolve(grammarGenerator: GbnfGrammarGenerator): string {
+    private _getRootRuleName(grammarGenerator: GbnfGrammarGenerator) {
+        if (this._ruleName != null)
+            return this._ruleName;
+
+        const ruleName = grammarGenerator.usedRootRuleName
+            ? this.getRuleName(grammarGenerator)
+            : "root";
+        this._ruleName = ruleName;
+
+        if (ruleName === "root")
+            grammarGenerator.usedRootRuleName = true;
+
+        return ruleName;
+    }
+
+    public resolve(grammarGenerator: GbnfGrammarGenerator, resolveAsRootGrammar: boolean = false): string {
         if (this._ruleName != null)
             return this._ruleName;
 
@@ -37,7 +52,12 @@ export abstract class GbnfTerminal {
             return existingRuleName;
         }
 
-        const ruleName = this.getRuleName(grammarGenerator);
+        const ruleName = resolveAsRootGrammar
+            ? this._getRootRuleName(grammarGenerator)
+            : this.getRuleName(grammarGenerator);
+
+        if (resolveAsRootGrammar)
+            return grammar;
 
         if (grammar === ruleName) {
             this._ruleName = ruleName;

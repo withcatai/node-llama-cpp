@@ -180,7 +180,9 @@ export type GbnfJsonRefSchema<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> 
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    readonly description?: string
+    readonly description?: string,
+
+    readonly $defs?: Defs
 };
 
 
@@ -211,7 +213,7 @@ export type GbnfJsonSchemaToTSType<T, Defs extends GbnfJsonDefList<NoInfer<Defs>
                                     : T extends GbnfJsonArraySchema<Record<any, any>>
                                         ? ArrayTypeToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
                                         : T extends GbnfJsonRefSchema<any>
-                                            ? GbnfJsonRefSchemaToType<T, NoInfer<Defs>>
+                                            ? GbnfJsonRefSchemaToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
                                             : undefined;
 
 type GbnfJsonBasicStringSchemaToType<T extends GbnfJsonBasicStringSchema> =

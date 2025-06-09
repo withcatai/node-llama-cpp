@@ -32,6 +32,9 @@ export function getGbnfJsonTerminalForGbnfJsonSchema(
         throw new Error("Maximum nesting scope exceeded. Ensure that your schema does not have circular references or excessive nesting.");
 
     if (isGbnfJsonRefSchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        grammarGenerator.registerDefs(currentDefs);
+
         const ref = schema?.$ref;
         const referencePrefix = "#/$defs/";
         if (ref == null || !ref.startsWith(referencePrefix)) {
@@ -44,7 +47,7 @@ export function getGbnfJsonTerminalForGbnfJsonSchema(
         }
 
         const defName = ref.slice(referencePrefix.length);
-        const def = defs[defName];
+        const def = currentDefs[defName];
         if (def == null) {
             console.warn(
                 getConsoleLogPrefix(true, false),

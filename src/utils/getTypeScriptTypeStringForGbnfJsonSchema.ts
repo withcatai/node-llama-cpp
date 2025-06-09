@@ -17,13 +17,16 @@ function _getTypeScriptTypeStringForGbnfJsonSchema(
     defScopeDefs: DefScopeDefs = new DefScopeDefs()
 ): string {
     if (isGbnfJsonRefSchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        defScopeDefs.registerDefs(currentDefs);
+
         const ref = schema?.$ref;
         const referencePrefix = "#/$defs/";
         if (ref == null || !ref.startsWith(referencePrefix))
             return "any";
 
         const defName = ref.slice(referencePrefix.length);
-        const def = defs[defName];
+        const def = currentDefs[defName];
         if (def == null)
             return "any";
         else if (printedDefs.has(def)) {
@@ -36,8 +39,8 @@ function _getTypeScriptTypeStringForGbnfJsonSchema(
             ].join("");
         }
 
-        const currentDefs = defScopeDefs.defScopeDefs.get([defName, def]);
-        if (currentDefs == null)
+        const scopeDefs = defScopeDefs.defScopeDefs.get([defName, def]);
+        if (scopeDefs == null)
             return "any";
 
         printedDefs.add(def);
@@ -47,7 +50,7 @@ function _getTypeScriptTypeStringForGbnfJsonSchema(
                 .replaceAll("\n", " ")
                 .replaceAll("*/", "* /"),
             " */ ",
-            _getTypeScriptTypeStringForGbnfJsonSchema(def, printedDefs, currentDefs, defScopeDefs)
+            _getTypeScriptTypeStringForGbnfJsonSchema(def, printedDefs, scopeDefs, defScopeDefs)
         ].join("");
     } else if (isGbnfJsonOneOfSchema(schema)) {
         const currentDefs = joinDefs(defs, schema.$defs);

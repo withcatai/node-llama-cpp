@@ -7,8 +7,6 @@ export class GbnfRef extends GbnfTerminal {
     public readonly getValueTerminal: () => GbnfTerminal;
     public readonly defName: string;
     public readonly def: GbnfJsonSchema;
-    private _valueTerminal?: GbnfTerminal;
-    private _grammar?: string;
 
     public constructor({
         getValueTerminal,
@@ -26,28 +24,30 @@ export class GbnfRef extends GbnfTerminal {
     }
 
     public override getGrammar(grammarGenerator: GbnfGrammarGenerator): string {
-        this._createRule(grammarGenerator);
-
-        if (this._valueTerminal != null)
-            return this._valueTerminal.getGrammar(grammarGenerator);
-        else if (this._grammar != null)
-            return this._grammar;
-
-        return this.getValueTerminal().getGrammar(grammarGenerator);
+        return this.generateRuleName(grammarGenerator);
     }
 
     protected override generateRuleName(grammarGenerator: GbnfGrammarGenerator): string {
-        return this._createRule(grammarGenerator);
-    }
+        if (!grammarGenerator.defRuleNames.has([this.defName, this.def])) {
+            const alreadyGeneratingGrammarForThisRef = grammarGenerator.defRuleNames.get([this.defName, this.def]) === null;
+            if (alreadyGeneratingGrammarForThisRef)
+                return grammarGenerator.generateRuleNameForDef(this.defName, this.def);
 
-    private _createRule(grammarGenerator: GbnfGrammarGenerator) {
-        const [isNew, ruleName] = grammarGenerator.generateRuleNameForDef(this.defName, this.def);
-        if (!isNew) {
-            this._grammar = ruleName;
+            grammarGenerator.defRuleNames.set([this.defName, this.def], null);
+            const grammar = this.getValueTerminal().resolve(grammarGenerator);
+
+            if (grammarGenerator.rules.has(grammar) && grammarGenerator.defRuleNames.get([this.defName, this.def]) === null) {
+                grammarGenerator.defRuleNames.set([this.defName, this.def], grammar);
+                return grammar;
+            }
+
+            const ruleName = grammarGenerator.generateRuleNameForDef(this.defName, this.def);
+            grammarGenerator.rules.set(ruleName, grammar);
+            grammarGenerator.ruleContentToRuleName.set(grammar, ruleName);
+
             return ruleName;
         }
 
-        this._valueTerminal = this.getValueTerminal();
-        return ruleName;
+        return grammarGenerator.generateRuleNameForDef(this.defName, this.def);
     }
 }

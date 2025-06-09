@@ -193,8 +193,8 @@ export type ChatSessionModelFunctions = {
 
 export type ChatSessionModelFunction<Params extends GbnfJsonSchema | undefined = GbnfJsonSchema | undefined> = {
     readonly description?: string,
-    readonly params?: Readonly<Params>,
-    readonly handler: (params: GbnfJsonSchemaToType<Params>) => any
+    readonly params?: Params,
+    readonly handler: (params: GbnfJsonSchemaToType<NoInfer<Params>>) => any
 };
 
 export function isChatModelResponseFunctionCall(item: ChatModelResponse["response"][number] | undefined): item is ChatModelFunctionCall {
