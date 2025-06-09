@@ -2178,11 +2178,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         !this.disengageInitiallyEngagedFunctionMode.hasInProgressStops
                     )
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops) {
                     const lastTokensForDetokenizer = this.streamRegulator.getLastQueuedChunkTokens();
@@ -2290,11 +2294,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (functionNameGenerationDoneDetector.hasTriggeredStops)
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 const functionCallNameText = this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens);
                 const functionName = functionNameGrammar.parseFunctionName(functionCallNameText);
@@ -2375,11 +2383,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                         if (functionParamsGenerationDoneDetector.hasTriggeredStops)
                             break;
+
+                        const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                        if (stopRes != null)
+                            return stopRes;
                     }
 
-                    const abortRes = this.handleAbortTrigger("model");
-                    if (abortRes != null)
-                        return abortRes;
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
 
                     const functionCallParamsText =
                         this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens, false, lastPartTokens);
@@ -2452,11 +2464,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (sectionSuffixDetector.hasTriggeredStops || !sectionSuffixDetector.hasInProgressStops)
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 if (sectionSuffixDetector.hasTriggeredStops) {
                     this.functionEvaluationMode = false;
