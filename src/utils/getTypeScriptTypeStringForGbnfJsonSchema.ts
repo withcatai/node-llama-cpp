@@ -1,14 +1,63 @@
 import {
     GbnfJsonSchema, isGbnfJsonArraySchema, isGbnfJsonBasicSchemaIncludesType, isGbnfJsonBasicStringSchema, isGbnfJsonConstSchema,
-    isGbnfJsonEnumSchema, isGbnfJsonFormatStringSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema
+    isGbnfJsonEnumSchema, isGbnfJsonFormatStringSchema, isGbnfJsonObjectSchema, isGbnfJsonOneOfSchema, isGbnfJsonRefSchema
 } from "./gbnfJson/types.js";
+import {DefScopeDefs, joinDefs} from "./gbnfJson/utils/defsScope.js";
 
 const maxTypeRepetition = 10;
 
 export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema): string {
-    if (isGbnfJsonOneOfSchema(schema)) {
+    return _getTypeScriptTypeStringForGbnfJsonSchema(schema);
+}
+
+function _getTypeScriptTypeStringForGbnfJsonSchema(
+    schema: GbnfJsonSchema,
+    printedDefs: Set<GbnfJsonSchema> = new Set(),
+    defs: Record<string, GbnfJsonSchema> = {},
+    defScopeDefs: DefScopeDefs = new DefScopeDefs()
+): string {
+    if (isGbnfJsonRefSchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        defScopeDefs.registerDefs(currentDefs);
+
+        const ref = schema?.$ref;
+        const referencePrefix = "#/$defs/";
+        if (ref == null || !ref.startsWith(referencePrefix))
+            return "any";
+
+        const defName = ref.slice(referencePrefix.length);
+        const def = currentDefs[defName];
+        if (def == null)
+            return "any";
+        else if (printedDefs.has(def)) {
+            return [
+                "/* ",
+                defName
+                    .replaceAll("\n", " ")
+                    .replaceAll("*/", "* /"),
+                " type */ any"
+            ].join("");
+        }
+
+        const scopeDefs = defScopeDefs.defScopeDefs.get([defName, def]);
+        if (scopeDefs == null)
+            return "any";
+
+        printedDefs.add(def);
+        return [
+            "/* Type: ",
+            defName
+                .replaceAll("\n", " ")
+                .replaceAll("*/", "* /"),
+            " */ ",
+            _getTypeScriptTypeStringForGbnfJsonSchema(def, printedDefs, scopeDefs, defScopeDefs)
+        ].join("");
+    } else if (isGbnfJsonOneOfSchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        defScopeDefs.registerDefs(currentDefs);
+
         const values = schema.oneOf
-            .map((altSchema) => getTypeScriptTypeStringForGbnfJsonSchema(altSchema));
+            .map((altSchema) => _getTypeScriptTypeStringForGbnfJsonSchema(altSchema, printedDefs, currentDefs, defScopeDefs));
 
         return values.join(" | ");
     } else if (isGbnfJsonConstSchema(schema)) {
@@ -19,12 +68,15 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             .filter((item) => item !== "")
             .join(" | ");
     } else if (isGbnfJsonObjectSchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        defScopeDefs.registerDefs(currentDefs);
+
         let addNewline = false;
         const valueTypes = Object.entries(schema.properties ?? {})
             .map(([propName, propSchema]) => {
                 const escapedValue = JSON.stringify(propName) ?? "";
                 const keyText = escapedValue.slice(1, -1) === propName ? propName : escapedValue;
-                const valueType = getTypeScriptTypeStringForGbnfJsonSchema(propSchema);
+                const valueType = _getTypeScriptTypeStringForGbnfJsonSchema(propSchema, printedDefs, currentDefs, defScopeDefs);
 
                 if (keyText === "" || valueType === "")
                     return "";
@@ -103,7 +155,7 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
             : schema.additionalProperties === true
                 ? "{[key: string]: any}"
                 : schema.additionalProperties != null
-                    ? ["{[key: string]: ", getTypeScriptTypeStringForGbnfJsonSchema(schema.additionalProperties), "}"].join("")
+                    ? ["{[key: string]: ", _getTypeScriptTypeStringForGbnfJsonSchema(schema.additionalProperties), "}"].join("")
                     : undefined;
 
         if (valueTypes.length === 0 && additionalPropertiesMapSyntax != null)
@@ -113,14 +165,17 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
 
         return knownPropertiesMapSyntax;
     } else if (isGbnfJsonArraySchema(schema)) {
+        const currentDefs = joinDefs(defs, schema.$defs);
+        defScopeDefs.registerDefs(currentDefs);
+
         if (schema.maxItems === 0)
             return "[]";
 
         if (schema.prefixItems != null && schema.prefixItems.length > 0) {
-            const valueTypes = schema.prefixItems.map((item) => getTypeScriptTypeStringForGbnfJsonSchema(item));
+            const valueTypes = schema.prefixItems.map((item) => _getTypeScriptTypeStringForGbnfJsonSchema(item));
 
             const restType = schema.items != null
-                ? getTypeScriptTypeStringForGbnfJsonSchema(schema.items)
+                ? _getTypeScriptTypeStringForGbnfJsonSchema(schema.items, printedDefs, currentDefs, defScopeDefs)
                 : "any";
 
             if (schema.minItems != null) {
@@ -133,7 +188,7 @@ export function getTypeScriptTypeStringForGbnfJsonSchema(schema: GbnfJsonSchema)
 
             return "[" + valueTypes.join(", ") + "]";
         } else if (schema.items != null) {
-            const valuesType = getTypeScriptTypeStringForGbnfJsonSchema(schema.items);
+            const valuesType = _getTypeScriptTypeStringForGbnfJsonSchema(schema.items, printedDefs, currentDefs, defScopeDefs);
 
             if (valuesType === "")
                 return "[]";

@@ -66,7 +66,7 @@ export class FunctionCallParamsGrammar<const Functions extends ChatModelFunction
 function getGbnfGrammarForFunctionParams(paramsSchema: GbnfJsonSchema): string {
     const grammarGenerator = new GbnfGrammarGenerator();
     const rootTerminal = getGbnfJsonTerminalForGbnfJsonSchema(paramsSchema, grammarGenerator);
-    const rootGrammar = rootTerminal.getGrammar(grammarGenerator);
+    const rootGrammar = rootTerminal.resolve(grammarGenerator, true);
 
     return grammarGenerator.generateGbnfFile(rootGrammar + ` "${"\\n".repeat(4)}"`);
 }

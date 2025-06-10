@@ -84,8 +84,8 @@ export class QwenChatWrapper extends ChatWrapper {
             segments: {
                 reiterateStackAfterFunctionCalls: true,
                 thought: {
-                    prefix: LlamaText(new SpecialTokensText("<think>")),
-                    suffix: LlamaText(new SpecialTokensText("</think>"))
+                    prefix: LlamaText(new SpecialTokensText("<think>\n")),
+                    suffix: LlamaText(new SpecialTokensText("\n</think>"))
                 }
             }
         };
@@ -247,7 +247,9 @@ export class QwenChatWrapper extends ChatWrapper {
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
         return [
             [{}, {}, {_requireFunctionCallSettingsExtraction: true}],
-            [{_lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}]
+            [{_lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}],
+            [{thoughts: "discourage"}, {}, {_requireFunctionCallSettingsExtraction: true}],
+            [{thoughts: "discourage", _lineBreakBeforeFunctionCallPrefix: true}, {}, {_requireFunctionCallSettingsExtraction: true}]
         ];
     }
 }

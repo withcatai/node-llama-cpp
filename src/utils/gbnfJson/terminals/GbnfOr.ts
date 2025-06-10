@@ -30,7 +30,7 @@ export class GbnfOr extends GbnfTerminal {
         return "( " + mappedValues.join(" | ") + " )";
     }
 
-    public override resolve(grammarGenerator: GbnfGrammarGenerator): string {
+    public override resolve(grammarGenerator: GbnfGrammarGenerator, resolveAsRootGrammar: boolean = false): string {
         const mappedValues = this.values
             .map((v) => v.resolve(grammarGenerator))
             .filter((value) => value !== "" && value !== grammarNoValue);
@@ -40,6 +40,6 @@ export class GbnfOr extends GbnfTerminal {
         else if (mappedValues.length === 1)
             return mappedValues[0]!;
 
-        return super.resolve(grammarGenerator);
+        return super.resolve(grammarGenerator, resolveAsRootGrammar);
     }
 }

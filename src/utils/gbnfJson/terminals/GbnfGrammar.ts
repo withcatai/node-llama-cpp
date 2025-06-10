@@ -21,10 +21,10 @@ export class GbnfGrammar extends GbnfTerminal {
         return this.grammar;
     }
 
-    public override resolve(grammarGenerator: GbnfGrammarGenerator): string {
+    public override resolve(grammarGenerator: GbnfGrammarGenerator, resolveAsRootGrammar: boolean = false): string {
         if (this.resolveToRawGrammar)
             return this.getGrammar();
 
-        return super.resolve(grammarGenerator);
+        return super.resolve(grammarGenerator, resolveAsRootGrammar);
     }
 }

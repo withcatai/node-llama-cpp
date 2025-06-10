@@ -39,6 +39,58 @@ describe("FunctionaryChatWrapper", () => {
                 return Math.floor(Math.random() * (params.max - params.min + 1) + params.min);
             }
         }),
+        notifyOwner: defineChatSessionFunction({
+            description: "Send a notification to the owner, and create sub notifications",
+            params: {
+                $ref: "#/$defs/notification",
+                $defs: {
+                    notification: {
+                        type: "object",
+                        properties: {
+                            message: {
+                                type: "string"
+                            },
+                            subNotifications: {
+                                type: "array",
+                                items: {
+                                    $ref: "#/$defs/notification"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            handler(notification) {
+                return "Notification created: " + notification.message;
+            }
+        }),
+        notifyOwner2: defineChatSessionFunction({
+            description: "Send a notification to the owner, and create sub notifications",
+            params: {
+                $ref: "#/$defs/notification",
+                $defs: {
+                    notification: {
+                        type: "object",
+                        properties: {
+                            message: {
+                                type: "string",
+                                description: "Notification message"
+                            },
+                            subNotifications: {
+                                type: "array",
+                                description: "Sub notifications",
+                                items: {
+                                    $ref: "#/$defs/notification"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            handler(notification) {
+                return "Notification created: " + notification.message;
+            }
+        }),
         func1: defineChatSessionFunction({
             description: "Some function",
             params: {
@@ -187,6 +239,18 @@ describe("FunctionaryChatWrapper", () => {
 
               // Get a random number
               type getRandomNumber = (_: {min: number, max: number}) => any;
+
+              // Send a notification to the owner, and create sub notifications
+              type notifyOwner = (_: /* Type: notification */ {message: string, subNotifications: (/* notification type */ any)[]}) => any;
+
+              // Send a notification to the owner, and create sub notifications
+              type notifyOwner2 = (_: /* Type: notification */ {
+                  // Notification message
+                  message: string,
+                  
+                  // Sub notifications
+                  subNotifications: (/* notification type */ any)[]
+              }) => any;
 
               // Some function
               type func1 = (_: {
@@ -402,6 +466,18 @@ describe("FunctionaryChatWrapper", () => {
 
               // Get a random number
               type getRandomNumber = (_: {min: number, max: number}) => any;
+
+              // Send a notification to the owner, and create sub notifications
+              type notifyOwner = (_: /* Type: notification */ {message: string, subNotifications: (/* notification type */ any)[]}) => any;
+
+              // Send a notification to the owner, and create sub notifications
+              type notifyOwner2 = (_: /* Type: notification */ {
+                  // Notification message
+                  message: string,
+                  
+                  // Sub notifications
+                  subNotifications: (/* notification type */ any)[]
+              }) => any;
 
               // Some function
               type func1 = (_: {

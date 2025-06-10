@@ -5,7 +5,7 @@ import {DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {LlamaModel, LlamaModelOptions} from "../evaluator/LlamaModel/LlamaModel.js";
 import {DisposeGuard} from "../utils/DisposeGuard.js";
-import {GbnfJsonSchema} from "../utils/gbnfJson/types.js";
+import {GbnfJsonDefList, GbnfJsonSchema} from "../utils/gbnfJson/types.js";
 import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
@@ -345,8 +345,11 @@ export class Llama {
      * @see [Using a JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#json-schema) tutorial
      * @see [Reducing Hallucinations When Using JSON Schema Grammar](https://node-llama-cpp.withcat.ai/guide/grammar#reducing-json-schema-hallucinations) tutorial
      */
-    public async createGrammarForJsonSchema<const T extends GbnfJsonSchema>(schema: Readonly<T>) {
-        return new LlamaJsonSchemaGrammar<T>(this, schema);
+    public async createGrammarForJsonSchema<
+        const T extends GbnfJsonSchema<Defs>,
+        const Defs extends GbnfJsonDefList<Defs> = Record<any, any>
+    >(schema: Readonly<T> & GbnfJsonSchema<Defs>) {
+        return new LlamaJsonSchemaGrammar<T, Defs>(this, schema);
     }
     /* eslint-enable @stylistic/max-len */
 

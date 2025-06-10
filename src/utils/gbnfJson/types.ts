@@ -1,6 +1,18 @@
 export type GbnfJsonSchemaImmutableType = "string" | "number" | "integer" | "boolean" | "null";
-export type GbnfJsonSchema = GbnfJsonBasicSchema | GbnfJsonConstSchema | GbnfJsonEnumSchema | GbnfJsonOneOfSchema |
-    GbnfJsonStringSchema | GbnfJsonObjectSchema | GbnfJsonArraySchema;
+
+export type GbnfJsonSchema<Defs extends GbnfJsonDefList<Defs> = Record<any, any>> = GbnfJsonBasicSchema | GbnfJsonConstSchema |
+    GbnfJsonEnumSchema | GbnfJsonOneOfSchema<Defs> | GbnfJsonStringSchema | GbnfJsonObjectSchema<string, Defs> |
+    GbnfJsonArraySchema<Defs> | (
+        keyof Defs extends string
+            ? keyof NoInfer<Defs> extends never
+                ? never
+                : GbnfJsonRefSchema<Defs>
+            : never
+    );
+
+export type GbnfJsonDefList<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> = {
+    readonly [key: string]: GbnfJsonSchema<NoInfer<Defs>>
+};
 
 export type GbnfJsonBasicSchema = {
     readonly type: GbnfJsonSchemaImmutableType | readonly GbnfJsonSchemaImmutableType[],
@@ -32,15 +44,17 @@ export type GbnfJsonEnumSchema = {
      */
     readonly description?: string
 };
-export type GbnfJsonOneOfSchema = {
-    readonly oneOf: readonly GbnfJsonSchema[],
+export type GbnfJsonOneOfSchema<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> = {
+    readonly oneOf: readonly GbnfJsonSchema<NoInfer<Defs>>[],
 
     /**
      * A description of what you expect the model to set this value to.
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    readonly description?: string
+    readonly description?: string,
+
+    readonly $defs?: Defs
 };
 export type GbnfJsonStringSchema = GbnfJsonBasicStringSchema | GbnfJsonFormatStringSchema;
 export type GbnfJsonBasicStringSchema = {
@@ -78,14 +92,17 @@ export type GbnfJsonFormatStringSchema = {
      */
     readonly description?: string
 };
-export type GbnfJsonObjectSchema<Keys extends string = string> = {
+export type GbnfJsonObjectSchema<
+    Keys extends string = string,
+    Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}
+> = {
     readonly type: "object",
-    readonly properties?: {readonly [key in Keys]: GbnfJsonSchema},
+    readonly properties?: {readonly [key in Keys]: GbnfJsonSchema<NoInfer<Defs>>},
 
     /**
      * Unlike the JSON Schema spec, `additionalProperties` defaults to `false` to avoid breaking existing code.
      */
-    readonly additionalProperties?: boolean | GbnfJsonSchema,
+    readonly additionalProperties?: boolean | GbnfJsonSchema<NoInfer<Defs>>,
 
     /**
      * Make sure you define `additionalProperties` for this to have any effect.
@@ -121,12 +138,14 @@ export type GbnfJsonObjectSchema<Keys extends string = string> = {
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    readonly description?: string
+    readonly description?: string,
+
+    readonly $defs?: Defs
 };
-export type GbnfJsonArraySchema = {
+export type GbnfJsonArraySchema<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> = {
     readonly type: "array",
-    readonly items?: GbnfJsonSchema,
-    readonly prefixItems?: readonly GbnfJsonSchema[],
+    readonly items?: GbnfJsonSchema<NoInfer<Defs>>,
+    readonly prefixItems?: readonly GbnfJsonSchema<NoInfer<Defs>>[],
 
     /**
      * When using `minItems` and/or `maxItems`,
@@ -147,7 +166,23 @@ export type GbnfJsonArraySchema = {
      *
      * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
      */
-    readonly description?: string
+    readonly description?: string,
+
+    readonly $defs?: Defs
+};
+export type GbnfJsonRefSchema<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> = {
+    readonly $ref: keyof NoInfer<Defs> extends never
+        ? never
+        : `#/$defs/${OnlyStringKeys<NoInfer<Defs>>}`,
+
+    /**
+     * A description of what you expect the model to set this value to.
+     *
+     * Only passed to the model when using function calling, and has no effect when using JSON Schema grammar directly.
+     */
+    readonly description?: string,
+
+    readonly $defs?: Defs
 };
 
 
@@ -156,7 +191,7 @@ export type GbnfJsonArraySchema = {
  */
 export type GbnfJsonSchemaToType<T> = GbnfJsonSchemaToTSType<T>;
 
-export type GbnfJsonSchemaToTSType<T> =
+export type GbnfJsonSchemaToTSType<T, Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> =
     Readonly<GbnfJsonBasicSchema> extends T
         ? undefined
         : undefined extends T
@@ -171,13 +206,15 @@ export type GbnfJsonSchemaToTSType<T> =
                         ? T["const"]
                         : T extends GbnfJsonEnumSchema
                             ? T["enum"][number]
-                            : T extends GbnfJsonOneOfSchema
-                                ? GbnfJsonSchemaToType<T["oneOf"][number]>
-                                : T extends GbnfJsonObjectSchema
-                                    ? GbnfJsonObjectSchemaToType<T>
-                                    : T extends GbnfJsonArraySchema
-                                        ? ArrayTypeToType<T>
-                                        : undefined;
+                            : T extends GbnfJsonOneOfSchema<Record<any, any>>
+                                ? GbnfJsonSchemaToTSType<T["oneOf"][number], CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                : T extends GbnfJsonObjectSchema<string, Record<any, any>>
+                                    ? GbnfJsonObjectSchemaToType<T, NoInfer<Defs>>
+                                    : T extends GbnfJsonArraySchema<Record<any, any>>
+                                        ? ArrayTypeToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                        : T extends GbnfJsonRefSchema<any>
+                                            ? GbnfJsonRefSchemaToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                            : undefined;
 
 type GbnfJsonBasicStringSchemaToType<T extends GbnfJsonBasicStringSchema> =
     T["maxLength"] extends 0
@@ -187,7 +224,7 @@ type GbnfJsonBasicStringSchemaToType<T extends GbnfJsonBasicStringSchema> =
 type GbnfJsonBasicSchemaToType<T extends GbnfJsonBasicSchema["type"]> =
     T extends GbnfJsonSchemaImmutableType
         ? ImmutableTypeToType<T>
-        : T extends GbnfJsonSchemaImmutableType[]
+        : T[number] extends GbnfJsonSchemaImmutableType
             ? ImmutableTypeToType<T[number]>
             : never;
 
@@ -205,7 +242,8 @@ type ImmutableTypeToType<T extends GbnfJsonSchemaImmutableType> =
                         : never;
 
 type ArrayTypeToType<
-    T extends GbnfJsonArraySchema,
+    T extends GbnfJsonArraySchema<Record<any, any>>,
+    Defs extends GbnfJsonDefList<Defs> = {},
     MinItems extends number = T["minItems"] extends number
         ? T["prefixItems"] extends readonly GbnfJsonSchema[]
             ? keyof T["prefixItems"] extends T["minItems"]
@@ -222,45 +260,49 @@ type ArrayTypeToType<
                 ? (
                     T["maxItems"] extends MinItems
                         ? [
-                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"], CombineDefs<Defs, T["$defs"]>>,
                             ...IndexRangeWithSkip<
                                 MinItems,
                                 T["prefixItems"]["length"],
                                 T["items"] extends GbnfJsonSchema
-                                    ? GbnfJsonSchemaToType<T["items"]>
+                                    ? GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
                                     : GbnfJsonAnyValue
                             >
                         ]
                         : [
-                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                            ...GbnfJsonOrderedArrayTypes<T["prefixItems"], CombineDefs<Defs, T["$defs"]>>,
                             ...(
                                 T["items"] extends GbnfJsonSchema
-                                    ? GbnfJsonSchemaToType<T["items"]>
+                                    ? GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
                                     : GbnfJsonAnyValue
                             )[]
                         ]
                 )
                 : T["maxItems"] extends MinItems
                     ? [
-                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"], CombineDefs<Defs, T["$defs"]>>,
                         ...(
                             T["items"] extends GbnfJsonSchema
-                                ? IndexRangeWithSkip<T["maxItems"], T["prefixItems"]["length"], GbnfJsonSchemaToType<T["items"]>>
+                                ? IndexRangeWithSkip<
+                                    T["maxItems"],
+                                    T["prefixItems"]["length"],
+                                    GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
+                                >
                                 : IndexRangeWithSkip<T["maxItems"], T["prefixItems"]["length"], GbnfJsonAnyValue>
                             )
                     ]
                     : [
-                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"]>,
+                        ...GbnfJsonOrderedArrayTypes<T["prefixItems"], CombineDefs<Defs, T["$defs"]>>,
                         ...IndexRangeWithSkip<
                             MinItems,
                             T["prefixItems"]["length"],
                             T["items"] extends GbnfJsonSchema
-                                ? GbnfJsonSchemaToType<T["items"]>
+                                ? GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
                                 : GbnfJsonAnyValue
                         >,
                         ...(
                             T["items"] extends GbnfJsonSchema
-                                ? GbnfJsonSchemaToType<T["items"]>
+                                ? GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
                                 : GbnfJsonAnyValue
                         )[]
                     ]
@@ -268,12 +310,18 @@ type ArrayTypeToType<
         : T["items"] extends GbnfJsonSchema
             ? (
                 MinItems extends 0
-                    ? GbnfJsonSchemaToType<T["items"]>[]
+                    ? GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>[]
                     : T["maxItems"] extends MinItems
-                        ? IndexRange<T["maxItems"], GbnfJsonSchemaToType<T["items"]>>
+                        ? IndexRange<
+                            T["maxItems"],
+                            GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
+                        >
                         : [
-                            ...IndexRange<MinItems, GbnfJsonSchemaToType<T["items"]>>,
-                            ...GbnfJsonSchemaToType<T["items"]>[]
+                            ...IndexRange<
+                                MinItems,
+                                GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
+                            >,
+                            ...GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>[]
                         ]
             )
             : (
@@ -289,20 +337,30 @@ type ArrayTypeToType<
 
 
 type GbnfJsonObjectSchemaToType<
-    T extends GbnfJsonObjectSchema,
+    T extends GbnfJsonObjectSchema<string, Record<any, any>>,
+    Defs extends GbnfJsonDefList<Defs> = {},
     Props extends Readonly<Record<string, GbnfJsonSchema>> | undefined = T["properties"],
     AdditionalProps extends true | false | GbnfJsonSchema | undefined = T["additionalProperties"],
     PropsMap = Props extends undefined
         ? {}
-        : {-readonly [P in keyof Props]: GbnfJsonSchemaToType<Props[P]>},
+        : {-readonly [P in keyof Props]: GbnfJsonSchemaToTSType<Props[P], CombineDefs<Defs, T["$defs"]>>},
     Res = AdditionalProps extends undefined | false
         ? PropsMap
         : AdditionalProps extends true
             ? PropsMap & {[key: string]: GbnfJsonAnyValue}
             : AdditionalProps extends GbnfJsonSchema
-                ? PropsMap & {[key: string]: GbnfJsonSchemaToType<AdditionalProps>}
+                ? PropsMap & {
+                    [key: string]: GbnfJsonSchemaToTSType<AdditionalProps, CombineDefs<Defs, T["$defs"]>>
+                }
                 : PropsMap
 > = Res;
+
+type GbnfJsonRefSchemaToType<T extends GbnfJsonRefSchema<Defs>, Defs extends GbnfJsonDefList<Defs> = {}> =
+    T["$ref"] extends `#/$defs/${infer Key}`
+        ? Key extends keyof Defs
+            ? GbnfJsonSchemaToTSType<Defs[Key], Defs>
+            : never
+        : never;
 
 type GbnfJsonAnyValue = string | number | boolean | null | GbnfJsonAnyValue[] | {[key: string]: GbnfJsonAnyValue};
 
@@ -334,6 +392,10 @@ export function isGbnfJsonArraySchema(schema: GbnfJsonSchema): schema is GbnfJso
     return (schema as GbnfJsonArraySchema).type === "array";
 }
 
+export function isGbnfJsonRefSchema(schema: GbnfJsonSchema): schema is GbnfJsonRefSchema<Record<any, any>> {
+    return typeof (schema as GbnfJsonRefSchema).$ref === "string";
+}
+
 export function isGbnfJsonBasicSchemaIncludesType<T extends GbnfJsonSchemaImmutableType>(
     schema: GbnfJsonBasicSchema, type: T
 ): schema is GbnfJsonBasicSchema & {type: T | (T | GbnfJsonSchemaImmutableType)[]} {
@@ -342,6 +404,19 @@ export function isGbnfJsonBasicSchemaIncludesType<T extends GbnfJsonSchemaImmuta
 
     return schema.type === type;
 }
+
+type OnlyStringKeys<T extends object> = {
+    [K in keyof T]: K extends string ? K : never;
+}[keyof T];
+
+type CombineDefs<
+    Defs1 extends GbnfJsonDefList<Defs1>,
+    Param2 extends Defs1 | Defs2 | undefined,
+    Defs2 extends GbnfJsonDefList<Defs2> = {}
+> =
+    undefined extends NoInfer<Param2>
+        ? Defs1
+        : Defs1 & Param2;
 
 type IndexRange<
     Length extends number,
@@ -371,6 +446,6 @@ type _IndexRangeWithSkip<
     ? Value
     : _IndexRangeWithSkip<[...Value, FillType], [...ConditionValue, ConditionValue["length"]], MaxLength, FillType>;
 
-type GbnfJsonOrderedArrayTypes<T extends readonly GbnfJsonSchema[]> = {
-    -readonly [P in keyof T]: GbnfJsonSchemaToType<T[P]>
+type GbnfJsonOrderedArrayTypes<T extends readonly GbnfJsonSchema[], Defs extends GbnfJsonDefList<Defs> = {}> = {
+    -readonly [P in keyof T]: GbnfJsonSchemaToTSType<T[P], Defs>
 };

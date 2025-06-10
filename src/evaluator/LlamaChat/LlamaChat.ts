@@ -24,6 +24,7 @@ import {LlamaSampler} from "../LlamaContext/LlamaSampler.js";
 import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
 import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
+import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -721,7 +722,7 @@ export class LlamaChat {
             onTextChunk,
             onToken,
             signal,
-            maxTokens = Math.min(256, Math.ceil(this.context.contextSize / 2)),
+            maxTokens = defaultMaxPreloadTokens(this.sequence),
             temperature,
             minP,
             topK,
@@ -2177,11 +2178,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         !this.disengageInitiallyEngagedFunctionMode.hasInProgressStops
                     )
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 if (this.disengageInitiallyEngagedFunctionMode.hasTriggeredStops) {
                     const lastTokensForDetokenizer = this.streamRegulator.getLastQueuedChunkTokens();
@@ -2289,11 +2294,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (functionNameGenerationDoneDetector.hasTriggeredStops)
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 const functionCallNameText = this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens);
                 const functionName = functionNameGrammar.parseFunctionName(functionCallNameText);
@@ -2374,11 +2383,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                         if (functionParamsGenerationDoneDetector.hasTriggeredStops)
                             break;
+
+                        const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                        if (stopRes != null)
+                            return stopRes;
                     }
 
-                    const abortRes = this.handleAbortTrigger("model");
-                    if (abortRes != null)
-                        return abortRes;
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
 
                     const functionCallParamsText =
                         this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens, false, lastPartTokens);
@@ -2451,11 +2464,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
                     if (sectionSuffixDetector.hasTriggeredStops || !sectionSuffixDetector.hasInProgressStops)
                         break;
+
+                    const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
                 }
 
-                const abortRes = this.handleAbortTrigger("model");
-                if (abortRes != null)
-                    return abortRes;
+                const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
 
                 if (sectionSuffixDetector.hasTriggeredStops) {
                     this.functionEvaluationMode = false;

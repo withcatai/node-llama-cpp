@@ -14,12 +14,12 @@ export class GbnfNumberValue extends GbnfTerminal {
         return '"' + JSON.stringify(this.value) + '"';
     }
 
-    public override resolve(grammarGenerator: GbnfGrammarGenerator): string {
+    public override resolve(grammarGenerator: GbnfGrammarGenerator, resolveAsRootGrammar: boolean = false): string {
         const grammar = this.getGrammar();
         if (grammar.length <= grammarGenerator.getProposedLiteralValueRuleNameLength())
             return grammar;
 
-        return super.resolve(grammarGenerator);
+        return super.resolve(grammarGenerator, resolveAsRootGrammar);
     }
 
     protected override generateRuleName(grammarGenerator: GbnfGrammarGenerator): string {
