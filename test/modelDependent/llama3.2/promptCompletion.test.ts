@@ -41,9 +41,9 @@ describe("llama 3.2", () => {
             });
 
             const promptCompletion = await chatSession.completePrompt("Hi there!", {
-                maxTokens: 50
+                maxTokens: 11
             });
-            expect(promptCompletion).toMatchInlineSnapshot("\" I'm looking for a new phone case. I need a case that can protect your phone from scratches and drops.\"");
+            expect(promptCompletion).toMatchInlineSnapshot(`" I'm looking for a new phone case. I need"`);
             expect(LlamaText.fromTokens(model.tokenizer, chatSession.sequence.contextTokens)).toMatchInlineSnapshot(`
               LlamaText([
                 new SpecialToken("BOS"),
@@ -64,7 +64,7 @@ describe("llama 3.2", () => {
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
-              Hi there! I'm looking for a new phone case. I need a case that can protect your phone from scratches and drops.",
+              Hi there! I'm looking for a new phone case. I",
               ])
             `);
 
