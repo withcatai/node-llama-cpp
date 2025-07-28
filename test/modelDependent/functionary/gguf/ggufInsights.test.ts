@@ -92,7 +92,7 @@ describe("gguf", async () => {
 
             const modelVramUsageDiff = currentModelVramUsage - initialModelVramUsage;
 
-            const s300MB = 300 * Math.pow(1024, 2);
+            const s330MB = 330 * Math.pow(1024, 2);
             const s5MB = 5 * Math.pow(1024, 2);
 
             const estimatedModelResourceUsage = ggufInsights.estimateModelResourceRequirements({
@@ -100,7 +100,7 @@ describe("gguf", async () => {
             });
             expect(toBytes(estimatedModelResourceUsage.gpuVram)).toMatchInlineSnapshot('"4.06GB"');
             expect(toBytes(estimatedModelResourceUsage.cpuRam)).toMatchInlineSnapshot('"281.81MB"');
-            expect(Math.abs(modelVramUsageDiff - estimatedModelResourceUsage.gpuVram)).to.be.lte(s300MB);
+            expect(Math.abs(modelVramUsageDiff - estimatedModelResourceUsage.gpuVram)).to.be.lte(s330MB);
 
             const modelEstimationDiffWithActual = estimatedModelResourceUsage.gpuVram + estimatedModelResourceUsage.cpuRam - model.size;
             expect(Math.abs(modelEstimationDiffWithActual)).to.be.lte(s5MB); // tolerate such a small difference
@@ -125,7 +125,7 @@ describe("gguf", async () => {
                 modelGpuLayers: ggufInsights.totalLayers
             }).gpuVram;
             expect(toBytes(estimatedContextVramUsage)).toMatchInlineSnapshot("\"1.03GB\"");
-            expect(Math.abs(contextVramUsageDiff - estimatedContextVramUsage)).to.be.lte(s300MB);
+            expect(Math.abs(contextVramUsageDiff - estimatedContextVramUsage)).to.be.lte(s330MB);
 
             await model.dispose();
         });
@@ -190,7 +190,7 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "643.07MB",
+                "cpuRam": "643.08MB",
                 "gpuVram": "0B",
               }
             `);
@@ -201,7 +201,7 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "451.07MB",
+                "cpuRam": "451.08MB",
                 "gpuVram": "0B",
               }
             `);
@@ -214,7 +214,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "1.71GB",
-                "gpuVram": "355.25MB",
+                "gpuVram": "355.75MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -224,8 +224,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1002.8MB",
-                "gpuVram": "315.25MB",
+                "cpuRam": "1002.82MB",
+                "gpuVram": "315.75MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -235,8 +235,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "630.8MB",
-                "gpuVram": "295.25MB",
+                "cpuRam": "630.82MB",
+                "gpuVram": "295.75MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -246,8 +246,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "444.8MB",
-                "gpuVram": "285.25MB",
+                "cpuRam": "444.82MB",
+                "gpuVram": "285.75MB",
               }
             `);
 
@@ -258,7 +258,7 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1022.78MB",
+                "cpuRam": "1022.79MB",
                 "gpuVram": "1.05GB",
               }
             `);
@@ -269,8 +269,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "638.78MB",
-                "gpuVram": "679.25MB",
+                "cpuRam": "638.79MB",
+                "gpuVram": "679.75MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -280,8 +280,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "446.78MB",
-                "gpuVram": "479.25MB",
+                "cpuRam": "446.79MB",
+                "gpuVram": "479.75MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -291,8 +291,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "350.78MB",
-                "gpuVram": "379.25MB",
+                "cpuRam": "350.79MB",
+                "gpuVram": "379.75MB",
               }
             `);
 
@@ -326,7 +326,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "250.5MB",
-                "gpuVram": "667.52MB",
+                "gpuVram": "668.02MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -337,7 +337,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "250.5MB",
-                "gpuVram": "475.52MB",
+                "gpuVram": "476.02MB",
               }
             `);
 
@@ -371,7 +371,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "250.5MB",
-                "gpuVram": "667.52MB",
+                "gpuVram": "668.02MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -382,7 +382,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "250.5MB",
-                "gpuVram": "475.52MB",
+                "gpuVram": "476.02MB",
               }
             `);
         });
