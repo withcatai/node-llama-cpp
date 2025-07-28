@@ -159,7 +159,7 @@ export type AddonContext = {
 };
 
 export type BatchLogitIndex = number & {
-    __batchLogitIndex: never
+    readonly __batchLogitIndex: never
 };
 
 export type AddonGrammar = {
@@ -167,7 +167,7 @@ export type AddonGrammar = {
 };
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {
-    __brand: never
+    readonly __brand: never
 };
 
 export type AddonSampler = {

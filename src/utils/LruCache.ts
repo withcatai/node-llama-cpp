@@ -12,7 +12,7 @@ export class LruCache<Key, Value> {
         this._onDelete = onDelete;
     }
 
-    public get(key: Key) {
+    public get(key: Key): Value | undefined {
         if (!this._cache.has(key))
             return undefined;
 
