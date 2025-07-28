@@ -643,6 +643,12 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
         return LlamaLogLevel.log;
     else if (level === LlamaLogLevel.warn && message.startsWith("make_cpu_buft_list: disabling extra buffer types"))
         return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("llama_context: non-unified KV cache requires ggml_set_rows() - forcing unified KV cache"))
+        return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("llama_kv_cache_unified: LLAMA_SET_ROWS=0, using old ggml_cpy() method for backwards compatibility"))
+        return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("init: embeddings required but some input tokens were not marked as outputs -> overriding"))
+        return LlamaLogLevel.info;
 
     return level;
 }
