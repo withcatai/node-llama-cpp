@@ -43,7 +43,7 @@ describe("llama 3.2", () => {
             const promptCompletion = await chatSession.completePrompt("Hi there!", {
                 maxTokens: 11
             });
-            expect(promptCompletion).toMatchInlineSnapshot(`" I'm looking for a new phone case. I need"`);
+            expect(promptCompletion).toMatchInlineSnapshot("\" I'm looking for a new phone case. I need\"");
             expect(LlamaText.fromTokens(model.tokenizer, chatSession.sequence.contextTokens)).toMatchInlineSnapshot(`
               LlamaText([
                 new SpecialToken("BOS"),
