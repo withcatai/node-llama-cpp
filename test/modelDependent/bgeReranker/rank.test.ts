@@ -45,14 +45,14 @@ describe("bgeReranker", () => {
               [
                 0.00002039908727992137,
                 0.00006772414961977023,
-                0.000045397868702434395,
-                0.000045397868702434395,
-                0.000045397868702434395,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00003716893710288947,
                 0.0024726231566347743,
-                0.00003043155690056533,
-                0.00003043155690056533,
+                0.00003716893710288947,
+                0.00003716893710288947,
                 0.00002039908727992137,
-                0.00003043155690056533,
+                0.00003716893710288947,
               ]
             `);
         });
@@ -96,14 +96,14 @@ describe("bgeReranker", () => {
               [
                 0.00002039908727992137,
                 0.00006772414961977023,
-                0.000045397868702434395,
-                0.000045397868702434395,
-                0.000045397868702434395,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00003716893710288947,
                 0.0024726231566347743,
-                0.00003043155690056533,
-                0.00003043155690056533,
+                0.00003716893710288947,
+                0.00003716893710288947,
                 0.00002039908727992137,
-                0.00003043155690056533,
+                0.00003716893710288947,
               ]
             `);
         });
@@ -156,19 +156,19 @@ describe("bgeReranker", () => {
                 },
                 {
                   "document": "The capital of France is Paris",
-                  "score": 0.000045397868702434395,
+                  "score": 0.00003716893710288947,
                 },
                 {
                   "document": "Dogs love to play fetch with their owners",
-                  "score": 0.000045397868702434395,
+                  "score": 0.00003716893710288947,
                 },
                 {
                   "document": "Cleaning the house is a good way to keep it tidy",
-                  "score": 0.00003043155690056533,
+                  "score": 0.00003716893710288947,
                 },
                 {
                   "document": "A warm cup of tea is perfect for a cold winter day",
-                  "score": 0.00003043155690056533,
+                  "score": 0.00003716893710288947,
                 },
                 {
                   "document": "Not all the things that shine are made of gold",
@@ -196,7 +196,7 @@ function simplifySortedRanks<const T extends {document: string, score: number}[]
 }
 
 function simplifyScore(score: number) {
-    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.4).toFixed(1)));
+    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.6).toFixed(1)));
 }
 
 function roundToPrecision(value: number, precision: number): number {

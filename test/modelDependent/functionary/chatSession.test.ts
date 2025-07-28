@@ -76,17 +76,17 @@ describe("functionary", () => {
                 contextSequence: contextSequence2
             });
 
-            const res2 = await chatSession2.prompt("How much is 6+6+6");
+            const res2 = await chatSession2.prompt("How much is 6+6+6?");
 
             const tokenMeterState2 = contextSequence2.tokenMeter.getState();
             expect(tokenMeterState2).to.toMatchInlineSnapshot(`
               {
-                "usedInputTokens": 82,
-                "usedOutputTokens": 14,
+                "usedInputTokens": 83,
+                "usedOutputTokens": 11,
               }
             `);
             expect(tokenMeterState2.usedInputTokens).to.be.greaterThanOrEqual(tokenMeterState.usedInputTokens);
-            expect(res2).to.eql("The sum of 6+6+6 is 18.");
+            expect(res2).to.eql("6 + 6 + 6 = 18");
         });
 
         test("reusing a context sequences utilizes existing state", {timeout: 1000 * 60 * 60 * 2}, async () => {
