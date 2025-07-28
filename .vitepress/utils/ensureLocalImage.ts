@@ -55,7 +55,7 @@ export async function ensureLocalImage(url: string, name: string, {
     if (resolvedImages.has(cacheKey))
         return resolvedImages.get(cacheKey)!;
 
-    return await withLock([ensureLocalImage, ...cacheKey], async () => {
+    return await withLock([resolvedImages, ...cacheKey], async () => {
         if (resolvedImages.has(cacheKey))
             return resolvedImages.get(cacheKey)!;
 
@@ -185,7 +185,9 @@ function getFileExtension(format: keyof FormatEnum | undefined) {
 async function fetchWithRetry(url: string, retires: number = 5, waitTime: number = 1000 * 2) {
     for (let i = retires; i >= 0; i--) {
         try {
-            return await fetch(url);
+            return await fetch(url, {
+                redirect: "follow"
+            });
         } catch (err) {
             if (i === 0) {
                 console.error(`Failed to fetch image: ${url}`, err);
