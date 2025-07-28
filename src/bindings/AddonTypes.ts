@@ -1,4 +1,5 @@
 import {Token} from "../types.js";
+import {LlamaNuma} from "./types.js";
 
 
 export type BindingModule = {
@@ -85,6 +86,7 @@ export type BindingModule = {
         total: number
     },
     init(): Promise<void>,
+    setNuma(numa?: LlamaNuma): void,
     loadBackends(forceLoadLibrariesSearchPath?: string): void,
     dispose(): Promise<void>
 };

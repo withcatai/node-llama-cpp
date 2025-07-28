@@ -11,7 +11,7 @@ import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
 import {getLlamaClasses, LlamaClasses} from "../utils/getLlamaClasses.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel, LlamaLogLevelGreaterThanOrEqual} from "./types.js";
+import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel, LlamaLogLevelGreaterThanOrEqual, LlamaNuma} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
@@ -67,8 +67,8 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, bindingPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, buildGpu, maxThreads, vramOrchestrator,
-        vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
+        bindings, bindingPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu, maxThreads,
+        vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -81,6 +81,7 @@ export class Llama {
             release: string
         },
         debug: boolean,
+        numa?: LlamaNuma,
         buildGpu: BuildGpu,
         maxThreads?: number,
         vramOrchestrator: MemoryOrchestrator,
@@ -109,6 +110,9 @@ export class Llama {
             bindings.loadBackends(path.dirname(bindingPath));
 
         bindings.ensureGpuDeviceIsSupported();
+
+        if (numa != null && numa !== false)
+            bindings.setNuma(numa);
 
         this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
@@ -468,7 +472,7 @@ export class Llama {
     /** @internal */
     public static async _create({
         bindings, bindingPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads, skipLlamaInit = false,
-        debug
+        debug, numa
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -480,7 +484,8 @@ export class Llama {
         vramPadding: number | ((totalVram: number) => number),
         ramPadding: number | ((totalRam: number) => number),
         skipLlamaInit?: boolean,
-        debug: boolean
+        debug: boolean,
+        numa?: LlamaNuma
     }) {
         const vramOrchestrator = new MemoryOrchestrator(() => {
             const {total, used, unifiedSize} = bindings.getGpuVramInfo();
@@ -537,6 +542,7 @@ export class Llama {
             logLevel,
             logger,
             debug,
+            numa,
             buildGpu: buildMetadata.buildOptions.gpu,
             vramOrchestrator,
             maxThreads,

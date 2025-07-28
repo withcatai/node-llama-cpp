@@ -196,6 +196,36 @@ Napi::Value addonLoadBackends(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+Napi::Value addonSetNuma(const Napi::CallbackInfo& info) {
+    const bool numaDisabled = info.Length() == 0
+        ? true
+        : info[0].IsBoolean()
+            ? !info[0].As<Napi::Boolean>().Value()
+            : false;
+
+    if (numaDisabled)
+        return info.Env().Undefined();
+
+    const auto numaType = info[0].IsString()
+        ? info[0].As<Napi::String>().Utf8Value()
+        : "";
+
+    if (numaType == "distribute") {
+        llama_numa_init(GGML_NUMA_STRATEGY_DISTRIBUTE);
+    } else if (numaType == "isolate") {
+        llama_numa_init(GGML_NUMA_STRATEGY_ISOLATE);
+    } else if (numaType == "numactl") {
+        llama_numa_init(GGML_NUMA_STRATEGY_NUMACTL);
+    } else if (numaType == "mirror") {
+        llama_numa_init(GGML_NUMA_STRATEGY_MIRROR);
+    } else {
+        Napi::Error::New(info.Env(), std::string("Invalid NUMA strategy \"") + numaType + "\"").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    return info.Env().Undefined();
+}
+
 Napi::Value addonInit(const Napi::CallbackInfo& info) {
     if (backendInitialized) {
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
@@ -255,6 +285,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
         Napi::PropertyDescriptor::Function("getMemoryInfo", getMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
+        Napi::PropertyDescriptor::Function("setNuma", addonSetNuma),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });
