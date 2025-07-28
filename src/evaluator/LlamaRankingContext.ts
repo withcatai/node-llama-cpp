@@ -185,7 +185,7 @@ export class LlamaRankingContext {
         if (input.length === 0)
             return Promise.resolve(0);
 
-        return withLock(this, "evaluate", async () => {
+        return withLock([this as LlamaRankingContext, "evaluate"], async () => {
             await this._sequence.eraseContextTokenRanges([{
                 start: 0,
                 end: this._sequence.nextTokenIndex

@@ -55,7 +55,7 @@ export async function ensureLocalImage(url: string, name: string, {
     if (resolvedImages.has(cacheKey))
         return resolvedImages.get(cacheKey)!;
 
-    return await withLock(cacheKey[0], cacheKey[1], async () => {
+    return await withLock([ensureLocalImage, ...cacheKey], async () => {
         if (resolvedImages.has(cacheKey))
             return resolvedImages.get(cacheKey)!;
 

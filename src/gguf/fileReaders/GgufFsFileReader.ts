@@ -52,7 +52,7 @@ export class GgufFsFileReader extends GgufFileReader {
     }
 
     private async _readToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
-        return await withLock(this, "modifyBuffer", this._signal, async () => {
+        return await withLock([this as GgufFsFileReader, "modifyBuffer"], this._signal, async () => {
             if (endOffset < this._buffer.length)
                 return;
 

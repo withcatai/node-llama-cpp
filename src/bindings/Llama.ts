@@ -328,7 +328,7 @@ export class Llama {
     public async loadModel(options: LlamaModelOptions) {
         this._ensureNotDisposed();
 
-        return await withLock(this._memoryLock, LlamaLocks.loadToMemory, options.loadSignal, async () => {
+        return await withLock([this._memoryLock, LlamaLocks.loadToMemory], options.loadSignal, async () => {
             this._ensureNotDisposed();
 
             const preventDisposalHandle = this._backendDisposeGuard.createPreventDisposalHandle();

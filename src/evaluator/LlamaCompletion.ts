@@ -302,7 +302,7 @@ export class LlamaCompletion {
                 throw new DisposedError();
         };
 
-        return await withLock(this, "generateCompletion", signal, async () => {
+        return await withLock([this as LlamaCompletion, "generateCompletion"], signal, async () => {
             ensureNotAborted();
 
             if (this._sequence == null || this.disposed)
@@ -503,7 +503,7 @@ export class LlamaCompletion {
                 throw new DisposedError();
         };
 
-        return await withLock(this, "generateCompletion", signal, async () => {
+        return await withLock([this as LlamaCompletion, "generateCompletion"], signal, async () => {
             ensureNotAborted();
 
             if (this._sequence == null || this.disposed)

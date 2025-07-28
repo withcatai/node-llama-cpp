@@ -8,13 +8,13 @@ export async function waitForLockfileRelease({
     resourcePath: string, checkInterval?: number, staleDuration?: number
 }) {
     while (true) {
-        if (isLockActive(lockfileLockScope, resourcePath)) {
-            await waitForLockRelease(lockfileLockScope, resourcePath);
+        if (isLockActive([lockfileLockScope, resourcePath])) {
+            await waitForLockRelease([lockfileLockScope, resourcePath]);
             continue;
         }
 
         const lockfileActive = await lockfile.check(resourcePath, {stale: staleDuration, realpath: false});
-        const lockIsActive = isLockActive(lockfileLockScope, resourcePath);
+        const lockIsActive = isLockActive([lockfileLockScope, resourcePath]);
 
         if (lockIsActive)
             continue;

@@ -603,7 +603,7 @@ export class LlamaChat {
         if (generateResponseState.grammar != null && generateResponseState.functionsEnabled)
             throw new Error("Using both grammar and functions is not supported yet");
 
-        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatResponse<Functions>> => {
+        return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatResponse<Functions>> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsModel();
                 generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
@@ -801,7 +801,7 @@ export class LlamaChat {
             }
         );
 
-        return await withLock(this._chatLock, "evaluate", signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
+        return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
             try {
                 generateResponseState.ensureLastHistoryItemIsUser();
 

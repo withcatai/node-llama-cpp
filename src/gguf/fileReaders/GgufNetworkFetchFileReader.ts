@@ -66,7 +66,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
     }
 
     private async _fetchToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
-        await withLock(this, "modifyBuffer", this._signal, async () => {
+        await withLock([this as GgufNetworkFetchFileReader, "modifyBuffer"], this._signal, async () => {
             if (endOffset < this._buffer.length)
                 return;
 

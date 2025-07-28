@@ -537,7 +537,7 @@ export class LlamaModel {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
 
-        return await withLock(this._llama._memoryLock, LlamaLocks.loadToMemory, options.createSignal, async () => {
+        return await withLock([this._llama._memoryLock, LlamaLocks.loadToMemory], options.createSignal, async () => {
             const preventDisposalHandle = this._backendModelDisposeGuard.createPreventDisposalHandle();
             try {
                 return await LlamaContext._create(options, {_model: this});
@@ -673,7 +673,7 @@ export class LlamaModel {
         if (this._loraAdapters.has(resolvedPath))
             return this._loraAdapters.get(resolvedPath)!;
 
-        return await withLock(this._loraAdapters, "modify", async () => {
+        return await withLock([this._loraAdapters, "modify"], async () => {
             if (this._loraAdapters.has(resolvedPath))
                 return this._loraAdapters.get(resolvedPath)!;
 
@@ -687,7 +687,7 @@ export class LlamaModel {
 
     /** @internal */
     public async _removeLoraUsage(loraAdapters: Set<AddonModelLora>) {
-        return await withLock(this._loraAdapters, "modify", async () => {
+        return await withLock([this._loraAdapters, "modify"], async () => {
             await Promise.all(
                 [...loraAdapters].map(async (lora) => {
                     lora.usages--;
