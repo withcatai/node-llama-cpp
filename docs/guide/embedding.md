@@ -172,7 +172,7 @@ const documents = [
     "Cleaning the house is a good way to keep it tidy"
 ];
 
-const query = "Tell me a nature geographical fact";
+const query = "Tell me a geographical fact";
 const rankedDocuments = await context.rankAndSort(query, documents);
 
 const topDocument = rankedDocuments[0]!;
@@ -185,7 +185,7 @@ console.log("Ranked documents:", rankedDocuments);
 ```
 > This example will produce this output:
 > ```
-> query: Tell me a nature geographical fact
+> query: Tell me a geographical fact
 > Top document: Mount Everest is the tallest mountain in the world
 > Second document: The capital of France is Paris
 > ```

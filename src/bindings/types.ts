@@ -22,6 +22,7 @@ export type BuildOptions = {
         release: string
     }
 };
+export const llamaNumaOptions = ["distribute", "isolate", "numactl", "mirror", false] as const satisfies LlamaNuma[];
 export type LlamaNuma = false | "distribute" | "isolate" | "numactl" | "mirror";
 
 export type BuildOptionsJSON = Omit<BuildOptions, "customCmakeOptions"> & {
@@ -42,6 +43,20 @@ export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOption
         return option;
 
     return "auto";
+}
+
+export function parseNumaOption(option: (typeof llamaNumaOptions)[number] | (typeof nodeLlamaCppGpuOffStringOptions)[number]): LlamaNuma {
+    function optionIsGpuOff(opt: typeof option): opt is (typeof nodeLlamaCppGpuOffStringOptions)[number] {
+        return nodeLlamaCppGpuOffStringOptions.includes(opt as (typeof nodeLlamaCppGpuOffStringOptions)[number]);
+    }
+
+    if (optionIsGpuOff(option))
+        return false;
+
+    if (llamaNumaOptions.includes(option))
+        return option;
+
+    return false;
 }
 
 

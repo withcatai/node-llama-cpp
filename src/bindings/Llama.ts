@@ -42,6 +42,7 @@ export class Llama {
     /** @internal */ public readonly _debug: boolean;
     /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
     /** @internal */ private readonly _gpu: LlamaGpuType;
+    /** @internal */ private readonly _numa: LlamaNuma;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
@@ -95,6 +96,7 @@ export class Llama {
 
         this._bindings = bindings;
         this._debug = debug;
+        this._numa = numa ?? false;
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
@@ -111,7 +113,7 @@ export class Llama {
 
         bindings.ensureGpuDeviceIsSupported();
 
-        if (numa != null && numa !== false)
+        if (this._numa !== false)
             bindings.setNuma(numa);
 
         this._gpu = bindings.getGpuType() ?? false;
@@ -209,6 +211,13 @@ export class Llama {
 
     public set maxThreads(value: number) {
         this._threadsSplitter.maxThreads = Math.floor(Math.max(0, value));
+    }
+
+    /**
+     * See the `numa` option of `getLlama` for more information
+     */
+    public get numa() {
+        return this._numa;
     }
 
     public get logLevel() {
