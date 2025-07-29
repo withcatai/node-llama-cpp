@@ -7,12 +7,12 @@ export async function isLockfileActive({
 }: {
     resourcePath: string, staleDuration?: number
 }) {
-    if (isLockActive(lockfileLockScope, resourcePath))
+    if (isLockActive([lockfileLockScope, resourcePath]))
         return true;
 
     const lockfileActive = await lockfile.check(resourcePath, {stale: staleDuration, realpath: false});
     if (lockfileActive)
         return true;
 
-    return isLockActive(lockfileLockScope, resourcePath);
+    return isLockActive([lockfileLockScope, resourcePath]);
 }

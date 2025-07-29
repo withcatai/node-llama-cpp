@@ -25,7 +25,7 @@ export class ReplHistory {
             return;
         }
 
-        await withLock(this, "file", async () => {
+        await withLock([this as ReplHistory, "file"], async () => {
             try {
                 const json = parseReplJsonfile(await fs.readJSON(this._filePath!));
                 this._fileContent = this._addItemToHistory(line, json);

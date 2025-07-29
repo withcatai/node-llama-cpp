@@ -315,7 +315,7 @@ export class LlamaContext {
 
         this._batchDispatchPending = true;
 
-        void withLock(this, "context", async () => {
+        void withLock([this as LlamaContext, "context"], async () => {
             this._currentDispatchBatchHandle = {};
             this._dispatchDecodeScheduled = false;
             this._batchDispatchPending = false;
@@ -589,7 +589,7 @@ export class LlamaContext {
                     let decodeLock: Lock | undefined;
                     // this is a workaround to prevent Vulkan from crashing the process when decoding on multiple contexts in parallel
                     if (this._llama.gpu === "vulkan")
-                        decodeLock = await acquireLock(decodeSyncWorkaround.vulkanLock, "decode");
+                        decodeLock = await acquireLock([decodeSyncWorkaround.vulkanLock, "decode"]);
 
                     try {
                         await decodeTokenBatchItems(currentBatchItems, currentBatchSize);
@@ -653,7 +653,7 @@ export class LlamaContext {
         if (this._disposed)
             return;
 
-        void withLock(this, "context", async () => {
+        void withLock([this as LlamaContext, "context"], async () => {
             if (this._disposed)
                 return;
 
@@ -1215,7 +1215,7 @@ export class LlamaContextSequence {
 
         let awaitPromise: Promise<void> | undefined;
 
-        await withLock(this._context, "context", async () => {
+        await withLock([this._context, "context"], async () => {
             this._ensureNotDisposed();
 
             if (ranges.length === 0)
@@ -1555,7 +1555,7 @@ export class LlamaContextSequence {
             return item;
         });
 
-        const evaluatorLock = await acquireLock(this._lock, "evaluate");
+        const evaluatorLock = await acquireLock([this._lock, "evaluate"]);
         try {
             return await this._decodeTokens(
                 resolvedTokens,
@@ -1588,7 +1588,7 @@ export class LlamaContextSequence {
                         tokenBias: sampleOptions.tokenBias
                     });
 
-                    return await withLock(sampler, "sample", async () => {
+                    return await withLock([sampler, "sample"], async () => {
                         if (sampler.disposed)
                             return undefined;
 
@@ -1623,7 +1623,7 @@ export class LlamaContextSequence {
             );
         } finally {
             evaluatorLock.dispose();
-            void withLock(sampler, "sample", sampler.asyncDispose);
+            void withLock([sampler, "sample"], sampler.asyncDispose);
         }
     }
 
@@ -1638,8 +1638,8 @@ export class LlamaContextSequence {
 
         const resolvedPath = path.resolve(process.cwd(), filePath);
 
-        const evaluatorLock = await acquireLock(this._lock, "evaluate");
-        const contextLock = await acquireLock(this._context, "context");
+        const evaluatorLock = await acquireLock([this._lock, "evaluate"]);
+        const contextLock = await acquireLock([this._context, "context"]);
 
         try {
             this._ensureNotDisposed();
@@ -1681,8 +1681,8 @@ export class LlamaContextSequence {
 
         const resolvedPath = path.resolve(process.cwd(), filePath);
 
-        const evaluatorLock = await acquireLock(this._lock, "evaluate");
-        const contextLock = await acquireLock(this._context, "context");
+        const evaluatorLock = await acquireLock([this._lock, "evaluate"]);
+        const contextLock = await acquireLock([this._context, "context"]);
 
         try {
             this._ensureNotDisposed();
@@ -1757,7 +1757,7 @@ export class LlamaContextSequence {
                 this._ensureNotDisposed();
                 const evaluatorLock = _skipLock
                     ? undefined
-                    : await acquireLock(this._lock, "evaluate");
+                    : await acquireLock([this._lock, "evaluate"]);
                 let nextToken: Token | -1 | null | undefined;
                 const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
 
@@ -1789,7 +1789,7 @@ export class LlamaContextSequence {
                                 tokenBias
                             });
 
-                            return withLock(sampler, "sample", async () => {
+                            return withLock([sampler, "sample"], async () => {
                                 if (sampler.disposed)
                                     return null;
 
@@ -1847,7 +1847,7 @@ export class LlamaContextSequence {
                     evalTokens = [nextToken];
             }
         } finally {
-            void withLock(sampler, "sample", sampler.asyncDispose);
+            void withLock([sampler, "sample"], sampler.asyncDispose);
         }
     }
 
@@ -1895,7 +1895,7 @@ export class LlamaContextSequence {
         try {
             while (true) {
                 this._ensureNotDisposed();
-                const evaluatorLock = await acquireLock(this._lock, "evaluate");
+                const evaluatorLock = await acquireLock([this._lock, "evaluate"]);
                 let nextToken: Token | undefined;
                 const yieldRes: Partial<SequenceEvaluateOutput<{probabilities: true, confidence: true}>> = {};
 
@@ -2019,7 +2019,7 @@ export class LlamaContextSequence {
                                     tokenBias
                                 });
 
-                                return withLock(sampler, "sample", async () => {
+                                return withLock([sampler, "sample"], async () => {
                                     if (sampler.disposed)
                                         return null;
 
@@ -2112,7 +2112,7 @@ export class LlamaContextSequence {
                 logitsArray[logitsStartIndex] = true;
             }
         } finally {
-            void withLock(sampler, "sample", sampler.asyncDispose);
+            void withLock([sampler, "sample"], sampler.asyncDispose);
 
             if (this._tokenPredictorOwner === tokenPredictorOwner)
                 tokenPredictor.stop();

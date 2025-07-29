@@ -12,7 +12,7 @@ export async function getLlamaWithoutBackend() {
     if (sharedLlamaWithoutBackend != null)
         return sharedLlamaWithoutBackend;
 
-    return await withLock(getLlamaWithoutBackend, "loadAddon", async () => {
+    return await withLock([getLlamaWithoutBackend, "loadAddon"], async () => {
         if (sharedLlamaWithoutBackend != null)
             return sharedLlamaWithoutBackend;
 

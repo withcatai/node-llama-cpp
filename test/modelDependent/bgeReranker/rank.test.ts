@@ -28,7 +28,7 @@ describe("bgeReranker", () => {
                 "Cleaning the house is a good way to keep it tidy"
             ];
 
-            const query = "Tell me a geographical fact";
+            const query = "Tell me a nature geographical fact";
 
             const ranks = await Promise.all(
                 documents.map((doc) => rankingContext.rank(query, doc))
@@ -40,19 +40,19 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.01798620996209156");
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.0024726231566347743");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
-                0.000013674009084599736,
-                0.000013674009084599736,
-                0.000013674009084599736,
-                0.003684239899435989,
-                0.000013674009084599736,
-                0.01798620996209156,
-                0.000013674009084599736,
-                0.000013674009084599736,
                 0.00002039908727992137,
-                0.000013674009084599736,
+                0.00006772414961977023,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.0024726231566347743,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00003716893710288947,
               ]
             `);
         });
@@ -81,7 +81,7 @@ describe("bgeReranker", () => {
                 "Cleaning the house is a good way to keep it tidy"
             ];
 
-            const query = "Tell me a geographical fact";
+            const query = "Tell me a nature geographical fact";
 
             const ranks = await rankingContext.rankAll(query, documents);
 
@@ -91,19 +91,19 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.01798620996209156");
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.0024726231566347743");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
-                0.000013674009084599736,
-                0.000013674009084599736,
-                0.000013674009084599736,
-                0.003684239899435989,
-                0.000013674009084599736,
-                0.01798620996209156,
-                0.000013674009084599736,
-                0.000013674009084599736,
                 0.00002039908727992137,
-                0.000013674009084599736,
+                0.00006772414961977023,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.0024726231566347743,
+                0.00003716893710288947,
+                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00003716893710288947,
               ]
             `);
         });
@@ -130,7 +130,7 @@ describe("bgeReranker", () => {
                 "Cleaning the house is a good way to keep it tidy"
             ];
 
-            const query = "Tell me a geographical fact";
+            const query = "Tell me a nature geographical fact";
 
             const rankedDocuments = await rankingContext.rankAndSort(query, documents);
 
@@ -141,42 +141,42 @@ describe("bgeReranker", () => {
             expect(simplifySortedRanks([topDocument])[0]).toMatchInlineSnapshot(`
               {
                 "document": "Mount Everest is the tallest mountain in the world",
-                "score": 0.01798620996209156,
+                "score": 0.0024726231566347743,
               }
             `);
             expect(simplifySortedRanks(rankedDocuments)).toMatchInlineSnapshot(`
               [
                 {
                   "document": "Mount Everest is the tallest mountain in the world",
-                  "score": 0.01798620996209156,
+                  "score": 0.0024726231566347743,
+                },
+                {
+                  "document": "I love eating pizza with extra cheese",
+                  "score": 0.00006772414961977023,
                 },
                 {
                   "document": "The capital of France is Paris",
-                  "score": 0.003684239899435989,
+                  "score": 0.00003716893710288947,
+                },
+                {
+                  "document": "Dogs love to play fetch with their owners",
+                  "score": 0.00003716893710288947,
+                },
+                {
+                  "document": "Cleaning the house is a good way to keep it tidy",
+                  "score": 0.00003716893710288947,
+                },
+                {
+                  "document": "A warm cup of tea is perfect for a cold winter day",
+                  "score": 0.00003716893710288947,
                 },
                 {
                   "document": "Not all the things that shine are made of gold",
                   "score": 0.00002039908727992137,
                 },
                 {
-                  "document": "I love eating pizza with extra cheese",
-                  "score": 0.000013674009084599736,
-                },
-                {
-                  "document": "Dogs love to play fetch with their owners",
-                  "score": 0.000013674009084599736,
-                },
-                {
                   "document": "The sky is clear and blue today",
-                  "score": 0.000013674009084599736,
-                },
-                {
-                  "document": "Cleaning the house is a good way to keep it tidy",
-                  "score": 0.000013674009084599736,
-                },
-                {
-                  "document": "A warm cup of tea is perfect for a cold winter day",
-                  "score": 0.000013674009084599736,
+                  "score": 0.00002039908727992137,
                 },
               ]
             `);
@@ -196,7 +196,7 @@ function simplifySortedRanks<const T extends {document: string, score: number}[]
 }
 
 function simplifyScore(score: number) {
-    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.4).toFixed(1)));
+    return toSigmoid(parseFloat(roundToPrecision(toLogit(score), 0.6).toFixed(1)));
 }
 
 function roundToPrecision(value: number, precision: number): number {

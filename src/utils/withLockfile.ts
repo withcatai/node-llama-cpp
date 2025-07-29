@@ -12,7 +12,7 @@ export async function withLockfile<const T>(
     },
     callback: () => T | Promise<T>
 ): Promise<T> {
-    return await withLock(lockfileLockScope, resourcePath, async () => {
+    return await withLock([lockfileLockScope, resourcePath], async () => {
         let releaseLock: () => Promise<void>;
         let res: T;
 

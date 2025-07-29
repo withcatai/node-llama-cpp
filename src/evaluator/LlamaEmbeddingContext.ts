@@ -96,7 +96,7 @@ export class LlamaEmbeddingContext {
         if (endToken != null && resolvedInput.at(-1) !== endToken)
             resolvedInput.push(endToken);
 
-        return await withLock(this, "evaluate", async () => {
+        return await withLock([this as LlamaEmbeddingContext, "evaluate"], async () => {
             await this._sequence.eraseContextTokenRanges([{
                 start: 0,
                 end: this._sequence.nextTokenIndex

@@ -25,7 +25,7 @@ export function UpdateBadge({appVersion, canShowCurrentVersion}: UpdateBadgeProp
 
     const updateLatestVersionInfo = useCallback(async () => {
         clearTimeout(nextUpdateTimeoutRef.current);
-        await withLock(instanceLock.current, "updateVersion", async () => {
+        await withLock([instanceLock.current, "updateVersion"], async () => {
             clearTimeout(nextUpdateTimeoutRef.current);
 
             const latestVersion = await getLatestAvailableVersion(appVersionIsBeta ?? false);

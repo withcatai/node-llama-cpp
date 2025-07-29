@@ -22,6 +22,7 @@ export type BuildOptions = {
         release: string
     }
 };
+export type LlamaNuma = false | "distribute" | "isolate" | "numactl" | "mirror";
 
 export type BuildOptionsJSON = Omit<BuildOptions, "customCmakeOptions"> & {
     customCmakeOptions: Record<string, string>

@@ -95,7 +95,7 @@ let inProgressResponse: SimplifiedModelChatItem["message"] = [];
 
 export const llmFunctions = {
     async loadLlama() {
-        await withLock(llmFunctions, "llama", async () => {
+        await withLock([llmFunctions, "llama"], async () => {
             if (llama != null) {
                 try {
                     await llama.dispose();
@@ -136,7 +136,7 @@ export const llmFunctions = {
         });
     },
     async loadModel(modelPath: string) {
-        await withLock(llmFunctions, "model", async () => {
+        await withLock([llmFunctions, "model"], async () => {
             if (llama == null)
                 throw new Error("Llama not loaded");
 
@@ -198,7 +198,7 @@ export const llmFunctions = {
         });
     },
     async createContext() {
-        await withLock(llmFunctions, "context", async () => {
+        await withLock([llmFunctions, "context"], async () => {
             if (model == null)
                 throw new Error("Model not loaded");
 
@@ -242,7 +242,7 @@ export const llmFunctions = {
         });
     },
     async createContextSequence() {
-        await withLock(llmFunctions, "contextSequence", async () => {
+        await withLock([llmFunctions, "contextSequence"], async () => {
             if (context == null)
                 throw new Error("Context not loaded");
 
@@ -278,7 +278,7 @@ export const llmFunctions = {
     },
     chatSession: {
         async createChatSession() {
-            await withLock(llmFunctions, "chatSession", async () => {
+            await withLock([llmFunctions, "chatSession"], async () => {
                 if (contextSequence == null)
                     throw new Error("Context sequence not loaded");
 
@@ -336,7 +336,7 @@ export const llmFunctions = {
             });
         },
         async prompt(message: string) {
-            await withLock(llmFunctions, "chatSession", async () => {
+            await withLock([llmFunctions, "chatSession"], async () => {
                 if (chatSession == null)
                     throw new Error("Chat session not loaded");
 

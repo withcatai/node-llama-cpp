@@ -119,7 +119,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         targetSequence.context._ctx.ensureDraftContextIsCompatibleForSpeculative(this._draftSequence.context._ctx);
 
         try {
-            await withLock(this, "evaluate", currentAbortSignal, async () => {
+            await withLock([this as DraftSequenceTokenPredictor, "evaluate"], currentAbortSignal, async () => {
                 this._stateTokens = stateTokens.slice();
                 this._pendingEvalTokens = [];
                 this._predictedTokens = [];
@@ -157,7 +157,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         const grammarEvaluationStateOption = this._evaluateOptions.grammarEvaluationState instanceof Function
             ? this._evaluateOptions.grammarEvaluationState()?.clone()
             : this._evaluateOptions.grammarEvaluationState?.clone();
-        void withLock(this, "pushTokens", async () => {
+        void withLock([this as DraftSequenceTokenPredictor, "pushTokens"], async () => {
             this._grammarEvaluationStateOption = grammarEvaluationStateOption;
 
             const tokensToPush = tokens.slice();
@@ -226,7 +226,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         if (untilPredictionsExhausted)
             this._waitForPredictionExhaustion = true;
 
-        void withLock(this, "evaluate", async () => {
+        void withLock([this as DraftSequenceTokenPredictor, "evaluate"], async () => {
             this._iterator?.return();
             this._iterator = undefined;
         });
@@ -238,7 +238,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
         this._resetAbortController.abort();
         this._currentEvaluationAbortController.abort();
 
-        void withLock(this, "evaluate", async () => {
+        void withLock([this as DraftSequenceTokenPredictor, "evaluate"], async () => {
             this._iterator?.return();
             this._iterator = undefined;
         });
@@ -255,7 +255,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
             return;
 
         this._active = true;
-        void withLock(this, "evaluate", async () => {
+        void withLock([this as DraftSequenceTokenPredictor, "evaluate"], async () => {
             try {
                 const abortSignal = this._currentEvaluationAbortController.signal;
 

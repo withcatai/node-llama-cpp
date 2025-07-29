@@ -1,4 +1,5 @@
 import {Token} from "../types.js";
+import {LlamaNuma} from "./types.js";
 
 
 export type BindingModule = {
@@ -85,6 +86,7 @@ export type BindingModule = {
         total: number
     },
     init(): Promise<void>,
+    setNuma(numa?: LlamaNuma): void,
     loadBackends(forceLoadLibrariesSearchPath?: string): void,
     dispose(): Promise<void>
 };
@@ -159,7 +161,7 @@ export type AddonContext = {
 };
 
 export type BatchLogitIndex = number & {
-    __batchLogitIndex: never
+    readonly __batchLogitIndex: never
 };
 
 export type AddonGrammar = {
@@ -167,7 +169,7 @@ export type AddonGrammar = {
 };
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {
-    __brand: never
+    readonly __brand: never
 };
 
 export type AddonSampler = {

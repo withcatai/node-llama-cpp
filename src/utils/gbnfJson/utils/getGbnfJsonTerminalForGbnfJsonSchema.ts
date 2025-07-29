@@ -199,5 +199,8 @@ export function getGbnfJsonTerminalForGbnfJsonSchema(
     if (isGbnfJsonBasicSchemaIncludesType(schema, "null"))
         terminals.push(new GbnfNull());
 
+    if (terminals.length === 0)
+        terminals.push(new GbnfNull());
+
     return new GbnfOr(terminals);
 }

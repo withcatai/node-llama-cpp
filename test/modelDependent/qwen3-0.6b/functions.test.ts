@@ -198,7 +198,7 @@ describe("qwen3 0.6b", () => {
 
             const res2 = await chatSession.prompt([
                 "The owner has 3 apps: App1, App2, and App3.",
-                "Notify the owner with a main notifications about 'apps time', with sub notifications for each app with the app's name.",
+                "Notify the owner with a main notifications about 'apps time', with a sub-notification for each app with the app's name.",
                 "Under each app sub-notification add a sub-notification with the app's number."
             ].join("\n"), {
                 ...promptOptions,
