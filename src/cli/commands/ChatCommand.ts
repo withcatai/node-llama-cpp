@@ -13,7 +13,8 @@ import {getLlama} from "../../bindings/getLlama.js";
 import {LlamaGrammar} from "../../evaluator/LlamaGrammar.js";
 import {LlamaChatSession} from "../../evaluator/LlamaChatSession/LlamaChatSession.js";
 import {
-    BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption
+    BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaNuma, llamaNumaOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption,
+    parseNumaOption
 } from "../../bindings/types.js";
 import withOra from "../../utils/withOra.js";
 import {TokenMeter} from "../../evaluator/TokenMeter.js";
@@ -67,6 +68,7 @@ type ChatCommand = {
     tokenPredictionDraftModel?: string,
     tokenPredictionModelContextSize?: number,
     debug: boolean,
+    numa?: LlamaNuma,
     meter: boolean,
     timing: boolean,
     noMmap: boolean,
@@ -298,6 +300,20 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Print llama.cpp info and debug logs"
             })
+            .option("numa", {
+                type: "string",
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: llamaNumaOptions as any as Exclude<typeof llamaNumaOptions[number], false>[],
+                coerce: (value) => {
+                    if (value == null || value == "")
+                        return false;
+
+                    return parseNumaOption(value);
+                },
+                defaultDescription: "false",
+                description: "NUMA allocation policy. See the `numa` option on the `getLlama` method for more information"
+            })
             .option("meter", {
                 type: "boolean",
                 default: false,
@@ -326,7 +342,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory,
-        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
+        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, printTimings
     }) {
         try {
             await RunChat({
@@ -335,7 +351,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 temperature, minP, topK, topP, seed,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-                debug, meter, timing, noMmap, printTimings
+                debug, numa, meter, timing, noMmap, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -352,7 +368,7 @@ async function RunChat({
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
-    tokenPredictionModelContextSize, debug, meter, timing, noMmap, printTimings
+    tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -369,11 +385,13 @@ async function RunChat({
         : LlamaLogLevel.warn;
     const llama = gpu == null
         ? await getLlama("lastBuild", {
-            logLevel: llamaLogLevel
+            logLevel: llamaLogLevel,
+            numa
         })
         : await getLlama({
             gpu,
-            logLevel: llamaLogLevel
+            logLevel: llamaLogLevel,
+            numa
         });
     const logBatchSize = batchSize != null;
     const useMmap = !noMmap && llama.supportsMmap;
