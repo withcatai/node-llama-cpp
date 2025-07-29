@@ -113,7 +113,7 @@ jobs:
         if: matrix.config.name == 'Windows for x64'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
-          cuda: '12.2.0'
+          cuda: '12.4.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
@@ -122,7 +122,7 @@ jobs:
         if: matrix.config.name == 'Ubuntu'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
-          cuda: '12.2.0'
+          cuda: '12.4.0'
           method: 'network'
 
       - name: Install Vulkan SDK on Windows for x64

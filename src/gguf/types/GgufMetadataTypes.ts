@@ -35,6 +35,7 @@ export const enum GgufArchitectureType {
     gemma = "gemma",
     gemma2 = "gemma2",
     gemma3 = "gemma3",
+    gemma3n = "gemma3n",
     starcoder2 = "starcoder2",
     mamba = "mamba",
     xverse = "xverse",
@@ -56,6 +57,7 @@ export const enum GgufArchitectureType {
     jais = "jais",
     nemotron = "nemotron",
     exaone = "exaone",
+    exaone4 = "exaone4",
     rwkv6 = "rwkv6",
     rwkv6qwen2 = "rwkv6qwen2",
     rwkv7 = "rwkv7",
@@ -66,6 +68,10 @@ export const enum GgufArchitectureType {
     wavtokenizerDec = "wavtokenizer-dec",
     plm = "plm",
     bailingmoe = "bailingmoe",
+    dots1 = "dots1",
+    arcee = "arcee",
+    ernie4_5 = "ernie4_5",
+    clip = "clip",
     unknown = "(unknown)"
 }
 
@@ -244,8 +250,8 @@ export type GgufMetadataTokenizer = {
         readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" |
             "pixtral" | "mpt" | "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" |
             "jina-v2-code" | "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" |
-            "viking" | "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "chameleon" | "minerva-7b" |
-            "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | string,
+            "viking" | "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "exaone4" | "chameleon" |
+            "minerva-7b" | "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | string,
         readonly tokens: readonly string[],
         readonly token_type: GgufMetadataTokenizerTokenType[],
         readonly token_type_count?: number,
