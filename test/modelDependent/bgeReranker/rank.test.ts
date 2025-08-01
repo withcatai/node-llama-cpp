@@ -5,7 +5,7 @@ import {getTestLlama} from "../../utils/getTestLlama.js";
 describe("bgeReranker", () => {
     describe("rank", () => {
         test("simple ranking", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
-            if (process.platform !== "darwin")
+            if (process.platform !== "darwin" && process.arch !== "arm64")
                 test.skip(); // the scores are a bit different on different platforms, so skipping on other platforms due to flakiness
 
             const modelPath = await getModelFile("bge-reranker-v2-m3-Q8_0.gguf");
@@ -61,7 +61,7 @@ describe("bgeReranker", () => {
         });
 
         test("rank all", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
-            if (process.platform !== "darwin")
+            if (process.platform !== "darwin" && process.arch !== "arm64")
                 test.skip(); // the scores are a bit different on different platforms, so skipping on other platforms due to flakiness
 
             const modelPath = await getModelFile("bge-reranker-v2-m3-Q8_0.gguf");
@@ -115,7 +115,7 @@ describe("bgeReranker", () => {
         });
 
         test("rank and sort", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
-            if (process.platform !== "darwin")
+            if (process.platform !== "darwin" && process.arch !== "arm64")
                 test.skip(); // the scores are a bit different on different platforms, so skipping on other platforms due to flakiness
 
             const modelPath = await getModelFile("bge-reranker-v2-m3-Q8_0.gguf");
