@@ -43,19 +43,19 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.026596993576865856");
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`0.014774031693273055`);
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 0.00002039908727992137,
-                0.00006772414961977023,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00002039908727992137,
                 0.004496273160941178,
-                0.00003716893710288947,
-                0.026596993576865856,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.014774031693273055,
                 0.00002039908727992137,
                 0.00002039908727992137,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00002039908727992137,
               ]
             `);
         });
@@ -97,19 +97,19 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.026596993576865856");
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`0.014774031693273055`);
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 0.00002039908727992137,
-                0.00006772414961977023,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00002039908727992137,
                 0.004496273160941178,
-                0.00003716893710288947,
-                0.026596993576865856,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.014774031693273055,
                 0.00002039908727992137,
                 0.00002039908727992137,
-                0.00003716893710288947,
+                0.00002039908727992137,
+                0.00002039908727992137,
               ]
             `);
         });
@@ -150,41 +150,41 @@ describe("bgeReranker", () => {
             expect(simplifySortedRanks([topDocument])[0]).toMatchInlineSnapshot(`
               {
                 "document": "Mount Everest is the tallest mountain in the world",
-                "score": 0.026596993576865856,
+                "score": 0.014774031693273055,
               }
             `);
             expect(simplifySortedRanks(rankedDocuments)).toMatchInlineSnapshot(`
               [
                 {
                   "document": "Mount Everest is the tallest mountain in the world",
-                  "score": 0.026596993576865856,
+                  "score": 0.014774031693273055,
                 },
                 {
                   "document": "The capital of France is Paris",
                   "score": 0.004496273160941178,
                 },
                 {
-                  "document": "I love eating pizza with extra cheese",
-                  "score": 0.00006772414961977023,
-                },
-                {
-                  "document": "A warm cup of tea is perfect for a cold winter day",
-                  "score": 0.00003716893710288947,
-                },
-                {
-                  "document": "Dogs love to play fetch with their owners",
-                  "score": 0.00003716893710288947,
-                },
-                {
-                  "document": "Cleaning the house is a good way to keep it tidy",
-                  "score": 0.00003716893710288947,
-                },
-                {
                   "document": "Not all the things that shine are made of gold",
                   "score": 0.00002039908727992137,
                 },
                 {
+                  "document": "I love eating pizza with extra cheese",
+                  "score": 0.00002039908727992137,
+                },
+                {
+                  "document": "Dogs love to play fetch with their owners",
+                  "score": 0.00002039908727992137,
+                },
+                {
                   "document": "The sky is clear and blue today",
+                  "score": 0.00002039908727992137,
+                },
+                {
+                  "document": "Cleaning the house is a good way to keep it tidy",
+                  "score": 0.00002039908727992137,
+                },
+                {
+                  "document": "A warm cup of tea is perfect for a cold winter day",
                   "score": 0.00002039908727992137,
                 },
               ]
@@ -226,12 +226,12 @@ describe("bgeReranker", () => {
               [
                 "Mount Everest is the tallest mountain in the world",
                 "The capital of France is Paris",
-                "I love eating pizza with extra cheese",
-                "A warm cup of tea is perfect for a cold winter day",
-                "Dogs love to play fetch with their owners",
-                "Cleaning the house is a good way to keep it tidy",
                 "Not all the things that shine are made of gold",
+                "I love eating pizza with extra cheese",
+                "Dogs love to play fetch with their owners",
                 "The sky is clear and blue today",
+                "Cleaning the house is a good way to keep it tidy",
+                "A warm cup of tea is perfect for a cold winter day",
               ]
             `);
         });
