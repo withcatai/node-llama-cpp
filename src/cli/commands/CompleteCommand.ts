@@ -114,7 +114,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
             .option("batchSize", {
                 alias: "b",
                 type: "number",
-                description: "Batch size to use for the model context. The default value is the context size"
+                description: "Batch size to use for the model context"
             })
             .option("flashAttention", {
                 alias: "fa",

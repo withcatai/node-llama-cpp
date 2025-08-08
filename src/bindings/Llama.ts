@@ -664,6 +664,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("init: embeddings required but some input tokens were not marked as outputs -> overriding"))
         return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("load: special_eog_ids contains both '<|return|>' and '<|call|>' tokens, removing '<|end|>' token from EOG list"))
+        return LlamaLogLevel.info;
 
     return level;
 }

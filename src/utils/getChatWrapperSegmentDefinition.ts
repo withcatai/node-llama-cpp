@@ -6,6 +6,8 @@ export function getChatWrapperSegmentDefinition(
 ): ChatWrapperSettingsSegment | undefined {
     if (segmentType === "thought")
         return chatWrapperSetting.segments?.thought;
+    else if (segmentType === "comment")
+        return chatWrapperSetting.segments?.comment;
 
     void (segmentType satisfies never);
     return undefined;

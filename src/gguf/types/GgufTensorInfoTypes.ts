@@ -59,5 +59,6 @@ export const enum GgmlType {
     TQ2_0 = 35,
     IQ4_NL_4_4 = 36,
     IQ4_NL_4_8 = 37,
-    IQ4_NL_8_8 = 38
+    IQ4_NL_8_8 = 38,
+    MXFP4 = 39 // MXFP4 (1 block)
 }

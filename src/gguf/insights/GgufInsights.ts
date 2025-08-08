@@ -121,7 +121,11 @@ export class GgufInsights {
     public get isRecurrent() {
         switch (this._ggufFileInfo.metadata?.general?.architecture) {
             case GgufArchitectureType.mamba:
+            case GgufArchitectureType.mamba2:
             case GgufArchitectureType.rwkv6:
+            case GgufArchitectureType.rwkv6qwen2:
+            case GgufArchitectureType.rwkv7:
+            case GgufArchitectureType.arwkv7:
                 return true;
         }
 
@@ -230,6 +234,9 @@ export class GgufInsights {
         const estimateGraphOverheadMemory = (): number => {
             const s1MB = Math.pow(1024, 2);
             const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
+            const expertCount = llmData?.expert_count ?? 0;
+            const headCount = llmData?.attention?.head_count ?? 0;
+            const embeddingLength = llmData?.embedding_length ?? 0;
 
             let defaultCalculationAdjustment = 0;
 
@@ -237,10 +244,6 @@ export class GgufInsights {
                 return 0;
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.llama) {
-                const expertCount = this._ggufFileInfo.architectureMetadata.expert_count ?? 0;
-                const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
-                const embeddingLength = llmData.embedding_length ?? 0;
-
                 if (expertCount > 0) {
                     const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
@@ -307,6 +310,10 @@ export class GgufInsights {
                 //         )
                 //     );
                 // }
+            } else if (expertCount > 0) {
+                const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
+
+                return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
             }
 
             const totalElements = tensorInfo.length === 0
@@ -764,7 +771,15 @@ function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): numb
             return 2;
         case GgufArchitectureType.gemma3:
             return 6;
+        case GgufArchitectureType.gemma3n:
+            return 5;
         case GgufArchitectureType.cohere2:
+            return 4;
+        case GgufArchitectureType.exaone4:
+            return 4;
+        case GgufArchitectureType.gptOss:
+            return 2;
+        case GgufArchitectureType.smallthinker:
             return 4;
     }
 

@@ -43,7 +43,7 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`0.014774031693273055`);
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.014774031693273055");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 0.00002039908727992137,
@@ -97,7 +97,7 @@ describe("bgeReranker", () => {
             const highestRankDocument = documents[highestRankIndex];
             expect(highestRankDocument).to.eql("Mount Everest is the tallest mountain in the world");
 
-            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot(`0.014774031693273055`);
+            expect(simplifyRanks([highestRank])[0]).toMatchInlineSnapshot("0.014774031693273055");
             expect(simplifyRanks(ranks)).toMatchInlineSnapshot(`
               [
                 0.00002039908727992137,

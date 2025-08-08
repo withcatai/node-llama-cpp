@@ -18,6 +18,7 @@ import {Tokenizer} from "../../types.js";
 import {includesText} from "../../utils/includesText.js";
 import {LlamaModel} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {QwenChatWrapper} from "../QwenChatWrapper.js";
+import {HarmonyChatWrapper} from "../HarmonyChatWrapper.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
@@ -25,7 +26,7 @@ import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 export const specializedChatWrapperTypeNames = Object.freeze([
     "general", "deepSeek", "qwen", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary",
-    "chatML", "falconChat", "gemma"
+    "chatML", "falconChat", "gemma", "harmony"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -55,6 +56,7 @@ export const chatWrappers = Object.freeze({
     "chatML": ChatMLChatWrapper,
     "falconChat": FalconChatWrapper,
     "gemma": GemmaChatWrapper,
+    "harmony": HarmonyChatWrapper,
     "template": TemplateChatWrapper,
     "jinjaTemplate": JinjaTemplateChatWrapper
 } as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>);
@@ -64,6 +66,10 @@ const chatWrapperToConfigType = new Map(
             [Wrapper, configType as keyof typeof chatWrappers]
         ))
 );
+
+const specializedChatWrapperRelatedTexts = {
+    "harmony": ["gpt", "gpt-oss"]
+} satisfies Partial<Record<ResolvableChatWrapperTypeName, string[]>>;
 
 export type BuiltInChatWrapperType = InstanceType<typeof chatWrappers[keyof typeof chatWrappers]>;
 
@@ -358,12 +364,16 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(MistralChatWrapper);
         else if (includesText(modelNames, ["Gemma", "Gemma 2"]))
             return createSpecializedChatWrapper(GemmaChatWrapper);
+        else if (includesText(modelNames, ["gpt-oss", "Gpt Oss", "Gpt-Oss", "openai_gpt-oss", "Openai_Gpt Oss", "openai.gpt-oss", "Openai.Gpt Oss"]))
+            return createSpecializedChatWrapper(HarmonyChatWrapper);
     }
 
     // try to find a pattern in the Jinja template to resolve to a specialized chat wrapper,
     // with a logic similar to `llama.cpp`'s `llama_chat_apply_template_internal` function
     if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
-        if (modelJinjaTemplate.includes("<|im_start|>"))
+        if (modelJinjaTemplate.includes("<|start|>") && modelJinjaTemplate.includes("<|channel|>"))
+            return createSpecializedChatWrapper(HarmonyChatWrapper);
+        else if (modelJinjaTemplate.includes("<|im_start|>"))
             return createSpecializedChatWrapper(ChatMLChatWrapper);
         else if (modelJinjaTemplate.includes("[INST]"))
             return createSpecializedChatWrapper(Llama2ChatWrapper, {
@@ -479,6 +489,14 @@ function orderChatWrapperNamesByAssumedCompatibilityWithModel<T extends Resolvab
         return 0;
     }
 
+    function getPointsForWrapperName(wrapperName: T, fullText: string | undefined, existsPoints: number, positionPoints: number) {
+        const additionalNames = specializedChatWrapperRelatedTexts[wrapperName as keyof typeof specializedChatWrapperRelatedTexts] ?? [];
+
+        return [wrapperName, ...additionalNames]
+            .map((pattern) => getPointsForTextMatch(pattern, fullText, existsPoints, positionPoints))
+            .reduce((res, item) => Math.max(res, item), 0);
+    }
+
     const modelName = fileInfo?.metadata?.general?.name;
 
     return chatWrapperNames
@@ -487,11 +505,11 @@ function orderChatWrapperNamesByAssumedCompatibilityWithModel<T extends Resolvab
             let aPoints = 0;
             let bPoints = 0;
 
-            aPoints += getPointsForTextMatch(a, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
-            bPoints += getPointsForTextMatch(b, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
+            aPoints += getPointsForWrapperName(a, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
+            bPoints += getPointsForWrapperName(b, modelName, rankPoints.modelName, rankPoints.modelNamePosition);
 
-            aPoints += getPointsForTextMatch(a, filename, rankPoints.fileName, rankPoints.fileNamePosition);
-            bPoints += getPointsForTextMatch(b, filename, rankPoints.fileName, rankPoints.fileNamePosition);
+            aPoints += getPointsForWrapperName(a, filename, rankPoints.fileName, rankPoints.fileNamePosition);
+            bPoints += getPointsForWrapperName(b, filename, rankPoints.fileName, rankPoints.fileNamePosition);
 
             return bPoints - aPoints;
         });

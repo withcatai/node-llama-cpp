@@ -2,8 +2,8 @@ import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage,
-    isChatModelResponseFunctionCall, isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes
+    ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage, isChatModelResponseFunctionCall,
+    isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState
 } from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
@@ -621,8 +621,12 @@ export class LlamaChat {
 
                 while (true) {
                     generateResponseState.startTokenLoop();
+                    generateResponseState.handleRerender();
+                    const shouldHandlePrefixTriggers = generateResponseState.isRerender;
+
                     generateResponseState.canAvoidReloadingHistory = false;
                     await loadContextWindow();
+                    generateResponseState.isRerender = false;
 
                     generateResponseState.addStopGenerationTriggersFromChatWrapper();
 
@@ -632,6 +636,14 @@ export class LlamaChat {
                         if (generateResponseState.functionsEnabled) {
                             generateResponseState.initFunctions();
                         }
+                    }
+
+                    if (shouldHandlePrefixTriggers) {
+                        const handlePrefixTriggersRes = await generateResponseState.handlePrefixTriggers(
+                            loadContextWindowForFunctionCallingLoop
+                        );
+                        if (handlePrefixTriggersRes != null)
+                            return handlePrefixTriggersRes;
                     }
 
                     if (generateResponseState.functionEvaluationMode !== false) {
@@ -680,7 +692,7 @@ export class LlamaChat {
                         if (maxTokensTriggerRes != null)
                             return maxTokensTriggerRes;
 
-                        if (generateResponseState.updateShouldContextShift())
+                        if (generateResponseState.handleShouldRerender() || generateResponseState.updateShouldContextShift())
                             break;
 
                         if (await generateResponseState.handleBudgetTriggers()) {
@@ -689,7 +701,7 @@ export class LlamaChat {
                             await generateResponseState.createNewEvaluationIterator();
                         }
 
-                        if (generateResponseState.updateShouldContextShift())
+                        if (generateResponseState.handleShouldRerender() || generateResponseState.updateShouldContextShift())
                             break;
 
                         const abortRes = generateResponseState.handleAbortTrigger("model");
@@ -699,7 +711,7 @@ export class LlamaChat {
 
                     generateResponseState.isFirstEvaluation = false;
 
-                    if (generateResponseState.shouldContextShift)
+                    if (generateResponseState.shouldRerender || generateResponseState.shouldContextShift)
                         continue;
 
                     break;
@@ -820,6 +832,7 @@ export class LlamaChat {
                         ),
                         true
                     );
+                    generateResponseState.isRerender = false;
                     generateResponseState.functionEvaluationMode = false;
 
                     generateResponseState.addStopGenerationTriggersFromChatWrapper();
@@ -828,6 +841,12 @@ export class LlamaChat {
                         generateResponseState.stopGenerationDetector.addStopTrigger(
                             StopGenerationDetector.resolveLlamaTextTrigger(userTextSuffix, this.model.tokenizer)
                         );
+
+                    generateResponseState.rerenderTriggers.forEach((trigger) => (
+                        generateResponseState.stopGenerationDetector.addStopTrigger(
+                            StopGenerationDetector.resolveLlamaTextTrigger(trigger, this.model.tokenizer)
+                        )
+                    ));
 
                     allSegmentTypes
                         .map((segmentType) => getChatWrapperSegmentDefinition(this._chatWrapper.settings, segmentType))
@@ -1334,12 +1353,12 @@ function generateContextTextThatEndsWithUserText(
 
 async function getContextWindow({
     resolvedHistory, resolvedContextShift,
-    lastHistoryCompressionMetadata, pendingTokensCount = 0, isFirstEvaluation,
+    lastHistoryCompressionMetadata, pendingTokensCount = 0, isFirstEvaluation, isRerender,
     chatWrapper, lastEvaluationContextWindowHistory, minimumOverlapPercentageToPreventContextShift,
     sequence, minFreeContextTokens = 1, functions, documentFunctionParams, endWithUserText
 }: {
     resolvedHistory: ChatHistoryItem[], resolvedContextShift: Required<LLamaChatContextShiftOptions>,
-    lastHistoryCompressionMetadata: object | null | undefined, pendingTokensCount: number, isFirstEvaluation: boolean,
+    lastHistoryCompressionMetadata: object | null | undefined, pendingTokensCount: number, isFirstEvaluation: boolean, isRerender: boolean,
     chatWrapper: ChatWrapper, lastEvaluationContextWindowHistory?: ChatHistoryItem[], minimumOverlapPercentageToPreventContextShift: number,
     sequence?: LlamaContextSequence, minFreeContextTokens?: number, functions?: ChatModelFunctions,
     documentFunctionParams?: boolean, endWithUserText: boolean
@@ -1347,7 +1366,11 @@ async function getContextWindow({
     history: ChatHistoryItem[], stopGenerationTriggers: LlamaText[], tokens: Token[],
     removeRawFromHistory: boolean, newHistoryCompressionMetadata: object | null | undefined,
     ignoreStartText: LlamaText[], functionCallInitiallyEngaged: boolean,
-    disengageInitiallyEngagedFunctionCall: LlamaText[], userTextSuffix?: LlamaText
+    disengageInitiallyEngagedFunctionCall: LlamaText[], userTextSuffix?: LlamaText,
+    prefixTriggers: ChatWrapperGeneratedContextState["prefixTriggers"],
+    noPrefixTrigger: ChatWrapperGeneratedContextState["noPrefixTrigger"],
+    rerender: ChatWrapperGeneratedContextState["rerender"],
+    detectFunctionCalls: ChatWrapperGeneratedContextState["detectFunctionCalls"]
 }> {
     if (sequence == null)
         throw new DisposedError();
@@ -1356,7 +1379,7 @@ async function getContextWindow({
     const context = sequence.context;
     let removeRawFromHistory = false;
 
-    if (isFirstEvaluation && lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory) {
+    if ((isFirstEvaluation || isRerender) && lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory) {
         const newContextWindow = lastEvaluationContextWindowHistory.slice();
 
         if (endWithUserText) {
@@ -1371,7 +1394,10 @@ async function getContextWindow({
                 response: []
             });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+        const {
+            contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix,
+            prefixTriggers, noPrefixTrigger, rerender, detectFunctionCalls
+        } = generateContextText(
             endWithUserText,
             chatWrapper,
             {
@@ -1386,7 +1412,7 @@ async function getContextWindow({
 
             const existingEvaluationPercentage = firstDifferentIndex / tokens.length;
 
-            if (existingEvaluationPercentage >= minimumOverlapPercentageToPreventContextShift)
+            if (isRerender || existingEvaluationPercentage >= minimumOverlapPercentageToPreventContextShift)
                 return {
                     history: newContextWindow,
                     stopGenerationTriggers,
@@ -1396,7 +1422,11 @@ async function getContextWindow({
                     ignoreStartText: ignoreStartText ?? [],
                     functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
                     disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
-                    userTextSuffix
+                    userTextSuffix,
+                    prefixTriggers,
+                    noPrefixTrigger,
+                    rerender,
+                    detectFunctionCalls
                 };
         }
     }
@@ -1426,7 +1456,10 @@ async function getContextWindow({
             documentFunctionParams
         });
 
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+        const {
+            contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix,
+            prefixTriggers, noPrefixTrigger, rerender, detectFunctionCalls
+        } = generateContextText(
             endWithUserText,
             chatWrapper,
             {
@@ -1445,12 +1478,19 @@ async function getContextWindow({
             ignoreStartText: ignoreStartText ?? [],
             functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
             disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
-            userTextSuffix
+            userTextSuffix,
+            prefixTriggers,
+            noPrefixTrigger,
+            rerender,
+            detectFunctionCalls
         };
     }
 
     {
-        const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+        const {
+            contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix,
+            prefixTriggers, noPrefixTrigger, rerender, detectFunctionCalls
+        } = generateContextText(
             endWithUserText,
             chatWrapper,
             {
@@ -1471,7 +1511,11 @@ async function getContextWindow({
                 ignoreStartText: ignoreStartText ?? [],
                 functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
                 disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
-                userTextSuffix
+                userTextSuffix,
+                prefixTriggers,
+                noPrefixTrigger,
+                rerender,
+                detectFunctionCalls
             };
     }
 
@@ -1502,7 +1546,10 @@ async function getContextWindow({
         documentFunctionParams
     });
 
-    const {contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix} = generateContextText(
+    const {
+        contextText, stopGenerationTriggers, ignoreStartText, functionCall, userTextSuffix,
+        prefixTriggers, noPrefixTrigger, rerender, detectFunctionCalls
+    } = generateContextText(
         endWithUserText,
         chatWrapper,
         {
@@ -1521,7 +1568,11 @@ async function getContextWindow({
         ignoreStartText: ignoreStartText ?? [],
         functionCallInitiallyEngaged: functionCall?.initiallyEngaged ?? false,
         disengageInitiallyEngagedFunctionCall: functionCall?.disengageInitiallyEngaged ?? [],
-        userTextSuffix
+        userTextSuffix,
+        prefixTriggers,
+        noPrefixTrigger,
+        rerender,
+        detectFunctionCalls
     };
 }
 
@@ -1565,6 +1616,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
     private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
     private functionsEvaluationState: LlamaGrammarEvaluationState | undefined;
+    public functionSyntaxStartDetectorEnabled: boolean = true;
 
     private readonly streamRegulator = new TokenStreamRegulator();
     public readonly stopGenerationDetector = new StopGenerationDetector();
@@ -1580,6 +1632,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public readonly res: Token[] = [];
     public readonly pendingTokens: Token[] = [];
     public ignoredStartTextTokens: Token[] = [];
+    public prefixTriggerTokens: Token[] = [];
     public readonly resFunctionCalls: Array<{
         functionName: string,
         params: any,
@@ -1598,6 +1651,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public generatedTokens = 0;
     public isFirstEvaluation = true;
+    public isRerender = true; // first render is a rerender
     public initiallyEngagedFunctionMode = false;
     public lastContextWindowHistory: ChatHistoryItem[];
     public lastHistoryCompressionMetadata: object | null | undefined;
@@ -1605,6 +1659,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     // context shift loop
     public shouldContextShift = false;
+    public shouldRerender = false;
 
     public canAvoidReloadingHistory: boolean = false;
     public contextWindowTokens: Token[] = [];
@@ -1613,6 +1668,15 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public functionCallInitiallyEngaged: boolean = false;
     public disengageInitiallyEngagedFunctionCall: LlamaText[] = [];
     public userTextSuffix?: LlamaText = undefined;
+
+    public prefixTriggerDetectors: Map<StopGenerationDetector, {
+        inject?: LlamaText,
+        trigger: Exclude<ChatWrapperGeneratedContextState["prefixTriggers"], undefined>[number]
+    }> = new Map();
+    public noPrefixTrigger: ChatWrapperGeneratedContextState["noPrefixTrigger"] = undefined;
+    public rerenderTriggers: LlamaText[] = [];
+    public rerenderTriggerDetector: StopGenerationDetector = new StopGenerationDetector();
+    public rerenderActions: Exclude<ChatWrapperGeneratedContextState["rerender"], undefined>["action"] = undefined;
 
     public tokens: Token[] = [];
 
@@ -1880,7 +1944,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             const lastTokensForDetokenizer = resolveLastTokens([
                 this.contextWindowTokens,
-                this.ignoredStartTextTokens
+                this.ignoredStartTextTokens,
+                this.prefixTriggerTokens
             ]);
 
             const pendingPartialTokens: Token[] = [];
@@ -1952,6 +2017,18 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.shouldContextShift = false;
     }
 
+    public handleRerender() {
+        if (this.shouldRerender) {
+            this.isRerender = true;
+            this.streamRegulator.reset();
+
+            if (this.rerenderActions === "closeResponseItem" && this.segmentHandler.topOpenSegmentType != null) {
+                this.segmentHandler.closeSegment(this.segmentHandler.topOpenSegmentType);
+                this.shouldRerender = false;
+            }
+        }
+    }
+
     private getContextWindowFunctionCallsTokens() {
         if (this.functionEvaluationMode === false)
             return [];
@@ -1991,7 +2068,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         const queuedChunkTokens = this.streamRegulator.getAllQueuedChunkTokens();
         const functionCallsTokens = this.getContextWindowFunctionCallsTokens();
 
-        if (!avoidReloadingHistory || !this.canAvoidReloadingHistory || !this.llamaChat.sequence.isLoadedToMemory) {
+        if (!avoidReloadingHistory || !this.canAvoidReloadingHistory || this.isRerender || !this.llamaChat.sequence.isLoadedToMemory) {
             const {
                 history: contextWindowHistory,
                 stopGenerationTriggers,
@@ -2001,14 +2078,19 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ignoreStartText,
                 functionCallInitiallyEngaged,
                 disengageInitiallyEngagedFunctionCall,
-                userTextSuffix
+                userTextSuffix,
+                prefixTriggers,
+                noPrefixTrigger,
+                rerender,
+                detectFunctionCalls
             } = await getContextWindow({
                 resolvedHistory: resolvedHistory,
                 resolvedContextShift: this.resolvedContextShift,
                 lastHistoryCompressionMetadata: this.lastHistoryCompressionMetadata,
-                pendingTokensCount: this.pendingTokens.length + queuedChunkTokens.length + functionCallsTokens.length +
-                    this.pendingPartialTokens.length,
+                pendingTokensCount: this.prefixTriggerTokens.length + this.pendingTokens.length + queuedChunkTokens.length +
+                    functionCallsTokens.length + this.pendingPartialTokens.length,
                 isFirstEvaluation: this.isFirstEvaluation,
+                isRerender: this.isRerender,
                 chatWrapper: this.chatWrapper,
                 lastEvaluationContextWindowHistory: resolvedContextWindowsHistory,
                 minimumOverlapPercentageToPreventContextShift: this.minimumOverlapPercentageToPreventContextShift,
@@ -2028,6 +2110,59 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.disengageInitiallyEngagedFunctionCall = disengageInitiallyEngagedFunctionCall;
             this.userTextSuffix = userTextSuffix;
 
+            if (this.isRerender) {
+                this.prefixTriggerTokens.length = 0;
+
+                for (const prefixDetector of this.prefixTriggerDetectors.keys()) {
+                    prefixDetector.clearInProgressStops();
+                    prefixDetector.clearTriggeredStops();
+                }
+                this.prefixTriggerDetectors.clear();
+
+                for (const trigger of prefixTriggers ?? []) {
+                    if (trigger.type === "functionCall" && !this.functionsEnabled)
+                        continue;
+
+                    const prefixDetector = new StopGenerationDetector();
+                    StopGenerationDetector.resolveStopTriggers(trigger.triggers, this.llamaChat.model.tokenizer)
+                        .forEach((stopTrigger) => prefixDetector.addStopTrigger(stopTrigger));
+
+                    this.prefixTriggerDetectors.set(prefixDetector, {inject: trigger.inject, trigger});
+
+                    const inject = trigger.inject;
+                    if (inject != null && inject.values.length > 0) {
+                        const fullPrefixDetector = new StopGenerationDetector();
+                        StopGenerationDetector
+                            .resolveStopTriggers(
+                                trigger.triggers.map((trigger) => LlamaText([trigger, inject])),
+                                this.llamaChat.model.tokenizer
+                            )
+                            .forEach((stopTrigger) => fullPrefixDetector.addStopTrigger(stopTrigger));
+
+                        this.prefixTriggerDetectors.set(fullPrefixDetector, {trigger});
+                    }
+                }
+
+                this.noPrefixTrigger = noPrefixTrigger;
+                if (this.noPrefixTrigger?.type === "functionCall" && !this.functionsEnabled)
+                    this.noPrefixTrigger = undefined;
+
+                this.rerenderTriggers = rerender?.triggers ?? [];
+                this.rerenderTriggerDetector.clearInProgressStops();
+                this.rerenderTriggerDetector.clearTriggeredStops();
+                this.rerenderTriggerDetector = new StopGenerationDetector();
+                this.rerenderActions = rerender?.action;
+
+                this.functionSyntaxStartDetectorEnabled = detectFunctionCalls ?? true;
+                if (!this.functionSyntaxStartDetectorEnabled)
+                    this.functionSyntaxStartDetector.clearInProgressStops();
+
+                if (rerender?.triggers != null) {
+                    StopGenerationDetector.resolveStopTriggers(rerender.triggers, this.llamaChat.model.tokenizer)
+                        .map((stopTrigger) => this.rerenderTriggerDetector.addStopTrigger(stopTrigger));
+                }
+            }
+
             this.lastHistoryCompressionMetadata = newHistoryCompressionMetadata;
             this.lastContextWindowHistory = contextWindowHistory;
             this.segmentHandler.resetContextWindow();
@@ -2043,6 +2178,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.tokens = [
             ...this.contextWindowTokens,
             ...this.ignoredStartTextTokens,
+            ...this.prefixTriggerTokens,
             ...this.pendingTokens,
             ...queuedChunkTokens,
             ...functionCallsTokens,
@@ -2084,6 +2220,144 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
             this.restartEvaluationIterator = true;
         }
+    }
+
+    public async handlePrefixTriggers(loadContextWindow: () => Promise<void>) {
+        const reloadTokens = async () => {
+            this.startTokenLoop();
+            await loadContextWindow();
+        };
+        const injectTokens = async (text?: LlamaText, alignStateTokens: boolean = false) => {
+            if (text == null)
+                return;
+
+            const tokens = text.tokenize(this.llamaChat.model.tokenizer, "trimLeadingSpace");
+            if (tokens.length === 0)
+                return;
+
+            pushAll(this.prefixTriggerTokens, tokens);
+
+            if (alignStateTokens)
+                await reloadTokens();
+        };
+
+        if (this.prefixTriggerDetectors.size === 0) {
+            if (this.noPrefixTrigger?.type === "functionCall" && this.chatWrapper.settings.functions != null) {
+                await injectTokens(this.noPrefixTrigger.inject, true);
+
+                this.functionEvaluationMode = "functionName";
+            } else if (this.noPrefixTrigger?.type === "segment") {
+                await injectTokens(this.noPrefixTrigger.inject, true);
+
+                this.segmentHandler.openSegment(this.noPrefixTrigger.segmentType);
+            } else if (this.noPrefixTrigger?.type === "response")
+                await injectTokens(this.noPrefixTrigger.inject, true);
+
+            return undefined;
+        }
+
+        const generatedTokens: Token[] = [];
+        let isFirstToken = true;
+        let continueGeneration = true;
+
+        for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+            pushAll(generatedTokens, tokens);
+
+            for (const [triggerDetector, {trigger, inject}] of [...this.prefixTriggerDetectors.entries()]) {
+                triggerDetector.recordGeneration({
+                    text: this.currentText,
+                    tokens: this.currentTokens,
+                    startNewChecks: isFirstToken,
+                    triggerMustStartWithGeneration: true
+                });
+
+                if (triggerDetector.hasTriggeredStops) {
+                    const {
+                        firstRemainingGenerationAfterStop,
+                        stopTrigger
+                    } = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggerDetector.getTriggeredStops());
+                    const remainingTokens = typeof firstRemainingGenerationAfterStop === "string"
+                        ? firstRemainingGenerationAfterStop === ""
+                            ? []
+                            : this.llamaChat.model.tokenize(firstRemainingGenerationAfterStop, false, "trimLeadingSpace")
+                        : (firstRemainingGenerationAfterStop ?? []);
+                    const triggerTokens = (stopTrigger == null || remainingTokens.length === 0)
+                        ? generatedTokens
+                        : stopTrigger.flatMap((item) => {
+                            if (typeof item === "string")
+                                return this.llamaChat.model.tokenize(item, false, "trimLeadingSpace");
+
+                            return [item];
+                        });
+
+                    this.streamRegulator.reset();
+
+                    if (trigger.type === "segment") {
+                        pushAll(this.prefixTriggerTokens, triggerTokens);
+                        if (inject != null)
+                            await injectTokens(inject);
+
+                        await reloadTokens();
+                        this.segmentHandler.openSegment(trigger.segmentType);
+                    } else if (trigger.type === "response") {
+                        pushAll(this.prefixTriggerTokens, triggerTokens);
+
+                        if (inject != null)
+                            await injectTokens(inject);
+
+                        await reloadTokens();
+                    } else if (trigger.type === "functionCall") {
+                        if (trigger.replaceTrigger === false)
+                            pushAll(this.prefixTriggerTokens, triggerTokens);
+
+                        if (inject != null)
+                            await injectTokens(inject);
+
+                        await reloadTokens();
+                        this.functionEvaluationMode = "functionName";
+                    } else
+                        void (trigger satisfies never);
+
+                    this.prefixTriggerDetectors.clear();
+                    continueGeneration = false;
+                    break;
+                } else if (!triggerDetector.hasInProgressStops)
+                    this.prefixTriggerDetectors.delete(triggerDetector);
+            }
+
+            if (this.prefixTriggerDetectors.size === 0 && continueGeneration) {
+                this.streamRegulator.reset();
+                continueGeneration = false;
+
+                if (this.noPrefixTrigger?.type === "functionCall" && this.chatWrapper.settings.functions != null) {
+                    await injectTokens(this.noPrefixTrigger.inject, true);
+
+                    this.functionEvaluationMode = "functionName";
+                } else if (this.noPrefixTrigger?.type === "segment") {
+                    await injectTokens(this.noPrefixTrigger.inject, true);
+
+                    this.segmentHandler.openSegment(this.noPrefixTrigger.segmentType);
+                } else if (this.noPrefixTrigger?.type === "response")
+                    await injectTokens(this.noPrefixTrigger.inject, true);
+                else
+                    this.streamRegulator.addChunk({
+                        tokens: generatedTokens,
+                        text: this.llamaChat.model.detokenize(generatedTokens, false, this.getLastTokens())
+                    });
+            }
+
+
+            isFirstToken = false;
+
+            if (!continueGeneration)
+                break;
+
+            const stopRes = this.handleAbortTrigger("model") ?? this.handleMaxTokensTrigger("model");
+            if (stopRes != null)
+                return stopRes;
+        }
+
+        return undefined;
     }
 
     public async enterFunctionCallingLoop(loadContextWindow: () => Promise<void>) {
@@ -2721,6 +2995,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public detectAndHandleFunctionStartSyntax() {
+        if (!this.functionSyntaxStartDetectorEnabled)
+            return;
+
         this.functionSyntaxStartDetector.recordGeneration({
             text: this.currentText,
             tokens: this.currentTokens,
@@ -2765,6 +3042,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public recordStopGenerationEvaluation() {
+        this.rerenderTriggerDetector.recordGeneration({
+            text: this.currentText,
+            tokens: this.currentTokens,
+            queuedTokenRelease: this.currentQueuedTokenRelease
+        });
         this.stopGenerationDetector.recordGeneration({
             text: this.currentText,
             tokens: this.currentTokens,
@@ -2785,9 +3067,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public handleStopGenerationTrigger(lastHistoryItemType: "user" | "model", forceStopReason?: "eogToken") {
-        if (this.stopGenerationDetector.hasTriggeredStops || this.customStopGenerationTriggersDetector.hasTriggeredStops ||
-            this.llamaChat.model.isEogToken(this.currentToken) || forceStopReason != null
-        ) {
+        const detectedStopGenerationTrigger = this.stopGenerationDetector.hasTriggeredStops ||
+            this.customStopGenerationTriggersDetector.hasTriggeredStops ||
+            this.llamaChat.model.isEogToken(this.currentToken);
+
+        if ((detectedStopGenerationTrigger && !this.rerenderTriggerDetector.hasTriggeredStops) || forceStopReason != null) {
             this.stopGenerationDetector.clearInProgressStops();
             this.customStopGenerationTriggersDetector.clearInProgressStops();
             pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
@@ -2942,6 +3226,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
 
         return shouldReloadEvaluationState;
+    }
+
+    public handleShouldRerender() {
+        this.shouldRerender = this.rerenderTriggerDetector.hasTriggeredStops;
+        return this.shouldRerender;
     }
 
     public updateShouldContextShift() {
@@ -3157,6 +3446,10 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
     public isSegmentTypeOpen(type: S): boolean {
         return this._segmentsStackSet.has(type);
+    }
+
+    public get topOpenSegmentType(): S | undefined {
+        return this._segmentsStack.at(-1);
     }
 
     private _processTokens(tokens: Token[], text: string) {
@@ -3402,18 +3695,18 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                 this.onTextChunk?.(text);
                 this.onResponseChunk?.({type: undefined, segmentType: undefined, tokens: tokens.slice(), text});
             } else {
-                if (lastSegment instanceof Array) {
-                    const text = (this.onResponseChunk != null || this.onTextChunk != null)
-                        ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
-                        : "";
+                const text = (this.onResponseChunk != null || this.onTextChunk != null)
+                    ? this.model.detokenize(tokens, false, this._getTokenTrailFromResult())
+                    : "";
 
+                if (lastSegment instanceof Array)
                     pushAll(lastSegment, tokens);
-
-                    this.onToken?.(tokens);
-                    this.onTextChunk?.(text);
-                    this.onResponseChunk?.({type: undefined, segmentType: undefined, tokens, text});
-                } else
+                else
                     this._segments.push(tokens);
+
+                this.onToken?.(tokens.slice());
+                this.onTextChunk?.(text);
+                this.onResponseChunk?.({type: undefined, segmentType: undefined, tokens: tokens.slice(), text});
             }
 
             if (lastContextWindowSegment == null)

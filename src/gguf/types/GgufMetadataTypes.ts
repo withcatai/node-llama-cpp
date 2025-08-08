@@ -158,7 +158,8 @@ export enum GgufFileType {
     MOSTLY_Q4_0_4_8 = 34, // deprecated
     MOSTLY_Q4_0_8_8 = 35, // deprecated
     MOSTLY_TQ1_0 = 36,
-    MOSTLY_TQ2_0 = 37
+    MOSTLY_TQ2_0 = 37,
+    MOSTLY_MXFP4_MOE = 38
 }
 
 
