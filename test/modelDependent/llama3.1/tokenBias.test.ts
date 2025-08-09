@@ -25,7 +25,7 @@ describe("llama 3.1", () => {
                 const text = model.detokenize([token]);
 
                 if (text.toLowerCase().includes("hello"))
-                    customBias.set(token, -0.9);
+                    customBias.set(token, -0.99);
                 else if (text.toLowerCase().includes("hi"))
                     customBias.set(token, "never");
             }
