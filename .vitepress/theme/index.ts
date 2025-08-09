@@ -19,9 +19,9 @@ import type {EnhanceAppContext} from "vitepress";
 export default {
     extends: Theme,
     Layout: () => {
-        const text = "DeepSeek R1 is here!";
-        const link = "/blog/v3.6-deepseek-r1";
-        const hideDate = new Date("2025-06-01T00:00:00Z");
+        const text = "gpt-oss is here!";
+        const link = "/blog/v3.12-gpt-oss";
+        const hideDate = new Date("2025-11-01T00:00:00Z");
 
         return h(LayoutContainer, null, h(Theme.Layout, null, {
             "home-hero-info-before": () => h(LatestVersionHomeBadge, {
