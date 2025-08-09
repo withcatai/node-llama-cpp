@@ -113,6 +113,8 @@
     "deepseek",
     "qwen",
     "qwq",
+    "gpt",
+    "gpt-oss",
     "typescript",
     "lora",
     "batching",
