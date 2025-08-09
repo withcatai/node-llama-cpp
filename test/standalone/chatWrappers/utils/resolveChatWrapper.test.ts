@@ -1,8 +1,9 @@
 import {describe, expect, test} from "vitest";
 import {
     AlpacaChatWrapper, ChatMLChatWrapper, DeepSeekChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper,
-    GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper, resolveChatWrapper
+    GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper, resolveChatWrapper, HarmonyChatWrapper
 } from "../../../../src/index.js";
+import {harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3} from "./jinjaTemplates.js";
 
 
 const alpacaJinjaTemplate = `
@@ -717,5 +718,41 @@ describe("resolveChatWrapper", () => {
             fallbackToOtherWrappersOnJinjaError: false
         });
         expect(chatWrapper).to.be.instanceof(QwenChatWrapper);
+    });
+
+    test("should resolve to specialized HarmonyChatWrapper", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: harmonyJinjaTemplate
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+        expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
+    });
+
+    test("should resolve to specialized HarmonyChatWrapper 2", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: harmonyJinjaTemplate2
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+        expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
+    });
+
+    test("should resolve to specialized HarmonyChatWrapper 3", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: harmonyJinjaTemplate3
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+        expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
     });
 });

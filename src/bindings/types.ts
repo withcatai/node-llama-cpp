@@ -103,13 +103,17 @@ export enum LlamaVocabularyType {
     bpe = "bpe",
     wpm = "wpm",
     ugm = "ugm",
-    rwkv = "rwkv"
+    rwkv = "rwkv",
+    plamo2 = "plamo2"
 }
 export const LlamaVocabularyTypeValues = Object.freeze([
     LlamaVocabularyType.none,
     LlamaVocabularyType.spm,
     LlamaVocabularyType.bpe,
-    LlamaVocabularyType.wpm
+    LlamaVocabularyType.wpm,
+    LlamaVocabularyType.ugm,
+    LlamaVocabularyType.rwkv,
+    LlamaVocabularyType.plamo2
 ] as const);
 
 /**

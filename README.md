@@ -15,7 +15,7 @@
 
 </div>
 
-✨ [DeepSeek R1 is here!](https://node-llama-cpp.withcat.ai/blog/v3.6-deepseek-r1) ✨
+✨ [`gpt-oss` is here!](https://node-llama-cpp.withcat.ai/blog/v3.12-gpt-oss) ✨
 
 ## Features
 * Run LLMs locally on your machine

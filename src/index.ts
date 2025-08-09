@@ -60,6 +60,7 @@ import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
 import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
+import {HarmonyChatWrapper} from "./chatWrappers/HarmonyChatWrapper.js";
 import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
 import {
     JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
@@ -95,7 +96,8 @@ import {
     type ChatModelResponse, type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, isChatModelResponseSegment,
     type LLamaContextualRepeatPenalty, type ChatWrapperSettings, type ChatWrapperSettingsSegment,
-    type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState, type ChatWrapperGenerateInitialHistoryOptions
+    type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState, type ChatWrapperGeneratedPrefixTriggersContextState,
+    type ChatWrapperGeneratedInitiallyEngagedFunctionsContextState, type ChatWrapperGenerateInitialHistoryOptions
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
@@ -205,6 +207,8 @@ export {
     type ChatWrapperSettingsSegment,
     type ChatWrapperGenerateContextStateOptions,
     type ChatWrapperGeneratedContextState,
+    type ChatWrapperGeneratedPrefixTriggersContextState,
+    type ChatWrapperGeneratedInitiallyEngagedFunctionsContextState,
     type ChatWrapperGenerateInitialHistoryOptions,
     EmptyChatWrapper,
     DeepSeekChatWrapper,
@@ -220,6 +224,7 @@ export {
     AlpacaChatWrapper,
     FunctionaryChatWrapper,
     GemmaChatWrapper,
+    HarmonyChatWrapper,
     TemplateChatWrapper,
     type TemplateChatWrapperOptions,
     JinjaTemplateChatWrapper,

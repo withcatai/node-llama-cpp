@@ -105,7 +105,14 @@ export type ChatWrapperSettings = {
         /** Chain of Thought text segment */
         readonly thought?: ChatWrapperSettingsSegment & {
             reopenAfterFunctionCalls?: boolean
-        }
+        },
+
+        /**
+         * Comment segment.
+         *
+         * Used by models such as gpt-oss.
+         */
+        readonly comment?: ChatWrapperSettingsSegment
     }
 };
 export type ChatWrapperSettingsSegment = {
@@ -124,14 +131,172 @@ export type ChatWrapperCheckModelCompatibilityParams = {
     fileInfo?: GgufFileInfo
 };
 
-export type ChatWrapperGeneratedContextState = {
+export type ChatWrapperGeneratedContextState =
+    ChatWrapperGeneratedPrefixTriggersContextState | ChatWrapperGeneratedInitiallyEngagedFunctionsContextState;
+
+export type ChatWrapperGeneratedPrefixTriggersContextState = {
+    /**
+     * The rendered chat to load into the context sequence state
+     */
+    contextText: LlamaText,
+
+    /**
+     * Triggers to stop the generation
+     */
+    stopGenerationTriggers: LlamaText[],
+
+    /**
+     * When this option is set, after evaluating the `contextText`,
+     * it'll look for any of the triggers to be the first generated output.
+     *
+     * When a trigger is matched, its type will determine the mode to enter to, a segment to open,
+     * or to continue the generation as a textual output.
+     *
+     * If all the triggers are unmatched, the `noPrefixTrigger` will take effect.
+     */
+    prefixTriggers?: Array<{
+        triggers: LlamaText[],
+
+        /**
+         * Enter into function calling mode.
+         *
+         * Entering this mode will put the function calling prefix into the context sequence state
+         * and force it to choose a function to call.
+         *
+         * If no functions are available, this trigger will be ignored.
+         */
+        type: "functionCall",
+
+        /**
+         * Remove the trigger tokens and replace them with the function call prefix.
+         *
+         * Defaults to `true`.
+         */
+        replaceTrigger?: boolean,
+
+        /**
+         * Text to inject into the context sequence state when this trigger is matched.
+         */
+        inject?: LlamaText
+    } | {
+        triggers: LlamaText[],
+
+        /**
+         * Open a segment of the specified type.
+         */
+        type: "segment",
+
+        /**
+         * Type of the segment to open.
+         */
+        segmentType: ChatModelSegmentType,
+
+        /**
+         * Text to inject into the context sequence state when this trigger is matched.
+         */
+        inject?: LlamaText
+    } | {
+        triggers: LlamaText[],
+
+        /**
+         * Continue the generation as a textual output.
+         */
+        type: "response",
+
+        /**
+         * Text to inject into the context sequence state when this trigger is matched.
+         */
+        inject?: LlamaText
+    }>,
+
+    /**
+     * When no prefix triggers are matched or non are provided, after evaluating the `contextText`,
+     * perform the action specified by this option.
+     */
+    noPrefixTrigger?: {
+        /**
+         * Enter into function calling mode.
+         *
+         * Entering this mode will put the function calling prefix into the context sequence state
+         * and force it to choose a function to call.
+         *
+         * If no functions are available, this action will be ignored.
+         */
+        type: "functionCall",
+
+        /**
+         * Text to inject into the context sequence state when this action is performed.
+         */
+        inject: LlamaText
+    } | {
+        /**
+         * Open a segment of the specified type.
+         */
+        type: "segment",
+
+        /**
+         * Type of the segment to open.
+         */
+        segmentType: ChatModelSegmentType,
+
+        /**
+         * Text to inject into the context sequence state when this action is performed.
+         */
+        inject: LlamaText
+    } | {
+        /**
+         * Continue the generation as a textual output.
+         */
+        type: "response",
+
+        /**
+         * Text to inject into the context sequence state when this action is performed.
+         */
+        inject: LlamaText
+    },
+
+    /**
+     * Trigger a rerender of the chat template when any of the provided triggers are matched.
+     *
+     * When a rerender it triggered, the chat template will be rendered again and the next trigger options will come into effect again,
+     * so if no prefix triggers are required after the rerender, make sure to not provide any.
+     *
+     * When a rerender is triggered, the `action` will be performed.
+     */
+    rerender?: {
+        triggers: LlamaText[],
+
+        /**
+         * Action to perform when the rerender is triggered.
+         *
+         * - **`"closeResponseItem"`**: Close the current segment or stop the textual response generation.
+         */
+        action?: "closeResponseItem"
+    },
+
+    /**
+     * Whether to detect the function calling prefix syntax in the current text generation to dynamically enter into function calling mode.
+     *
+     * If it's only possible to enter function calling using a prefix trigger, then set this option to `false`.
+     */
+    detectFunctionCalls?: boolean,
+
+    ignoreStartText?: never,
+    functionCall?: never
+};
+export type ChatWrapperGeneratedInitiallyEngagedFunctionsContextState = {
     contextText: LlamaText,
     stopGenerationTriggers: LlamaText[],
     ignoreStartText?: LlamaText[],
     functionCall?: {
         initiallyEngaged: boolean,
         disengageInitiallyEngaged: LlamaText[]
-    }
+    },
+
+    detectFunctionCalls?: never,
+    prefixTriggers?: never,
+    noPrefixTrigger?: never,
+    rerender?: never
 };
 
 export type ChatWrapperGenerateInitialHistoryOptions = {
@@ -169,7 +334,7 @@ export type ChatModelFunctionCall = {
 };
 
 export const allSegmentTypes = ["thought"] as const satisfies ChatModelSegmentType[];
-export type ChatModelSegmentType = "thought";
+export type ChatModelSegmentType = "thought" | "comment";
 export type ChatModelSegment = {
     type: "segment",
     segmentType: ChatModelSegmentType,

@@ -1,6 +1,30 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "gpt-oss 20B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "gpt-oss models were created by OpenAI and are using chain of though (CoT) to reason across a wide variety of topics, and utilize a Mixture of Experts architecture.\n" +
+        "It's optimized for agentic cases, with native support for function calling.\n" +
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model only has 3.6B active parameters, thus making it very fast.\n" +
+        "This is the 20 billion parameters version of the model.",
+
+    fileOptions: [
+        "hf:giladgd/gpt-oss-20b-GGUF/gpt-oss-20b.MXFP4.gguf"
+    ]
+}, {
+    name: "gpt-oss 120B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "gpt-oss models were created by OpenAI and are using chain of though (CoT) to reason across a wide variety of topics, and utilize a Mixture of Experts architecture.\n" +
+        "It's optimized for agentic cases, with native support for function calling.\n" +
+        "Mixtures of Experts (MoE) is a technique where different models, each skilled in solving a particular kind of problem, work together to the improve the overall performance on complex tasks.\n" +
+        "This model only has 5.1B active parameters, thus making it very fast.\n" +
+        "This is the 120 billion parameters version of the model.",
+
+    fileOptions: [
+        "hf:giladgd/gpt-oss-120b-GGUF/gpt-oss-120b.MXFP4-00001-of-00002.gguf"
+    ]
+}, {
     name: "Qwen 3 32B",
     abilities: ["chat", "complete", "functionCalling", "reasoning"],
     description: "Qwen model was created by Alibaba and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
