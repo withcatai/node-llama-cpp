@@ -310,6 +310,8 @@ export class GgufInsights {
                 //         )
                 //     );
                 // }
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen3) {
+                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
             } else if (expertCount > 0) {
                 const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
