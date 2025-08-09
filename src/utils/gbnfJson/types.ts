@@ -189,7 +189,9 @@ export type GbnfJsonRefSchema<Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> 
 /**
  * Converts a GBNF JSON schema to a TypeScript type
  */
-export type GbnfJsonSchemaToType<T> = GbnfJsonSchemaToTSType<T>;
+export type GbnfJsonSchemaToType<T> = 0 extends 1 & T // if T is `any`, return `any`
+    ? any
+    : GbnfJsonSchemaToTSType<T>;
 
 export type GbnfJsonSchemaToTSType<T, Defs extends GbnfJsonDefList<NoInfer<Defs>> = {}> =
     Readonly<GbnfJsonBasicSchema> extends T
