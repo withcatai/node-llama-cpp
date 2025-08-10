@@ -139,13 +139,22 @@ function checkEquivalence(
         if (!compareContextTexts(jinjaRes.contextText, specializedWrapperRes.contextText, tokenizer))
             return false;
 
+        const specializedStopGenerationTriggers = [
+            ...specializedWrapperRes.stopGenerationTriggers,
+            ...(
+                specializedWrapperRes.rerender?.triggers == null
+                    ? []
+                    : specializedWrapperRes.rerender.triggers
+            )
+        ];
+
         const jinjaHasAllSpecializedStopGenerationTriggers = jinjaRes.stopGenerationTriggers
             .every((trigger) => {
                 return [trigger, trigger.trimEnd(), trigger.trimStart(), trigger.trimStart().trimEnd()].some((normalizedJinjaTrigger) => {
                     if (normalizedJinjaTrigger.values.length === 0)
                         return true;
 
-                    const foundSimilarTriggers = specializedWrapperRes.stopGenerationTriggers.some((specializedTrigger) => (
+                    const foundSimilarTriggers = specializedStopGenerationTriggers.some((specializedTrigger) => (
                         normalizedJinjaTrigger.includes(specializedTrigger)
                     ));
 
@@ -158,7 +167,7 @@ function checkEquivalence(
                             tokenizer
                         );
 
-                        const foundSimilarOrShorterTokenizedTriggers = specializedWrapperRes.stopGenerationTriggers
+                        const foundSimilarOrShorterTokenizedTriggers = specializedStopGenerationTriggers
                             .some((specializedTrigger) => {
                                 const resolvedSpecializedTrigger = StopGenerationDetector.resolveLlamaTextTrigger(
                                     specializedTrigger,
