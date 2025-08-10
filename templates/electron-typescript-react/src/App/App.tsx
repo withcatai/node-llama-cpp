@@ -173,10 +173,10 @@ export function App() {
                             <div className="links">
                                 <a
                                     target="_blank"
-                                    href="https://huggingface.co/mradermacher/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf"
+                                    href="https://huggingface.co/giladgd/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b.MXFP4.gguf"
                                 >
                                     <DownloadIconSVG className="downloadIcon" />
-                                    <div className="text">Get Llama 3.1 8B</div>
+                                    <div className="text"><code>gpt-oss</code> 20B</div>
                                 </a>
                                 <div className="separator" />
                                 <a
