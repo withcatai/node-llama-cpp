@@ -26,7 +26,7 @@ export function MarkdownContent({children, inline = false, dir, className}: Mark
             return;
 
         if (inline)
-            divRef.current.innerHTML = md.renderInline(children ?? "");
+            divRef.current.innerHTML = md.renderInline(children ?? "").replaceAll("<br>", "");
         else
             divRef.current.innerHTML = md.render(children ?? "");
     }, [inline, children]);

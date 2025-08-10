@@ -1,7 +1,6 @@
 import {ChatWrapper, ChatWrapperJinjaMatchConfiguration} from "../ChatWrapper.js";
 import {
-    ChatModelFunctions, ChatModelResponse, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
-    ChatWrapperGeneratedPrefixTriggersContextState, ChatWrapperSettings
+    ChatModelFunctions, ChatModelResponse, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings
 } from "../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
@@ -282,23 +281,21 @@ export class HarmonyChatWrapper extends ChatWrapper {
                     ],
                     inject: LlamaText(new SpecialTokensText("<|message|>"))
                 },
-                ...(
-                    !hasFunctions ? [] : [{
-                        type: "functionCall",
-                        triggers: [
-                            LlamaText(new SpecialTokensText("<|channel|>commentary to="))
-                        ],
-                        replaceTrigger: true,
-                        inject: LlamaText(new SpecialTokensText("<|channel|>commentary"))
-                    }, {
-                        type: "functionCall",
-                        triggers: [
-                            LlamaText(new SpecialTokensText("<|channel|>analysis to="))
-                        ],
-                        replaceTrigger: true,
-                        inject: LlamaText(new SpecialTokensText("<|channel|>analysis"))
-                    }] satisfies ChatWrapperGeneratedPrefixTriggersContextState["prefixTriggers"]
-                )
+                {
+                    type: "functionCall",
+                    triggers: [
+                        LlamaText(new SpecialTokensText("<|channel|>commentary to="))
+                    ],
+                    replaceTrigger: true,
+                    inject: LlamaText(new SpecialTokensText("<|channel|>commentary"))
+                }, {
+                    type: "functionCall",
+                    triggers: [
+                        LlamaText(new SpecialTokensText("<|channel|>analysis to="))
+                    ],
+                    replaceTrigger: true,
+                    inject: LlamaText(new SpecialTokensText("<|channel|>analysis"))
+                }
             ],
             noPrefixTrigger: {
                 type: "response",
@@ -664,6 +661,18 @@ export class HarmonyChatWrapper extends ChatWrapper {
                         useSpecialTokensForFullSystemMessage: true,
                         useNonFinalFinalMessage: true,
                         noFinalMessages: true
+                    }
+                },
+                {},
+                {additionalRenderParameters: jinjaParameters}
+            ],
+            [
+                {
+                    _jinjaFlags: {
+                        emptyLastModelResponseIsFinalMessage: true,
+                        useSpecialTokensForFullSystemMessage: true,
+                        useNonFinalFinalMessage: false,
+                        noFinalMessages: false
                     }
                 },
                 {},

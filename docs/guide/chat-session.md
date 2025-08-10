@@ -833,7 +833,8 @@ console.log("AI: " + a1);
 
 ## Stream Response Segments {#stream-response-segments}
 The raw model response is automatically segmented into different types of segments.
-The main response is not segmented, but other kinds of sections, like thoughts (chain of thought), are segmented.
+The main response is not segmented, but other kinds of sections,
+like thoughts (chain of thought) and comments (on relevant models, like [`gpt-oss`](../blog/v3.12-gpt-oss.md#comment-segments)), are segmented.
 
 To stream response segments you can use the [`onResponseChunk`](../api/type-aliases/LLamaChatPromptOptions.md#onresponsechunk) option.
 
@@ -862,6 +863,8 @@ const a1 = await session.promptWithMeta(q1, {
     onResponseChunk(chunk) {
         const isThoughtSegment = chunk.type === "segment" &&
             chunk.segmentType === "thought";
+        const isCommentSegment = chunk.type === "segment" &&
+            chunk.segmentType === "comment";
         
         if (chunk.type === "segment" && chunk.segmentStartTime != null)
             process.stdout.write(` [segment start: ${chunk.segmentType}] `);
@@ -879,6 +882,7 @@ const fullResponse = a1.response
             return item;
         else if (item.type === "segment") {
             const isThoughtSegment = item.segmentType === "thought";
+            const isCommentSegment = item.segmentType === "comment";
             let res = "";
             
             if (item.startTime != null)

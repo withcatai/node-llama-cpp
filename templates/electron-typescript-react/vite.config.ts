@@ -34,6 +34,12 @@ export default defineConfig({
             main: {
                 // Shortcut of `build.lib.entry`.
                 entry: path.join(__dirname, "electron/index.ts"),
+                onstart({startup}) {
+                    if (process.env["ENABLE_INSPECT"] === "true")
+                        return startup([".", "--inspect"]);
+
+                    return startup(["."]);
+                },
                 vite: {
                     build: {
                         target: "es2022",

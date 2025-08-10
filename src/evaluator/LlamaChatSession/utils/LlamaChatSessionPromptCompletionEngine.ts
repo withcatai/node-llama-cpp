@@ -33,7 +33,8 @@ export type LLamaChatPromptCompletionEngineOptions = {
     customStopTriggers?: LLamaChatCompletePromptOptions["customStopTriggers"],
     grammar?: LLamaChatCompletePromptOptions["grammar"],
     functions?: LLamaChatCompletePromptOptions["functions"],
-    documentFunctionParams?: LLamaChatCompletePromptOptions["documentFunctionParams"]
+    documentFunctionParams?: LLamaChatCompletePromptOptions["documentFunctionParams"],
+    completeAsModel?: LLamaChatCompletePromptOptions["completeAsModel"]
 };
 
 export const defaultMaxPreloadTokens = (sequence: LlamaContextSequence) => {

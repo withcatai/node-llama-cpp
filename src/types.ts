@@ -183,6 +183,9 @@ export type ChatWrapperGeneratedPrefixTriggersContextState = {
 
         /**
          * Open a segment of the specified type.
+         *
+         * If the budget for this segment has exceeded, this trigger will be ignored,
+         * so ensure to have a fallback for a response.
          */
         type: "segment",
 
@@ -231,6 +234,8 @@ export type ChatWrapperGeneratedPrefixTriggersContextState = {
     } | {
         /**
          * Open a segment of the specified type.
+         *
+         * If the budget for this segment has exceeded, this action will be ignored.
          */
         type: "segment",
 
@@ -333,7 +338,9 @@ export type ChatModelFunctionCall = {
     startsNewChunk?: boolean
 };
 
-export const allSegmentTypes = ["thought"] as const satisfies ChatModelSegmentType[];
+export const allSegmentTypes = ["thought", "comment"] as const satisfies readonly ChatModelSegmentType[];
+void (null as Exclude<ChatModelSegmentType, typeof allSegmentTypes[number]> satisfies never);
+
 export type ChatModelSegmentType = "thought" | "comment";
 export type ChatModelSegment = {
     type: "segment",

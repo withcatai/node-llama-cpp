@@ -313,8 +313,24 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          *
          * Defaults to `Infinity`.
          */
-        thoughtTokens?: number
-    }
+        thoughtTokens?: number,
+
+        /**
+         * Budget for comment tokens.
+         *
+         * Defaults to `Infinity`.
+         */
+        commentTokens?: number
+    },
+
+    /**
+     * Stop the generation when the model tries to generate a non-textual segment or call a function.
+     *
+     * Useful for generating completions in a form of a model response.
+     *
+     * Defaults to `false`.
+     */
+    abortOnNonText?: boolean
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
@@ -555,6 +571,7 @@ export class LlamaChat {
             maxParallelFunctionCalls,
             contextShift = defaultContextShiftOptions,
             customStopTriggers,
+            abortOnNonText = false,
             lastEvaluationContextWindow: {
                 history: lastEvaluationContextWindowHistory,
                 minimumOverlapPercentageToPreventContextShift = 0.5
@@ -593,6 +610,7 @@ export class LlamaChat {
                 maxParallelFunctionCalls,
                 contextShift,
                 customStopTriggers,
+                abortOnNonText,
                 lastEvaluationContextWindow: {
                     history: lastEvaluationContextWindowHistory,
                     minimumOverlapPercentageToPreventContextShift
@@ -600,7 +618,7 @@ export class LlamaChat {
             }
         );
 
-        if (generateResponseState.grammar != null && generateResponseState.functionsEnabled)
+        if (generateResponseState.grammar != null && generateResponseState.functionsEnabled && !abortOnNonText)
             throw new Error("Using both grammar and functions is not supported yet");
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatResponse<Functions>> => {
@@ -617,7 +635,6 @@ export class LlamaChat {
                     );
                 };
                 const loadContextWindowForFunctionCallingLoop = async () => loadContextWindow(true);
-                const loadContextWindowForBudgetTriggers = async () => loadContextWindow(false);
 
                 while (true) {
                     generateResponseState.startTokenLoop();
@@ -638,6 +655,10 @@ export class LlamaChat {
                         }
                     }
 
+                    const abortRes = generateResponseState.handleAbortTrigger("model");
+                    if (abortRes != null)
+                        return abortRes;
+
                     if (shouldHandlePrefixTriggers) {
                         const handlePrefixTriggersRes = await generateResponseState.handlePrefixTriggers(
                             loadContextWindowForFunctionCallingLoop
@@ -646,7 +667,7 @@ export class LlamaChat {
                             return handlePrefixTriggersRes;
                     }
 
-                    if (generateResponseState.functionEvaluationMode !== false) {
+                    if (generateResponseState.functionEvaluationMode !== false && !generateResponseState.abortOnNonText) {
                         const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
                             loadContextWindowForFunctionCallingLoop
                         );
@@ -696,9 +717,9 @@ export class LlamaChat {
                             break;
 
                         if (await generateResponseState.handleBudgetTriggers()) {
-                            await loadContextWindowForBudgetTriggers();
-                            await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
-                            await generateResponseState.createNewEvaluationIterator();
+                            generateResponseState.shouldRerender = true;
+                            generateResponseState.skipClosingResponseItemOnRerender = true;
+                            break;
                         }
 
                         if (generateResponseState.handleShouldRerender() || generateResponseState.updateShouldContextShift())
@@ -1604,6 +1625,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly maxParallelFunctionCalls: LLamaChatGenerateResponseOptions<Functions>["maxParallelFunctionCalls"];
     private readonly contextShift: LLamaChatGenerateResponseOptions<Functions>["contextShift"];
     private readonly customStopTriggers: LLamaChatGenerateResponseOptions<Functions>["customStopTriggers"];
+    public readonly abortOnNonText: boolean;
     private readonly minimumOverlapPercentageToPreventContextShift: Exclude<Exclude<LLamaChatGenerateResponseOptions<Functions>["lastEvaluationContextWindow"], undefined>["minimumOverlapPercentageToPreventContextShift"], undefined>;
 
     public readonly functionsEnabled: boolean;
@@ -1660,6 +1682,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     // context shift loop
     public shouldContextShift = false;
     public shouldRerender = false;
+    public skipClosingResponseItemOnRerender = false;
+    public shouldAbortBecauseOfNonText: boolean = false;
 
     public canAvoidReloadingHistory: boolean = false;
     public contextWindowTokens: Token[] = [];
@@ -1718,6 +1742,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             maxParallelFunctionCalls,
             contextShift = defaultContextShiftOptions,
             customStopTriggers,
+            abortOnNonText,
             lastEvaluationContextWindow: {
                 history: lastEvaluationContextWindowHistory,
                 minimumOverlapPercentageToPreventContextShift = 0.5
@@ -1751,6 +1776,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.maxParallelFunctionCalls = maxParallelFunctionCalls;
         this.contextShift = contextShift;
         this.customStopTriggers = customStopTriggers;
+        this.abortOnNonText = abortOnNonText ?? false;
         this.minimumOverlapPercentageToPreventContextShift = minimumOverlapPercentageToPreventContextShift;
 
         this.functionsEnabled = (this.functions != null && Object.keys(this.functions).length > 0);
@@ -1796,7 +1822,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             StopGenerationDetector.resolveStopTriggers(this.grammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                 .map((stopTrigger) => this.stopGenerationDetector.addStopTrigger(stopTrigger));
 
-        if (this.functions != null && Object.keys(this.functions).length > 0)
+        if (this.functions != null && Object.keys(this.functions).length > 0 && !this.abortOnNonText)
             this.functionSyntaxStartDetector.addStopTrigger(
                 StopGenerationDetector.resolveLlamaTextTrigger(
                     LlamaText([
@@ -1828,6 +1854,29 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ? new Map()
                 : SegmentHandler.getSegmentTokenCounts(lastModelMessageFullResponse, this.llamaChat.model.tokenizer)
         });
+
+        if (this.abortOnNonText) {
+            this.stopGenerationDetector.addStopTrigger(
+                StopGenerationDetector.resolveLlamaTextTrigger(
+                    LlamaText([
+                        this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
+                        this.chatWrapper.settings.functions.call.prefix
+                    ]),
+                    this.llamaChat.model.tokenizer
+                )
+            );
+
+            for (const segmentType of allSegmentTypes) {
+                const segmentDefinition = getChatWrapperSegmentDefinition(this.chatWrapper.settings, segmentType);
+                if (segmentDefinition != null)
+                    this.stopGenerationDetector.addStopTrigger(
+                        StopGenerationDetector.resolveLlamaTextTrigger(
+                            LlamaText(segmentDefinition.prefix),
+                            this.llamaChat.model.tokenizer
+                        )
+                    );
+            }
+        }
 
         this.getPenaltyTokens = this.getPenaltyTokens.bind(this);
     }
@@ -1890,7 +1939,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (!hadThoughtSegments)
             return;
 
-        this.segmentHandler.openSegment("thought");
+        if (this.abortOnNonText)
+            this.shouldAbortBecauseOfNonText = true;
+        else
+            this.segmentHandler.openSegment("thought");
     }
 
     public ensureNotAborted() {
@@ -2022,10 +2074,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.isRerender = true;
             this.streamRegulator.reset();
 
-            if (this.rerenderActions === "closeResponseItem" && this.segmentHandler.topOpenSegmentType != null) {
+            if (this.rerenderActions === "closeResponseItem" && this.segmentHandler.topOpenSegmentType != null &&
+                !this.skipClosingResponseItemOnRerender
+            ) {
                 this.segmentHandler.closeSegment(this.segmentHandler.topOpenSegmentType);
                 this.shouldRerender = false;
             }
+            this.skipClosingResponseItemOnRerender = false;
         }
     }
 
@@ -2120,7 +2175,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.prefixTriggerDetectors.clear();
 
                 for (const trigger of prefixTriggers ?? []) {
+                    const segmentBudget = trigger.type === "segment"
+                        ? this.getSegmentBudget(trigger.segmentType)
+                        : null;
+
                     if (trigger.type === "functionCall" && !this.functionsEnabled)
+                        continue;
+                    else if (trigger.type === "segment" &&
+                        segmentBudget != null &&
+                        !this.segmentHandler.isSegmentTypeOpen(trigger.segmentType) &&
+                        this.segmentHandler.getSegmentTokensCount(trigger.segmentType) >= segmentBudget
+                    )
                         continue;
 
                     const prefixDetector = new StopGenerationDetector();
@@ -2144,7 +2209,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 }
 
                 this.noPrefixTrigger = noPrefixTrigger;
+
+                const noPrefixTriggerSegmentBudget = noPrefixTrigger?.type === "segment"
+                    ? this.getSegmentBudget(noPrefixTrigger.segmentType)
+                    : null;
                 if (this.noPrefixTrigger?.type === "functionCall" && !this.functionsEnabled)
+                    this.noPrefixTrigger = undefined;
+                else if (noPrefixTrigger?.type === "segment" &&
+                    noPrefixTriggerSegmentBudget != null &&
+                    !this.segmentHandler.isSegmentTypeOpen(noPrefixTrigger.segmentType) &&
+                    this.segmentHandler.getSegmentTokensCount(noPrefixTrigger.segmentType) >= noPrefixTriggerSegmentBudget
+                )
                     this.noPrefixTrigger = undefined;
 
                 this.rerenderTriggers = rerender?.triggers ?? [];
@@ -2206,6 +2281,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public initFunctions() {
         this.initiallyEngagedFunctionMode = this.functionCallInitiallyEngaged;
 
+        if (this.initiallyEngagedFunctionMode && this.abortOnNonText) {
+            this.shouldAbortBecauseOfNonText = true;
+            return;
+        }
+
         if (this.initiallyEngagedFunctionMode) {
             StopGenerationDetector.resolveStopTriggers(this.disengageInitiallyEngagedFunctionCall, this.llamaChat.model.tokenizer)
                 .map((stopTrigger) => this.disengageInitiallyEngagedFunctionMode.addStopTrigger(stopTrigger));
@@ -2242,6 +2322,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         };
 
         if (this.prefixTriggerDetectors.size === 0) {
+            if (this.abortOnNonText && this.noPrefixTrigger != null && this.noPrefixTrigger.type !== "response") {
+                this.shouldAbortBecauseOfNonText = true;
+
+                const stopRes = this.handleAbortTrigger("model");
+                if (stopRes != null)
+                    return stopRes;
+
+                return undefined;
+            }
+
             if (this.noPrefixTrigger?.type === "functionCall" && this.chatWrapper.settings.functions != null) {
                 await injectTokens(this.noPrefixTrigger.inject, true);
 
@@ -2290,6 +2380,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                             return [item];
                         });
 
+                    if (this.abortOnNonText && trigger.type !== "response") {
+                        this.shouldAbortBecauseOfNonText = true;
+
+                        const stopRes = this.handleAbortTrigger("model");
+                        if (stopRes != null)
+                            return stopRes;
+
+                        return undefined;
+                    }
+
                     this.streamRegulator.reset();
 
                     if (trigger.type === "segment") {
@@ -2326,6 +2426,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             }
 
             if (this.prefixTriggerDetectors.size === 0 && continueGeneration) {
+                if (this.abortOnNonText && this.noPrefixTrigger != null && this.noPrefixTrigger.type !== "response") {
+                    this.shouldAbortBecauseOfNonText = true;
+
+                    const stopRes = this.handleAbortTrigger("model");
+                    if (stopRes != null)
+                        return stopRes;
+
+                    return undefined;
+                }
+
                 this.streamRegulator.reset();
                 continueGeneration = false;
 
@@ -3007,6 +3117,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         if (this.currentQueuedTokenRelease != null && this.functionEvaluationMode === false && this.functionsEnabled &&
             this.functionSyntaxStartDetector.hasTriggeredStops
         ) {
+            if (this.abortOnNonText) {
+                this.shouldAbortBecauseOfNonText = true;
+                return;
+            }
+
             this.functionEvaluationMode = "functionName";
             this.currentQueuedTokenRelease.createTextIndexLock(0);
 
@@ -3211,16 +3326,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public async handleBudgetTriggers() {
         let shouldReloadEvaluationState = false;
 
-        const hasBudget = (budget: number | undefined): budget is number => budget != null && budget !== Infinity;
-
-        const hasBudgetTriggers = this.budgets != null && hasBudget(this.budgets.thoughtTokens);
-        if (!hasBudgetTriggers)
+        if (this.budgets == null)
             return shouldReloadEvaluationState;
 
-        if (hasBudget(this.budgets.thoughtTokens) && this.segmentHandler.isSegmentTypeOpen("thought")) {
-            const usedThoughtTokens = this.segmentHandler.getSegmentTokensCount("thought");
-            if (usedThoughtTokens >= this.budgets.thoughtTokens) {
-                this.segmentHandler.closeSegment("thought");
+        for (const segmentType of this.segmentHandler.getOpenSegmentStack().reverse()) {
+            const budget = this.getSegmentBudget(segmentType);
+            if (budget == null)
+                continue;
+
+            const usedSegmentTokens = this.segmentHandler.getSegmentTokensCount(segmentType);
+            if (usedSegmentTokens >= budget) {
+                this.segmentHandler.closeSegment(segmentType);
                 shouldReloadEvaluationState = true;
             }
         }
@@ -3228,8 +3344,31 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return shouldReloadEvaluationState;
     }
 
+    public getSegmentBudget(segmentType: ChatModelSegmentType) {
+        const getBudget = (budget: number | undefined) => (
+            (budget == null || budget === Infinity)
+                ? null
+                : budget
+        );
+
+        if (this.budgets == null)
+            return null;
+
+        if (segmentType === "thought")
+            return getBudget(this.budgets.thoughtTokens);
+        else if (segmentType === "comment")
+            return getBudget(this.budgets.commentTokens);
+
+        void (segmentType satisfies never);
+        return null;
+    }
+
     public handleShouldRerender() {
         this.shouldRerender = this.rerenderTriggerDetector.hasTriggeredStops;
+
+        if (this.abortOnNonText && this.shouldRerender)
+            this.shouldAbortBecauseOfNonText = true;
+
         return this.shouldRerender;
     }
 
@@ -3239,7 +3378,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public get shouldAbort() {
-        return !!(this.signal?.aborted && this.stopOnAbortSignal);
+        return !!(this.signal?.aborted && this.stopOnAbortSignal) || this.shouldAbortBecauseOfNonText;
     }
 
     public handleAbortTrigger(lastHistoryItemType: "user" | "model") {
@@ -3270,7 +3409,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
                 metadata: {
-                    stopReason: "abort"
+                    stopReason: this.shouldAbortBecauseOfNonText
+                        ? "eogToken"
+                        : "abort"
                 }
             } satisfies LlamaChatResponse<Functions>;
         }
@@ -3450,6 +3591,27 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
     public get topOpenSegmentType(): S | undefined {
         return this._segmentsStack.at(-1);
+    }
+
+    /**
+     * First segment in the stack is the top most that'll close last.
+     * ```
+     * <segment1>
+     *     some text here
+     *     <segment2>
+     *        some text here
+     *         <segment3>
+     *             some text here
+     *         </segment3>
+     * ```
+     * In that example, the top most segment is `segment1`, and the last open segment is `segment2` (which is the next one to close).
+     * So in that example, this function will return:
+     * ```
+     * ["segment1", "segment2"]
+     * ```
+     */
+    public getOpenSegmentStack(): S[] {
+        return this._segmentsStack.slice(this._ownedSegmentsStackLength);
     }
 
     private _processTokens(tokens: Token[], text: string) {
