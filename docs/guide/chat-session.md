@@ -862,6 +862,8 @@ const a1 = await session.promptWithMeta(q1, {
     onResponseChunk(chunk) {
         const isThoughtSegment = chunk.type === "segment" &&
             chunk.segmentType === "thought";
+        const isCommentSegment = chunk.type === "segment" &&
+            chunk.segmentType === "comment";
         
         if (chunk.type === "segment" && chunk.segmentStartTime != null)
             process.stdout.write(` [segment start: ${chunk.segmentType}] `);
@@ -879,6 +881,7 @@ const fullResponse = a1.response
             return item;
         else if (item.type === "segment") {
             const isThoughtSegment = item.segmentType === "thought";
+            const isCommentSegment = item.segmentType === "comment";
             let res = "";
             
             if (item.startTime != null)
