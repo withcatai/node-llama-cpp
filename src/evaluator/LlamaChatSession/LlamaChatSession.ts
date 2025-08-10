@@ -16,10 +16,10 @@ import {TokenBias} from "../TokenBias.js";
 import {LlamaText, LlamaTextJSON} from "../../utils/LlamaText.js";
 import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
+import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {
     LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
 } from "./utils/LlamaChatSessionPromptCompletionEngine.js";
-import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 
 
 export type LlamaChatSessionOptions = {
