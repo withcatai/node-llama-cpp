@@ -13,7 +13,7 @@
                 > .title {
                     opacity: 0.6;
                     font-weight: bold;
-                    --animation-mask-transparency-color: rgb(0 0 0 / 48%);
+                    --thinking-animation-mask-transparency-color: rgb(0 0 0 / 48%);
 
                     animation-play-state: running;
                 }
@@ -65,13 +65,13 @@
             transition: opacity 0.3s var(--transition-easing);
 
             > .title {
-                --animation-mask-transparency-color: rgb(0 0 0 / 100%);
-                transition: font-weight 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing), --animation-mask-transparency-color 0.3s var(--transition-easing), margin-bottom 0.3s var(--transition-easing);
+                --thinking-animation-mask-transparency-color: rgb(0 0 0 / 100%);
+                transition: font-weight 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing), --thinking-animation-mask-transparency-color 0.3s var(--transition-easing), margin-bottom 0.3s var(--transition-easing);
                 mask: linear-gradient(
                     to right,
-                    var(--animation-mask-transparency-color) 34%,
+                    var(--thinking-animation-mask-transparency-color) 34%,
                     black,
-                    var(--animation-mask-transparency-color) 66%
+                    var(--thinking-animation-mask-transparency-color) 66%
                 ) content-box 0 0 / 300% 100% no-repeat;
                 animation: thinking-animation 2s infinite ease-in-out;
                 animation-play-state: paused;
@@ -98,7 +98,7 @@
             justify-content: end;
             justify-self: flex-start;
             mask: linear-gradient(to right, transparent, black 48px);
-            max-width: 360px;
+            max-width: calc-size(fit-content, min(360px, size + 8px));
             opacity: 0.24;
             font-size: 14px;
             margin-top: 2px;
@@ -156,7 +156,7 @@
     }
 }
 
-@property --animation-mask-transparency-color {
+@property --thinking-animation-mask-transparency-color {
     syntax: "<color>";
     inherits: false;
     initial-value: transparent;

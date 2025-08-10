@@ -55,6 +55,9 @@
 
     --message-hr-color: light-dark(rgba(0 0 0 / 16%), rgba(255 255 255 / 16%));
     --message-blockquote-border-color: light-dark(rgba(0 0 0 / 8%), rgba(255 255 255 / 8%));
+
+    --model-comment-block-background-color: light-dark(rgba(0 0 0 / 6%), rgba(0 0 0 / 24%));
+    --model-comment-block-button-background-color: light-dark(rgba(0 0 0 / 6%), rgba(0 0 0 / 24%));
 }
 
 body {

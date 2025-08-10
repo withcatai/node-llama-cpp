@@ -1,0 +1,170 @@
+.appChatHistory > .message.model > .responseComment {
+    padding: 4px 16px 0px 16px;
+    position: relative;
+    margin: 4px -8px;
+    border-radius: 12px;
+
+    transition: margin-bottom 0.3s var(--transition-easing), background-color 0.5s var(--transition-easing);
+
+    &.active {
+        margin-bottom: 8px;
+
+        > .header > .opener > .summary {
+            opacity: 1;
+
+            > .title {
+                opacity: 0.6;
+                font-weight: bold;
+                --generating-animation-mask-transparency-color: rgb(0 0 0 / 48%);
+
+                animation-play-state: running;
+            }
+
+            > .chevron {
+                opacity: 0.48;
+            }
+        }
+    }
+
+    &.open {
+        margin-bottom: 20px;
+        background-color: var(--model-comment-block-background-color);
+
+        > .header > .opener > .summary > .chevron {
+            transform: rotate(90deg);
+            margin-inline-end: -2px;
+        }
+    }
+
+    > .header {
+        display: flex;
+        flex-direction: row;
+
+        > .opener {
+            border: none;
+            background-color: var(--model-comment-block-button-background-color);
+            display: flex;
+            flex-direction: column;
+            padding: 8px 12px;
+            margin: 0px 0px 0px -12px;
+            border-radius: 12px;
+            user-select: none;
+            outline: solid 2px transparent;
+            outline-offset: 4px;
+            align-self: flex-start;
+            max-width: 100%;
+            opacity: 0.64;
+
+            transition: opacity 0.3s var(--transition-easing);
+
+            &:focus-visible {
+                outline: solid 2px Highlight;
+                outline-offset: 0px;
+            }
+
+            &:hover {
+                opacity: 0.82;
+            }
+
+            > .summary {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+
+                > .title {
+                    --generating-animation-mask-transparency-color: rgb(0 0 0 / 100%);
+                    transition: font-weight 0.3s var(--transition-easing), opacity 0.3s var(--transition-easing), --generating-animation-mask-transparency-color 0.3s var(--transition-easing), margin-bottom 0.3s var(--transition-easing);
+                    mask: linear-gradient(
+                        to right,
+                        var(--generating-animation-mask-transparency-color) 34%,
+                        black,
+                        var(--generating-animation-mask-transparency-color) 66%
+                    ) content-box 0 0 / 300% 100% no-repeat;
+                    animation: generating-animation 2s infinite ease-in-out;
+                    animation-play-state: paused;
+                    white-space: nowrap;
+                }
+
+                > .chevron {
+                    flex-shrink: 0;
+
+                    width: 20px;
+                    height: 20px;
+                    margin: -4px;
+                    margin-inline-start: 0px;
+                    margin-inline-end: -6px;
+                    opacity: 0.64;
+
+                    transform-origin: 56% 56%;
+                    transition: transform 0.2s var(--transition-easing), margin-inline-end 0.2s var(--transition-easing), opacity 0.3s var(--transition-easing);
+                }
+            }
+        }
+
+        > .excerpt {
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            justify-content: end;
+            align-self: center;
+            width: calc-size(fit-content, min(360px, size + 8px));
+            opacity: 0.24;
+            mask: linear-gradient(to right, transparent, black 64px);
+            margin-inline-start: 4px;
+
+            user-select: none;
+
+            interpolate-size: allow-keywords;
+            transition: margin-inline-start 0.2s var(--transition-easing), width 0.5s var(--transition-easing), opacity 0.3s 0.2s var(--transition-easing);
+
+            &.hide {
+                width: calc-size(fit-content, max(0px, min(360px, size + 8px) - 24px));
+                opacity: 0;
+                margin-inline-start: 0px; /* this is to offset the chevron right margin on open */
+                transition-delay: 0s, 0s;
+            }
+        }
+    }
+
+    > .comment {
+        margin-top: 16px;
+        padding-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        interpolate-size: allow-keywords;
+        transition: height 0.5s var(--transition-easing), margin-top 0.5s var(--transition-easing), padding-bottom 0.5s var(--transition-easing), margin-bottom 0.5s var(--transition-easing), opacity 0.3s 0.2s var(--transition-easing);
+
+        &.hide {
+            margin-top: 32px;
+            height: 0px;
+            margin-bottom: -12px;
+            padding-bottom: 0px;
+            opacity: 0;
+            transition-delay: 0s, 0s, 0s, 0s;
+        }
+
+        > .content {
+            opacity: 0.64;
+            justify-self: flex-start;
+            position: relative;
+            overflow: hidden;
+            max-height: 100%;
+        }
+    }
+}
+
+@keyframes generating-animation {
+    0% {
+        mask-position: 100% 100%;
+    }
+
+    100% {
+        mask-position: 0 100%;
+    }
+}
+
+@property --generating-animation-mask-transparency-color {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: transparent;
+}
