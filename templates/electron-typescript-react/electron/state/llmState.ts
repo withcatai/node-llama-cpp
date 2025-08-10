@@ -408,7 +408,8 @@ export const llmFunctions = {
                         simplifiedChat: getSimplifiedChatHistory(false),
                         draftPrompt: {
                             ...llmState.state.chatSession.draftPrompt,
-                            completion: chatSessionCompletionEngine?.complete(llmState.state.chatSession.draftPrompt.prompt) ?? ""
+                            completion:
+                                chatSessionCompletionEngine?.complete(llmState.state.chatSession.draftPrompt.prompt)?.trimStart() ?? ""
                         }
                     }
                 };
@@ -428,6 +429,7 @@ export const llmFunctions = {
                 autoDisposeSequence: false
             });
             chatSessionCompletionEngine = chatSession.createPromptCompletionEngine({
+                functions: modelFunctions, // these won't be called, but are used to avoid redundant context shifts
                 onGeneration(prompt, completion) {
                     if (llmState.state.chatSession.draftPrompt.prompt === prompt) {
                         llmState.state = {
@@ -436,7 +438,7 @@ export const llmFunctions = {
                                 ...llmState.state.chatSession,
                                 draftPrompt: {
                                     prompt,
-                                    completion
+                                    completion: completion.trimStart()
                                 }
                             }
                         };
@@ -454,7 +456,7 @@ export const llmFunctions = {
                     simplifiedChat: [],
                     draftPrompt: {
                         prompt: llmState.state.chatSession.draftPrompt.prompt,
-                        completion: chatSessionCompletionEngine.complete(llmState.state.chatSession.draftPrompt.prompt) ?? ""
+                        completion: chatSessionCompletionEngine.complete(llmState.state.chatSession.draftPrompt.prompt)?.trimStart() ?? ""
                     }
                 }
             };
@@ -483,7 +485,7 @@ export const llmFunctions = {
                     ...llmState.state.chatSession,
                     draftPrompt: {
                         prompt: prompt,
-                        completion: chatSessionCompletionEngine.complete(prompt) ?? ""
+                        completion: chatSessionCompletionEngine.complete(prompt)?.trimStart() ?? ""
                     }
                 }
             };
