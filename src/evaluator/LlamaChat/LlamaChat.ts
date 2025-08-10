@@ -313,8 +313,15 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
          *
          * Defaults to `Infinity`.
          */
-        thoughtTokens?: number
-    }
+        thoughtTokens?: number,
+
+        /**
+         * Budget for comment tokens.
+         *
+         * Defaults to `Infinity`.
+         */
+        commentTokens?: number
+    },
 } & ({
     grammar?: LlamaGrammar,
     functions?: never,
@@ -617,7 +624,6 @@ export class LlamaChat {
                     );
                 };
                 const loadContextWindowForFunctionCallingLoop = async () => loadContextWindow(true);
-                const loadContextWindowForBudgetTriggers = async () => loadContextWindow(false);
 
                 while (true) {
                     generateResponseState.startTokenLoop();
@@ -696,9 +702,9 @@ export class LlamaChat {
                             break;
 
                         if (await generateResponseState.handleBudgetTriggers()) {
-                            await loadContextWindowForBudgetTriggers();
-                            await generateResponseState.alignCurrentSequenceStateWithCurrentTokens();
-                            await generateResponseState.createNewEvaluationIterator();
+                            generateResponseState.shouldRerender = true;
+                            generateResponseState.skipClosingResponseItemOnRerender = true;
+                            break;
                         }
 
                         if (generateResponseState.handleShouldRerender() || generateResponseState.updateShouldContextShift())
@@ -1660,6 +1666,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     // context shift loop
     public shouldContextShift = false;
     public shouldRerender = false;
+    public skipClosingResponseItemOnRerender = false;
 
     public canAvoidReloadingHistory: boolean = false;
     public contextWindowTokens: Token[] = [];
@@ -2120,7 +2127,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.prefixTriggerDetectors.clear();
 
                 for (const trigger of prefixTriggers ?? []) {
+                    const segmentBudget = trigger.type === "segment"
+                        ? this.getSegmentBudget(trigger.segmentType)
+                        : null;
+
                     if (trigger.type === "functionCall" && !this.functionsEnabled)
+                        continue;
+                    else if (trigger.type === "segment" &&
+                        segmentBudget != null &&
+                        !this.segmentHandler.isSegmentTypeOpen(trigger.segmentType) &&
+                        this.segmentHandler.getSegmentTokensCount(trigger.segmentType) >= segmentBudget
+                    )
                         continue;
 
                     const prefixDetector = new StopGenerationDetector();
@@ -2144,7 +2161,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 }
 
                 this.noPrefixTrigger = noPrefixTrigger;
+
+                const noPrefixTriggerSegmentBudget = noPrefixTrigger?.type === "segment"
+                    ? this.getSegmentBudget(noPrefixTrigger.segmentType)
+                    : null;
                 if (this.noPrefixTrigger?.type === "functionCall" && !this.functionsEnabled)
+                    this.noPrefixTrigger = undefined;
+                else if (noPrefixTrigger?.type === "segment" &&
+                    noPrefixTriggerSegmentBudget != null &&
+                    !this.segmentHandler.isSegmentTypeOpen(noPrefixTrigger.segmentType) &&
+                    this.segmentHandler.getSegmentTokensCount(noPrefixTrigger.segmentType) >= noPrefixTriggerSegmentBudget
+                )
                     this.noPrefixTrigger = undefined;
 
                 this.rerenderTriggers = rerender?.triggers ?? [];
@@ -3211,21 +3238,41 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public async handleBudgetTriggers() {
         let shouldReloadEvaluationState = false;
 
-        const hasBudget = (budget: number | undefined): budget is number => budget != null && budget !== Infinity;
-
-        const hasBudgetTriggers = this.budgets != null && hasBudget(this.budgets.thoughtTokens);
-        if (!hasBudgetTriggers)
+        if (this.budgets == null)
             return shouldReloadEvaluationState;
 
-        if (hasBudget(this.budgets.thoughtTokens) && this.segmentHandler.isSegmentTypeOpen("thought")) {
-            const usedThoughtTokens = this.segmentHandler.getSegmentTokensCount("thought");
-            if (usedThoughtTokens >= this.budgets.thoughtTokens) {
-                this.segmentHandler.closeSegment("thought");
+        for (const segmentType of this.segmentHandler.getOpenSegmentStack().reverse()) {
+            const budget = this.getSegmentBudget(segmentType);
+            if (budget == null)
+                continue;
+
+            const usedSegmentTokens = this.segmentHandler.getSegmentTokensCount(segmentType);
+            if (usedSegmentTokens >= budget) {
+                this.segmentHandler.closeSegment(segmentType);
                 shouldReloadEvaluationState = true;
             }
         }
 
         return shouldReloadEvaluationState;
+    }
+
+    public getSegmentBudget(segmentType: ChatModelSegmentType) {
+        const getBudget = (budget: number | undefined) => (
+            (budget == null || budget === Infinity)
+                ? null
+                : budget
+        );
+
+        if (this.budgets == null)
+            return null;
+
+        if (segmentType === "thought")
+            return getBudget(this.budgets.thoughtTokens);
+        else if (segmentType === "comment")
+            return getBudget(this.budgets.commentTokens);
+
+        void (segmentType satisfies never);
+        return null;
     }
 
     public handleShouldRerender() {
@@ -3450,6 +3497,27 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
     public get topOpenSegmentType(): S | undefined {
         return this._segmentsStack.at(-1);
+    }
+
+    /**
+     * First segment in the stack is the top most that'll close last.
+     * ```
+     * <segment1>
+     *     some text here
+     *     <segment2>
+     *        some text here
+     *         <segment3>
+     *             some text here
+     *         </segment3>
+     * ```
+     * In that example, the top most segment is `segment1`, and the last open segment is `segment2` (which is the next one to close).
+     * So in that example, this function will return:
+     * ```
+     * ["segment1", "segment2"]
+     * ```
+     */
+    public getOpenSegmentStack(): S[] {
+        return this._segmentsStack.slice(this._ownedSegmentsStackLength);
     }
 
     private _processTokens(tokens: Token[], text: string) {

@@ -183,6 +183,9 @@ export type ChatWrapperGeneratedPrefixTriggersContextState = {
 
         /**
          * Open a segment of the specified type.
+         *
+         * If the budget for this segment has exceeded, this trigger will be ignored,
+         * so ensure to have a fallback for a response.
          */
         type: "segment",
 
@@ -231,6 +234,8 @@ export type ChatWrapperGeneratedPrefixTriggersContextState = {
     } | {
         /**
          * Open a segment of the specified type.
+         *
+         * If the budget for this segment has exceeded, this action will be ignored.
          */
         type: "segment",
 

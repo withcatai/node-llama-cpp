@@ -220,7 +220,14 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
          *
          * Defaults to `Infinity`.
          */
-        thoughtTokens?: number
+        thoughtTokens?: number,
+
+        /**
+         * Budget for comment tokens.
+         *
+         * Defaults to `Infinity`.
+         */
+        commentTokens?: number
     }
 } & ({
     grammar?: LlamaGrammar,
@@ -605,7 +612,8 @@ export class LlamaChatSession {
                             })),
                         budgets: {
                             includeCurrentResponse: true,
-                            thoughtTokens: budgets?.thoughtTokens
+                            thoughtTokens: budgets?.thoughtTokens,
+                            commentTokens: budgets?.commentTokens
                         },
                         signal: abortController.signal,
                         stopOnAbortSignal,
