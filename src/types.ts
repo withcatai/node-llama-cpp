@@ -338,7 +338,9 @@ export type ChatModelFunctionCall = {
     startsNewChunk?: boolean
 };
 
-export const allSegmentTypes = ["thought"] as const satisfies ChatModelSegmentType[];
+export const allSegmentTypes = ["thought", "comment"] as const satisfies readonly ChatModelSegmentType[];
+void (null as Exclude<ChatModelSegmentType, typeof allSegmentTypes[number]> satisfies never);
+
 export type ChatModelSegmentType = "thought" | "comment";
 export type ChatModelSegment = {
     type: "segment",
