@@ -833,7 +833,8 @@ console.log("AI: " + a1);
 
 ## Stream Response Segments {#stream-response-segments}
 The raw model response is automatically segmented into different types of segments.
-The main response is not segmented, but other kinds of sections, like thoughts (chain of thought), are segmented.
+The main response is not segmented, but other kinds of sections,
+like thoughts (chain of thought) and comments (on relevant models, like [`gpt-oss`](../blog/v3.12-gpt-oss.md#comment-segments)), are segmented.
 
 To stream response segments you can use the [`onResponseChunk`](../api/type-aliases/LLamaChatPromptOptions.md#onresponsechunk) option.
 
