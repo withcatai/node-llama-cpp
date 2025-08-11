@@ -2,13 +2,16 @@ import {CSSProperties} from "react";
 import classNames from "classnames";
 import {LoadFileIconSVG} from "../../../icons/LoadFileIconSVG.tsx";
 import {DeleteIconSVG} from "../../../icons/DeleteIconSVG.tsx";
-import {UpdateBadge} from "./components/UpdateBadge.js";
+import {FixedDivWithSpacer} from "../FixedDivWithSpacer/FixedDivWithSpacer.tsx";
+import {UpdateBadge} from "./components/UpdateBadge.tsx";
 
 import "./Header.css";
 
 
 export function Header({appVersion, canShowCurrentVersion, modelName, onLoadClick, loadPercentage, onResetChatClick}: HeaderProps) {
-    return <div className="appHeader">
+    // we use a FixedDivWithSpacer to push down the content while keeping the header fixed.
+    // this allows the content to have macOS's scroll bounce while keeping the header fixed at the top.
+    return <FixedDivWithSpacer className="appHeader">
         <div className="panel model">
             <div
                 className={classNames("progress", loadPercentage === 1 && "hide")}
@@ -42,7 +45,7 @@ export function Header({appVersion, canShowCurrentVersion, modelName, onLoadClic
             appVersion={appVersion}
             canShowCurrentVersion={canShowCurrentVersion}
         />
-    </div>;
+    </FixedDivWithSpacer>;
 }
 
 type HeaderProps = {
