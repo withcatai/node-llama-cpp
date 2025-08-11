@@ -65,6 +65,7 @@ body {
     display: flex;
     min-width: 320px;
     min-height: 100vh;
+    overscroll-behavior-x: none;
 }
 
 a {

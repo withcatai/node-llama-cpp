@@ -330,18 +330,26 @@ export type LLamaChatCompletePromptOptions = {
         enabled?: "auto" | boolean,
 
         /**
-         * The user prompt to give the model for the completion.
+         * The messages to append to the chat history to generate a completion as a model response.
          *
-         * Defaults to `"What may I say next?"`
-         */
-        userPrompt?: string,
-
-        /**
-         * The prefix to supply a model message with for the completion.
+         * If the last message is a model message, the prompt will be pushed to it for the completion,
+         * otherwise a new model message will be added with the prompt.
          *
-         * Defaults to `"Here's a possible reply from you:\t"`
+         * It must contain a user message or a system message before the model message.
+         *
+         * Default to:
+         * ```ts
+         * [
+         *     {
+         *         type: "system",
+         *         text: "For your next response predict what the user may send next. No yapping, no whitespace. Match the user's language and tone."
+         *     },
+         *     {type: "user", text: ""},
+         *     {type: "model", response: [""]}
+         * ]
+         * ```
          */
-        modelPrefix?: string
+        appendedMessages?: ChatHistoryItem[]
     }
 };
 
@@ -391,8 +399,14 @@ export type LlamaChatSessionRepeatPenalty = {
 
 const defaultCompleteAsModel = {
     enabled: "auto",
-    userPrompt: "What may I say next?",
-    modelPrefix: "Here's a possible reply from you:\t"
+    appendedMessages: [
+        {
+            type: "system",
+            text: "For your next response predict what the user may send next. No yapping, no whitespace. Match the user's language and tone."
+        },
+        {type: "user", text: ""},
+        {type: "model", response: [""]}
+    ]
 } as const satisfies LLamaChatCompletePromptOptions["completeAsModel"];
 
 /**
@@ -928,19 +942,56 @@ export class LlamaChatSession {
                     throw new DisposedError();
 
                 if (shouldCompleteAsModel) {
-                    const completeAsModelUserPrompt = (typeof completeAsModel == "boolean" || completeAsModel === "auto")
-                        ? defaultCompleteAsModel.userPrompt
-                        : completeAsModel?.userPrompt ?? defaultCompleteAsModel.userPrompt;
-                    const completeAsModelMessagePrefix = (typeof completeAsModel == "boolean" || completeAsModel === "auto")
-                        ? defaultCompleteAsModel.modelPrefix
-                        : completeAsModel?.modelPrefix ?? defaultCompleteAsModel.modelPrefix;
+                    const messagesToAppendOption = (typeof completeAsModel == "boolean" || completeAsModel === "auto")
+                        ? defaultCompleteAsModel.appendedMessages
+                        : completeAsModel?.appendedMessages ?? defaultCompleteAsModel.appendedMessages;
 
+                    const messagesToAppend = messagesToAppendOption.length === 0
+                        ? defaultCompleteAsModel.appendedMessages
+                        : messagesToAppendOption;
+
+                    const addMessageToChatHistory = (chatHistory: ChatHistoryItem[]): {
+                        history: ChatHistoryItem[],
+                        addedCount: number
+                    } => {
+                        const newHistory = chatHistory.slice();
+                        if (messagesToAppend.at(0)?.type === "model")
+                            newHistory.push({type: "user", text: ""});
+
+                        for (let i = 0; i < messagesToAppend.length; i++) {
+                            const item = messagesToAppend[i];
+                            const isLastItem = i === messagesToAppend.length - 1;
+
+                            if (item == null)
+                                continue;
+
+                            if (isLastItem && item.type === "model") {
+                                const newResponse = item.response.slice();
+                                if (typeof newResponse.at(-1) === "string")
+                                    newResponse.push((newResponse.pop()! as string) + prompt)
+                                else
+                                    newResponse.push(prompt);
+
+                                newHistory.push({
+                                    type: "model",
+                                    response: newResponse
+                                })
+                            } else
+                                newHistory.push(item);
+                        }
+
+                        if (messagesToAppend.at(-1)?.type !== "model")
+                            newHistory.push({type: "model", response: [prompt]});
+
+                        return {
+                            history: newHistory,
+                            addedCount: newHistory.length - chatHistory.length
+                        };
+                    };
+
+                    const {history: messagesWithPrompt, addedCount} = addMessageToChatHistory(this._chatHistory);
                     const {response, lastEvaluation, metadata} = await this._chat.generateResponse(
-                        [
-                            ...asWithLastUserMessageRemoved(this._chatHistory),
-                            {type: "user", text: completeAsModelUserPrompt},
-                            {type: "model", response: [completeAsModelMessagePrefix + prompt]}
-                        ] as ChatHistoryItem[],
+                        messagesWithPrompt,
                         {
                             abortOnNonText: true,
                             functions,
@@ -968,11 +1019,7 @@ export class LlamaChatSession {
                             lastEvaluationContextWindow: {
                                 history: this._lastEvaluation?.contextWindow == null
                                     ? undefined
-                                    : [
-                                        ...asWithLastUserMessageRemoved(this._lastEvaluation?.contextWindow),
-                                        {type: "user", text: completeAsModelUserPrompt},
-                                        {type: "model", response: [completeAsModelMessagePrefix + prompt]}
-                                    ] as ChatHistoryItem[],
+                                    : addMessageToChatHistory(this._lastEvaluation?.contextWindow).history,
                                 minimumOverlapPercentageToPreventContextShift: 0.8
                             }
                         }
@@ -981,7 +1028,7 @@ export class LlamaChatSession {
 
                     this._lastEvaluation = {
                         cleanHistory: this._chatHistory,
-                        contextWindow: asWithLastUserMessageRemoved(asWithLastModelMessageRemoved(lastEvaluation.contextWindow)),
+                        contextWindow: lastEvaluation.contextWindow.slice(0, -addedCount),
                         contextShiftMetadata: lastEvaluation.contextShiftMetadata
                     };
                     this._canUseContextWindowForCompletion = this._chatHistory.at(-1)?.type === "user";
@@ -1179,21 +1226,6 @@ function asWithLastUserMessageRemoved(chatHistory?: ChatHistoryItem[]) {
     const newChatHistory = chatHistory.slice();
 
     while (newChatHistory.at(-1)?.type === "user")
-        newChatHistory.pop();
-
-    return newChatHistory;
-}
-
-
-function asWithLastModelMessageRemoved(chatHistory: ChatHistoryItem[]): ChatHistoryItem[];
-function asWithLastModelMessageRemoved(chatHistory: ChatHistoryItem[] | undefined): ChatHistoryItem[] | undefined;
-function asWithLastModelMessageRemoved(chatHistory?: ChatHistoryItem[]) {
-    if (chatHistory == null)
-        return chatHistory;
-
-    const newChatHistory = chatHistory.slice();
-
-    while (newChatHistory.at(-1)?.type === "model")
         newChatHistory.pop();
 
     return newChatHistory;

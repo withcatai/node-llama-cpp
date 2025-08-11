@@ -2,6 +2,7 @@ import {useCallback, useMemo, useRef, useState} from "react";
 import classNames from "classnames";
 import {AddMessageIconSVG} from "../../../icons/AddMessageIconSVG.tsx";
 import {AbortIconSVG} from "../../../icons/AbortIconSVG.tsx";
+import {FixedDivWithSpacer} from "../FixedDivWithSpacer/FixedDivWithSpacer.tsx";
 
 import "./InputRow.css";
 
@@ -98,7 +99,9 @@ export function InputRow({
         return autocompleteText;
     }, [autocompleteText]);
 
-    return <div className={classNames("appInputRow", disabled && "disabled")}>
+    // we use a FixedDivWithSpacer to push down the content while keeping the input fixed.
+    // this allows the content to have macOS's scroll bounce while keeping the input fixed at the bottom.
+    return <FixedDivWithSpacer className={classNames("appInputRow", disabled && "disabled")}>
         <div className="inputContainer">
             <textarea
                 ref={inputRef}
@@ -137,7 +140,7 @@ export function InputRow({
         >
             <AddMessageIconSVG className="icon" />
         </button>
-    </div>;
+    </FixedDivWithSpacer>;
 }
 
 type InputRowProps = {
