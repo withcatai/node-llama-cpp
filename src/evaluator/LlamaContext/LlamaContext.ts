@@ -28,7 +28,7 @@ const defaultLoraScale = 1;
 const shrinkRetriesMinContextSize = 4096;
 const defaultMaxPunishTokens = 64;
 const defaultFailedCreationRemedy = {
-    retries: 6,
+    retries: 16,
     autoContextSizeShrink: 0.16
 } as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 const defaultEvaluationPriority: EvaluationPriority = 5;
