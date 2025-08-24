@@ -79,20 +79,23 @@ const cudaCmakeOptionsTable = data.cudaCmakeOptionsTable;
 To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_`.
 
 ### Fix the `Failed to detect a default CUDA architecture` Build Error
-To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler.
+To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler,
+and the `CUDA_PATH` environment variable to the path of the CUDA home directory that contains the `nvcc` compiler.
 
 For example, if you have installed CUDA Toolkit 12.4, you have to run a command like this:
 ::: code-group
 ```shell [Linux]
 export CUDACXX=/usr/local/cuda-12.4/bin/nvcc
+export CUDA_PATH=/usr/local/cuda-12.4
 ```
 
 ```cmd [Windows]
 set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe
+set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
 ```
 :::
 
-Then run the build command again to check whether setting the `CUDACXX` environment variable fixed the issue.
+Then run the build command again to check whether setting the `CUDACXX` and `CUDA_PATH` environment variables fixed the issue.
 
 ### Fix the `The CUDA compiler identification is unknown` Build Error
 The solution to this error is the same as [the solution to the `Failed to detect a default CUDA architecture` error](#fix-the-failed-to-detect-a-default-cuda-architecture-build-error).

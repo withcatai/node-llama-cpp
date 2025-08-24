@@ -348,22 +348,28 @@ export async function getCudaNvccPaths({
     const nvccPotentialPaths = cudaInstallationPaths
         .map((cudaInstallationPath) => {
             if (platform === "win")
-                return path.join(cudaInstallationPath, "bin", "nvcc.exe");
+                return {
+                    nvccPath: path.join(cudaInstallationPath, "bin", "nvcc.exe"),
+                    cudaHomePath: cudaInstallationPath
+                };
 
-            return path.join(cudaInstallationPath, "bin", "nvcc");
+            return {
+                nvccPath: path.join(cudaInstallationPath, "bin", "nvcc"),
+                cudaHomePath: cudaInstallationPath
+            };
         });
 
     try {
-        const resolvedNvccPaths = await Promise.all(
-            nvccPotentialPaths.map(async (nvccPotentialPath) => {
-                if (await fs.pathExists(nvccPotentialPath))
-                    return nvccPotentialPath;
+        const resolvedPaths = await Promise.all(
+            nvccPotentialPaths.map(async ({nvccPath, cudaHomePath}) => {
+                if (await fs.pathExists(nvccPath))
+                    return {nvccPath, cudaHomePath};
 
                 return null;
             })
         );
 
-        return resolvedNvccPaths.filter((nvccPath): nvccPath is string => nvccPath != null);
+        return resolvedPaths.filter((resolvedPath) => resolvedPath != null);
     } catch (err) {
         console.error(getConsoleLogPrefix() + `Failed to search for "nvcc${platform === "win" ? ".exe" : ""}" in CUDA installation paths`, err);
     }

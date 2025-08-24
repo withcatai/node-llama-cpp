@@ -259,10 +259,11 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     )
                 )
             )) {
-                for (const nvccPath of await getCudaNvccPaths()) {
+                for (const {nvccPath, cudaHomePath} of await getCudaNvccPaths()) {
                     if (buildOptions.progressLogs)
                         console.info(
-                            getConsoleLogPrefix(true) + `Trying to compile again with "CUDACXX=${nvccPath}" environment variable`
+                            getConsoleLogPrefix(true) +
+                            `Trying to compile again with "CUDACXX=${nvccPath}" and "CUDA_PATH=${cudaHomePath}" environment variables`
                         );
 
                     try {
@@ -270,7 +271,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             ...compileOptions,
                             envVars: {
                                 ...envVars,
-                                CUDACXX: nvccPath
+                                CUDACXX: nvccPath,
+                                "CUDA_PATH": cudaHomePath
                             },
                             ignoreWorkarounds: [...ignoreWorkarounds, "cudaArchitecture"]
                         });
