@@ -173,11 +173,11 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
 
         for (const gpu of gpusToLogVramUsageOf) {
             const llama = gpuToLlama.get(gpu);
-            if (llama == null)
+            if (llama == null || llama.gpu !== gpu)
                 continue;
 
             console.info();
-            await logGpuVramUsage(gpu, llama);
+            await logGpuVramUsage(llama);
         }
 
         console.info();
@@ -208,9 +208,9 @@ async function getLlamaForGpu(gpu: BuildGpu) {
     }
 }
 
-async function logGpuVramUsage(gpu: BuildGpu, llama: Llama) {
+async function logGpuVramUsage(llama: Llama) {
     try {
-        const gpuName = getPrettyBuildGpuName(gpu);
+        const gpuName = getPrettyBuildGpuName(llama.gpu);
         const vramState = await llama.getVramState();
         const gpuDeviceNames = await llama.getGpuDeviceNames();
 
