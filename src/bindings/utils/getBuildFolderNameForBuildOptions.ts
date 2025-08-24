@@ -4,18 +4,26 @@ import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease} from "../../config.js
 
 export async function getBuildFolderNameForBuildOptions(buildOptions: BuildOptions) {
     const nameParts: string[] = [buildOptions.platform, buildOptions.arch];
+    const binParts: string[] = [];
 
-    if (buildOptions.gpu !== false)
+    if (buildOptions.gpu !== false) {
         nameParts.push(makeStringSafeForPathName(buildOptions.gpu));
+        binParts.push(makeStringSafeForPathName(buildOptions.gpu.toLowerCase()));
+    }
 
-    if (buildOptions.llamaCpp.repo !== builtinLlamaCppGitHubRepo || buildOptions.llamaCpp.release !== builtinLlamaCppRelease)
-        nameParts.push("release-" + await getFolderNamePartForRelease(buildOptions.llamaCpp.repo, buildOptions.llamaCpp.release));
+    if (buildOptions.llamaCpp.repo !== builtinLlamaCppGitHubRepo || buildOptions.llamaCpp.release !== builtinLlamaCppRelease) {
+        const releaseFolderNamePart = await getFolderNamePartForRelease(buildOptions.llamaCpp.repo, buildOptions.llamaCpp.release);
+        nameParts.push("release-" + releaseFolderNamePart);
+        binParts.push(releaseFolderNamePart.replaceAll(" ", "_"));
+    } else if (buildOptions.llamaCpp.release !== "latest")
+        binParts.push(buildOptions.llamaCpp.release);
 
     if (buildOptions.customCmakeOptions.size === 0) {
         const name = nameParts.join("-");
         return {
             withoutCustomCmakeOptions: name,
-            withCustomCmakeOptions: name
+            withCustomCmakeOptions: name,
+            binVariant: binParts.join(".")
         };
     }
 
@@ -34,18 +42,21 @@ export async function getBuildFolderNameForBuildOptions(buildOptions: BuildOptio
     if (cmakeOptionStringsArray.length === 0) {
         return {
             withoutCustomCmakeOptions: nameWithoutCustomCmakeOptions,
-            withCustomCmakeOptions: nameWithoutCustomCmakeOptions
+            withCustomCmakeOptions: nameWithoutCustomCmakeOptions,
+            binVariant: binParts.join(".")
         };
     }
 
     const cmakeOptionsHash = await hashString(cmakeOptionStringsArray.join(";"));
 
     nameParts.push(cmakeOptionsHash);
+    binParts.push(cmakeOptionsHash.slice(0, 8));
     const nameWithCustomCmakeOptions = nameParts.join("-");
 
     return {
         withoutCustomCmakeOptions: nameWithoutCustomCmakeOptions,
-        withCustomCmakeOptions: nameWithCustomCmakeOptions
+        withCustomCmakeOptions: nameWithCustomCmakeOptions,
+        binVariant: binParts.join(".")
     };
 }
 
@@ -60,7 +71,7 @@ async function getFolderNamePartForRelease(repo: string, release: string) {
             shouldHash = true;
             resParts.push(encodeURIComponent(String(owner)) + " " + encodeURIComponent(String(name)));
         } else
-            resParts.push(owner + " " + name);
+            resParts.push(String(owner) + " " + String(name));
     }
 
     if (containsUnsafeCharacters(release)) {

@@ -4,6 +4,8 @@ if (NLC_CURRENT_PLATFORM STREQUAL "win-x64" OR NLC_CURRENT_PLATFORM STREQUAL "wi
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
+include("./cmake/addVariantSuffix.cmake")
+
 if (NLC_CURRENT_PLATFORM STREQUAL "win-x64")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL" CACHE STRING "" FORCE)
@@ -108,6 +110,9 @@ endif()
 list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
 list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
 list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
+
+addVariantSuffix(llama ${NLC_VARIANT})
+addVariantSuffix(ggml ${NLC_VARIANT})
 
 file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
 
