@@ -50,7 +50,7 @@ export async function clearAllLocalBuilds(waitForLocks = false) {
             if (waitForLocks)
                 console.log(getConsoleLogPrefix() + "Some builds are in progress. Waiting for those builds to finish before removing them.");
             else
-                console.log(getConsoleLogPrefix() + "Some builds are in progress. Skipping removal of those builds.");
+                console.log(getConsoleLogPrefix() + "Some builds are in progress. Skipping the removal of those builds.");
         }
 
         await Promise.all(buildRemovals);

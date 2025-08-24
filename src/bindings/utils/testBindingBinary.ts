@@ -24,7 +24,7 @@ export async function testBindingBinary(
     if (!detectedFileName.startsWith(expectedFileName)) {
         console.warn(
             getConsoleLogPrefix() +
-            `"${expectedFileName}.js" file is not independent, so testing a binding binary with the current system` +
+            `"${expectedFileName}.js" file is not independent, so testing a binding binary with the current system ` +
             "prior to importing it cannot be done.\n" +
             getConsoleLogPrefix() +
             "Assuming the test passed with the risk that the process may crash due to an incompatible binary.\n" +
