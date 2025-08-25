@@ -136,12 +136,10 @@ jobs:
           use-local-cache: false
 
       - name: Install Cuda 13.0 on Windows (2)
-        if: matrix.config.name == 'Windows (2)'
-        uses: Jimver/cuda-toolkit@v0.2.27
-        with:
-          cuda: '13.0.0'
-          method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
+        run: |
+          wget -c https://developer.download.nvidia.com/compute/cuda/13.0.0/network_installers/cuda_13.0.0_windows_network.exe -O cuda_13.0.0_windows_network.exe
+          ./cuda_13.0.0_windows_network.exe -s nvcc_13.0,cudart_13.0,cublas_13.0,cublas_dev_13.0,thrust_13.0,visual_studio_integration_13.0
+          rm -f ./cuda_13.0.0_windows_network.exe
 
       - name: Install Cuda 12.4 on Ubuntu
         if: matrix.config.name == 'Ubuntu (1)'
