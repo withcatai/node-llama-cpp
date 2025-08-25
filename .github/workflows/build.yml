@@ -56,15 +56,18 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - name: "Windows for x64"
+          - name: "Windows (1)"
             os: windows-2022
-            artifact: "win-x64"
-          - name: "Windows for Arm"
+            artifact: "win-1"
+          - name: "Windows (2)"
             os: windows-2022
-            artifact: "win-arm"
-          - name: "Ubuntu"
+            artifact: "win-2"
+          - name: "Ubuntu (1)"
             os: ubuntu-22.04
-            artifact: "linux"
+            artifact: "linux-1"
+          - name: "Ubuntu (2)"
+            os: ubuntu-22.04
+            artifact: "linux-2"
           - name: "macOS x64"
             os: macos-13
             artifact: "mac-x64"
@@ -97,8 +100,8 @@ jobs:
           choco install cmake --version=3.31.1
           choco install ninja
 
-      - name: Install dependencies on Ubuntu
-        if: matrix.config.name == 'Ubuntu'
+      - name: Install dependencies on Ubuntu (1)
+        if: matrix.config.name == 'Ubuntu (1)'
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
@@ -108,9 +111,23 @@ jobs:
           
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
+          
+          cmake --version
 
-      - name: Install Cuda on Windows for x64
-        if: matrix.config.name == 'Windows for x64'
+      - name: Install dependencies on Ubuntu (2)
+        if: matrix.config.name == 'Ubuntu (2)'
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build libtbb-dev
+          
+          wget -c https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-3.31.7-linux-x86_64.tar.gz
+          rm -f ./cmake-3.31.7-linux-x86_64.tar.gz
+          
+          cmake --version
+
+      - name: Install Cuda 12.4 on Windows (1)
+        if: matrix.config.name == 'Windows (1)'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
           cuda: '12.4.0'
@@ -118,15 +135,42 @@ jobs:
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
 
-      - name: Install Cuda on Ubuntu
-        if: matrix.config.name == 'Ubuntu'
+      - name: Install Cuda 13.0 on Windows (2)
+        if: matrix.config.name == 'Windows (2)'
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          curl -Lo cuda_13.0.0_windows_network.exe https://developer.download.nvidia.com/compute/cuda/13.0.0/network_installers/cuda_13.0.0_windows_network.exe
+          
+          echo "Installing Cuda 13.0.0"
+          powershell -Command "Start-Process -FilePath cuda_13.0.0_windows_network.exe -ArgumentList '-s','-n' -Wait"
+          echo "Cuda installation finished"
+          
+          rm -f ./cuda_13.0.0_windows_network.exe
+          
+          echo "where cudart64_13.dll: $(where cudart64_13.dll)"
+          
+          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
+          echo "CUDA_PATH_V13_0=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
+          echo "CUDA_PATH_VX_Y=CUDA_PATH_V13_0" >> $GITHUB_ENV
+          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin" >> $GITHUB_PATH
+
+      - name: Install Cuda 12.4 on Ubuntu
+        if: matrix.config.name == 'Ubuntu (1)'
         uses: Jimver/cuda-toolkit@v0.2.15
         with:
           cuda: '12.4.0'
           method: 'network'
 
-      - name: Install Vulkan SDK on Windows for x64
-        if: matrix.config.name == 'Windows for x64'
+      - name: Install Cuda 13.0 on Ubuntu
+        if: matrix.config.name == 'Ubuntu (2)'
+        uses: Jimver/cuda-toolkit@v0.2.27
+        with:
+          cuda: '13.0.0'
+          method: 'network'
+
+      - name: Install Vulkan SDK on Windows (1)
+        if: matrix.config.name == 'Windows (1)'
         shell: powershell
         env:
           VULKAN_VERSION: 1.3.261.1
@@ -137,7 +181,7 @@ jobs:
           Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
 
       - name: Install Vulkan SDK on Ubuntu
-        if: matrix.config.name == 'Ubuntu'
+        if: matrix.config.name == 'Ubuntu (1)'
         run: |
           wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
@@ -205,18 +249,21 @@ jobs:
           }
           
           // build binaries
-          if (process.env.ARTIFACT_NAME === "win-x64") {
+          if (process.env.ARTIFACT_NAME === "win-1") {
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
-          } else if (process.env.ARTIFACT_NAME === "win-arm") {
+          } else if (process.env.ARTIFACT_NAME === "win-2") {
             await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
-          } else if (process.env.ARTIFACT_NAME === "linux") {
+            await buildBinary("x64", ["--gpu", "cuda"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-1") {
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
             await buildBinary("arm64", ["--gpu", "false"]);
             await buildBinary("armv7l", ["--gpu", "false"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-2") {
+            await buildBinary("x64", ["--gpu", "cuda"]);
           } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
@@ -231,6 +278,26 @@ jobs:
               path.join(localBuildsDirectoryPath, folderName, "Release"),
               path.join(llamaBinsDirectoryPath, folderName)
             );
+          }
+          
+          if (process.env.ARTIFACT_NAME === "win-2") {
+            await fs.move(
+              path.join(llamaBinsDirectoryPath, "win-x64-cuda"),
+              path.join(llamaBinsDirectoryPath, "win-x64-cuda-2")
+            );
+            
+            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "win-x64-cuda-2", "ggml-cuda.dll")))) {
+              throw new Error("ggml-cuda.dll not found in win-x64-cuda-2");
+            }
+          } else if (process.env.ARTIFACT_NAME === "linux-2") {
+            await fs.move(
+              path.join(llamaBinsDirectoryPath, "linux-x64-cuda"),
+              path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2")
+            );
+            
+            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2", "libggml-cuda.so")))) {
+              throw new Error("libggml-cuda.so not found in linux-x64-cuda-2");
+            }
           }
           
           await $`echo "Built binaries:"`;
@@ -493,6 +560,14 @@ jobs:
           mkdir -p bins
           mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
+          
+          mkdir -p ./bins/win-x64-cuda/fallback
+          mv ./bins/win-x64-cuda-2/ggml-cuda.dll ./bins/win-x64-cuda/fallback/ggml-cuda.dll
+          rm -rf ./bins/win-x64-cuda-2
+          
+          mkdir -p ./bins/linux-x64-cuda/fallback
+          mv ./bins/linux-x64-cuda-2/libggml-cuda.so ./bins/linux-x64-cuda/fallback/libggml-cuda.so
+          rm -rf ./bins/linux-x64-cuda-2
           
           cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
           

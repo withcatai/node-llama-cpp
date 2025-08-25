@@ -245,6 +245,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         else if (buildOptions.gpu === "cuda") {
             if (!ignoreWorkarounds.includes("cudaArchitecture") && (platform === "win" || platform === "linux") &&
                 err instanceof SpawnError && (
+                err.combinedStd.toLowerCase().includes("CUDA Toolkit not found".toLowerCase()) ||
                 err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase()) ||
                 err.combinedStd.toLowerCase().includes("CMAKE_CUDA_COMPILER-NOTFOUND".toLowerCase()) || (
                     err.combinedStd.toLowerCase().includes(
@@ -253,6 +254,10 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     err.combinedStd.toLowerCase().includes(
                         'variable "CUDACXX" or the CMake cache entry CMAKE_CUDA_COMPILER to the full'.toLowerCase()
                     )
+                ) || (
+                    err.combinedStd.toLowerCase().includes("The CUDA compiler".toLowerCase()) &&
+                    err.combinedStd.toLowerCase().includes("is not able to compile a simple test program".toLowerCase()) &&
+                    err.combinedStd.toLowerCase().includes("nvcc fatal".toLowerCase())
                 )
             )) {
                 for (const {nvccPath, cudaHomePath} of await getCudaNvccPaths()) {

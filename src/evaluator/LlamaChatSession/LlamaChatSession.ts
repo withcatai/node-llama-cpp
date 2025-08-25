@@ -342,7 +342,8 @@ export type LLamaChatCompletePromptOptions = {
          * [
          *     {
          *         type: "system",
-         *         text: "For your next response predict what the user may send next. No yapping, no whitespace. Match the user's language and tone."
+         *         text: "For your next response predict what the user may send next. " +
+         *             "No yapping, no whitespace. Match the user's language and tone."
          *     },
          *     {type: "user", text: ""},
          *     {type: "model", response: [""]}
@@ -968,14 +969,14 @@ export class LlamaChatSession {
                             if (isLastItem && item.type === "model") {
                                 const newResponse = item.response.slice();
                                 if (typeof newResponse.at(-1) === "string")
-                                    newResponse.push((newResponse.pop()! as string) + prompt)
+                                    newResponse.push((newResponse.pop()! as string) + prompt);
                                 else
                                     newResponse.push(prompt);
 
                                 newHistory.push({
                                     type: "model",
                                     response: newResponse
-                                })
+                                });
                             } else
                                 newHistory.push(item);
                         }

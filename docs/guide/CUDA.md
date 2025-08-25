@@ -43,6 +43,7 @@ If you see `CUDA used VRAM` in the output, it means that CUDA support is working
 
 ## Prerequisites
 * [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher
+* [NVIDIA Drivers](https://www.nvidia.com/en-us/drivers/)
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 
@@ -89,9 +90,14 @@ export CUDACXX=/usr/local/cuda-12.4/bin/nvcc
 export CUDA_PATH=/usr/local/cuda-12.4
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe
 set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
+```
+
+```cmd [Windows (PowerShell)]
+$env:CUDACXX="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe"
+$env:CUDA_PATH="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
 ```
 :::
 
@@ -110,8 +116,12 @@ To do this, set the `NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET` enviro
 export NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$CUDA_PATH
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 set NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=%CUDA_PATH%
+```
+
+```cmd [Windows (PowerShell)]
+$env:NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$env:CUDA_PATH
 ```
 :::
 
@@ -136,12 +146,21 @@ Run this command inside of your project:
 ldd ./node_modules/@node-llama-cpp/linux-x64-cuda/bins/linux-x64-cuda/libggml-cuda.so
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 "C:\Program Files\Git\usr\bin\ldd.exe" node_modules\@node-llama-cpp\win-x64-cuda\bins\win-x64-cuda\ggml-cuda.dll
+```
+
+```cmd [Windows (PowerShell)]
+& "C:\Program Files\Git\usr\bin\ldd.exe" node_modules\@node-llama-cpp\win-x64-cuda\bins\win-x64-cuda\ggml-cuda.dll
 ```
 :::
 
 ::::
+
+### Fix the `ggml_cuda_init: failed to initialize CUDA: (null)` Error {#fix-failed-to-initialize-cuda-null}
+This error usually happens when the NVIDIA drivers installed on your machine are incompatible with the version of CUDA you have installed.
+
+To fix it, update your NVIDIA drivers to the latest version from the [NVIDIA Driver Downloads](https://www.nvidia.com/en-us/drivers/) page.
 
 
 ## Using `node-llama-cpp` With CUDA
