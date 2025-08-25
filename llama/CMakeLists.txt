@@ -87,7 +87,7 @@ endif()
 if (GGML_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT NLC_GGML_NATIVE)
     find_package(CUDAToolkit)
     if (CUDAToolkit_FOUND AND CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
-        set(CMAKE_CUDA_ARCHITECTURES "70-virtual;72-virtual;75-virtual;80-virtual;86-real;89-real;90-real")
+        set(CMAKE_CUDA_ARCHITECTURES "75-virtual;80-virtual;86-real;89-real;90-real")
     endif()
 endif()
 
