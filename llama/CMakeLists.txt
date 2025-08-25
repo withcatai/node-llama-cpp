@@ -76,6 +76,10 @@ execute_process(COMMAND node -p "require('node-addon-api').include.slice(1,-1)"
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 include_directories(${NODE_ADDON_API_DIR} ${CMAKE_JS_INC})
 
+if (GGML_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT GGML_NATIVE AND CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
+    set(CMAKE_CUDA_ARCHITECTURES "70-virtual;75-virtual;80-virtual;86-real;89-real;90-real")
+endif()
+
 add_subdirectory("llama.cpp")
 include_directories("llama.cpp")
 include_directories("./llama.cpp/common")
