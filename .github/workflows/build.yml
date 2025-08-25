@@ -147,6 +147,13 @@ jobs:
           echo "Cuda installation finished"
           
           rm -f ./cuda_13.0.0_windows_network.exe
+          
+          echo "where cudart64_13.dll: $(where cudart64_13.dll)"
+          
+          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
+          echo "CUDA_PATH_V13_0=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
+          echo "CUDA_PATH_VX_Y=CUDA_PATH_V13_0" >> $GITHUB_ENV
+          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin" >> $GITHUB_PATH
 
       - name: Install Cuda 12.4 on Ubuntu
         if: matrix.config.name == 'Ubuntu (1)'

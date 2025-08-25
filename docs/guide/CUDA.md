@@ -43,6 +43,7 @@ If you see `CUDA used VRAM` in the output, it means that CUDA support is working
 
 ## Prerequisites
 * [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher
+* [NVIDIA Drivers](https://www.nvidia.com/en-us/drivers/)
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 
