@@ -279,7 +279,7 @@ jobs:
               path.join(llamaBinsDirectoryPath, "win-x64-cuda-2")
             );
             
-            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "win-x64-cuda-2", "bins", "win-x64-cuda", "ggml-cuda.dll")))) {
+            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "win-x64-cuda-2", "ggml-cuda.dll")))) {
               throw new Error("ggml-cuda.dll not found in win-x64-cuda-2");
             }
           } else if (process.env.ARTIFACT_NAME === "linux-2") {
@@ -288,7 +288,7 @@ jobs:
               path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2")
             );
             
-            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2", "bins", "linux-x64-cuda", "libggml-cuda.so")))) {
+            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2", "libggml-cuda.so")))) {
               throw new Error("libggml-cuda.so not found in linux-x64-cuda-2");
             }
           }
@@ -554,12 +554,12 @@ jobs:
           mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
           
-          mkdir -p ./bins/win-x64-cuda/bins/win-x64-cuda/fallback
-          mv ./bins/win-x64-cuda-2/bins/win-x64-cuda/ggml-cuda.dll ./bins/win-x64-cuda/bins/win-x64-cuda/fallback/ggml-cuda.dll
+          mkdir -p ./bins/win-x64-cuda/fallback
+          mv ./bins/win-x64-cuda-2/ggml-cuda.dll ./bins/win-x64-cuda/fallback/ggml-cuda.dll
           rm -rf ./bins/win-x64-cuda-2
           
-          mkdir -p ./bins/linux-x64-cuda/bins/linux-x64-cuda/fallback
-          mv ./bins/linux-x64-cuda-2/bins/linux-x64-cuda/libggml-cuda.so ./bins/linux-x64-cuda/bins/linux-x64-cuda/fallback/libggml-cuda.so
+          mkdir -p ./bins/linux-x64-cuda/fallback
+          mv ./bins/linux-x64-cuda-2/libggml-cuda.so ./bins/linux-x64-cuda/fallback/libggml-cuda.so
           rm -rf ./bins/linux-x64-cuda-2
           
           cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
