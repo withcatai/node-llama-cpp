@@ -145,8 +145,12 @@ Run this command inside of your project:
 ldd ./node_modules/@node-llama-cpp/linux-x64-cuda/bins/linux-x64-cuda/libggml-cuda.so
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 "C:\Program Files\Git\usr\bin\ldd.exe" node_modules\@node-llama-cpp\win-x64-cuda\bins\win-x64-cuda\ggml-cuda.dll
+```
+
+```cmd [Windows (PowerShell)]
+& "C:\Program Files\Git\usr\bin\ldd.exe" node_modules\@node-llama-cpp\win-x64-cuda\bins\win-x64-cuda\ggml-cuda.dll
 ```
 :::
 
