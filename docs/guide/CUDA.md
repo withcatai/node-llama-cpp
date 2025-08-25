@@ -89,9 +89,14 @@ export CUDACXX=/usr/local/cuda-12.4/bin/nvcc
 export CUDA_PATH=/usr/local/cuda-12.4
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe
 set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
+```
+
+```cmd [Windows (PowerShell)]
+$env:CUDACXX="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe"
+$env:CUDA_PATH="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
 ```
 :::
 
@@ -110,8 +115,12 @@ To do this, set the `NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET` enviro
 export NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$CUDA_PATH
 ```
 
-```cmd [Windows]
+```cmd [Windows (cmd)]
 set NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=%CUDA_PATH%
+```
+
+```cmd [Windows (PowerShell)]
+$env:NODE_LLAMA_CPP_CMAKE_OPTION_CMAKE_GENERATOR_TOOLSET=$env:CUDA_PATH
 ```
 :::
 
