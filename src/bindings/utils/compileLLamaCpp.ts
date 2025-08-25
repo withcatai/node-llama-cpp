@@ -61,7 +61,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         platform === "win" &&
         (
             buildOptions.gpu === false ||
-            (buildOptions.gpu === "vulkan" && buildOptions.arch === "arm64") // Vulkan can't be compiled on Windows x64 with LLVM ATM
+            buildOptions.gpu === "vulkan"
         ) &&
         !ignoreWorkarounds.includes("avoidWindowsLlvm") &&
         !buildOptions.customCmakeOptions.has("CMAKE_TOOLCHAIN_FILE") &&
@@ -105,6 +105,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 cmakeCustomOptions.set("CMAKE_CONFIGURATION_TYPES", buildConfigType);
                 cmakeCustomOptions.set("NLC_CURRENT_PLATFORM", platform + "-" + process.arch);
                 cmakeCustomOptions.set("NLC_TARGET_PLATFORM", buildOptions.platform + "-" + buildOptions.arch);
+                cmakeCustomOptions.set("NLC_VARIANT", buildFolderName.binVariant);
 
                 if (toolchainFile != null && !cmakeCustomOptions.has("CMAKE_TOOLCHAIN_FILE"))
                     cmakeToolchainOptions.set("CMAKE_TOOLCHAIN_FILE", toolchainFile);
@@ -244,7 +245,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         else if (buildOptions.gpu === "cuda") {
             if (!ignoreWorkarounds.includes("cudaArchitecture") && (platform === "win" || platform === "linux") &&
                 err instanceof SpawnError && (
-                err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase()) || (
+                err.combinedStd.toLowerCase().includes("Failed to detect a default CUDA architecture".toLowerCase()) ||
+                err.combinedStd.toLowerCase().includes("CMAKE_CUDA_COMPILER-NOTFOUND".toLowerCase()) || (
                     err.combinedStd.toLowerCase().includes(
                         "Tell CMake where to find the compiler by setting either the environment".toLowerCase()
                     ) &&
@@ -253,10 +255,11 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     )
                 )
             )) {
-                for (const nvccPath of await getCudaNvccPaths()) {
+                for (const {nvccPath, cudaHomePath} of await getCudaNvccPaths()) {
                     if (buildOptions.progressLogs)
                         console.info(
-                            getConsoleLogPrefix(true) + `Trying to compile again with "CUDACXX=${nvccPath}" environment variable`
+                            getConsoleLogPrefix(true) +
+                            `Trying to compile again with "CUDACXX=${nvccPath}" and "CUDA_PATH=${cudaHomePath}" environment variables`
                         );
 
                     try {
@@ -264,7 +267,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             ...compileOptions,
                             envVars: {
                                 ...envVars,
-                                CUDACXX: nvccPath
+                                CUDACXX: nvccPath,
+                                "CUDA_PATH": cudaHomePath
                             },
                             ignoreWorkarounds: [...ignoreWorkarounds, "cudaArchitecture"]
                         });

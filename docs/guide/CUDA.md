@@ -9,14 +9,14 @@ description: CUDA support in node-llama-cpp
 and these are automatically used when CUDA is detected on your machine.
 
 To use `node-llama-cpp`'s CUDA support with your NVIDIA GPU,
-make sure you have [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.2 or higher installed on your machine.
+make sure you have [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher installed on your machine.
 
 If the pre-built binaries don't work with your CUDA installation,
 `node-llama-cpp` will automatically download a release of `llama.cpp` and build it from source with CUDA support.
 Building from source with CUDA support is slow and can take up to an hour.
 
-The pre-built binaries are compiled with CUDA Toolkit 12.2,
-so any version of CUDA Toolkit that is 12.2 or higher should work with the pre-built binaries.
+The pre-built binaries are compiled with CUDA Toolkit 12.4,
+so any version of CUDA Toolkit that is 12.4 or higher should work with the pre-built binaries.
 If you have an older version of CUDA Toolkit installed on your machine,
 consider updating it to avoid having to wait the long build time.
 
@@ -42,7 +42,7 @@ You should see an output like this:
 If you see `CUDA used VRAM` in the output, it means that CUDA support is working on your machine.
 
 ## Prerequisites
-* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.2 or higher
+* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 
@@ -79,20 +79,23 @@ const cudaCmakeOptionsTable = data.cudaCmakeOptionsTable;
 To build `node-llama-cpp` with any of these options, set an environment variable of an option prefixed with `NODE_LLAMA_CPP_CMAKE_OPTION_`.
 
 ### Fix the `Failed to detect a default CUDA architecture` Build Error
-To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler.
+To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler,
+and the `CUDA_PATH` environment variable to the path of the CUDA home directory that contains the `nvcc` compiler.
 
-For example, if you have installed CUDA Toolkit 12.2, you have to run a command like this:
+For example, if you have installed CUDA Toolkit 12.4, you have to run a command like this:
 ::: code-group
 ```shell [Linux]
-export CUDACXX=/usr/local/cuda-12.2/bin/nvcc
+export CUDACXX=/usr/local/cuda-12.4/bin/nvcc
+export CUDA_PATH=/usr/local/cuda-12.4
 ```
 
 ```cmd [Windows]
-set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\bin\nvcc.exe
+set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe
+set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
 ```
 :::
 
-Then run the build command again to check whether setting the `CUDACXX` environment variable fixed the issue.
+Then run the build command again to check whether setting the `CUDACXX` and `CUDA_PATH` environment variables fixed the issue.
 
 ### Fix the `The CUDA compiler identification is unknown` Build Error
 The solution to this error is the same as [the solution to the `Failed to detect a default CUDA architecture` error](#fix-the-failed-to-detect-a-default-cuda-architecture-build-error).
