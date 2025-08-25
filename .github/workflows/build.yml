@@ -121,6 +121,8 @@ jobs:
           wget -c https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-3.31.7-linux-x86_64.tar.gz
           rm -f ./cmake-3.31.7-linux-x86_64.tar.gz
+          
+          cmake --version
 
       - name: Install Cuda 12.4 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
