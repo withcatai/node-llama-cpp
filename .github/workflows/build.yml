@@ -100,8 +100,8 @@ jobs:
           choco install cmake --version=3.31.1
           choco install ninja
 
-      - name: Install dependencies on Ubuntu
-        if: matrix.config.name == 'Ubuntu (1)' || matrix.config.name == 'Ubuntu (2)'
+      - name: Install dependencies on Ubuntu (1)
+        if: matrix.config.name == 'Ubuntu (1)'
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build cmake libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
@@ -111,6 +111,16 @@ jobs:
           
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
+
+      - name: Install dependencies on Ubuntu (2)
+        if: matrix.config.name == 'Ubuntu (2)'
+        run: |
+          sudo apt-get update
+          sudo apt-get install ninja-build libtbb-dev
+          
+          wget -c https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-3.31.7-linux-x86_64.tar.gz
+          rm -f ./cmake-3.31.7-linux-x86_64.tar.gz
 
       - name: Install Cuda 12.4 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
@@ -129,6 +139,7 @@ jobs:
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
+          use-github-cache: false
 
       - name: Install Cuda 12.4 on Ubuntu
         if: matrix.config.name == 'Ubuntu (1)'
