@@ -153,6 +153,9 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             } else {
                 console.info(`${chalk.yellow("CUDA:")} ${chalk.green("available")}`);
                 gpusToLogVramUsageOf.push("cuda");
+
+                if (llama._hadErrorLogs)
+                    console.info(chalk.yellow("To resolve errors related to CUDA, see the CUDA guide: ") + documentationPageUrls.CUDA);
             }
         }
 
@@ -165,6 +168,11 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             } else {
                 console.info(`${chalk.yellow("Vulkan:")} ${chalk.green("available")}`);
                 gpusToLogVramUsageOf.push("vulkan");
+
+                if (llama._hadErrorLogs)
+                    console.info(
+                        chalk.yellow("To resolve errors related to Vulkan, see the Vulkan guide: ") + documentationPageUrls.Vulkan
+                    );
             }
         }
 

@@ -117,14 +117,23 @@ export const LlamaVocabularyTypeValues = Object.freeze([
 ] as const);
 
 /**
- *Check if a log level is higher than another log level
+ * Check if a log level is higher than another log level
+ * @example
+ * ```ts
+ * LlamaLogLevelGreaterThan(LlamaLogLevel.error, LlamaLogLevel.info); // true
+ * ```
  */
 export function LlamaLogLevelGreaterThan(a: LlamaLogLevel, b: LlamaLogLevel): boolean {
     return LlamaLogLevelValues.indexOf(a) < LlamaLogLevelValues.indexOf(b);
 }
 
 /**
- *Check if a log level is higher than or equal to another log level
+ * Check if a log level is higher than or equal to another log level
+ * @example
+ * ```ts
+ * LlamaLogLevelGreaterThanOrEqual(LlamaLogLevel.error, LlamaLogLevel.info); // true
+ * LlamaLogLevelGreaterThanOrEqual(LlamaLogLevel.error, LlamaLogLevel.error); // true
+ * ```
  */
 export function LlamaLogLevelGreaterThanOrEqual(a: LlamaLogLevel, b: LlamaLogLevel): boolean {
     return LlamaLogLevelValues.indexOf(a) <= LlamaLogLevelValues.indexOf(b);

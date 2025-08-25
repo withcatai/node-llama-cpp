@@ -156,6 +156,11 @@ ldd ./node_modules/@node-llama-cpp/linux-x64-cuda/bins/linux-x64-cuda/libggml-cu
 
 ::::
 
+### Fix the `ggml_cuda_init: failed to initialize CUDA: (null)` Error {#fix-failed-to-initialize-cuda-null}
+This error usually happens when the NVIDIA drivers installed on your machine are incompatible with the version of CUDA you have installed.
+
+To fix it, update your NVIDIA drivers to the latest version from the [NVIDIA Driver Downloads](https://www.nvidia.com/en-us/drivers/) page.
+
 
 ## Using `node-llama-cpp` With CUDA
 It's recommended to use [`getLlama`](../api/functions/getLlama) without specifying a GPU type,

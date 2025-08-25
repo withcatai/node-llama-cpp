@@ -11,7 +11,10 @@ import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
 import {getLlamaClasses, LlamaClasses} from "../utils/getLlamaClasses.js";
 import {BindingModule} from "./AddonTypes.js";
-import {BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel, LlamaLogLevelGreaterThanOrEqual, LlamaNuma} from "./types.js";
+import {
+    BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel,
+    LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma
+} from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
@@ -41,6 +44,7 @@ export class Llama {
     /** @internal */ public readonly _swapOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _debug: boolean;
     /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
+    /** @internal */ public _hadErrorLogs: boolean = false;
     /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _numa: LlamaNuma;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
@@ -470,6 +474,9 @@ export class Llama {
 
         this._previousLog = message;
         this._previousLogLevel = level;
+
+        if (!this._hadErrorLogs && LlamaLogLevelGreaterThan(level, LlamaLogLevel.error))
+            this._hadErrorLogs = true;
     }
 
     /** @internal */
