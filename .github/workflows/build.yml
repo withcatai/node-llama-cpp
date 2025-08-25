@@ -111,6 +111,8 @@ jobs:
           
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
+          
+          cmake --version
 
       - name: Install dependencies on Ubuntu (2)
         if: matrix.config.name == 'Ubuntu (2)'
