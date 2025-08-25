@@ -286,9 +286,17 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                     throw new Error("Binding binary is not loaded");
 
                 binding.loadBackends();
-                const loadedGpu = binding.getGpuType();
-                if (loadedGpu == null || (loadedGpu === false && message.gpu !== false))
-                    binding.loadBackends(path.dirname(path.resolve(message.bindingBinaryPath)));
+                let loadedGpu = binding.getGpuType();
+                if (loadedGpu == null || (loadedGpu === false && message.gpu !== false)) {
+                    const backendsPath = path.dirname(path.resolve(message.bindingBinaryPath));
+                    const fallbackBackendsDir = path.join(backendsPath, "fallback");
+
+                    binding.loadBackends(backendsPath);
+
+                    loadedGpu = binding.getGpuType();
+                    if (loadedGpu == null || (loadedGpu === false && message.gpu !== false))
+                        binding.loadBackends(fallbackBackendsDir);
+                }
 
                 await binding.init();
                 binding.getGpuVramInfo();

@@ -107,9 +107,17 @@ export class Llama {
         }
 
         bindings.loadBackends();
-        const loadedGpu = bindings.getGpuType();
-        if (loadedGpu == null || (loadedGpu === false && buildGpu !== false))
-            bindings.loadBackends(path.dirname(bindingPath));
+        let loadedGpu = bindings.getGpuType();
+        if (loadedGpu == null || (loadedGpu === false && buildGpu !== false)) {
+            const backendsPath = path.dirname(bindingPath);
+            const fallbackBackendsDir = path.join(backendsPath, "fallback");
+
+            bindings.loadBackends(backendsPath);
+
+            loadedGpu = bindings.getGpuType();
+            if (loadedGpu == null || (loadedGpu === false && buildGpu !== false))
+                bindings.loadBackends(fallbackBackendsDir);
+        }
 
         bindings.ensureGpuDeviceIsSupported();
 
