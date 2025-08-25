@@ -143,7 +143,7 @@ jobs:
           curl -Lo cuda_13.0.0_windows_network.exe https://developer.download.nvidia.com/compute/cuda/13.0.0/network_installers/cuda_13.0.0_windows_network.exe
           
           echo "Installing Cuda 13.0.0"
-          cmd /c "start /wait \"\" cuda_13.0.0_windows_network.exe -s -n nvcc_13.0 cudart_13.0 cublas_13.0 cublas_dev_13.0 thrust_13.0 visual_studio_integration_13.0"
+          powershell -Command "Start-Process -FilePath cuda_13.0.0_windows_network.exe -ArgumentList '-s','-n','nvcc_13.0','cudart_13.0','cublas_13.0','cublas_dev_13.0','thrust_13.0','visual_studio_integration_13.0' -Wait"
           echo "Cuda installation finished"
           
           rm -f ./cuda_13.0.0_windows_network.exe
