@@ -75,8 +75,8 @@ describe("llama 3.2", () => {
                 const chatSession1_1 = new LlamaChatSession({
                     contextSequence: contextSequence1
                 });
-                const res1_1 = await chatSession1_1.prompt("What did I tell you to remember?", {maxTokens: 12});
-                expect(res1_1).to.toMatchInlineSnapshot("\"You didn't tell me to remember anything. This is the\"");
+                const res1_1 = await chatSession1_1.prompt("What did I tell you to remember?", {maxTokens: 10});
+                expect(res1_1).to.toMatchInlineSnapshot("\"You didn't tell me to remember anything. This\"");
 
                 await contextSequence1.clearHistory();
                 const contextSequence1TokensState2 = contextSequence1.tokenMeter.getState();
@@ -85,7 +85,7 @@ describe("llama 3.2", () => {
                 expect(TokenMeter.diff(contextSequence1TokensState2, contextSequence1TokensState1)).toMatchInlineSnapshot(`
                   {
                     "usedInputTokens": 101,
-                    "usedOutputTokens": 12,
+                    "usedOutputTokens": 10,
                   }
                 `);
 
@@ -139,8 +139,8 @@ describe("llama 3.2", () => {
                     contextSequence: contextSequence1
                 });
 
-                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 6});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever phrase.\"");
+                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
+                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -150,12 +150,12 @@ describe("llama 3.2", () => {
                 const contextSequence1TokensState = contextSequence1.tokenMeter.getState();
 
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("105");
-                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.49MB"');
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
+                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.27MB"');
                 expect(contextSequence1TokensState).to.toMatchInlineSnapshot(`
                   {
                     "usedInputTokens": 99,
-                    "usedOutputTokens": 6,
+                    "usedOutputTokens": 4,
                   }
                 `);
 
@@ -200,8 +200,8 @@ describe("llama 3.2", () => {
                     contextSequence: contextSequence1
                 });
 
-                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 6});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever phrase.\"");
+                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
+                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -211,12 +211,12 @@ describe("llama 3.2", () => {
                 const contextSequence1TokensState = contextSequence1.tokenMeter.getState();
 
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("105");
-                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.49MB"');
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
+                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.27MB"');
                 expect(contextSequence1TokensState).to.toMatchInlineSnapshot(`
                   {
                     "usedInputTokens": 99,
-                    "usedOutputTokens": 6,
+                    "usedOutputTokens": 4,
                   }
                 `);
 
@@ -258,8 +258,8 @@ describe("llama 3.2", () => {
                     contextSequence: contextSequence1
                 });
 
-                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 6});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever phrase.\"");
+                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
+                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -269,12 +269,12 @@ describe("llama 3.2", () => {
                 const contextSequence1TokensState = contextSequence1.tokenMeter.getState();
 
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("105");
-                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.49MB"');
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
+                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.27MB"');
                 expect(contextSequence1TokensState).to.toMatchInlineSnapshot(`
                   {
                     "usedInputTokens": 99,
-                    "usedOutputTokens": 6,
+                    "usedOutputTokens": 4,
                   }
                 `);
 
