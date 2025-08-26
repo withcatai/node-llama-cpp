@@ -1,0 +1,47 @@
+{
+  "name": "@node-llama-cpp/win-x64-cuda-ext",
+  "version": "0.1.0",
+  "description": "Extension of @node-llama-cpp/win-x64-cuda - prebuilt binary for node-llama-cpp for Windows x64 with CUDA support",
+  "main": "dist/index.js",
+  "type": "module",
+  "files": [
+    "dist/",
+    "bins/",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "node": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "scripts": {
+    "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",
+    "build": "tsc --build tsconfig.json --force",
+    "prewatch": "rimraf ./dist ./tsconfig.tsbuildinfo",
+    "watch": "tsc --build tsconfig.json --watch --force",
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/withcatai/node-llama-cpp.git"
+  },
+  "author": "Gilad S.",
+  "license": "MIT",
+  "preferUnplugged": true,
+  "bugs": {
+    "url": "https://github.com/withcatai/node-llama-cpp/issues"
+  },
+  "homepage": "https://node-llama-cpp.withcat.ai",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}

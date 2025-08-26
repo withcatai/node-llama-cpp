@@ -706,7 +706,7 @@ async function loadExistingLlamaBinary({
             });
             const resolvedBindingPath = await resolveActualBindingBinaryPath(localBuildBinPath);
             const binaryCompatible = shouldTestBinaryBeforeLoading
-                ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
+                ? await testBindingBinary(resolvedBindingPath, undefined, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
                 : true;
 
             if (binaryCompatible) {
@@ -765,8 +765,13 @@ async function loadExistingLlamaBinary({
                     buildMetadata
                 });
                 const resolvedBindingPath = await resolveActualBindingBinaryPath(prebuiltBinDetails.binaryPath);
+                const resolvedExtBackendsPath = prebuiltBinDetails.extBackendsPath == null
+                    ? undefined
+                    : await resolveActualBindingBinaryPath(prebuiltBinDetails.extBackendsPath);
                 const binaryCompatible = shouldTestBinaryBeforeLoading
-                    ? await testBindingBinary(resolvedBindingPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs)
+                    ? await testBindingBinary(
+                        resolvedBindingPath, resolvedExtBackendsPath, buildOptions.gpu, undefined, pipeBinaryTestErrorLogs
+                    )
                     : true;
 
                 if (binaryCompatible) {
@@ -775,6 +780,7 @@ async function loadExistingLlamaBinary({
                     return await Llama._create({
                         bindings: binding,
                         bindingPath: resolvedBindingPath,
+                        extBackendsPath: resolvedExtBackendsPath,
                         buildType: "prebuilt",
                         buildMetadata,
                         logLevel,

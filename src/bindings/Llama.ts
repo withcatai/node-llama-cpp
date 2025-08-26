@@ -72,11 +72,12 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, bindingPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu, maxThreads,
-        vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
+        bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu,
+        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
     }: {
         bindings: BindingModule,
         bindingPath: string,
+        extBackendsPath?: string,
         logLevel: LlamaLogLevel,
         logger: (level: LlamaLogLevel, message: string) => void,
         buildType: "localBuild" | "prebuilt",
@@ -114,7 +115,7 @@ export class Llama {
         let loadedGpu = bindings.getGpuType();
         if (loadedGpu == null || (loadedGpu === false && buildGpu !== false)) {
             const backendsPath = path.dirname(bindingPath);
-            const fallbackBackendsDir = path.join(backendsPath, "fallback");
+            const fallbackBackendsDir = path.join(extBackendsPath ?? backendsPath, "fallback");
 
             bindings.loadBackends(backendsPath);
 
@@ -495,11 +496,12 @@ export class Llama {
 
     /** @internal */
     public static async _create({
-        bindings, bindingPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads, skipLlamaInit = false,
-        debug, numa
+        bindings, bindingPath, extBackendsPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads,
+        skipLlamaInit = false, debug, numa
     }: {
         bindings: BindingModule,
         bindingPath: string,
+        extBackendsPath?: string,
         buildType: "localBuild" | "prebuilt",
         buildMetadata: BuildMetadataFile,
         logLevel: LlamaLogLevel,
@@ -557,6 +559,7 @@ export class Llama {
         const llama = new Llama({
             bindings,
             bindingPath,
+            extBackendsPath,
             buildType,
             cmakeOptions: buildMetadata.buildOptions.customCmakeOptions,
             llamaCppRelease: {
