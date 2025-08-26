@@ -27,7 +27,17 @@ const {packageVersion} = argv;
 if (packageVersion === "")
     throw new Error("packageVersion is empty");
 
-for (const packageName of await fs.readdir(subPackagesDirectory)) {
+const packageNames = (await fs.readdir(subPackagesDirectory))
+    .sort((a, b) => {
+        if (a.endsWith("-ext"))
+            return -1;
+        else if (b.endsWith("-ext"))
+            return 1;
+
+        return a.localeCompare(b);
+    });
+
+for (const packageName of packageNames) {
     const packagePath = path.join(subPackagesDirectory, packageName);
     const packagePackageJsonPath = path.join(packagePath, "package.json");
 

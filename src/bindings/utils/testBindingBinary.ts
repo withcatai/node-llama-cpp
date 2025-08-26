@@ -17,6 +17,7 @@ const expectedFileName = "testBindingBinary";
 
 export async function testBindingBinary(
     bindingBinaryPath: string,
+    extBackendsPath: string | undefined,
     gpu: BuildGpu,
     testTimeout: number = 1000 * 60 * 5,
     pipeOutputOnNode: boolean = false
@@ -233,6 +234,7 @@ export async function testBindingBinary(
                         subProcess!.sendMessage({
                             type: "start",
                             bindingBinaryPath,
+                            extBackendsPath,
                             gpu
                         });
                     } else if (message.type === "loaded") {
@@ -240,6 +242,7 @@ export async function testBindingBinary(
                         subProcess!.sendMessage({
                             type: "test",
                             bindingBinaryPath,
+                            extBackendsPath,
                             gpu
                         });
                     } else if (message.type === "done") {
@@ -289,7 +292,7 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 let loadedGpu = binding.getGpuType();
                 if (loadedGpu == null || (loadedGpu === false && message.gpu !== false)) {
                     const backendsPath = path.dirname(path.resolve(message.bindingBinaryPath));
-                    const fallbackBackendsDir = path.join(backendsPath, "fallback");
+                    const fallbackBackendsDir = path.join(path.resolve(message.extBackendsPath ?? backendsPath), "fallback");
 
                     binding.loadBackends(backendsPath);
 
@@ -337,10 +340,12 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
 type ParentToChildMessage = {
     type: "start",
     bindingBinaryPath: string,
+    extBackendsPath?: string,
     gpu: BuildGpu
 } | {
     type: "test",
     bindingBinaryPath: string,
+    extBackendsPath?: string,
     gpu: BuildGpu
 } | {
     type: "exit"
