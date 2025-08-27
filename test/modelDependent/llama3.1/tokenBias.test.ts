@@ -24,20 +24,18 @@ describe("llama 3.1", () => {
             for (const token of model.iterateAllTokens()) {
                 const text = model.detokenize([token]);
 
-                if (text.toLowerCase().includes("hello"))
-                    customBias.set(token, -1);
+                if (text.toLowerCase().includes("well"))
+                    customBias.set(token, -0.99);
                 else if (text.toLowerCase().includes("hi"))
                     customBias.set(token, "never");
-                else if (text.toLowerCase().includes("well"))
-                    customBias.set(token, -0.99);
             }
 
-            const res = await chatSession.prompt('Greet me by saying "hello" to me', {
+            const res = await chatSession.prompt('Greet me by saying "hi" to me', {
                 tokenBias: customBias,
                 maxTokens: 100
             });
 
-            expect(res.toLowerCase()).to.not.include("hello");
+            expect(res.toLowerCase()).to.not.include("well");
             expect(res.toLowerCase()).to.not.include("hi ");
             expect(res.toLowerCase()).to.not.include("hi.");
         });
