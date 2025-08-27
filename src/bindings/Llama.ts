@@ -465,7 +465,7 @@ export class Llama {
             }
 
             try {
-                const transformedLogLevel = getTransformedLogLevel(level, message);
+                const transformedLogLevel = getTransformedLogLevel(level, message, this.gpu);
                 if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevel))
                     this._logger(transformedLogLevel, message);
             } catch (err) {
@@ -665,7 +665,7 @@ function logMessageIsOnlyDots(message: string | null) {
     return true;
 }
 
-function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLogLevel {
+function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: BuildGpu): LlamaLogLevel {
     if (level === LlamaLogLevel.warn && message.endsWith("the full capacity of the model will not be utilized"))
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("ggml_metal_init: skipping kernel_") && message.endsWith("(not supported)"))
@@ -683,6 +683,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string): LlamaLog
     else if (level === LlamaLogLevel.warn && message.startsWith("init: embeddings required but some input tokens were not marked as outputs -> overriding"))
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("load: special_eog_ids contains both '<|return|>' and '<|call|>' tokens, removing '<|end|>' token from EOG list"))
+        return LlamaLogLevel.info;
+    else if (gpu === false && level === LlamaLogLevel.warn && message.startsWith("llama_adapter_lora_init_impl: lora for '") && message.endsWith("' cannot use buft 'CPU_REPACK', fallback to CPU"))
         return LlamaLogLevel.info;
 
     return level;

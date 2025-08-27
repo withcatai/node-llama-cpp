@@ -25,9 +25,11 @@ describe("llama 3.1", () => {
                 const text = model.detokenize([token]);
 
                 if (text.toLowerCase().includes("hello"))
-                    customBias.set(token, -0.99);
+                    customBias.set(token, -1);
                 else if (text.toLowerCase().includes("hi"))
                     customBias.set(token, "never");
+                else if (text.toLowerCase().includes("well"))
+                    customBias.set(token, -0.99);
             }
 
             const res = await chatSession.prompt('Greet me by saying "hello" to me', {
