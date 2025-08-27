@@ -854,6 +854,7 @@ export class LlamaChatSession {
     public async preloadPrompt(prompt: string, options: LLamaChatPreloadPromptOptions = {}): Promise<void> {
         await this.completePromptWithMeta(prompt, {
             ...options,
+            completeAsModel: false,
             maxTokens: 0
         });
     }
@@ -1009,7 +1010,9 @@ export class LlamaChatSession {
                             seed,
                             tokenBias,
                             customStopTriggers,
-                            maxTokens,
+                            maxTokens: maxTokens == null
+                                ? undefined
+                                : Math.min(1, maxTokens), // regular prompting ignores `maxTokens: 0`
                             temperature,
                             trimWhitespaceSuffix,
                             contextShift: {
