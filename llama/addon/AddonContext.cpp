@@ -420,7 +420,16 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("flashAttention")) {
-            context_params.flash_attn = options.Get("flashAttention").As<Napi::Boolean>().Value();
+            if (options.Get("flashAttention").IsBoolean()) {
+                bool value = options.Get("flashAttention").As<Napi::Boolean>().Value();
+                if (value) {
+                    context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+                } else {
+                    context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+                }
+            } else {
+                context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+            }
         }
 
         if (options.Has("threads")) {
