@@ -42,18 +42,17 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
             physicalDevice.getMemoryProperties2(&memProps2);
 
             for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-                const auto flags = memProps.memoryHeaps[i].flags;
+                const auto heap = memProps2.memoryProperties.memoryHeaps[i];
 
-                if (flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-                    const auto size = memProps.memoryHeaps[i].size;
-                    totalMem += size;
-                    usedMem += memoryBudgetProperties.heapUsage[i];
+                if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+                    totalMem += heap.size;
+                    usedMem += memoryBudgetProperties.heapUsage[i] + (heap.size - memoryBudgetProperties.heapBudget[i]);
 
-                    if (flags & vk::MemoryHeapFlagBits::eMultiInstance) {
-                        totalUnifiedMemorySize += size;
+                    if (heap.flags & vk::MemoryHeapFlagBits::eMultiInstance) {
+                        totalUnifiedMemorySize += heap.size;
                     }
 
-                    if (size > 0 && addDeviceNames) {
+                    if (heap.size > 0 && addDeviceNames) {
                         (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
                     }
 
