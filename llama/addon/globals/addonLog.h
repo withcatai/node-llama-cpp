@@ -2,6 +2,7 @@
 #include "llama.h"
 #include "napi.h"
 
+
 struct addon_logger_log {
     public:
         const int logLevelNumber;

@@ -133,7 +133,7 @@ jobs:
       - name: Install Cuda 13.0 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
         shell: bash
-        timeout-minutes: 30
+        timeout-minutes: 60
         run: |
           curl -Lo cuda_13.0.0_windows_network.exe https://developer.download.nvidia.com/compute/cuda/13.0.0/network_installers/cuda_13.0.0_windows_network.exe
           

@@ -307,6 +307,7 @@ export const llmFunctions = {
 
                     try {
                         await chatSession?.preloadPrompt("", {
+                            functions: modelFunctions, // these won't be called, but are used to avoid redundant context shifts
                             signal: promptAbortController?.signal
                         });
                     } catch (err) {
