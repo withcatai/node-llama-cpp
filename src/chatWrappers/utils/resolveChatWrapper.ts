@@ -19,6 +19,7 @@ import {includesText} from "../../utils/includesText.js";
 import {LlamaModel} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {QwenChatWrapper} from "../QwenChatWrapper.js";
 import {HarmonyChatWrapper} from "../HarmonyChatWrapper.js";
+import {SeedChatWrapper} from "../SeedChatWrapper.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
@@ -26,7 +27,7 @@ import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 export const specializedChatWrapperTypeNames = Object.freeze([
     "general", "deepSeek", "qwen", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary",
-    "chatML", "falconChat", "gemma", "harmony"
+    "chatML", "falconChat", "gemma", "harmony", "seed"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -57,6 +58,7 @@ export const chatWrappers = Object.freeze({
     "falconChat": FalconChatWrapper,
     "gemma": GemmaChatWrapper,
     "harmony": HarmonyChatWrapper,
+    "seed": SeedChatWrapper,
     "template": TemplateChatWrapper,
     "jinjaTemplate": JinjaTemplateChatWrapper
 } as const satisfies Record<SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName, any>);
@@ -366,12 +368,18 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(GemmaChatWrapper);
         else if (includesText(modelNames, ["gpt-oss", "Gpt Oss", "Gpt-Oss", "openai_gpt-oss", "Openai_Gpt Oss", "openai.gpt-oss", "Openai.Gpt Oss"]))
             return createSpecializedChatWrapper(HarmonyChatWrapper);
+        else if (includesText(modelNames, ["seed-oss", "Seed Oss", "Seed OSS", "Seed-Oss", "Seed-OSS", "ByteDance-Seed_Seed-OSS", "ByteDance-Seed.Seed-OSS"]))
+            return createSpecializedChatWrapper(SeedChatWrapper);
     }
 
     // try to find a pattern in the Jinja template to resolve to a specialized chat wrapper,
     // with a logic similar to `llama.cpp`'s `llama_chat_apply_template_internal` function
     if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
-        if (modelJinjaTemplate.includes("<|start|>") && modelJinjaTemplate.includes("<|channel|>"))
+        if (modelJinjaTemplate.includes("<seed:think>") || (
+            modelJinjaTemplate.includes("<seed:bos>") && modelJinjaTemplate.includes("<seed:eos>")
+        ))
+            return createSpecializedChatWrapper(SeedChatWrapper);
+        else if (modelJinjaTemplate.includes("<|start|>") && modelJinjaTemplate.includes("<|channel|>"))
             return createSpecializedChatWrapper(HarmonyChatWrapper);
         else if (modelJinjaTemplate.includes("<|im_start|>"))
             return createSpecializedChatWrapper(ChatMLChatWrapper);

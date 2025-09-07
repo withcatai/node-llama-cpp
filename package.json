@@ -143,7 +143,7 @@
     "@nolebase/vitepress-plugin-og-image": "^2.17.0",
     "@resvg/resvg-js": "^2.6.2",
     "@semantic-release/exec": "^7.1.0",
-    "@semantic-release/github": "11.0.4",
+    "@semantic-release/github": "11.0.5",
     "@semantic-release/npm": "12.0.2",
     "@shikijs/vitepress-twoslash": "^3.4.0",
     "@stylistic/eslint-plugin": "^4.2.0",

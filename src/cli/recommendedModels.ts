@@ -93,6 +93,20 @@ export const recommendedModels: ModelRecommendation[] = [{
         "hf:Qwen/Qwen3-0.6B-GGUF:Q8_0"
     ]
 }, {
+    name: "Seed OSS 36B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Seed OSS model was created by ByteDance and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
+        "It's optimized for agentic use cases, with native support for function calling and flexible control of the thinking budget (via `SeedChatWrapper` options).\n" +
+        "This model can support a context size of up to 512K tokens (if you have enough VRAM to accommodate it).\n" +
+        "This is a 36 billion parameters model.",
+
+    fileOptions: [
+        "hf:giladgd/Seed-OSS-36B-Instruct-GGUF:Q8_0",
+        "hf:giladgd/Seed-OSS-36B-Instruct-GGUF:Q6_K",
+        "hf:giladgd/Seed-OSS-36B-Instruct-GGUF:Q5_K_M",
+        "hf:giladgd/Seed-OSS-36B-Instruct-GGUF:Q4_K_M"
+    ]
+}, {
     name: "DeepSeek R1 Distill Qwen 7B",
     abilities: ["chat", "complete", "functionCalling", "reasoning"],
     description: "DeepSeek R1 model was created by DeepSeek and is using chain of though (CoT) to reason across a wide variety of topics.\n" +
