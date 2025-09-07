@@ -191,6 +191,10 @@ export class ChatModelFunctionsDocumentationGenerator {
             .join("\n");
     }
 
+    public getSeedFunctionSignatures({documentParams = true}: {documentParams?: boolean} = {}) {
+        return jsonDumps(this._convertToJinjaTools({documentParams}));
+    }
+
     /** @internal */
     private _convertToJinjaTools({documentParams = true}: {documentParams?: boolean} = {}) {
         const chatModelFunctions = this.chatModelFunctions;
