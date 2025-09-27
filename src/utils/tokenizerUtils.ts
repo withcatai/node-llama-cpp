@@ -12,6 +12,10 @@ export function resolveBeginningTokenToPrepend(vocabularyType: LlamaVocabularyTy
     if (vocabularyType === LlamaVocabularyType.wpm)
         return tokens.bos;
 
+
+    if (vocabularyType === LlamaVocabularyType.ugm)
+        return null;
+
     if (tokens.shouldPrependBosToken)
         return tokens.bos;
 
@@ -28,6 +32,9 @@ export function resolveEndTokenToAppend(vocabularyType: LlamaVocabularyType, tok
 
     if (vocabularyType === LlamaVocabularyType.wpm)
         return tokens.sep;
+
+    if (vocabularyType === LlamaVocabularyType.ugm)
+        return tokens.eos;
 
     if (tokens.shouldAppendEosToken)
         return tokens.eos;

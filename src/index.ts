@@ -84,6 +84,7 @@ import {getModuleVersion} from "./utils/getModuleVersion.js";
 import {readGgufFileInfo} from "./gguf/readGgufFileInfo.js";
 import {GgufInsights, type GgufInsightsResourceRequirements} from "./gguf/insights/GgufInsights.js";
 import {GgufInsightsConfigurationResolver} from "./gguf/insights/GgufInsightsConfigurationResolver.js";
+import {GgufInsightsTokens} from "./gguf/insights/GgufInsightsTokens.js";
 import {
     createModelDownloader, ModelDownloader, type ModelDownloaderOptions, combineModelDownloaders, CombinedModelDownloader,
     type CombinedModelDownloaderOptions
@@ -315,6 +316,7 @@ export {
     isGgufMetadataOfArchitectureType,
     GgufInsights,
     type GgufInsightsResourceRequirements,
+    GgufInsightsTokens,
     GgufInsightsConfigurationResolver,
     createModelDownloader,
     ModelDownloader,

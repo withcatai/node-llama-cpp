@@ -263,7 +263,7 @@ export const enum GgufMetadataTokenizerTokenType {
 
 export type GgufMetadataTokenizer = {
     readonly ggml: {
-        readonly model: "no_vocab" | "llama" | "gpt2" | "bert" | string,
+        readonly model: "no_vocab" | "none" | "llama" | "gpt2" | "bert" | "rwkv" | "t5" | "plamo2" | string,
         readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" |
             "pixtral" | "mpt" | "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" |
             "jina-v2-code" | "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" |
@@ -279,7 +279,7 @@ export type GgufMetadataTokenizer = {
         readonly eot_token_id?: number,
         readonly eom_token_id?: number,
         readonly unknown_token_id?: number,
-        readonly separator_token_id?: number,
+        readonly seperator_token_id?: number,
         readonly padding_token_id?: number,
         readonly cls_token_id?: number,
         readonly mask_token_id?: number,
@@ -304,7 +304,8 @@ export type GgufMetadataTokenizer = {
     readonly huggingface?: {
         readonly json?: string
     },
-    readonly chat_template?: string
+    readonly chat_template?: string,
+    readonly "chat_template.rerank"?: string
 };
 
 export const enum GgufMetadataArchitecturePoolingType {

@@ -6,6 +6,7 @@ import {GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {GgufInsightsConfigurationResolver} from "./GgufInsightsConfigurationResolver.js";
+import {GgufInsightsTokens} from "./GgufInsightsTokens.js";
 
 export type GgufInsightsResourceRequirements = {
     cpuRam: number,
@@ -16,8 +17,10 @@ export class GgufInsights {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ private readonly _modelSize: number;
     /** @internal */ private _totalFileLayers: number | null = null;
-    /** @internal */ private readonly _ggufFileInfo: GgufFileInfo;
+    /** @internal */ private _supportsRanking?: boolean;
+    /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
+    /** @internal */ private readonly _tokens: GgufInsightsTokens;
 
     private constructor(ggufFileInfo: GgufFileInfo, llama: Llama) {
         this._llama = llama;
@@ -25,6 +28,7 @@ export class GgufInsights {
 
         this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama, true, true);
         this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
+        this._tokens = GgufInsightsTokens._create(this);
     }
 
     /**
@@ -58,6 +62,10 @@ export class GgufInsights {
 
     public get configurationResolver() {
         return this._configurationResolver;
+    }
+
+    public get tokens() {
+        return this._tokens;
     }
 
     /** The context size the model was trained on */
@@ -130,6 +138,29 @@ export class GgufInsights {
         }
 
         return false;
+    }
+
+    public get supportsRanking() {
+        if (this._supportsRanking != null)
+            return this._supportsRanking;
+
+        const layers = this._ggufFileInfo.fullTensorInfo ?? [];
+        for (let i = layers.length - 1; i >= 0; i--) {
+            const tensor = layers[i];
+            if (tensor == null)
+                continue;
+
+            if (tensor.name === "cls.weight" || tensor.name === "cls.output.weight") {
+                this._supportsRanking = this.tokens.sepToken != null || this.tokens.eosToken != null ||
+                    isRankingTemplateValid(parseRankingTemplate(this._ggufFileInfo.metadata?.tokenizer?.["chat_template.rerank"]));
+                this._supportsRanking &&= !(this.hasEncoder && this.hasDecoder); // encoder-decoder models are not supported
+
+                return this._supportsRanking;
+            }
+        }
+
+        this._supportsRanking = false;
+        return this._supportsRanking;
     }
 
     /**
@@ -786,4 +817,17 @@ function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): numb
     }
 
     return 1;
+}
+
+export function parseRankingTemplate(template: string | undefined | null): string | undefined {
+    if (template == null)
+        return undefined;
+
+    return template
+        .replaceAll("{query}", "{{query}}")
+        .replaceAll("{document}", "{{document}}");
+}
+
+export function isRankingTemplateValid(template: string | undefined | null): boolean {
+    return template != null && template.includes("{{query}}") && template.includes("{{document}}");
 }
