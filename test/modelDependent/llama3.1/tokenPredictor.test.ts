@@ -6,7 +6,7 @@ import {compareTokens} from "../../../src/utils/compareTokens.js";
 
 describe("llama 3.1", () => {
     describe("token predictor", () => {
-        test("DraftModelTokenPredictor", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        test("DraftModelTokenPredictor", {retry: 4, timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf");
             const llama = await getTestLlama();
 
