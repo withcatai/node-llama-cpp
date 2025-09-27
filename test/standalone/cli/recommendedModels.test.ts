@@ -4,7 +4,7 @@ import {recommendedModels} from "../../../src/cli/recommendedModels.js";
 
 describe("cli", () => {
     describe("recommended models", () => {
-        test("all URIs resolve correctly", async () => {
+        test("all URIs resolve correctly", {timeout: 1000 * 60 * 6}, async () => {
             const unresolvedUris = (
                 await Promise.all(
                     recommendedModels
@@ -18,10 +18,11 @@ describe("cli", () => {
                             try {
                                 await resolveParsedModelUri(parseModelUri(uri));
                                 return null;
-                            } catch (err) {
+                            } catch (err: Error | any) {
                                 return {
                                     modelName,
-                                    uri
+                                    uri,
+                                    error: String(err?.stack ?? err)
                                 };
                             }
                         })

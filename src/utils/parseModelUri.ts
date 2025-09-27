@@ -1,4 +1,5 @@
 import filenamify from "filenamify";
+import prettyMilliseconds from "pretty-ms";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {createSplitPartFilename, getGgufSplitPartsInfo} from "../gguf/utils/resolveSplitGgufParts.js";
@@ -7,9 +8,19 @@ import {isUrl} from "./isUrl.js";
 import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccessTokens.js";
 import {isHuggingFaceUrl, ModelDownloadEndpoints, resolveHuggingFaceEndpoint} from "./modelDownloadEndpoints.js";
 import {parseModelFileName} from "./parseModelFileName.js";
+import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+import {signalSleep} from "./signalSleep.js";
 
 const defaultHuggingFaceBranch = "main";
 const defaultHuggingFaceFileQuantization = "Q4_K_M";
+const huggingFaceRateLimit = {
+    wait: {
+        min: 1000,
+        max: 60 * 5 * 1000,
+        default: 1000
+    },
+    retries: 4
+} as const;
 
 export const genericFilePartNumber = "{:\n{number}\n:}" as const;
 
@@ -208,9 +219,12 @@ async function fetchHuggingFaceModelManifest({
         {},
         await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens, endpoints)
     ];
+    let rateLimitPendingRetries = 0;
 
-    while (headersToTry.length > 0) {
-        const headers = headersToTry.shift();
+    for (let i = 0; i < headersToTry.length * (1 + rateLimitPendingRetries); i++) {
+        const headers = headersToTry[i % headersToTry.length];
+        if (headers == null)
+            continue;
 
         let response: Awaited<ReturnType<typeof fetch>> | undefined;
         try {
@@ -226,10 +240,52 @@ async function fetchHuggingFaceModelManifest({
                 signal
             });
         } catch (err) {
+            if (signal?.aborted && err === signal?.reason)
+                throw err;
+
             throw new Error(`Failed to fetch manifest for resolving URI ${JSON.stringify(fullUri)}: ${err}`);
         }
 
-        if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
+        if (response.status === 429) {
+            const doneRetires = Math.floor(i / headersToTry.length);
+            rateLimitPendingRetries = Math.min(doneRetires + 1, huggingFaceRateLimit.retries);
+
+            if (i % headersToTry.length === headersToTry.length - 1 && i !== headersToTry.length * (1 + rateLimitPendingRetries) - 1) {
+                const [,secondsUntilResetString] = response.headers.get("ratelimit")
+                    ?.split(";")
+                    .map((part) => part.split("="))
+                    .find(([key, value]) => key === "t" && !isNaN(Number(value))) ?? [];
+
+                if (secondsUntilResetString != null) {
+                    const timeToWait = Math.min(
+                        huggingFaceRateLimit.wait.max,
+                        Math.max(
+                            huggingFaceRateLimit.wait.min,
+                            Number(secondsUntilResetString) * 1000
+                        )
+                    );
+                    console.info(
+                        getConsoleLogPrefix() +
+                        "Received a rate limit response from Hugging Face, waiting for " + (
+                            prettyMilliseconds(timeToWait, {
+                                keepDecimalsOnWholeSeconds: true,
+                                secondsDecimalDigits: 0,
+                                compact: true,
+                                verbose: true
+                            })
+                        ) + " before retrying..."
+                    );
+                    await signalSleep(timeToWait, signal);
+                } else
+                    await signalSleep(huggingFaceRateLimit.wait.default, signal);
+            }
+
+            continue;
+        }
+
+        if ((response.status >= 500 || response.status === 429 || response.status === 401) &&
+            i < headersToTry.length * (1 + rateLimitPendingRetries) - 1
+        )
             continue;
 
         if (response.status === 400 || response.status === 404)
