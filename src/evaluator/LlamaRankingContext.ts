@@ -182,11 +182,11 @@ export class LlamaRankingContext {
                 .flatMap((item) => {
                     if (typeof item === "string")
                         return this._llamaContext.model.tokenize(item, true, "trimLeadingSpace");
-                    else if (item.separator === "{{query}}") {
+                    else if (item.separator === "{{query}}")
                         return tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
-                    } else if (item.separator === "{{document}}") {
+                    else if (item.separator === "{{document}}")
                         return tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
-                    } else
+                    else
                         void (item satisfies never);
 
                     void (item satisfies never);
