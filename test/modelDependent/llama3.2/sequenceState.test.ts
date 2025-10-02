@@ -75,7 +75,7 @@ describe("llama 3.2", () => {
                 const chatSession1_1 = new LlamaChatSession({
                     contextSequence: contextSequence1
                 });
-                const res1_1 = await chatSession1_1.prompt("What did I tell you to remember?", {maxTokens: 10});
+                const res1_1 = await chatSession1_1.prompt("What's the exact thing I told you to remember?", {maxTokens: 10});
                 expect(res1_1).to.toMatchInlineSnapshot("\"You didn't tell me to remember anything. This\"");
 
                 await contextSequence1.clearHistory();
@@ -84,7 +84,7 @@ describe("llama 3.2", () => {
                 expect(contextSequence1.contextTokens).to.eql([]);
                 expect(TokenMeter.diff(contextSequence1TokensState2, contextSequence1TokensState1)).toMatchInlineSnapshot(`
                   {
-                    "usedInputTokens": 101,
+                    "usedInputTokens": 104,
                     "usedOutputTokens": 10,
                   }
                 `);
@@ -105,15 +105,15 @@ describe("llama 3.2", () => {
                     contextSequence: contextSequence1
                 });
                 chatSession1_2.setChatHistory(chatSession1.getChatHistory());
-                const res1_2 = await chatSession1_2.prompt("What did I tell you to remember?", {maxTokens: 12});
+                const res1_2 = await chatSession1_2.prompt("What's the exact thing I told you to remember?", {maxTokens: 12});
                 const contextSequence1TokensState4 = contextSequence1.tokenMeter.getState();
 
-                expect(res1_2).to.toMatchInlineSnapshot('"You told me to remember that "locks are not doors"."');
+                expect(res1_2).to.toMatchInlineSnapshot('"You told me to "Remember: locks are not doors"."');
                 const contextSequence1TokensState4Diff = TokenMeter.diff(contextSequence1TokensState4, contextSequence1TokensState3);
                 expect(contextSequence1TokensState4Diff.usedInputTokens).to.be.lessThan(contextSequence1TokensState1.usedInputTokens);
                 expect(contextSequence1TokensState4Diff).toMatchInlineSnapshot(`
                   {
-                    "usedInputTokens": 18,
+                    "usedInputTokens": 21,
                     "usedOutputTokens": 12,
                   }
                 `);
