@@ -34,13 +34,13 @@ export class Llama3ChatWrapper extends ChatWrapper {
                     },
                     result: {
                         prefix: LlamaText(new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")),
-                        suffix: LlamaText(new SpecialToken("EOT"))
+                        suffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                     },
                     parallelism: {
                         call: {
                             sectionPrefix: "",
                             betweenCalls: "\n",
-                            sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                         },
                         result: {
                             sectionPrefix: "",
@@ -62,11 +62,11 @@ export class Llama3ChatWrapper extends ChatWrapper {
                     },
                     result: {
                         prefix: LlamaText([
-                            LlamaText(new SpecialToken("EOT")),
+                            LlamaText(new SpecialTokensText("<|eot_id|>")),
                             new SpecialTokensText("<|start_header_id|>function_call_result<|end_header_id|>\n\n")
                         ]),
                         suffix: LlamaText([
-                            new SpecialToken("EOT"),
+                            new SpecialTokensText("<|eot_id|>"),
                             new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n")
                         ])
                     }
@@ -147,7 +147,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
                             item.system,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -157,7 +157,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
                             item.user,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -169,7 +169,7 @@ export class Llama3ChatWrapper extends ChatWrapper {
                             item.model,
                             isLastItem
                                 ? LlamaText([])
-                                : new SpecialToken("EOT")
+                                : new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }

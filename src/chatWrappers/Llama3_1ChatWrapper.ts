@@ -29,7 +29,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
             },
             result: {
                 prefix: LlamaText(new SpecialTokensText("\n<|start_header_id|>ipython<|end_header_id|>\n\n")),
-                suffix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
+                suffix: LlamaText(new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"))
             }
         }
     };
@@ -189,7 +189,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
                             item.system,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -199,7 +199,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
                             item.user,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -211,7 +211,7 @@ export class Llama3_1ChatWrapper extends ChatWrapper {
                             item.model,
                             isLastItem
                                 ? LlamaText([])
-                                : new SpecialToken("EOT")
+                                : new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }

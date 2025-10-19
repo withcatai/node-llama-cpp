@@ -75,13 +75,11 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>user<|end_header_id|>
 
           "),
             "Hi there!",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           "),
             "Hello!",
@@ -143,23 +141,19 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>user<|end_header_id|>
 
           "),
             "Hi there!",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           "),
             "Hello!",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>user<|end_header_id|>
 
           "),
             "What is the time?",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           <function="),
             "getTime",
@@ -170,8 +164,7 @@ describe("Llama3_1ChatWrapper", () => {
 
           "),
             ""22:00:00"",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           "),
             "I'm good, how are you?",
@@ -206,13 +199,11 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>user<|end_header_id|>
 
           "),
             "Hi there!",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           "),
             "Hello!",
@@ -235,13 +226,11 @@ describe("Llama3_1ChatWrapper", () => {
 
           You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>user<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>user<|end_header_id|>
 
           "),
             "Hi there!",
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>
+            new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
           "),
             "Hello!

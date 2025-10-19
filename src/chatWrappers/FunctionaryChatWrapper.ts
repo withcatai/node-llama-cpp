@@ -39,13 +39,13 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                         prefix: LlamaText([
                             new SpecialTokensText("<|start_header_id|>tool<|end_header_id|>\n\n")
                         ]),
-                        suffix: LlamaText(new SpecialToken("EOT"))
+                        suffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                     },
                     parallelism: {
                         call: {
                             sectionPrefix: "",
                             betweenCalls: "",
-                            sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                         },
                         result: {
                             sectionPrefix: "",
@@ -72,13 +72,13 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                             "{{functionName}}",
                             new SpecialTokensText("\n")
                         ]),
-                        suffix: LlamaText(new SpecialToken("EOT"))
+                        suffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                     },
                     parallelism: {
                         call: {
                             sectionPrefix: "",
                             betweenCalls: "",
-                            sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|eot_id|>"))
                         },
                         result: {
                             sectionPrefix: "",
@@ -155,13 +155,13 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                     return LlamaText([
                         new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
                         LlamaText.fromJSON(item.text),
-                        new SpecialToken("EOT")
+                        new SpecialTokensText("<|eot_id|>")
                     ]);
                 } else if (item.type === "user") {
                     return LlamaText([
                         new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
                         item.text,
-                        new SpecialToken("EOT")
+                        new SpecialTokensText("<|eot_id|>")
                     ]);
                 } else if (item.type === "model") {
                     if (isLastItem && item.response.length === 0)
@@ -178,7 +178,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                             return;
 
                         res.push(LlamaText(pendingFunctionCalls));
-                        res.push(LlamaText(new SpecialToken("EOT")));
+                        res.push(LlamaText(new SpecialTokensText("<|eot_id|>")));
                         res.push(LlamaText(pendingFunctionResults));
 
                         pendingFunctionResults.length = 0;
@@ -206,7 +206,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                             response,
                                             (!isLastResponse || isLastItem)
                                                 ? LlamaText([])
-                                                : new SpecialToken("EOT")
+                                                : new SpecialTokensText("<|eot_id|>")
                                         ])
                                 ])
                             );
@@ -232,7 +232,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     response.result === undefined
                                         ? "" // "void"
                                         : jsonDumps(response.result),
-                                    new SpecialToken("EOT")
+                                    new SpecialTokensText("<|eot_id|>")
                                 ])
                             );
                         } else
@@ -320,13 +320,13 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                     return LlamaText([
                         new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
                         LlamaText.fromJSON(item.text),
-                        new SpecialToken("EOT")
+                        new SpecialTokensText("<|eot_id|>")
                     ]);
                 } else if (item.type === "user") {
                     return LlamaText([
                         new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
                         item.text,
-                        new SpecialToken("EOT")
+                        new SpecialTokensText("<|eot_id|>")
                     ]);
                 } else if (item.type === "model") {
                     if (isLastItem && item.response.length === 0)
@@ -343,7 +343,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                             return;
 
                         res.push(LlamaText(pendingFunctionCalls));
-                        res.push(LlamaText(new SpecialToken("EOT")));
+                        res.push(LlamaText(new SpecialTokensText("<|eot_id|>")));
                         res.push(LlamaText(pendingFunctionResults));
 
                         pendingFunctionResults.length = 0;
@@ -365,7 +365,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     response,
                                     (isLastItem && isLastResponse)
                                         ? LlamaText([])
-                                        : new SpecialToken("EOT")
+                                        : new SpecialTokensText("<|eot_id|>")
                                 ])
                             );
                         } else if (isChatModelResponseFunctionCall(response)) {
@@ -392,7 +392,7 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                     response.result === undefined
                                         ? "" // "void"
                                         : jsonDumps(response.result),
-                                    new SpecialToken("EOT")
+                                    new SpecialTokensText("<|eot_id|>")
                                 ])
                             );
                         } else
