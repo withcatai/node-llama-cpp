@@ -27,7 +27,8 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
 
     for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
         device = ggml_backend_dev_get(i);
-        if (ggml_backend_dev_type(device) == GGML_BACKEND_DEVICE_TYPE_GPU) {
+        auto deviceType = ggml_backend_dev_type(device);
+        if (deviceType == GGML_BACKEND_DEVICE_TYPE_GPU || deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
             deviceTotal = 0;
             deviceFree = 0;
             ggml_backend_dev_memory(device, &deviceFree, &deviceTotal);
@@ -76,8 +77,8 @@ Napi::Value getGpuDeviceInfo(const Napi::CallbackInfo& info) {
 
     for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
         ggml_backend_dev_t device = ggml_backend_dev_get(i);
-        if (ggml_backend_dev_type(device) == GGML_BACKEND_DEVICE_TYPE_GPU) {
-
+        auto deviceType = ggml_backend_dev_type(device);
+        if (deviceType == GGML_BACKEND_DEVICE_TYPE_GPU || deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
             deviceNames.push_back(std::string(ggml_backend_dev_description(device)));
         }
     }
