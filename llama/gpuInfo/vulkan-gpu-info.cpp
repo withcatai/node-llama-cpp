@@ -4,10 +4,10 @@
 
 #include <vulkan/vulkan.hpp>
 
-constexpr uint32_t VK_VENDOR_ID_AMD = 0x1002;
-constexpr uint32_t VK_VENDOR_ID_APPLE = 0x106b;
-constexpr uint32_t VK_VENDOR_ID_INTEL = 0x8086;
-constexpr uint32_t VK_VENDOR_ID_NVIDIA = 0x10de;
+constexpr std::uint32_t VK_VENDOR_ID_AMD = 0x1002;
+constexpr std::uint32_t VK_VENDOR_ID_APPLE = 0x106b;
+constexpr std::uint32_t VK_VENDOR_ID_INTEL = 0x8086;
+constexpr std::uint32_t VK_VENDOR_ID_NVIDIA = 0x10de;
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
