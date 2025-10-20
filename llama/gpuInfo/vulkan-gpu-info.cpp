@@ -62,8 +62,8 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
         oldDevice->getProperties2(&oldProps);
 
         std::map<vk::DriverId, int> driverPriorities {};
-        int oldPriority = std::numeric_limits<int>::max();
-        int newPriority = std::numeric_limits<int>::max();
+        int oldPriority = 1000;
+        int newPriority = 1000;
 
         switch (oldProps.properties.vendorID) {
             case VK_VENDOR_ID_AMD:
