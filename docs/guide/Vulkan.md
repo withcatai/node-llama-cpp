@@ -68,7 +68,7 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
 * :::details Windows only: LLVM (optional, recommended if you have build issues)
   There are a few methods to install LLVM:
   * **As part of Microsoft Visual C++ Build Tools (Recommended):** the dependencies for Window listed under [Downloading a Release](./building-from-source.md#downloading-a-release) will also install LLVM.
-  * **Independently:** visit the [latest LLVM release page](https://github.com/llvm/llvm-project/releases/latest) and download an installer for your Windows architecture.
+  * **Independently:** visit the [latest LLVM release page](https://github.com/llvm/llvm-project/releases/latest) and download the installer for your Windows architecture.
   :::
 
 ### Building From Source
