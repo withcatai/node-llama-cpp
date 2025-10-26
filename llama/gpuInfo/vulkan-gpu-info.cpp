@@ -1,16 +1,109 @@
 #include <stddef.h>
+#include <map>
 #include <vector>
 
 #include <vulkan/vulkan.hpp>
 
+constexpr std::uint32_t VK_VENDOR_ID_AMD = 0x1002;
+constexpr std::uint32_t VK_VENDOR_ID_APPLE = 0x106b;
+constexpr std::uint32_t VK_VENDOR_ID_INTEL = 0x8086;
+constexpr std::uint32_t VK_VENDOR_ID_NVIDIA = 0x10de;
+
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback, bool * checkSupported) {
+static vk::Instance vulkanInstance() {
     vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
     vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
-    vk::Instance instance = vk::createInstance(createInfo);
+    return vk::createInstance(createInfo);
+}
 
+static std::vector<vk::PhysicalDevice> dedupedDevices() {
+    vk::Instance instance = vulkanInstance();
     auto physicalDevices = instance.enumeratePhysicalDevices();
+    std::vector<vk::PhysicalDevice> dedupedDevices;
+    dedupedDevices.reserve(physicalDevices.size());
+
+    // adapted from `ggml_vk_instance_init` in `ggml-vulkan.cpp`
+    for (const auto& device : physicalDevices) {
+        vk::PhysicalDeviceProperties2 newProps;
+        vk::PhysicalDeviceDriverProperties newDriver;
+        vk::PhysicalDeviceIDProperties newId;
+        newProps.pNext = &newDriver;
+        newDriver.pNext = &newId;
+        device.getProperties2(&newProps);
+
+        auto oldDevice = std::find_if(
+            dedupedDevices.begin(),
+            dedupedDevices.end(),
+            [&newId](const vk::PhysicalDevice& oldDevice) {
+                vk::PhysicalDeviceProperties2 oldProps;
+                vk::PhysicalDeviceDriverProperties oldDriver;
+                vk::PhysicalDeviceIDProperties oldId;
+                oldProps.pNext = &oldDriver;
+                oldDriver.pNext = &oldId;
+                oldDevice.getProperties2(&oldProps);
+
+                bool equals = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
+                equals = equals || (
+                    oldId.deviceLUIDValid && newId.deviceLUIDValid &&
+                    std::equal(std::begin(oldId.deviceLUID), std::end(oldId.deviceLUID), std::begin(newId.deviceLUID))
+                );
+
+                return equals;
+            }
+        );
+
+        if (oldDevice == dedupedDevices.end()) {
+            dedupedDevices.push_back(device);
+            continue;
+        }
+
+        vk::PhysicalDeviceProperties2 oldProps;
+        vk::PhysicalDeviceDriverProperties oldDriver;
+        oldProps.pNext = &oldDriver;
+        oldDevice->getProperties2(&oldProps);
+
+        std::map<vk::DriverId, int> driverPriorities {};
+        int oldPriority = 1000;
+        int newPriority = 1000;
+
+        switch (oldProps.properties.vendorID) {
+            case VK_VENDOR_ID_AMD:
+                driverPriorities[vk::DriverId::eMesaRadv] = 1;
+                driverPriorities[vk::DriverId::eAmdOpenSource] = 2;
+                driverPriorities[vk::DriverId::eAmdProprietary] = 3;
+                break;
+            case VK_VENDOR_ID_INTEL:
+                driverPriorities[vk::DriverId::eIntelOpenSourceMESA] = 1;
+                driverPriorities[vk::DriverId::eIntelProprietaryWindows] = 2;
+                break;
+            case VK_VENDOR_ID_NVIDIA:
+                driverPriorities[vk::DriverId::eNvidiaProprietary] = 1;
+#if defined(VK_API_VERSION_1_3) && VK_HEADER_VERSION >= 235
+                driverPriorities[vk::DriverId::eMesaNvk] = 2;
+#endif
+                break;
+        }
+        driverPriorities[vk::DriverId::eMesaDozen] = 4;
+
+        if (driverPriorities.count(oldDriver.driverID)) {
+            oldPriority = driverPriorities[oldDriver.driverID];
+        }
+        if (driverPriorities.count(newDriver.driverID)) {
+            newPriority = driverPriorities[newDriver.driverID];
+        }
+
+        if (newPriority < oldPriority) {
+            dedupedDevices.erase(std::remove(dedupedDevices.begin(), dedupedDevices.end(), *oldDevice), dedupedDevices.end());
+            dedupedDevices.push_back(device);
+        }
+    }
+
+    return dedupedDevices;
+}
+
+static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback, bool * checkSupported) {
+    auto physicalDevices = dedupedDevices();
 
     size_t usedMem = 0;
     size_t totalMem = 0;

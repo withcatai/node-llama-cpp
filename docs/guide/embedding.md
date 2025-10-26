@@ -204,7 +204,7 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
 </script>
 
 #### Embedded databases {#databases-embedded}
-* **[LanceDB](https://lancedb.com/)** ([GitHub](https://github.com/lancedb/lancedb) | [npm](https://www.npmjs.com/package/@lancedb/lancedb) | [Quick start](https://lancedb.github.io/lancedb/basic/#__tabbed_1_2)) - Serverless vector database you can embed inside your application. No server required.
+* **[LanceDB](https://lancedb.com/)** ([GitHub](https://github.com/lancedb/lancedb) | [npm](https://www.npmjs.com/package/@lancedb/lancedb) | [Quick start](https://www.npmjs.com/package/@lancedb/lancedb#usage)) - Serverless vector database you can embed inside your application. No server required.
   <br/><DataBadge title="Written in" content="Rust"/><DataBadge title="License" content="Apache-2.0"/>
 
 * **Vectra** ([GitHub](https://github.com/Stevenic/vectra) | [npm](https://www.npmjs.com/package/vectra)) - local vector database using local files

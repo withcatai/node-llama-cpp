@@ -24,12 +24,12 @@ export class Llama3_2LightweightChatWrapper extends ChatWrapper {
                 optionalPrefixSpace: true,
                 prefix: '{"name": "',
                 paramsPrefix: '", "parameters": ',
-                suffix: LlamaText("}", new SpecialToken("EOT")),
+                suffix: LlamaText("}", new SpecialTokensText("<|eot_id|>")),
                 emptyCallParamsPlaceholder: {}
             },
             result: {
-                prefix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>ipython<|end_header_id|>\n\n")),
-                suffix: LlamaText(new SpecialToken("EOT"), new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"))
+                prefix: LlamaText(new SpecialTokensText("<|eot_id|><|start_header_id|>ipython<|end_header_id|>\n\n")),
+                suffix: LlamaText(new SpecialTokensText("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"))
             }
         }
     };
@@ -192,7 +192,7 @@ export class Llama3_2LightweightChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>system<|end_header_id|>\n\n"),
                             item.system,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -202,7 +202,7 @@ export class Llama3_2LightweightChatWrapper extends ChatWrapper {
                         LlamaText([
                             new SpecialTokensText("<|start_header_id|>user<|end_header_id|>\n\n"),
                             item.user,
-                            new SpecialToken("EOT")
+                            new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }
@@ -214,7 +214,7 @@ export class Llama3_2LightweightChatWrapper extends ChatWrapper {
                             item.model,
                             isLastItem
                                 ? LlamaText([])
-                                : new SpecialToken("EOT")
+                                : new SpecialTokensText("<|eot_id|>")
                         ])
                     );
                 }

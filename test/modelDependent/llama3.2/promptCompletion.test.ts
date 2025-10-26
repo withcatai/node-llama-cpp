@@ -58,7 +58,7 @@ describe("llama 3.2", () => {
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                new SpecialToken("EOT"),
+                new SpecialToken("EOS"),
                 new SpecialTokensText("<|start_header_id|>"),
                 "user",
                 new SpecialTokensText("<|end_header_id|>"),
@@ -86,14 +86,14 @@ describe("llama 3.2", () => {
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
-                new SpecialToken("EOT"),
+                new SpecialToken("EOS"),
                 new SpecialTokensText("<|start_header_id|>"),
                 "user",
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
               Hi there!",
-                new SpecialToken("EOT"),
+                new SpecialToken("EOS"),
                 new SpecialTokensText("<|start_header_id|>"),
                 "assistant",
                 new SpecialTokensText("<|end_header_id|>"),

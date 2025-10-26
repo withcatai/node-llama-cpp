@@ -65,6 +65,11 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
   reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" /v "LongPathsEnabled" /t REG_DWORD /d "1" /f  
   ```
   :::
+* :::details Windows only: LLVM (optional, recommended if you have build issues)
+  There are a few methods to install LLVM:
+  * **As part of Microsoft Visual C++ Build Tools (Recommended):** the dependencies for Window listed under [Downloading a Release](./building-from-source.md#downloading-a-release) will also install LLVM.
+  * **Independently:** visit the [latest LLVM release page](https://github.com/llvm/llvm-project/releases/latest) and download the installer for your Windows architecture.
+  :::
 
 ### Building From Source
 When you use the [`getLlama`](../api/functions/getLlama) method, if there's no binary that matches the provided options, it'll automatically build `llama.cpp` from source.
