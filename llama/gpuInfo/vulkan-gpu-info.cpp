@@ -44,8 +44,10 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
                 oldDevice.getProperties2(&oldProps);
 
                 bool equals = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
-                equals |= oldId.deviceLUIDValid && newId.deviceLUIDValid &&
-                    std::equal(std::begin(oldId.deviceLUID), std::end(oldId.deviceLUID), std::begin(newId.deviceLUID));
+                equals = equals || (
+                    oldId.deviceLUIDValid && newId.deviceLUIDValid &&
+                    std::equal(std::begin(oldId.deviceLUID), std::end(oldId.deviceLUID), std::begin(newId.deviceLUID))
+                );
 
                 return equals;
             }
