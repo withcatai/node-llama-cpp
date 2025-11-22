@@ -24,7 +24,7 @@
 * [Adapts to your hardware automatically](https://node-llama-cpp.withcat.ai/guide/#gpu-support), no need to configure anything
 * A Complete suite of everything you need to use LLMs in your projects
 * [Use the CLI to chat with a model without writing any code](#try-it-without-installing)
-* Up-to-date with the latest `llama.cpp`. Download and compile the latest release with a [single CLI command](https://node-llama-cpp.withcat.ai//guide/building-from-source#downloading-a-release)
+* Up-to-date with the latest `llama.cpp`. Download and compile the latest release with a [single CLI command](https://node-llama-cpp.withcat.ai/guide/building-from-source#downloading-a-release)
 * Enforce a model to generate output in a parseable format, [like JSON](https://node-llama-cpp.withcat.ai/guide/chat-session#json-response), or even force it to [follow a specific JSON schema](https://node-llama-cpp.withcat.ai/guide/chat-session#response-json-schema)
 * [Provide a model with functions it can call on demand](https://node-llama-cpp.withcat.ai/guide/chat-session#function-calling) to retrieve information or perform actions
 * [Embedding and reranking support](https://node-llama-cpp.withcat.ai/guide/embedding)
