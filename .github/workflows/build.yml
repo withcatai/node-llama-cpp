@@ -70,7 +70,7 @@ jobs:
             os: ubuntu-22.04
             artifact: "linux-2"
           - name: "macOS x64"
-            os: macos-13
+            os: macos-15-intel
             artifact: "mac-x64"
           - name: "macOS arm64"
             os: macos-14
@@ -461,7 +461,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
@@ -682,7 +682,7 @@ jobs:
           - name: "Ubuntu"
             os: ubuntu-22.04
           - name: "macOS"
-            os: macos-13
+            os: macos-15-intel
 
     steps:
       - uses: actions/checkout@v4
