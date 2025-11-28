@@ -21,6 +21,7 @@ import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDes
 import {documentationPageUrls} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
 import {toBytes} from "../../../utils/toBytes.js";
+import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -951,6 +952,8 @@ function getContextSizesCheckPlan(trainContextSize: number, tests: number = 10, 
 
         if (size < 2)
             size = 2;
+
+        size = padSafeContextSize(size, "up");
 
         if (res[res.length - 1] === size) {
             shouldStop = true;

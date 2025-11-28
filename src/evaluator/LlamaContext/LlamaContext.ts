@@ -22,6 +22,7 @@ import {
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import {LlamaSampler} from "./LlamaSampler.js";
 import {TokenPredictor} from "./TokenPredictor.js";
+import {padSafeContextSize} from "./utils/padSafeContextSize.js";
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
@@ -98,12 +99,15 @@ export class LlamaContext {
         if (_model.disposed)
             throw new DisposedError();
 
+        const kvUnified = false;
         this._llama = _model._llama;
         this._model = _model;
         this._backendContextDisposeGuard = new DisposeGuard([this._model._backendModelDisposeGuard]);
         this._modelPreventDisposalHandle = this._model._backendModelDisposeGuard.createPreventDisposalHandle();
         this._totalSequences = Math.max(1, Math.floor(sequences));
-        this._contextSize = Math.max(2, contextSize);
+        this._contextSize = kvUnified
+            ? Math.floor(padSafeContextSize(Math.max(2, contextSize) * this._totalSequences, "up") / this._totalSequences)
+            : padSafeContextSize(Math.max(2, contextSize), "up");
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
         this._idealThreads = typeof threads === "number"
@@ -124,7 +128,7 @@ export class LlamaContext {
         this._performanceTracking = !!performanceTracking;
         this._swaFullCache = !!swaFullCache;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
-            contextSize: this._contextSize * this._totalSequences, // each sequence needs its own <contextSize> of cells
+            contextSize: padSafeContextSize(this._contextSize * this._totalSequences, "up"), // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize + (
                 (!this._swaFullCache && this.model.fileInsights.swaSize != null && this.model.fileInsights.swaSize > 0)
                     ? 1 // +1 to handle edge cases with SWA KV cache
