@@ -194,10 +194,11 @@ jobs:
           sudo apt install vulkan-sdk
 
       - name: Install dependencies on macOS
-        if: matrix.config.name == 'macOS'
+        if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'
         run: |
           brew install cmake ninja
           alias make=cmake
+          cmake --version
 
       - name: Setup & Build
         id: build
@@ -490,7 +491,6 @@ jobs:
 #          sudo apt-get install ninja-build cmake
 
       - name: Install dependencies on macOS
-        if: matrix.config.name == 'macOS'
         run: |
           brew install cmake ninja
           alias make=cmake
