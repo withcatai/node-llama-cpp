@@ -11,6 +11,8 @@
 #include "globals/getSwapInfo.h"
 #include "globals/getMemoryInfo.h"
 
+#include <atomic>
+
 bool backendInitialized = false;
 bool backendDisposed = false;
 
@@ -226,6 +228,11 @@ Napi::Value addonSetNuma(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+Napi::Value markLoaded(const Napi::CallbackInfo& info) {
+    static std::atomic_bool loaded = false;
+    return Napi::Boolean::New(info.Env(), loaded.exchange(true));
+}
+
 Napi::Value addonInit(const Napi::CallbackInfo& info) {
     if (backendInitialized) {
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
@@ -266,6 +273,7 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     exports.DefineProperties({
+        Napi::PropertyDescriptor::Function("markLoaded", markLoaded),
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
         Napi::PropertyDescriptor::Function("getSupportsGpuOffloading", addonGetSupportsGpuOffloading),
         Napi::PropertyDescriptor::Function("getSupportsMmap", addonGetSupportsMmap),

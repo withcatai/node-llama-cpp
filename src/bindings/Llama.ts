@@ -73,7 +73,7 @@ export class Llama {
 
     private constructor({
         bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu,
-        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
+        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator, skipLlamaInit
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -94,7 +94,8 @@ export class Llama {
         vramPadding: MemoryReservation,
         ramOrchestrator: MemoryOrchestrator,
         ramPadding: MemoryReservation,
-        swapOrchestrator: MemoryOrchestrator
+        swapOrchestrator: MemoryOrchestrator,
+        skipLlamaInit: boolean
     }) {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
@@ -106,7 +107,9 @@ export class Llama {
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
 
-        if (!this._debug) {
+        const previouslyLoaded = bindings.markLoaded();
+
+        if (!this._debug && (!skipLlamaInit || !previouslyLoaded)) {
             this._bindings.setLogger(this._onAddonLog);
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
         }
@@ -576,7 +579,8 @@ export class Llama {
             vramPadding: vramOrchestrator.reserveMemory(0),
             ramOrchestrator,
             ramPadding: resolvedRamPadding,
-            swapOrchestrator
+            swapOrchestrator,
+            skipLlamaInit
         });
 
         if (llama.gpu === false || vramPadding === 0) {
