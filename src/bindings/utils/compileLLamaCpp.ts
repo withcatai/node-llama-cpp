@@ -168,12 +168,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     }
                 }
 
-                // workaround for macOS build issues with GGML_BACKEND_DL
-                if (buildOptions.platform === "mac" && isCmakeValueOn(cmakeCustomOptions.get("GGML_BACKEND_DL")) &&
-                    !cmakeCustomOptions.has("CMAKE_PLATFORM_NO_VERSIONED_SONAME")
-                )
-                    cmakeCustomOptions.set("CMAKE_PLATFORM_NO_VERSIONED_SONAME", "ON");
-
                 await fs.remove(outDirectory);
 
                 await spawnCommand(
@@ -692,10 +686,6 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, 
 
 function reduceParallelBuildThreads(originalParallelBuildThreads: number) {
     return Math.max(1, Math.round(originalParallelBuildThreads / 2));
-}
-
-function isCmakeValueOn(value?: string) {
-    return value === "ON" || value === "1";
 }
 
 function isCmakeValueOff(value?: string) {
