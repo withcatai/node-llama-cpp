@@ -688,6 +688,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: Buil
         return LlamaLogLevel.info;
     else if (gpu === false && level === LlamaLogLevel.warn && message.startsWith("llama_adapter_lora_init_impl: lora for '") && message.endsWith("' cannot use buft 'CPU_REPACK', fallback to CPU"))
         return LlamaLogLevel.info;
+    else if (gpu === "metal" && level === LlamaLogLevel.warn && message.startsWith("ggml_metal_device_init: tensor API disabled for"))
+        return LlamaLogLevel.info;
 
     return level;
 }

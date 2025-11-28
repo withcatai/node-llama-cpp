@@ -20,3 +20,5 @@ using AddonThreadSafeLogCallbackFunction =
 
 Napi::Value setLogger(const Napi::CallbackInfo& info);
 Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info);
+
+void addonLog(ggml_log_level level, const std::string text);
