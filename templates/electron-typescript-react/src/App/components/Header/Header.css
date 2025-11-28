@@ -10,6 +10,7 @@
 
     &.main {
         width: calc(100% - 16px * 2);
+        max-width: var(--app-max-width, 1280px);
         position: fixed;
         z-index: 10;
 

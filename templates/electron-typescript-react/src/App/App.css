@@ -16,6 +16,7 @@
     width: 100%;
     min-height: 100%;
     max-width: 1280px;
+    --app-max-width: 1280px;
 
     > .chatHistory {
         margin-bottom: 32px;
