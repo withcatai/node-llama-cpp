@@ -28,6 +28,11 @@ export type LlamaContextOptions = {
      * - **`{min?: number, max?: number}`** - adapt to the current VRAM state and attemp to set the context size as high as possible
      * up to the size the model was trained on, but at least `min` and at most `max`.
      *
+     * The actual context size may be slightly larger than your request (by up to 256) due to the implementation in `llama.cpp` that
+     * aligns the context size to multiples of 256 for performance reasons.
+     * To check the actual context size that gets created, use the `.contextSize` property
+     * of the created context instance or any of its sequences.
+     *
      * Defaults to `"auto"`.
      */
     contextSize?: "auto" | number | {
