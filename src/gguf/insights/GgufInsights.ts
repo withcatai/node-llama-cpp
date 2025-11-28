@@ -219,9 +219,7 @@ export class GgufInsights {
             : (1 / (swaPattern + (flashAttention ? -0.5 : -1)));
 
         // source: `llama_kv_cache_unified::get_padding` in `llama-kv-cache.cpp`
-        const kvCachePadding = flashAttention
-            ? 256
-            : 32;
+        const kvCachePadding = 1;
         const actualContextSize = sequences * contextSize;
         const kvSize = usingSWA
             ? (

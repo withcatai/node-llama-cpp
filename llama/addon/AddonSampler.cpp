@@ -1,5 +1,7 @@
 #include <cmath>
 #include "common/common.h"
+#include "globals/addonLog.h"
+#include "ggml.h"
 #include "llama.h"
 
 #include "AddonGrammarEvaluationState.h"
@@ -449,7 +451,15 @@ Napi::Value AddonSampler::AcceptGrammarEvaluationStateToken(const Napi::Callback
     llama_token tokenId = info[1].As<Napi::Number>().Int32Value();
 
     if ((grammar_evaluation_state)->sampler != nullptr) {
-        llama_sampler_accept((grammar_evaluation_state)->sampler, tokenId);
+        try {
+            llama_sampler_accept((grammar_evaluation_state)->sampler, tokenId);
+        } catch (const std::exception & e) {
+            Napi::Error::New(info.Env(), std::string("Failed to accept token in grammar sampler: ") + e.what()).ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        } catch (...) {
+            Napi::Error::New(info.Env(), "Failed to accept token in grammar sampler").ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        }
     }
 
     return info.Env().Undefined();
@@ -465,7 +475,14 @@ Napi::Value AddonSampler::CanBeNextTokenForGrammarEvaluationState(const Napi::Ca
         candidates.emplace_back(llama_token_data { tokenId, 1, 0.0f });
 
         llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
-        llama_sampler_apply((grammar_evaluation_state)->sampler, &candidates_p);
+        try {
+            llama_sampler_apply((grammar_evaluation_state)->sampler, &candidates_p);
+        } catch (const std::exception & e) {
+            addonLog(GGML_LOG_LEVEL_DEBUG, std::string("Failed to apply grammar sampler: ") + e.what());
+            return Napi::Boolean::New(info.Env(), false);
+        } catch (...) {
+            return Napi::Boolean::New(info.Env(), false);
+        }
 
         if (candidates_p.size == 0 || candidates_p.data[0].logit == -INFINITY) {
             return Napi::Boolean::New(info.Env(), false);

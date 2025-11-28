@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include "common/common.h"
+#include "llama-vocab.h"
 #include "llama.h"
 
 #include "addonGlobals.h"
@@ -345,8 +346,14 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                 }
             }
 
-            sampler->acceptToken(new_token_id);
-            result = new_token_id;
+            try {
+                sampler->acceptToken(new_token_id);
+                result = new_token_id;
+            } catch (const std::exception& e) {
+                SetError(std::string("Failed to accept token in sampler: ") + e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"acceptToken\"");
+            }
         }
         void OnOK() {
             Napi::Number resultToken;
