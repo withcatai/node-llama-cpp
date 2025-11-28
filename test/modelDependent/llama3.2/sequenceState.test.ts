@@ -195,13 +195,14 @@ describe("llama 3.2", () => {
                 });
                 const contextSequence1 = context1.getSequence();
                 const contextSequence2 = context2.getSequence();
+                expect(context2.contextSize).to.eql(256); // the context is actually bigger due to `llama.cpp`'s padding
 
                 const chatSession1 = new LlamaChatSession({
                     contextSequence: contextSequence1
                 });
 
-                const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
+                const res1 = await chatSession1.prompt("Remember: locks are not doors. Also, write a long poem about it", {maxTokens: 154});
+                expect(res1).toMatch(/^A clever reminder indeed./);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -211,12 +212,12 @@ describe("llama 3.2", () => {
                 const contextSequence1TokensState = contextSequence1.tokenMeter.getState();
 
                 expect(contextSequence1.contextTokens).to.eql(state1Tokens);
-                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("103");
-                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"11.27MB"');
+                expect(contextSequence1.contextTokens.length).toMatchInlineSnapshot("262");
+                expect(toBytes((await fs.stat(stateFile1Path)).size)).to.toMatchInlineSnapshot('"28.66MB"');
                 expect(contextSequence1TokensState).to.toMatchInlineSnapshot(`
                   {
-                    "usedInputTokens": 99,
-                    "usedOutputTokens": 4,
+                    "usedInputTokens": 108,
+                    "usedOutputTokens": 154,
                   }
                 `);
 
