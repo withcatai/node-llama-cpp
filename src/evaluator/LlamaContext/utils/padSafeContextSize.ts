@@ -1,4 +1,4 @@
-const contextSizePad = 256;
+import {contextSizePad} from "../../../config.js";
 
 export function padSafeContextSize(value: number, padDirection: "up" | "down", padding: number = contextSizePad) {
     const paddedSize = ggmlPad(value, padding);

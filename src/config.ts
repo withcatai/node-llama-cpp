@@ -125,3 +125,4 @@ export const documentationPageUrls = {
 export const newGithubIssueUrl = "https://github.com/withcatai/node-llama-cpp/issues";
 export const recommendedBaseDockerImage = "node:20";
 export const minAllowedContextSizeInCalculations = 24;
+export const contextSizePad = 256; // source: `GGML_PAD` usage in `llama_context::llama_context` in `llama-context.cpp`
