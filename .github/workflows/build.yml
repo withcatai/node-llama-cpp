@@ -602,10 +602,8 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           export DRY_RUN_RESULT_FILE_PATH="$(pwd)/semanticReleaseDryRunReleaseResult.json"
           
           git apply --ignore-whitespace ./scripts/patches/@semantic-release+github+11.0.0.patch
@@ -638,12 +636,9 @@ jobs:
       - name: Release `create-node-llama-cpp` module
         if: steps.set-npm-url.outputs.npm-url != ''
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           cd packages/create-node-llama-cpp
-          
-          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           
           if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
               npm publish --tag beta
