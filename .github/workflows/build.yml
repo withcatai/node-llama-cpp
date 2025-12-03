@@ -462,7 +462,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-26
+    runs-on: macos-15-intel
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
