@@ -362,7 +362,7 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(Llama3_1ChatWrapper);
         else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
             return createSpecializedChatWrapper(Llama3ChatWrapper);
-        else if (includesText(modelNames, ["Mistral", "Mistral Large", "Mistral Large Instruct", "Mistral-Large", "Codestral"]))
+        else if (includesText(modelNames, ["Mistral", "Mistral Large", "Mistral Large Instruct", "Mistral-Large", "Mistral 3", "mistral3", "Ministral", "Codestral"]))
             return createSpecializedChatWrapper(MistralChatWrapper);
         else if (includesText(modelNames, ["Gemma", "Gemma 2"]))
             return createSpecializedChatWrapper(GemmaChatWrapper);
