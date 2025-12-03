@@ -99,6 +99,7 @@ export const enum GgufArchitectureType {
     grovemoe = "grovemoe",
     apertus = "apertus",
     cogvlm = "cogvlm",
+    mistral3 = "mistral3",
     clip = "clip",
     unknown = "(unknown)"
 }
