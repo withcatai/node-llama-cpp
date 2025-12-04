@@ -239,7 +239,9 @@ export class QwenChatWrapper extends ChatWrapper {
             architecture === GgufArchitectureType.qwen2moe ||
             architecture === GgufArchitectureType.qwen2vl ||
             architecture === GgufArchitectureType.qwen3 ||
-            architecture === GgufArchitectureType.qwen3moe
+            architecture === GgufArchitectureType.qwen3moe ||
+            architecture === GgufArchitectureType.qwen3vl ||
+            architecture === GgufArchitectureType.qwen3vlmoe
         );
     }
 

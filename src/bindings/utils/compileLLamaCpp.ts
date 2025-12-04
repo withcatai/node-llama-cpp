@@ -131,12 +131,20 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
-                if (!cmakeCustomOptions.has("LLAMA_CURL") || isCmakeValueOff(cmakeCustomOptions.get("LLAMA_CURL"))) {
-                    cmakeCustomOptions.set("LLAMA_CURL", "OFF");
+                // avoid linking to extra libraries that we don't use
+                {
+                    if (!cmakeCustomOptions.has("LLAMA_CURL") || isCmakeValueOff(cmakeCustomOptions.get("LLAMA_CURL")))
+                        cmakeCustomOptions.set("LLAMA_CURL", "OFF");
 
-                    // avoid linking to extra libraries that we don't use
-                    if (!cmakeCustomOptions.has("LLAMA_OPENSSL"))
-                        cmakeCustomOptions.set("LLAMA_OPENSSL", "OFF");
+                    if (!cmakeCustomOptions.has("LLAMA_HTTPLIB") || isCmakeValueOff(cmakeCustomOptions.get("LLAMA_HTTPLIB"))) {
+                        cmakeCustomOptions.set("LLAMA_HTTPLIB", "OFF");
+
+                        if (!cmakeCustomOptions.has("LLAMA_BUILD_BORINGSSL"))
+                            cmakeCustomOptions.set("LLAMA_BUILD_BORINGSSL", "OFF");
+
+                        if (!cmakeCustomOptions.has("LLAMA_OPENSSL"))
+                            cmakeCustomOptions.set("LLAMA_OPENSSL", "OFF");
+                    }
                 }
 
                 if (buildOptions.platform === "win" && buildOptions.arch === "arm64" && !cmakeCustomOptions.has("GGML_OPENMP"))

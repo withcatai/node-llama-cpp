@@ -271,7 +271,13 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
     console.log();
     console.log();
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
-    console.log(`${chalk.yellow("Release:")} ${release}`);
+    console.log(
+        chalk.yellow("Release:") + " " + release + (
+            release === "latest"
+                ? (" " + chalk.gray("(" + githubReleaseTag + ")"))
+                : ""
+        )
+    );
     console.log();
     console.log(chalk.green("Done"));
 }

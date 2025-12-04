@@ -48,6 +48,7 @@ export type BindingModule = {
         acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,
         canBeNextTokenForGrammarEvaluationState(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): boolean
     },
+    markLoaded(): boolean,
     systemInfo(): string,
     getSupportsGpuOffloading(): boolean,
     getSupportsMmap(): boolean,

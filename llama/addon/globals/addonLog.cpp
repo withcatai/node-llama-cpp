@@ -137,3 +137,7 @@ Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
 
     return info.Env().Undefined();
 }
+
+void addonLog(ggml_log_level level, const std::string text) {
+    addonLlamaCppLogCallback(level, std::string("[addon] " + text + "\n").c_str(), nullptr);
+}

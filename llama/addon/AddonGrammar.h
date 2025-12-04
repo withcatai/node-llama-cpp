@@ -2,7 +2,7 @@
 #include "llama.h"
 #include "common/common.h"
 #include "llama-grammar.h"
-#include "unicode.h"
+#include "src/unicode.h"
 #include "napi.h"
 #include "addonGlobals.h"
 

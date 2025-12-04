@@ -49,7 +49,15 @@ Napi::Value AddonGrammar::isTextCompatible(const Napi::CallbackInfo& info) {
     llama_grammar_stacks & stacks_cur = llama_grammar_get_stacks(parsed_grammar);
 
     for (const auto & cpt : cpts) {
-        llama_grammar_accept(parsed_grammar, cpt);
+        try {
+            llama_grammar_accept(parsed_grammar, cpt);
+        } catch (const std::exception & e) {
+            llama_grammar_free_impl(parsed_grammar);
+            return Napi::Boolean::New(info.Env(), false);
+        } catch (...) {
+            llama_grammar_free_impl(parsed_grammar);
+            return Napi::Boolean::New(info.Env(), false);
+        }
 
         if (stacks_cur.empty()) {
             // no stacks means that the grammar failed to match at this point

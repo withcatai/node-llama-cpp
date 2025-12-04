@@ -70,10 +70,10 @@ jobs:
             os: ubuntu-22.04
             artifact: "linux-2"
           - name: "macOS x64"
-            os: macos-13
+            os: macos-15-intel
             artifact: "mac-x64"
           - name: "macOS arm64"
-            os: macos-14
+            os: macos-26
             artifact: "mac-arm64"
 
     steps:
@@ -194,10 +194,11 @@ jobs:
           sudo apt install vulkan-sdk
 
       - name: Install dependencies on macOS
-        if: matrix.config.name == 'macOS'
+        if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'
         run: |
           brew install cmake ninja
           alias make=cmake
+          cmake --version
 
       - name: Setup & Build
         id: build
@@ -461,7 +462,7 @@ jobs:
 
   model-dependent-tests:
     name: Model dependent tests
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       NODE_LLAMA_CPP_GPU: false
     needs:
@@ -490,7 +491,6 @@ jobs:
 #          sudo apt-get install ninja-build cmake
 
       - name: Install dependencies on macOS
-        if: matrix.config.name == 'macOS'
         run: |
           brew install cmake ninja
           alias make=cmake
@@ -602,10 +602,8 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           export DRY_RUN_RESULT_FILE_PATH="$(pwd)/semanticReleaseDryRunReleaseResult.json"
           
           git apply --ignore-whitespace ./scripts/patches/@semantic-release+github+11.0.0.patch
@@ -638,12 +636,9 @@ jobs:
       - name: Release `create-node-llama-cpp` module
         if: steps.set-npm-url.outputs.npm-url != ''
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           cd packages/create-node-llama-cpp
-          
-          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
           
           if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
               npm publish --tag beta
@@ -682,7 +677,7 @@ jobs:
           - name: "Ubuntu"
             os: ubuntu-22.04
           - name: "macOS"
-            os: macos-13
+            os: macos-15-intel
 
     steps:
       - uses: actions/checkout@v4

@@ -231,10 +231,12 @@ export class GgufInsightsConfigurationResolver {
             useMmap
         });
 
-        let resolvedContextSize = Math.min(
-            this.ggufInsights.trainContextSize ?? defaultContextSizeForUnfitContextSizeConfiguration,
-            defaultContextSizeForUnfitContextSizeConfiguration
-        );
+        let resolvedContextSize = forceStrictContextSize
+            ? contextSize
+            : Math.min(
+                this.ggufInsights.trainContextSize ?? defaultContextSizeForUnfitContextSizeConfiguration,
+                defaultContextSizeForUnfitContextSizeConfiguration
+            );
         let contextFitsMemory = false;
 
         try {
@@ -273,6 +275,13 @@ export class GgufInsightsConfigurationResolver {
                 swaFullCache
             });
             contextFitsMemory = true;
+
+            if (forceStrictContextSize && resolvedContextSize < contextSize) {
+                contextFitsMemory = false;
+                resolvedContextSize = contextSize;
+            } else if (forceStrictContextSize && resolvedContextSize > contextSize) {
+                resolvedContextSize = contextSize;
+            }
         } catch (err) {
             if (!(err instanceof InsufficientMemoryError))
                 throw err;

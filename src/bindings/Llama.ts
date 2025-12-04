@@ -73,7 +73,7 @@ export class Llama {
 
     private constructor({
         bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu,
-        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator
+        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator, skipLlamaInit
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -94,7 +94,8 @@ export class Llama {
         vramPadding: MemoryReservation,
         ramOrchestrator: MemoryOrchestrator,
         ramPadding: MemoryReservation,
-        swapOrchestrator: MemoryOrchestrator
+        swapOrchestrator: MemoryOrchestrator,
+        skipLlamaInit: boolean
     }) {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
@@ -106,7 +107,9 @@ export class Llama {
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
 
-        if (!this._debug) {
+        const previouslyLoaded = bindings.markLoaded();
+
+        if (!this._debug && (!skipLlamaInit || !previouslyLoaded)) {
             this._bindings.setLogger(this._onAddonLog);
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
         }
@@ -576,7 +579,8 @@ export class Llama {
             vramPadding: vramOrchestrator.reserveMemory(0),
             ramOrchestrator,
             ramPadding: resolvedRamPadding,
-            swapOrchestrator
+            swapOrchestrator,
+            skipLlamaInit
         });
 
         if (llama.gpu === false || vramPadding === 0) {
@@ -687,6 +691,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: Buil
     else if (level === LlamaLogLevel.warn && message.startsWith("llama_init_from_model: model default pooling_type is [0], but [-1] was specified"))
         return LlamaLogLevel.info;
     else if (gpu === false && level === LlamaLogLevel.warn && message.startsWith("llama_adapter_lora_init_impl: lora for '") && message.endsWith("' cannot use buft 'CPU_REPACK', fallback to CPU"))
+        return LlamaLogLevel.info;
+    else if (gpu === "metal" && level === LlamaLogLevel.warn && message.startsWith("ggml_metal_device_init: tensor API disabled for"))
         return LlamaLogLevel.info;
 
     return level;

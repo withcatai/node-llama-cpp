@@ -12,6 +12,7 @@
 
     &.main {
         width: calc(100% - 16px * 2);
+        max-width: var(--app-max-width, 1280px);
         position: fixed;
         background-color: var(--panel-background-color);
         border-radius: 12px;
