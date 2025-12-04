@@ -454,6 +454,8 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(FalconChatWrapper);
         else if (arch === "gemma" || arch === "gemma2")
             return createSpecializedChatWrapper(GemmaChatWrapper);
+        else if (arch === "mistral3")
+            return createSpecializedChatWrapper(MistralChatWrapper);
     }
 
     return null;
