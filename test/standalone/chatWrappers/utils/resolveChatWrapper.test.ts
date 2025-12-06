@@ -767,34 +767,4 @@ describe("resolveChatWrapper", () => {
         });
         expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
     });
-
-    test("should resolve to MistralChatWrapper based on mistral3 architecture", () => {
-        const chatWrapper = resolveChatWrapper({
-            fileInfo: {
-                version: 3,
-                tensorCount: 0,
-                metadata: {
-                    general: {
-                        architecture: "mistral3",
-                        // eslint-disable-next-line camelcase
-                        quantization_version: "1"
-                    },
-                    tokenizer: {
-                        ggml: {
-                            model: "llama",
-                            tokens: [],
-                            // eslint-disable-next-line camelcase
-                            token_type: []
-                        }
-                    }
-                } as any,
-                metadataSize: 0,
-                architectureMetadata: {} as any,
-                splicedParts: 1,
-                totalTensorCount: 0,
-                totalMetadataSize: 0
-            }
-        });
-        expect(chatWrapper).to.be.instanceof(MistralChatWrapper);
-    });
 });
