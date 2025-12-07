@@ -122,6 +122,17 @@ export abstract class ChatWrapper {
     }
 
     public generateFunctionCallResult(functionName: string, functionParams: any, result: any): LlamaText {
+        return this._generateFunctionCallResult(
+            functionName,
+            functionParams,
+            result === undefined
+                ? "void"
+                : jsonDumps(result)
+        );
+    }
+
+    /** @internal */
+    protected _generateFunctionCallResult(functionName: string, functionParams: any, rawResult: string): LlamaText {
         function resolveParameters(text: string | LlamaText) {
             return LlamaText(text)
                 .mapValues((value) => {
@@ -136,11 +147,7 @@ export abstract class ChatWrapper {
 
         return LlamaText([
             resolveParameters(this.settings.functions.result.prefix),
-            (
-                result === undefined
-                    ? "void"
-                    : jsonDumps(result)
-            ),
+            rawResult,
             resolveParameters(this.settings.functions.result.suffix)
         ]);
     }
