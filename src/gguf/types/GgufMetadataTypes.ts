@@ -25,6 +25,7 @@ export const enum GgufArchitectureType {
     qwen2vl = "qwen2vl",
     qwen3 = "qwen3",
     qwen3moe = "qwen3moe",
+    qwen3next = "qwen3next",
     qwen3vl = "qwen3vl",
     qwen3vlmoe = "qwen3vlmoe",
     phi2 = "phi2",
@@ -83,6 +84,7 @@ export const enum GgufArchitectureType {
     bailingmoe2 = "bailingmoe2",
     dots1 = "dots1",
     arcee = "arcee",
+    afmoe = "afmoe",
     ernie4_5 = "ernie4_5",
     ernie4_5Moe = "ernie4_5-moe",
     hunyuanMoe = "hunyuan-moe",
@@ -98,7 +100,11 @@ export const enum GgufArchitectureType {
     seedOss = "seed_oss",
     grovemoe = "grovemoe",
     apertus = "apertus",
+    minimaxM2 = "minimax-m2",
     cogvlm = "cogvlm",
+    rnd1 = "rnd1",
+    panguEmbedded = "pangu-embedded",
+    mistral3 = "mistral3",
     clip = "clip",
     unknown = "(unknown)"
 }
