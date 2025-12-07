@@ -131,7 +131,7 @@ export abstract class ChatWrapper {
         );
     }
 
-    /** internal */
+    /** @internal */
     protected _generateFunctionCallResult(functionName: string, functionParams: any, rawResult: string): LlamaText {
         function resolveParameters(text: string | LlamaText) {
             return LlamaText(text)
