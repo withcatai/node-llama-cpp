@@ -3,7 +3,9 @@ import {
     AlpacaChatWrapper, ChatMLChatWrapper, DeepSeekChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper,
     GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper, resolveChatWrapper, HarmonyChatWrapper
 } from "../../../../src/index.js";
-import {harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4} from "./jinjaTemplates.js";
+import {
+    harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5
+} from "./jinjaTemplates.js";
 
 
 const alpacaJinjaTemplate = `
@@ -761,6 +763,18 @@ describe("resolveChatWrapper", () => {
             customWrapperSettings: {
                 jinjaTemplate: {
                     template: harmonyJinjaTemplate4
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+        expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
+    });
+
+    test("should resolve to specialized HarmonyChatWrapper 5", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: harmonyJinjaTemplate5
                 }
             },
             fallbackToOtherWrappersOnJinjaError: false

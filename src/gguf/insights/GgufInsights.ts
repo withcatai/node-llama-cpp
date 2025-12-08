@@ -382,8 +382,24 @@ export class GgufInsights {
         const cpuKVCacheSize = this._estimateKvMemorySizeInBytes(kvSize, finalCpuLayers);
 
         // source: `llama_context::graph_max_nodes` in `llama-context.cpp`
-        const maxNodes = Math.max(65536, 5 * tensorInfo.length);
-        const cpuNodes = 5 * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
+        const getMaxNodesMultiplier = (arch: GgufArchitectureType | undefined, nTokens: number): {min: number, multiplier: number} => {
+            if (arch === GgufArchitectureType.qwen3next)
+                return {
+                    min: nTokens * 40,
+                    multiplier: 32
+                };
+
+            return {
+                min: 1024,
+                multiplier: 8
+            };
+        };
+        const maxNodesMultiplier = getMaxNodesMultiplier(
+            this._ggufFileInfo.metadata?.general?.architecture,
+            Math.min(actualContextSize, batchSize)
+        );
+        const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * tensorInfo.length);
+        const cpuNodes = maxNodesMultiplier.multiplier * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
         const gpuNodes = maxNodes - cpuNodes;
 
         const gpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * gpuNodes) +
