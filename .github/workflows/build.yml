@@ -636,6 +636,7 @@ jobs:
       - name: Release `create-node-llama-cpp` module
         if: steps.set-npm-url.outputs.npm-url != ''
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           cd packages/create-node-llama-cpp
