@@ -8,7 +8,7 @@ This document describes how to set up your development environment to contribute
 ## Prerequisites
 - [Git](https://git-scm.com/). [GitHub's Guide to Installing Git](https://help.github.com/articles/set-up-git) is a good source of information.
 - [Node.js](https://nodejs.org/en/) (v20 or higher)
-- [cmake dependencies](https://github.com/cmake-js/cmake-js#installation:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) - make sure the required dependencies of `cmake` are installed on your machine. More info is available [here](https://github.com/cmake-js/cmake-js#installation:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) (you don't necessarily have to install `cmake`, just the dependencies)
+- [cmake dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) - make sure the required dependencies of `cmake` are installed on your machine. More info is available [here](https://github.com/cmake-js/cmake-js#installation:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake) (you don't necessarily have to install `cmake`, just the dependencies)
 
 ## Setup
 1. [Fork `node-llama-cpp` repo](https://github.com/withcatai/node-llama-cpp/fork)
