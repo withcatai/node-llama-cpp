@@ -34,7 +34,7 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
 
 ## Building `node-llama-cpp` With Vulkan Support {#building}
 ### Prerequisites
-* [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
+* [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 * <a id="vulkan-sdk" />[Vulkan SDK](https://vulkan.lunarg.com/sdk/home):
   >
