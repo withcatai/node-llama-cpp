@@ -19,7 +19,7 @@ and when building from source on macOS on Apple Silicon Macs, Metal support is e
 
 ## Toggling Metal Support {#building}
 ### Prerequisites
-* [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=projectRoot/build%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5Bstring%5D-,Requirements%3A,-CMake)
+* [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
 
 ### Building `node-llama-cpp` With Metal Support Disabled
