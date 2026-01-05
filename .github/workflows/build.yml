@@ -97,8 +97,8 @@ jobs:
       - name: Install dependencies on Windows
         if: startsWith(matrix.config.os, 'windows')
         run: |
-          choco install cmake.install --version=3.31.1
-          choco install cmake --version=3.31.1
+          choco install cmake.install --version=4.2.1
+          choco install cmake --version=4.2.1
           choco install ninja
 
       - name: Install dependencies on Ubuntu (1)
@@ -107,9 +107,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install ninja-build libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
           
-          wget -c https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
-          sudo tar --strip-components=1 -C /usr/local -xzf cmake-3.31.7-linux-x86_64.tar.gz
-          rm -f ./cmake-3.31.7-linux-x86_64.tar.gz
+          wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
+          rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
           
           which aarch64-linux-gnu-gcc
           which aarch64-linux-gnu-g++
@@ -125,9 +125,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install ninja-build libtbb-dev
           
-          wget -c https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
-          sudo tar --strip-components=1 -C /usr/local -xzf cmake-3.31.7-linux-x86_64.tar.gz
-          rm -f ./cmake-3.31.7-linux-x86_64.tar.gz
+          wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
+          rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
           
           cmake --version
 
