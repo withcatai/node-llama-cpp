@@ -9,14 +9,14 @@ description: CUDA support in node-llama-cpp
 and these are automatically used when CUDA is detected on your machine.
 
 To use `node-llama-cpp`'s CUDA support with your NVIDIA GPU,
-make sure you have [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher installed on your machine.
+make sure you have [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 13.1 or higher installed on your machine.
 
 If the pre-built binaries don't work with your CUDA installation,
 `node-llama-cpp` will automatically download a release of `llama.cpp` and build it from source with CUDA support.
 Building from source with CUDA support is slow and can take up to an hour.
 
-The pre-built binaries are compiled with CUDA Toolkit 12.4,
-so any version of CUDA Toolkit that is 12.4 or higher should work with the pre-built binaries.
+The pre-built binaries are compiled with CUDA Toolkits 12.4 and 13.1,
+so any CUDA Toolkit 12 that's on version 12.4 or higher or CUDA Toolkit 13 on version 13.1 or higher should work with the pre-built binaries.
 If you have an older version of CUDA Toolkit installed on your machine,
 consider updating it to avoid having to wait the long build time.
 
@@ -42,7 +42,7 @@ You should see an output like this:
 If you see `CUDA used VRAM` in the output, it means that CUDA support is working on your machine.
 
 ## Prerequisites
-* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 12.4 or higher
+* [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 13.1 or higher
 * [NVIDIA Drivers](https://www.nvidia.com/en-us/drivers/)
 * [`cmake-js` dependencies](https://github.com/cmake-js/cmake-js#:~:text=%5Bstring%5D-,Requirements%3A,-CMake)
 * [CMake](https://cmake.org/download/) 3.26 or higher (optional, recommended if you have build issues)
@@ -83,21 +83,21 @@ To build `node-llama-cpp` with any of these options, set an environment variable
 To fix this issue you have to set the `CUDACXX` environment variable to the path of the `nvcc` compiler,
 and the `CUDA_PATH` environment variable to the path of the CUDA home directory that contains the `nvcc` compiler.
 
-For example, if you have installed CUDA Toolkit 12.4, you have to run a command like this:
+For example, if you have installed CUDA Toolkit 13.1, you have to run a command like this:
 ::: code-group
 ```shell [Linux]
-export CUDACXX=/usr/local/cuda-12.4/bin/nvcc
-export CUDA_PATH=/usr/local/cuda-12.4
+export CUDACXX=/usr/local/cuda-13.1/bin/nvcc
+export CUDA_PATH=/usr/local/cuda-13.1
 ```
 
 ```cmd [Windows (cmd)]
-set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe
-set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
+set CUDACXX=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\nvcc.exe
+set CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1
 ```
 
 ```cmd [Windows (PowerShell)]
-$env:CUDACXX="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\nvcc.exe"
-$env:CUDA_PATH="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
+$env:CUDACXX="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\nvcc.exe"
+$env:CUDA_PATH="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1"
 ```
 :::
 

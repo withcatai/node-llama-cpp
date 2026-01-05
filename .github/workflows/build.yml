@@ -131,11 +131,11 @@ jobs:
           
           cmake --version
 
-      - name: Install Cuda 13.0 on Windows (1)
+      - name: Install Cuda 13.1 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
         uses: Jimver/cuda-toolkit@v0.2.30
         with:
-          cuda: '13.0.0'
+          cuda: '13.1.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
@@ -149,11 +149,11 @@ jobs:
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
 
-      - name: Install Cuda 13.0 on Ubuntu (1)
+      - name: Install Cuda 13.1 on Ubuntu (1)
         if: matrix.config.name == 'Ubuntu (1)'
         uses: Jimver/cuda-toolkit@v0.2.30
         with:
-          cuda: '13.0.0'
+          cuda: '13.1.0'
           method: 'network'
 
       - name: Install Cuda 12.4 on Ubuntu (2)
