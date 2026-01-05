@@ -133,23 +133,12 @@ jobs:
 
       - name: Install Cuda 13.0 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
-        shell: bash
-        timeout-minutes: 60
-        run: |
-          curl -Lo cuda_13.0.0_windows_network.exe https://developer.download.nvidia.com/compute/cuda/13.0.0/network_installers/cuda_13.0.0_windows_network.exe
-          
-          echo "Installing Cuda 13.0.0"
-          powershell -Command "Start-Process -FilePath cuda_13.0.0_windows_network.exe -ArgumentList '-s','-n' -Wait"
-          echo "Cuda installation finished"
-          
-          rm -f ./cuda_13.0.0_windows_network.exe
-          
-          echo "where cudart64_13.dll: $(where cudart64_13.dll)"
-          
-          echo "CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
-          echo "CUDA_PATH_V13_0=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0" >> $GITHUB_ENV
-          echo "CUDA_PATH_VX_Y=CUDA_PATH_V13_0" >> $GITHUB_ENV
-          echo "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin" >> $GITHUB_PATH
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: '13.0.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
+          use-local-cache: false
 
       - name: Install Cuda 12.4 on Windows (2)
         if: matrix.config.name == 'Windows (2)'
@@ -162,7 +151,7 @@ jobs:
 
       - name: Install Cuda 13.0 on Ubuntu (1)
         if: matrix.config.name == 'Ubuntu (1)'
-        uses: Jimver/cuda-toolkit@v0.2.27
+        uses: Jimver/cuda-toolkit@v0.2.30
         with:
           cuda: '13.0.0'
           method: 'network'

@@ -105,6 +105,9 @@ export const enum GgufArchitectureType {
     rnd1 = "rnd1",
     panguEmbedded = "pangu-embedded",
     mistral3 = "mistral3",
+    mimo2 = "mimo2",
+    llamaEmbed = "llama-embed",
+    maincoder = "maincoder",
     clip = "clip",
     unknown = "(unknown)"
 }
