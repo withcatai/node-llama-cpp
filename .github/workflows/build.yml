@@ -137,7 +137,6 @@ jobs:
         with:
           cuda: '13.1.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
 
       - name: Install Cuda 12.4 on Windows (2)
