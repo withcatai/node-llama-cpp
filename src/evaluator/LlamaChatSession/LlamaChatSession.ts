@@ -96,6 +96,13 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      */
     onResponseChunk?: (chunk: LlamaChatResponseChunk) => void,
 
+    /**
+     * An AbortSignal to later abort the generation.
+     *
+     * When the signal is aborted, the generation will stop and throw `signal.reason` as the error.
+     *
+     * > To stop an ongoing generation without throwing an error, also set `stopOnAbortSignal` to `true`.
+     */
     signal?: AbortSignal,
 
     /**
@@ -106,6 +113,7 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
      */
     stopOnAbortSignal?: boolean,
 
+    /** Maximum number of tokens to generate */
     maxTokens?: number,
 
     /**

@@ -76,3 +76,51 @@ const res = await completion.generateInfillCompletion(prefix, suffix, {
 console.log("Fill: " + res);
 ```
 > This example uses [CodeGemma](https://huggingface.co/bartowski/codegemma-2b-GGUF).
+
+## Stop Text Completion Generation {#stop-generation}
+To stop the generation of an ongoing text completion without throwing an error (to get the partially generated text),
+you can use the [`stopOnAbortSignal`](../api/type-aliases/LlamaCompletionGenerationOptions.md#stoponabortsignal) option
+to configure what happens when the given [`signal`](../api/type-aliases/LlamaCompletionGenerationOptions.md#signal) is aborted.
+
+```typescript
+import {fileURLToPath} from "url";
+import path from "path";
+import {getLlama, LlamaCompletion} from "node-llama-cpp";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: path.join(__dirname, "models", "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf")
+});
+const context = await model.createContext();
+const completion = new LlamaCompletion({
+    contextSequence: context.getSequence()
+});
+
+const abortController = new AbortController();
+const input = "Here is a list of sweet fruits:\n* ";
+console.log("Input: " + input);
+
+let result = "";
+
+process.stdout.write("Streamed completion: ");
+const res = await completion.generateCompletion(input, {
+    maxTokens: 256,
+
+    // stop the generation, instead of cancelling it
+    stopOnAbortSignal: true,
+
+    signal: abortController.signal,
+    onTextChunk(chunk) {
+        result += chunk;
+        process.stdout.write(chunk);
+
+        // max 10 lines
+        if (result.split("\n").length >= 10)
+            abortController.abort();
+    }
+});
+console.log();
+console.log("Completion: " + res);
+```
