@@ -46,6 +46,14 @@ export type LlamaCompletionGenerationOptions = {
     onToken?: (tokens: Token[]) => void,
 
     signal?: AbortSignal,
+
+    /**
+     * When a completion already started being generated and then the signal is aborted,
+     * the generation will stop and the completion will be returned as is instead of throwing an error.
+     *
+     * Defaults to `false`.
+     */
+    stopOnAbortSignal?: boolean,
     maxTokens?: number,
 
     /**
@@ -160,7 +168,7 @@ export type LlamaCompletionResponse = {
     response: string,
     metadata: {
         remainingGenerationAfterStop?: string | Token[],
-        stopReason: "eogToken" | "stopGenerationTrigger" | "maxTokens"
+        stopReason: "eogToken" | "stopGenerationTrigger" | "maxTokens" | "abort"
     } | {
         remainingGenerationAfterStop?: string | Token[],
         stopReason: "customStopTrigger",
@@ -247,6 +255,7 @@ export class LlamaCompletion {
             onTextChunk,
             onToken,
             signal,
+            stopOnAbortSignal = false,
             maxTokens,
             temperature,
             minP,
@@ -295,7 +304,7 @@ export class LlamaCompletion {
         }
 
         const ensureNotAborted = () => {
-            if (signal?.aborted)
+            if (signal?.aborted && !stopOnAbortSignal)
                 throw signal.reason;
 
             if (this.disposed)
@@ -334,6 +343,7 @@ export class LlamaCompletion {
                 onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),
                 signal,
+                stopOnAbortSignal,
                 maxTokens: resolvedMaxTokens,
                 temperature,
                 minP,
@@ -390,6 +400,7 @@ export class LlamaCompletion {
             onTextChunk,
             onToken,
             signal,
+            stopOnAbortSignal = false,
             maxTokens,
             temperature,
             minP,
@@ -496,7 +507,7 @@ export class LlamaCompletion {
         }
 
         const ensureNotAborted = () => {
-            if (signal?.aborted)
+            if (signal?.aborted && !stopOnAbortSignal)
                 throw signal.reason;
 
             if (this.disposed)
@@ -533,6 +544,7 @@ export class LlamaCompletion {
                 onTextChunk: safeEventCallback(onTextChunk),
                 onToken: safeEventCallback(onToken),
                 signal,
+                stopOnAbortSignal,
                 maxTokens: resolvedMaxTokens,
                 temperature,
                 minP,
@@ -571,6 +583,7 @@ export class LlamaCompletion {
             onTextChunk,
             onToken,
             signal,
+            stopOnAbortSignal = false,
             maxTokens,
             temperature,
             minP,
@@ -638,7 +651,7 @@ export class LlamaCompletion {
                 .map((stopTrigger) => customStopGenerationTriggersDetector.addStopTrigger(stopTrigger));
 
         const ensureNotAborted = () => {
-            if (signal?.aborted)
+            if (signal?.aborted && !stopOnAbortSignal)
                 throw signal.reason;
 
             if (this.disposed)
@@ -805,7 +818,10 @@ export class LlamaCompletion {
                     }
                 }
 
-                if (maxTokens != null && maxTokens > 0 && generatedTokens >= maxTokens) {
+                const aborted = (signal?.aborted ?? false) && stopOnAbortSignal;
+                const maxTokensReached = maxTokens != null && maxTokens > 0 && generatedTokens >= maxTokens;
+
+                if (aborted || maxTokensReached) {
                     let modelResponse = model.detokenize(res);
 
                     if (grammar?.trimWhitespaceSuffix || trimWhitespaceSuffix)
@@ -814,7 +830,9 @@ export class LlamaCompletion {
                     return {
                         response: modelResponse,
                         metadata: {
-                            stopReason: "maxTokens"
+                            stopReason: aborted
+                                ? "abort"
+                                : "maxTokens"
                         }
                     };
                 }
