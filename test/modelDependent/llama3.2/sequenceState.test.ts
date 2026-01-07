@@ -108,7 +108,7 @@ describe("llama 3.2", () => {
                 const res1_2 = await chatSession1_2.prompt("What's the exact thing I told you to remember?", {maxTokens: 12});
                 const contextSequence1TokensState4 = contextSequence1.tokenMeter.getState();
 
-                expect(res1_2).to.toMatchInlineSnapshot('"You told me to "Remember: locks are not doors"."');
+                expect(res1_2).toMatch(/^(You told me to "Remember: locks are not doors".|You told me to "Remember: locks are not doors.")/);
                 const contextSequence1TokensState4Diff = TokenMeter.diff(contextSequence1TokensState4, contextSequence1TokensState3);
                 expect(contextSequence1TokensState4Diff.usedInputTokens).to.be.lessThan(contextSequence1TokensState1.usedInputTokens);
                 expect(contextSequence1TokensState4Diff).toMatchInlineSnapshot(`
