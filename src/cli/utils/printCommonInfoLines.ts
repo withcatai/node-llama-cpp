@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
+import {getPlatform} from "../../bindings/utils/getPlatform.js";
 import {printInfoLine} from "./printInfoLine.js";
 import {toBytes} from "./toBytes.js";
 
@@ -9,6 +10,7 @@ export async function printCommonInfoLines({
     draftContext,
     minTitleLength = 0,
     useMmap,
+    useDirectIo,
     logBatchSize = false,
     tokenMeterEnabled = false,
     printBos = false,
@@ -18,11 +20,13 @@ export async function printCommonInfoLines({
     draftContext?: LlamaContext,
     minTitleLength?: number,
     useMmap?: boolean,
+    useDirectIo?: boolean,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
     printBos?: boolean,
     printEos?: boolean
 }) {
+    const platform = getPlatform();
     const llama = context._llama;
     const model = context.model;
     const padTitle = Math.max(
@@ -77,6 +81,14 @@ export async function printCommonInfoLines({
             value: !model._llama.supportsMmap
                 ? "unsupported"
                 : (useMmap || useMmap == null)
+                    ? "enabled"
+                    : "disabled"
+        }, {
+            title: "Direct I/O",
+            show: platform !== "mac", // Direct IO is not supported on macOS
+            value: platform === "mac"
+                ? "unsupported"
+                : (useDirectIo || useDirectIo == null)
                     ? "enabled"
                     : "disabled"
         }, {

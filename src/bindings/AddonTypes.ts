@@ -9,6 +9,7 @@ export type BindingModule = {
             gpuLayers?: number,
             vocabOnly?: boolean,
             useMmap?: boolean,
+            useDirectIo?: boolean,
             useMlock?: boolean,
             checkTensors?: boolean,
             onLoadProgress?(loadPercentage: number): void,

@@ -252,6 +252,10 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonM
             model_params.use_mmap = options.Get("useMmap").As<Napi::Boolean>().Value();
         }
 
+        if (options.Has("useDirectIo")) {
+            model_params.use_direct_io = options.Get("useDirectIo").As<Napi::Boolean>().Value();
+        }
+
         if (options.Has("useMlock")) {
             model_params.use_mlock = options.Get("useMlock").As<Napi::Boolean>().Value();
         }
