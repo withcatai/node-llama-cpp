@@ -77,6 +77,22 @@ export type LlamaModelOptions = {
     useMmap?: boolean,
 
     /**
+     * Direct I/O is a method of reading and writing data to and from the storage device directly to the application memory,
+     * bypassing OS in-memory caches.
+     *
+     * It leads to improved model loading times and reduced RAM usage,
+     * on the expense of higher loading times when the model unloaded and loaded again repeatedly in a short period of time.
+     *
+     * When this option is enabled, if Direct I/O is supported by the system (and for the given file)
+     * it will be used and mmap will be disabled.
+     *
+     * Unsupported on macOS.
+     *
+     * Defaults to `true`.
+     */
+    useDirectIo?: boolean,
+
+    /**
      * Force the system to keep the model in the RAM/VRAM.
      * Use with caution as this can crash your system if the available resources are insufficient.
      */
@@ -150,6 +166,7 @@ export type LlamaModelOptions = {
 };
 
 const defaultUseMmap = true;
+const defaultUseDirectIo = true;
 const defaultContextFlashAttentionEnabled = false;
 const defaultContextSwaFullCache = false;
 
@@ -181,7 +198,7 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly = false, useMmap, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number
     }, {
@@ -219,6 +236,7 @@ export class LlamaModel {
             gpuLayers,
             vocabOnly: this._vocabOnly,
             useMmap,
+            useDirectIo,
             useMlock: _llama.supportsMlock
                 ? useMlock
                 : undefined,
@@ -709,6 +727,7 @@ export class LlamaModel {
     }) {
         const {loadSignal, defaultContextFlashAttention} = modelOptions;
         const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
+        const useDirectIo = modelOptions.useDirectIo ?? defaultUseDirectIo;
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
             sourceType: "filesystem",
@@ -732,7 +751,7 @@ export class LlamaModel {
             useMmap
         });
 
-        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap}, {
+        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap, useDirectIo}, {
             _fileInfo: fileInfo,
             _fileInsights: ggufInsights,
             _llama,

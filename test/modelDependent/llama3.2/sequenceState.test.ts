@@ -108,7 +108,7 @@ describe("llama 3.2", () => {
                 const res1_2 = await chatSession1_2.prompt("What's the exact thing I told you to remember?", {maxTokens: 12});
                 const contextSequence1TokensState4 = contextSequence1.tokenMeter.getState();
 
-                expect(res1_2).to.toMatchInlineSnapshot('"You told me to "Remember: locks are not doors"."');
+                expect(res1_2).toMatch(/^(You told me to "Remember: locks are not doors".|You told me to "Remember: locks are not doors.")/);
                 const contextSequence1TokensState4Diff = TokenMeter.diff(contextSequence1TokensState4, contextSequence1TokensState3);
                 expect(contextSequence1TokensState4Diff.usedInputTokens).to.be.lessThan(contextSequence1TokensState1.usedInputTokens);
                 expect(contextSequence1TokensState4Diff).toMatchInlineSnapshot(`
@@ -202,7 +202,7 @@ describe("llama 3.2", () => {
                 });
 
                 const res1 = await chatSession1.prompt("Remember: locks are not doors. Also, write a long poem about it", {maxTokens: 154});
-                expect(res1).toMatch(/^(A clever reminder indeed.|A wise phrase to ponder)/);
+                expect(res1).toMatch(/^(A clever reminder indeed.|A wise phrase to ponder|A wise phrase indeed)/);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");

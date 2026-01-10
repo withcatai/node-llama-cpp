@@ -54,6 +54,7 @@ type CompleteCommand = {
     meter: boolean,
     timing: boolean,
     noMmap: boolean,
+    noDirectIo: boolean,
     printTimings: boolean
 };
 
@@ -249,6 +250,11 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 default: false,
                 description: "Disable mmap (memory-mapped file) usage"
             })
+            .option("noDirectIo", {
+                type: "boolean",
+                default: false,
+                description: "Disable Direct I/O usage when available"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -261,14 +267,14 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
         flashAttention, swaFullCache, threads, temperature, minP, topK,
         topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-        debug, numa, meter, timing, noMmap, printTimings
+        debug, numa, meter, timing, noMmap, noDirectIo, printTimings
     }) {
         try {
             await RunCompletion({
                 modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
                 threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, maxTokens,
-                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, printTimings
+                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, noDirectIo, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -283,7 +289,7 @@ async function RunCompletion({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
     threads, temperature, minP, topK, topP, seed, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
-    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, printTimings
+    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, noDirectIo, printTimings
 }: CompleteCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -308,6 +314,7 @@ async function RunCompletion({
         });
     const logBatchSize = batchSize != null;
     const useMmap = !noMmap && llama.supportsMmap;
+    const useDirectIo = !noDirectIo;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
@@ -358,6 +365,7 @@ async function RunCompletion({
                 defaultContextFlashAttention: flashAttention,
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
+                useDirectIo,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -392,6 +400,7 @@ async function RunCompletion({
                     defaultContextFlashAttention: flashAttention,
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
+                    useDirectIo,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
                     },
@@ -470,6 +479,7 @@ async function RunCompletion({
         context,
         draftContext,
         useMmap,
+        useDirectIo,
         minTitleLength: "Complete".length + 1,
         logBatchSize,
         tokenMeterEnabled: meter

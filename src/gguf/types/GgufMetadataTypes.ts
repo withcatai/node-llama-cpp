@@ -12,6 +12,7 @@ export const enum GgufArchitectureType {
     starcoder = "starcoder",
     refact = "refact",
     bert = "bert",
+    modernBert = "modern-bert",
     nomicBert = "nomic-bert",
     nomicBertMoe = "nomic-bert-moe",
     neoBert = "neo-bert",
@@ -33,6 +34,7 @@ export const enum GgufArchitectureType {
     phimoe = "phimoe",
     plamo = "plamo",
     plamo2 = "plamo2",
+    plamo3 = "plamo3",
     codeshell = "codeshell",
     orion = "orion",
     internlm2 = "internlm2",
@@ -68,6 +70,7 @@ export const enum GgufArchitectureType {
     jais = "jais",
     nemotron = "nemotron",
     nemotronH = "nemotron_h",
+    nemotronHMoe = "nemotron_h_moe",
     exaone = "exaone",
     exaone4 = "exaone4",
     rwkv6 = "rwkv6",
@@ -105,6 +108,9 @@ export const enum GgufArchitectureType {
     rnd1 = "rnd1",
     panguEmbedded = "pangu-embedded",
     mistral3 = "mistral3",
+    mimo2 = "mimo2",
+    llamaEmbed = "llama-embed",
+    maincoder = "maincoder",
     clip = "clip",
     unknown = "(unknown)"
 }

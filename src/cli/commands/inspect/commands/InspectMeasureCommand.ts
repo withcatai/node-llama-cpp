@@ -22,6 +22,7 @@ import {documentationPageUrls} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
+import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -37,6 +38,7 @@ type InspectMeasureCommand = {
     measures: number,
     memory: "vram" | "ram" | "all",
     noMmap: boolean,
+    noDirectIo: boolean,
     printHeaderBeforeEachLayer?: boolean,
     evaluateText?: string,
     repeatEvaluateText?: number
@@ -135,6 +137,11 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: false,
                 description: "Disable mmap (memory-mapped file) usage"
             })
+            .option("noDirectIo", {
+                type: "boolean",
+                default: false,
+                description: "Disable Direct I/O usage when available"
+            })
             .option("printHeaderBeforeEachLayer", {
                 alias: "ph",
                 type: "boolean",
@@ -155,7 +162,8 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     },
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, swaFullCache,
-        batchSize, measures = 10, memory: measureMemoryType, noMmap, printHeaderBeforeEachLayer = true, evaluateText, repeatEvaluateText
+        batchSize, measures = 10, memory: measureMemoryType, noMmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
+        repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
         if (maxContextSize === -1) maxContextSize = undefined;
@@ -174,7 +182,9 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 logLevel: LlamaLogLevel.error
             });
 
+        const platform = getPlatform();
         const useMmap = !noMmap && llama.supportsMmap;
+        const useDirectIo = !noDirectIo;
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers, {
             flashAttention, swaFullCache, useMmap
         });
@@ -188,6 +198,14 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                     ? "enabled"
                     : "disabled"
         ));
+
+        if (platform !== "mac") // Direct I/O is not supported on macOS
+            console.info(chalk.yellow("Direct I/O:") + " " + (
+                useDirectIo
+                    ? "enabled"
+                    : "disabled"
+            ));
+
         if (measureMemoryType === "ram" || measureMemoryType === "all")
             console.warn(chalk.yellow("RAM measurements are greatly inaccurate due to OS optimizations that prevent released memory from being immediately available"));
 
@@ -221,6 +239,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             const done = await measureModel({
                 modelPath: resolvedGgufPath,
                 useMmap,
+                useDirectIo,
                 gpu: gpu == null
                     ? undefined
                     : llama.gpu,
@@ -513,11 +532,12 @@ const detectedFileName = path.basename(__filename);
 const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
-    modelPath, useMmap, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers, flashAttention,
-    swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, onInfo
+    modelPath, useMmap, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers,
+    flashAttention, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, onInfo
 }: {
     modelPath: string,
     useMmap?: boolean,
+    useDirectIo?: boolean,
     gpu?: BuildGpu | "auto",
     tests: number,
     initialMaxContextSize?: number,
@@ -628,6 +648,7 @@ async function measureModel({
                         type: "start",
                         modelPath,
                         useMmap,
+                        useDirectIo,
                         tests,
                         initialMaxContextSize,
                         maxContextSize,
@@ -828,12 +849,12 @@ async function runTestWorkerLogic() {
     }
 
     async function testWithGpuLayers({
-        modelPath, useMmap, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, swaFullCache, batchSize,
-        evaluateText, exitAfterMeasurement = false
+        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, swaFullCache,
+        batchSize, evaluateText, exitAfterMeasurement = false
     }: {
-        modelPath: string, useMmap?: boolean, gpuLayers: number, tests: number, startContextSize?: number, maxContextSize?: number,
-        minContextSize?: number, flashAttention?: boolean, swaFullCache?: boolean, batchSize?: number, evaluateText?: string,
-        exitAfterMeasurement?: boolean
+        modelPath: string, useMmap?: boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
+        maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, swaFullCache?: boolean, batchSize?: number,
+        evaluateText?: string, exitAfterMeasurement?: boolean
     }) {
         try {
             const preModelVramUsage = (await llama.getVramState()).used;
@@ -841,6 +862,7 @@ async function runTestWorkerLogic() {
             const model = await llama.loadModel({
                 modelPath,
                 useMmap,
+                useDirectIo,
                 gpuLayers,
                 defaultContextFlashAttention: flashAttention,
                 defaultContextSwaFullCache: swaFullCache,
@@ -908,6 +930,7 @@ async function runTestWorkerLogic() {
                 const measurementsDone = await testWithGpuLayers({
                     modelPath: message.modelPath,
                     useMmap: message.useMmap,
+                    useDirectIo: message.useDirectIo,
                     gpuLayers,
                     tests: message.tests,
                     startContextSize: gpuLayers == message.maxGpuLayers
@@ -1005,6 +1028,7 @@ type ParentToChildMessage = {
     type: "start",
     modelPath: string,
     useMmap?: boolean,
+    useDirectIo?: boolean,
     tests: number,
     maxGpuLayers: number,
     minGpuLayers?: number,
