@@ -1,14 +1,14 @@
 import {createBirpc} from "birpc";
 
 export function createRendererSideBirpc<
-    const RendererFunction = Record<string, never>,
-    const ElectronFunctions extends object = Record<string, never>
+    const ElectronFunction = Record<string, never>,
+    const RendererFunctions extends object = Record<string, never>
 >(
     toRendererEventName: string,
     fromRendererEventName: string,
-    electronFunctions: ElectronFunctions
+    rendererFunctions: RendererFunctions
 ) {
-    return createBirpc<RendererFunction, ElectronFunctions>(electronFunctions, {
+    return createBirpc<ElectronFunction, RendererFunctions>(rendererFunctions, {
         post: (data) => window.ipcRenderer.send(fromRendererEventName, data),
         on: (onData) => window.ipcRenderer.on(toRendererEventName, (event, data) => {
             onData(data);
@@ -17,4 +17,3 @@ export function createRendererSideBirpc<
         deserialize: (value) => JSON.parse(value)
     });
 }
-
