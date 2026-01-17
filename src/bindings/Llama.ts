@@ -137,7 +137,7 @@ export class Llama {
         this._supportsMmap = bindings.getSupportsMmap();
         this._gpuSupportsMmap = bindings.getGpuSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
-        this._mathCores = bindings.getMathCores();
+        this._mathCores = Math.floor(bindings.getMathCores());
         this._consts = bindings.getConsts();
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;
@@ -689,6 +689,8 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: Buil
     else if (level === LlamaLogLevel.warn && message.startsWith("load: special_eog_ids contains both '<|return|>' and '<|call|>' tokens, removing '<|end|>' token from EOG list"))
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("llama_init_from_model: model default pooling_type is [0], but [-1] was specified"))
+        return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("llama_context: n_ctx_seq (") && message.endsWith("- the full capacity of the model will not be utilized"))
         return LlamaLogLevel.info;
     else if (gpu === false && level === LlamaLogLevel.warn && message.startsWith("llama_adapter_lora_init_impl: lora for '") && message.endsWith("' cannot use buft 'CPU_REPACK', fallback to CPU"))
         return LlamaLogLevel.info;
