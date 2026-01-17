@@ -670,7 +670,7 @@ function logMessageIsOnlyDots(message: string | null) {
 }
 
 function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: BuildGpu): LlamaLogLevel {
-    if (level === LlamaLogLevel.warn && message.trimEnd().endsWith("the full capacity of the model will not be utilized"))
+    if (level === LlamaLogLevel.warn && message.endsWith("the full capacity of the model will not be utilized"))
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("ggml_metal_init: skipping kernel_") && message.endsWith("(not supported)"))
         return LlamaLogLevel.log;
