@@ -137,7 +137,7 @@ export class Llama {
         this._supportsMmap = bindings.getSupportsMmap();
         this._gpuSupportsMmap = bindings.getGpuSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
-        this._mathCores = bindings.getMathCores();
+        this._mathCores = Math.floor(bindings.getMathCores());
         this._consts = bindings.getConsts();
         this._vramOrchestrator = vramOrchestrator;
         this._vramPadding = vramPadding;

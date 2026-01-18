@@ -94,12 +94,12 @@ void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user
 }
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {
-    if (info.Length() < 1 || !info[0].IsFunction()) {
-        if (addonJsLoggerCallbackSet) {
-            addonJsLoggerCallbackSet = false;
-            addonThreadSafeLoggerCallback.Release();
-        }
+    if (addonJsLoggerCallbackSet) {
+        addonJsLoggerCallbackSet = false;
+        addonThreadSafeLoggerCallback.Release();
+    }
 
+    if (info.Length() < 1 || !info[0].IsFunction()) {
         return info.Env().Undefined();
     }
 

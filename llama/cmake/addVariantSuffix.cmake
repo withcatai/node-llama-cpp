@@ -1,5 +1,5 @@
 function(addVariantSuffix originalTarget variantSuffix)
-    if (NOT TARGET ${originalTarget} OR variantSuffix STREQUAL "")
+    if (NOT TARGET ${originalTarget} OR ${variantSuffix} STREQUAL "")
         return()
     endif()
 

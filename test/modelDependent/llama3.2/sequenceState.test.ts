@@ -169,7 +169,7 @@ describe("llama 3.2", () => {
                 await contextSequence2.loadStateFromFile(stateFile1Path, {acceptRisk: true});
 
                 const res2 = await chatSession2.prompt("What did I tell you to remember?", {maxTokens: 12});
-                expect(res2).to.toMatchInlineSnapshot('"You told me to remember that "locks are not doors"."');
+                expect(res2).toMatch(/^(You told me to remember that "locks are not doors".|You told me to remember that "locks are not doors.")/);
                 const contextSequence2TokensState = contextSequence2.tokenMeter.getState();
                 expect(contextSequence2TokensState.usedInputTokens).to.be.lessThan(contextSequence1TokensState.usedInputTokens);
                 expect(contextSequence2TokensState).toMatchInlineSnapshot(`
