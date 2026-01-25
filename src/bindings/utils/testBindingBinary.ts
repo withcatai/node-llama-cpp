@@ -4,9 +4,9 @@ import {createRequire} from "module";
 import path from "path";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {runningInBun, runningInElectron} from "../../utils/runtime.js";
-import {BuildGpu, LlamaLogLevel} from "../types.js";
+import {BuildGpu} from "../types.js";
 import {LlamaLogLevelToAddonLogLevel} from "../Llama.js";
-import {newGithubIssueUrl} from "../../config.js";
+import {defaultBindingTestLogLevel, newGithubIssueUrl} from "../../config.js";
 import {getPlatform} from "./getPlatform.js";
 import type {BindingModule} from "../AddonTypes.js";
 
@@ -274,7 +274,7 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
             try {
                 binding = require(message.bindingBinaryPath);
 
-                const errorLogLevel = LlamaLogLevelToAddonLogLevel.get(LlamaLogLevel.error);
+                const errorLogLevel = LlamaLogLevelToAddonLogLevel.get(defaultBindingTestLogLevel);
                 if (errorLogLevel != null)
                     binding.setLoggerLogLevel(errorLogLevel);
 
