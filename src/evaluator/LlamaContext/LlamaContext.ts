@@ -60,7 +60,6 @@ export class LlamaContext {
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _modelPreventDisposalHandle: DisposalPreventionHandle;
     /** @internal */ private readonly _loraAdapters = new Set<AddonModelLora>();
-    /** @internal */ private readonly _gcRegistry: FinalizationRegistry<Set<AddonModelLora>>;
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
@@ -146,8 +145,6 @@ export class LlamaContext {
             dispatchSchedule: batchingDispatchSchedule,
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy
         };
-        this._gcRegistry = new FinalizationRegistry(this._model._removeLoraUsage);
-        this._gcRegistry.register(this, this._loraAdapters);
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
         this._freeReservedThreads = this._freeReservedThreads.bind(this);
@@ -155,7 +152,6 @@ export class LlamaContext {
         this._disposeAggregator.add(() => {
             this._disposed = true;
         });
-        this._disposeAggregator.add(() => void this._gcRegistry.unregister(this));
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
         this._disposeAggregator.add(
@@ -163,13 +159,6 @@ export class LlamaContext {
                 disposeContextIfReferenced.bind(null, new WeakRef(this))
             )
         );
-        this._disposeAggregator.add((): Promise<void> | void => {
-            if (this._loraAdapters.size > 0) {
-                const loraAdapters = new Set(this._loraAdapters);
-                this._loraAdapters.clear();
-                return this._model._removeLoraUsage(loraAdapters);
-            }
-        });
 
         this._disposeAggregator.add(async () => {
             await this._backendContextDisposeGuard.acquireDisposeLock();

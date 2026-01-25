@@ -126,6 +126,8 @@ export type LlamaContextOptions = {
      * without the need for extensive retraining from scratch.
      *
      * If a string is provided, it will be treated as a path to a single LoRA adapter file.
+     *
+     * The adapters will be released from memory once the model (not just the context) is disposed.
      */
     lora?: string | {
         adapters: Array<{

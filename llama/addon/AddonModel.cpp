@@ -362,18 +362,19 @@ void AddonModel::dispose() {
     }
 
     disposed = true;
+    
+    if (data != nullptr) {
+        auto currentData = data;
+        data = nullptr;
+        delete currentData;
+    }
+
     if (modelLoaded) {
         modelLoaded = false;
         llama_model_free(model);
 
         adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
         loadedModelSize = 0;
-    }
-
-    if (data != nullptr) {
-        auto currentData = data;
-        data = nullptr;
-        delete currentData;
     }
 
     if (hasAddonExportsRef) {
