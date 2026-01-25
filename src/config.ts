@@ -73,6 +73,9 @@ export const defaultLlamaCppDebugMode = env.get("NODE_LLAMA_CPP_DEBUG")
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();
+export const defaultBindingTestLogLevel = env.get("NODE_LLAMA_CPP_BINDING_TEST_LOG_LEVEL")
+    .default(LlamaLogLevel.error)
+    .asEnum(LlamaLogLevelValues);
 export const defaultXpacksStoreDirectory = env.get("NODE_LLAMA_CPP_XPACKS_STORE_FOLDER")
     .default(localXpacksStoreDirectory)
     .asString();
