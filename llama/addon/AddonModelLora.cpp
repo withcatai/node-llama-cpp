@@ -53,10 +53,8 @@ AddonModelLora::~AddonModelLora() {
 
 void AddonModelLora::dispose(bool skipErase) {
     if (lora_adapter != nullptr) {
-        auto loraAdapterToDispose = lora_adapter;
         lora_adapter = nullptr;
-        llama_adapter_lora_free(loraAdapterToDispose);
-        
+
         if (!skipErase && model->data != nullptr) {
             model->data->removeLora(this);
         }

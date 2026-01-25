@@ -275,8 +275,6 @@ export class LlamaModel {
             this._llamaPreventDisposalHandle.dispose();
         });
 
-        this._removeLoraUsage = this._removeLoraUsage.bind(this);
-
         this.tokenize = this.tokenize.bind(this);
         this.detokenize = this.detokenize.bind(this);
         this.isSpecialToken = this.isSpecialToken.bind(this);
@@ -700,22 +698,6 @@ export class LlamaModel {
             this._loraAdapters.set(resolvedPath, lora);
 
             return lora;
-        });
-    }
-
-    /** @internal */
-    public async _removeLoraUsage(loraAdapters: Set<AddonModelLora>) {
-        return await withLock([this._loraAdapters, "modify"], async () => {
-            await Promise.all(
-                [...loraAdapters].map(async (lora) => {
-                    lora.usages--;
-
-                    if (lora.usages <= 0 && this._loraAdapters.get(lora.filePath) === lora) {
-                        this._loraAdapters.delete(lora.filePath);
-                        await lora.dispose();
-                    }
-                })
-            );
         });
     }
 
