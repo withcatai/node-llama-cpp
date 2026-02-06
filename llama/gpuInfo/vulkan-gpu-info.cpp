@@ -35,7 +35,7 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
         auto oldDevice = std::find_if(
             dedupedDevices.begin(),
             dedupedDevices.end(),
-            [&newId](const vk::PhysicalDevice& oldDevice) {
+            [&newId, &newDriver](const vk::PhysicalDevice& oldDevice) {
                 vk::PhysicalDeviceProperties2 oldProps;
                 vk::PhysicalDeviceDriverProperties oldDriver;
                 vk::PhysicalDeviceIDProperties oldId;
@@ -43,13 +43,14 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
                 oldDriver.pNext = &oldId;
                 oldDevice.getProperties2(&oldProps);
 
-                bool equals = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
-                equals = equals || (
+                bool sameUuid = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
+                sameUuid = sameUuid || (
                     oldId.deviceLUIDValid && newId.deviceLUIDValid &&
                     std::equal(std::begin(oldId.deviceLUID), std::end(oldId.deviceLUID), std::begin(newId.deviceLUID))
                 );
+                bool bothMoltenVk = (newDriver.driverID == vk::DriverId::eMoltenvk && oldDriver.driverID == vk::DriverId::eMoltenvk);
 
-                return equals;
+                return sameUuid && !bothMoltenVk;
             }
         );
 
