@@ -119,16 +119,17 @@ export type GgufMetadata<A extends GgufArchitectureType = GgufArchitectureType> 
     readonly general: GgufMetadataGeneral<A>,
     readonly tokenizer: GgufMetadataTokenizer
 } & (
-    GgufArchitectureType extends A ? {
-        readonly [key in GgufArchitectureType]?: key extends keyof GgufMetadataLlmToType
-            ? GgufMetadataLlmToType[key]
-            : GgufMetadataDefaultArchitectureType
-    }
-    : {
-        readonly [key in A]: key extends keyof GgufMetadataLlmToType
-            ? GgufMetadataLlmToType[key]
-            : GgufMetadataDefaultArchitectureType
-    }
+    GgufArchitectureType extends A
+        ? {
+            readonly [key in GgufArchitectureType]?: key extends keyof GgufMetadataLlmToType
+                ? GgufMetadataLlmToType[key]
+                : GgufMetadataDefaultArchitectureType
+        }
+        : {
+            readonly [key in A]: key extends keyof GgufMetadataLlmToType
+                ? GgufMetadataLlmToType[key]
+                : GgufMetadataDefaultArchitectureType
+        }
 );
 
 
