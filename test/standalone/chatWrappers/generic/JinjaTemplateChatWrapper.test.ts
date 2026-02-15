@@ -1055,6 +1055,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     "sectionPrefix": LlamaText([
                       new SpecialTokensText("[TOOL_CALLS]["),
                     ]),
+                    "sectionPrefixAlternateMatches": undefined,
                     "sectionSuffix": LlamaText([
                       new SpecialTokensText("]"),
                       new SpecialToken("EOS"),
@@ -1134,6 +1135,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     "sectionPrefix": LlamaText([
                       new SpecialTokensText("[TOOL_CALLS]["),
                     ]),
+                    "sectionPrefixAlternateMatches": undefined,
                     "sectionSuffix": LlamaText([
                       new SpecialTokensText("]"),
                       new SpecialToken("EOS"),
@@ -1216,6 +1218,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     "sectionPrefix": LlamaText([
                       new SpecialTokensText("[TOOL_CALLS]["),
                     ]),
+                    "sectionPrefixAlternateMatches": undefined,
                     "sectionSuffix": LlamaText([
                       new SpecialTokensText("]"),
                       new SpecialToken("EOS"),
