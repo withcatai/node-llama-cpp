@@ -80,6 +80,13 @@ export type ChatWrapperSettings = {
         readonly parallelism?: {
             readonly call: {
                 readonly sectionPrefix: string | LlamaText,
+
+                /**
+                 * Alternate section prefixes that can be used to detect a function call section,
+                 * but won't be used to construct the context when building it from scratch.
+                 */
+                readonly sectionPrefixAlternateMatches?: Array<string | LlamaText>,
+
                 readonly betweenCalls?: string | LlamaText,
                 readonly sectionSuffix?: string | LlamaText
             },

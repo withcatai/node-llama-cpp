@@ -99,7 +99,7 @@ describe("qwen3 0.6b", () => {
                 }
             } as const;
 
-            const res = await chatSession.prompt("What is the second word? No yapping, no formatting", {
+            const res = await chatSession.prompt("What is the second word? No yapping, no formatting, use the function", {
                 ...promptOptions,
                 maxTokens: 250,
                 budgets: {
