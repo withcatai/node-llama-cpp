@@ -1,7 +1,7 @@
 import {createBirpc} from "birpc";
 
 export function createRendererSideBirpc<
-    const ElectronFunction = Record<string, never>,
+    const ElectronFunction extends object = Record<string, never>,
     const RendererFunctions extends object = Record<string, never>
 >(
     toRendererEventName: string,

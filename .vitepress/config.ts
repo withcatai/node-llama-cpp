@@ -387,6 +387,9 @@ export default defineConfig({
         },
         codeTransformers: [
             transformerTwoslash({
+                floatingVue: {
+                    classFloatingPanel: "twoslash-floating vp-code"
+                },
                 explicitTrigger: false,
                 filter(lang, code, options) {
                     return options.lang?.toLowerCase() === "typescript";

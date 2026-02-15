@@ -2,7 +2,7 @@ import {BrowserWindow, ipcMain} from "electron";
 import {createBirpc} from "birpc";
 
 export function createElectronSideBirpc<
-    const RendererFunction = Record<string, never>,
+    const RendererFunction extends object = Record<string, never>,
     const ElectronFunctions extends object = Record<string, never>
 >(
     toRendererEventName: string,

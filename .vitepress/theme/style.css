@@ -256,13 +256,19 @@ img.blog-coverImage {
     transform: scaleX(1);
 }
 
-.v-popper--theme-dropdown .v-popper__inner {
+.v-popper--theme-dropdown .v-popper__wrapper {
     box-shadow: 0 6px 30px 0px rgb(0 0 0 / 32%);
+    border-radius: 12px;
+    background-color: var(--twoslash-popup-bg);
+}
+.v-popper--theme-dropdown .v-popper__inner {
+    box-shadow: none;
     border-radius: 12px;
 }
 
-.twoslash-floating {
+.twoslash-floating[class][class] {
     --twoslash-border-color: color-mix(in srgb, var(--vp-c-border), transparent 64%);
+    content-visibility: initial;
 }
 .twoslash-floating .v-popper__inner {
     border: none;

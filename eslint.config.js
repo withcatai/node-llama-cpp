@@ -8,12 +8,13 @@ import n from "eslint-plugin-n";
 import tseslint from "typescript-eslint";
 import stylistic from "@stylistic/eslint-plugin";
 import {includeIgnoreFile} from "@eslint/compat";
+import {defineConfig} from "eslint/config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const gitignorePath = path.join(__dirname, ".gitignore");
 
 
-export default tseslint.config({
+export default defineConfig({
     ignores: [
         "dist/",
         "**/dist/",
@@ -25,12 +26,12 @@ export default tseslint.config({
         "packages/create-node-llama-cpp/dist/",
         "packages/@node-llama-cpp/*/dist/",
         ".releaserc.ts",
-        ...includeIgnoreFile(gitignorePath).ignores
+        ...(includeIgnoreFile(gitignorePath).ignores ?? [])
     ]
 }, {
     files: ["**/**.{,c,m}{js,ts}"],
     extends: [
-        stylistic.configs["recommended-flat"],
+        stylistic.configs["recommended"],
         jsdoc.configs["flat/recommended"],
         importPlugin.flatConfigs.recommended
     ],
@@ -61,7 +62,7 @@ export default tseslint.config({
         }
     },
     rules: {
-        "@stylistic/indent": ["off"],
+        "@stylistic/indent": ["warn", 4],
         "indent": ["warn", 4, {
             SwitchCase: 1,
             FunctionDeclaration: {
@@ -80,7 +81,8 @@ export default tseslint.config({
             args: "none",
             ignoreRestSiblings: true,
             varsIgnorePattern: "^set",
-            caughtErrors: "none"
+            caughtErrors: "none",
+            ignoreUsingDeclarations: true
         }],
         "@stylistic/no-prototype-builtins": ["off"],
         "@stylistic/object-curly-spacing": ["warn", "never"],
@@ -174,7 +176,8 @@ export default tseslint.config({
             args: "none",
             ignoreRestSiblings: true,
             varsIgnorePattern: "^set",
-            caughtErrors: "none"
+            caughtErrors: "none",
+            ignoreUsingDeclarations: true
         }],
         "@typescript-eslint/no-empty-object-type": ["off"],
         "@typescript-eslint/member-ordering": ["warn", {

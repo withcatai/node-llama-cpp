@@ -49,7 +49,6 @@
                 padding: calc((var(--min-height) - 1lh) / 2) 24px;
                 background-color: transparent;
                 font: inherit;
-                align-content: center;
                 align-self: stretch;
                 color: var(--panel-text-color);
                 z-index: 2;

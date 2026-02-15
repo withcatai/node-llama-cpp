@@ -6,14 +6,15 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import stylistic from "@stylistic/eslint-plugin";
 import pluginReactHooks from "eslint-plugin-react-hooks";
+import {defineConfig} from "eslint/config";
 
 
-export default tseslint.config({
+export default defineConfig({
     ignores: ["dist/", "dist-electron/", "release/", "models/"]
 }, {
     files: ["**/**.{,c,m}{js,ts}{,x}"],
     extends: [
-        stylistic.configs["recommended-flat"],
+        stylistic.configs["recommended"],
         jsdoc.configs["flat/recommended"],
         importPlugin.flatConfigs.recommended
     ],
@@ -40,7 +41,7 @@ export default tseslint.config({
         }
     },
     rules: {
-        "@stylistic/indent": ["off"],
+        "@stylistic/indent": ["warn", 4],
         "indent": ["warn", 4, {
             SwitchCase: 1,
             FunctionDeclaration: {
@@ -59,7 +60,8 @@ export default tseslint.config({
             args: "none",
             ignoreRestSiblings: true,
             varsIgnorePattern: "^set",
-            caughtErrors: "none"
+            caughtErrors: "none",
+            ignoreUsingDeclarations: true
         }],
         "@stylistic/no-prototype-builtins": ["off"],
         "@stylistic/object-curly-spacing": ["warn", "never"],
@@ -155,7 +157,8 @@ export default tseslint.config({
             args: "none",
             ignoreRestSiblings: true,
             varsIgnorePattern: "^set",
-            caughtErrors: "none"
+            caughtErrors: "none",
+            ignoreUsingDeclarations: true
         }],
         "@typescript-eslint/no-empty-object-type": ["off"],
         "@typescript-eslint/member-ordering": ["warn", {
