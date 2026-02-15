@@ -159,7 +159,7 @@ export type AddonContext = {
     ensureDraftContextIsCompatibleForSpeculative(draftContext: AddonContext): void,
     saveSequenceStateToFile(filePath: string, sequenceId: number, tokens: Uint32Array): Promise<number>,
     loadSequenceStateFromFile(filePath: string, sequenceId: number, maxContextSize: number): Promise<Uint32Array>,
-    setLora(lora: AddonModelLora, scale: number): void
+    setLoras(loras: AddonModelLora[], scales: number[]): void
 };
 
 export type BatchLogitIndex = number & {

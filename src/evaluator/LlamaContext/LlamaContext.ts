@@ -730,17 +730,26 @@ export class LlamaContext {
     }
 
     /** @internal */
-    private async _setLora({
-        filePath, scale
-    }: {
-        filePath: string, scale?: number
-    }) {
-        const lora = await this._model._getOrLoadLora(filePath);
-        this._ctx.setLora(lora, scale ?? defaultLoraScale);
+    private async _setLoras(loras: Array<{
+        filePath: string,
+        scale?: number
+    }>) {
+        const addonLoras: AddonModelLora[] = [];
+        const addonScales: number[] = [];
 
-        if (!this._loraAdapters.has(lora)) {
-            this._loraAdapters.add(lora);
-            lora.usages++;
+        for (const {filePath, scale} of loras) {
+            const lora = await this._model._getOrLoadLora(filePath);
+            addonLoras.push(lora);
+            addonScales.push(scale ?? defaultLoraScale);
+        }
+
+        this._ctx.setLoras(addonLoras, addonScales);
+
+        for (const addonLora of addonLoras) {
+            if (!this._loraAdapters.has(addonLora)) {
+                this._loraAdapters.add(addonLora);
+                addonLora.usages++;
+            }
         }
     }
 
@@ -854,30 +863,22 @@ export class LlamaContext {
                 contextCreationRamReservation?.dispose?.();
 
                 if (loraOptions != null && loraOptions.adapters.length > 0) {
-                    let loadedAdapters = 0;
+                    try {
+                        await context._setLoras(loraOptions.adapters);
 
-                    for (const adapter of loraOptions.adapters) {
                         try {
-                            await context._setLora({
-                                filePath: adapter.filePath,
-                                scale: adapter.scale
-                            });
-                            loadedAdapters++;
-
-                            try {
-                                loraOptions.onLoadProgress?.(loadedAdapters / loraOptions.adapters.length);
-                            } catch (err) {
-                                console.error(err);
-                            }
+                            loraOptions.onLoadProgress?.(1);
                         } catch (err) {
-                            await context.dispose();
-                            throw err;
+                            console.error(err);
                         }
+                    } catch (err) {
+                        await context.dispose();
+                        throw err;
+                    }
 
-                        if (createSignal?.aborted) {
-                            await context.dispose();
-                            throw createSignal.reason;
-                        }
+                    if (createSignal?.aborted) {
+                        await context.dispose();
+                        throw createSignal.reason;
                     }
                 } else if (loraOptions?.onLoadProgress != null) {
                     try {
