@@ -182,6 +182,8 @@ export type AddonSampler = {
         topK?: number,
         topP?: number,
         seed?: number,
+        xtcProbability?: number,
+        xtcThreshold?: number,
         repeatPenalty?: number,
         repeatPenaltyMaxTokens?: number,
         repeatPenaltyTokens?: Uint32Array,

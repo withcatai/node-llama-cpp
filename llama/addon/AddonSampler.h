@@ -25,6 +25,10 @@ class AddonSampler : public Napi::ObjectWrap<AddonSampler> {
 
         llama_sampler * topPSampler = nullptr;
         float topPSampler_topP = 0.0f; // Top p sampling >=1.0 = disabled
+
+        llama_sampler * xtcSampler = nullptr;
+        float xtcSampler_probability = 0;
+        float xtcSampler_threshold = 0;
         
         llama_sampler * seedSampler = nullptr;
         uint32_t seedSampler_seed = 0;

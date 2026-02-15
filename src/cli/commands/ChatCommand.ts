@@ -30,6 +30,7 @@ import {resolveHeaderFlag} from "../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescriptionDocsUrl.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
+import {ParsedXtcArg, parseXtcArg} from "../utils/parseXtcArg.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -55,6 +56,7 @@ type ChatCommand = {
     topK: number,
     topP: number,
     seed?: number,
+    xtc?: ParsedXtcArg,
     gpuLayers?: number,
     repeatPenalty: number,
     lastTokensRepeatPenalty: number,
@@ -224,6 +226,11 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 description: "Used to control the randomness of the generated text. Only relevant when using `temperature`.",
                 defaultDescription: "The current epoch time"
             })
+            .option("xtc", {
+                type: "string",
+                description: "Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations. `probability` (a number between `0` and `1`) controls the chance that the top tokens will be removed in the next token generation step, `threshold` (a number between `0` and `1`) controls the minimum probability of a token for it to be removed. Set this argument to `probability,threshold` to set both values. For example, `0.5,0.1`",
+                coerce: parseXtcArg
+            })
             .option("gpuLayers", {
                 alias: "gl",
                 type: "number",
@@ -346,7 +353,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, swaFullCache,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
-        topP, seed, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
+        topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory,
         environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, noDirectIo,
         printTimings
@@ -355,7 +362,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
                 batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads,
-                temperature, minP, topK, topP, seed,
+                temperature, minP, topK, topP, seed, xtc,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
                 debug, numa, meter, timing, noMmap, noDirectIo, printTimings
@@ -373,7 +380,7 @@ async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
     contextSize, batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
-    threads, temperature, minP, topK, topP, seed, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
+    threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
     tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, noDirectIo, printTimings
 }: ChatCommand) {
@@ -629,6 +636,14 @@ async function RunChat({
             title: "Penalize repeating new line",
             value: "disabled"
         }, {
+            show: xtc != null,
+            title: "XTC probability",
+            value: String(xtc?.probability)
+        }, {
+            show: xtc != null,
+            title: "XTC threshold",
+            value: String(xtc?.threshold)
+        }, {
             show: jsonSchemaGrammarFilePath != null,
             title: "JSON schema grammar file",
             value: () => path.relative(process.cwd(), path.resolve(process.cwd(), jsonSchemaGrammarFilePath ?? ""))
@@ -720,6 +735,7 @@ async function RunChat({
                 topK,
                 topP,
                 seed: seed ?? undefined,
+                xtc,
                 signal: abortController.signal,
                 stopOnAbortSignal: true,
                 budgets: {

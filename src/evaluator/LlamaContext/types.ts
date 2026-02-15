@@ -309,6 +309,30 @@ export type SequenceEvaluateOptions = {
      * Only relevant when using `temperature`.
      */
     seed?: number,
+
+    /**
+     * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+     * Using it leads to more creative responses, but also to increased hallucinations.
+     *
+     * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+     * The `threshold` value control the minimum probability of a token for it to be removed.
+     *
+     * It's recommended to use it alongside `minP` for better results.
+     * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+     */
+    xtc?: {
+        /**
+         * A number between `0` and `1` representing the probability of applying Exclude Top Choices (XTC) at each token generation step.
+         */
+        probability: number,
+
+        /**
+         * A number between `0` and `1` representing the minimum probability
+         * of a token for it to be removed when applying Exclude Top Choices (XTC).
+         */
+        threshold: number
+    },
+
     grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
     repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
@@ -452,6 +476,31 @@ export type ControlledEvaluateInputItem = Token | [token: Token, options: {
              * Only relevant when using `temperature`.
              */
             seed?: number,
+
+            /**
+             * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+             * Using it leads to more creative responses, but also to increased hallucinations.
+             *
+             * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+             * The `threshold` value control the minimum probability of a token for it to be removed.
+             *
+             * It's recommended to use it alongside `minP` for better results.
+             * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+             */
+            xtc?: {
+                /**
+                 * A number between `0` and `1` representing the probability
+                 * of applying Exclude Top Choices (XTC) at each token generation step.
+                 */
+                probability: number,
+
+                /**
+                 * A number between `0` and `1` representing the minimum probability
+                 * of a token for it to be removed when applying Exclude Top Choices (XTC).
+                 */
+                threshold: number
+            },
+
             repeatPenalty?: LlamaContextSequenceRepeatPenalty,
 
             /**

@@ -28,6 +28,11 @@ void AddonSampler::dispose() {
     model->Unref();
     freeChain();
 
+    if (xtcSampler != nullptr) {
+        llama_sampler_free(xtcSampler);
+        xtcSampler = nullptr;
+    }
+
     if (temperatureSampler != nullptr) {
         llama_sampler_free(temperatureSampler);
         temperatureSampler = nullptr;
@@ -113,6 +118,10 @@ void AddonSampler::rebuildChainIfNeeded() {
     }
 
     if (greedySampler != nullptr) {
+        if (xtcSampler != nullptr) {
+            llama_sampler_chain_add(chain, xtcSampler);
+        }
+
         llama_sampler_chain_add(chain, greedySampler);
     } else {
         if (topKSampler != nullptr) {
@@ -125,6 +134,10 @@ void AddonSampler::rebuildChainIfNeeded() {
 
         if (minPSampler != nullptr) {
             llama_sampler_chain_add(chain, minPSampler);
+        }
+
+        if (xtcSampler != nullptr) {
+            llama_sampler_chain_add(chain, xtcSampler);
         }
 
         if (temperatureSampler != nullptr) {
@@ -280,6 +293,33 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
     } else if (seedSampler == nullptr) {
         freeChain();
         seedSampler = llama_sampler_init_dist(time(NULL));
+    }
+
+    if (config.Has("xtcProbability") && config.Has("xtcThreshold")) {
+        auto xtcProbability = config.Get("xtcProbability").As<Napi::Number>().FloatValue();
+        auto xtcThreshold = config.Get("xtcThreshold").As<Napi::Number>().FloatValue();
+
+        if (xtcProbability != xtcSampler_probability || xtcThreshold != xtcSampler_threshold || xtcSampler == nullptr) {
+            xtcSampler_probability = xtcProbability;
+            xtcSampler_threshold = xtcThreshold;
+            freeChain();
+
+            if (xtcSampler != nullptr) {
+                llama_sampler_free(xtcSampler);
+                xtcSampler = nullptr;
+            }
+
+            xtcSampler = llama_sampler_init_xtc(
+                xtcSampler_probability,
+                xtcSampler_threshold,
+                0,
+                seedSampler == nullptr ? LLAMA_DEFAULT_SEED : seedSampler_seed
+            );
+        }
+    } else if (xtcSampler != nullptr) {
+        freeChain();
+        llama_sampler_free(xtcSampler);
+        xtcSampler = nullptr;
     }
 
     if (config.Has("repeatPenaltyTokens")) {

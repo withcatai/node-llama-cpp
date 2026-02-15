@@ -1358,6 +1358,7 @@ export class LlamaContextSequence {
             topK = 40,
             topP = 0.95,
             seed,
+            xtc,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -1378,6 +1379,7 @@ export class LlamaContextSequence {
                 topK,
                 topP,
                 seed,
+                xtc,
                 grammarEvaluationState,
                 repeatPenalty,
                 tokenBias,
@@ -1396,6 +1398,7 @@ export class LlamaContextSequence {
             topK,
             topP,
             seed,
+            xtc,
             grammarEvaluationState,
             repeatPenalty,
             tokenBias,
@@ -1578,6 +1581,7 @@ export class LlamaContextSequence {
                         topK: sampleOptions.topK,
                         topP: sampleOptions.topP,
                         seed: sampleOptions.seed,
+                        xtc: sampleOptions.xtc,
                         repeatPenalty: sampleOptions.repeatPenalty,
                         tokenBias: sampleOptions.tokenBias
                     });
@@ -1714,6 +1718,7 @@ export class LlamaContextSequence {
         topK,
         topP,
         seed,
+        xtc,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias,
@@ -1725,7 +1730,7 @@ export class LlamaContextSequence {
         _noSampling = false,
         _skipLock = false
     }: {
-        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
@@ -1778,6 +1783,7 @@ export class LlamaContextSequence {
                                 topK,
                                 topP,
                                 seed,
+                                xtc,
                                 grammarEvaluationState,
                                 repeatPenalty,
                                 tokenBias
@@ -1852,6 +1858,7 @@ export class LlamaContextSequence {
         topK,
         topP,
         seed,
+        xtc,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias,
@@ -1860,7 +1867,7 @@ export class LlamaContextSequence {
         yieldEogToken = false,
         tokenPredictor
     }: {
-        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, contextShiftOptions: Required<ContextShiftOptions>,
@@ -1940,6 +1947,7 @@ export class LlamaContextSequence {
                                 topK,
                                 topP,
                                 seed,
+                                xtc,
                                 grammarEvaluationState: grammarEvaluationState instanceof Function
                                     ? grammarEvaluationState()?.clone()
                                     : grammarEvaluationState?.clone(),
@@ -2008,6 +2016,7 @@ export class LlamaContextSequence {
                                     topK,
                                     topP,
                                     seed,
+                                    xtc,
                                     grammarEvaluationState: resolvedGrammarEvaluationState,
                                     repeatPenalty,
                                     tokenBias
@@ -2135,11 +2144,12 @@ export class LlamaContextSequence {
         topK = 40,
         topP = 0.95,
         seed,
+        xtc,
         grammarEvaluationState,
         repeatPenalty,
         tokenBias
     }: {
-        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number,
+        temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
         repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias)
     }) {
@@ -2172,6 +2182,12 @@ export class LlamaContextSequence {
                     ? Math.floor(seed ?? (Date.now() / 1000))
                     : Math.floor(Date.now() / 1000)
             ),
+            xtcProbability: xtc == null
+                ? undefined
+                : Math.min(1, Math.max(0, xtc.probability)),
+            xtcThreshold: xtc == null
+                ? undefined
+                : Math.min(1, Math.max(0, xtc.threshold)),
             repeatPenalty: repeatPenalty?.penalty,
             repeatPenaltyMaxTokens: maxPunishTokens,
             repeatPenaltyTokens: repeatPenaltyTokens != null

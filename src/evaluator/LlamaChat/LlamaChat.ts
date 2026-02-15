@@ -244,6 +244,29 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     seed?: number,
 
     /**
+     * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+     * Using it leads to more creative responses, but also to increased hallucinations.
+     *
+     * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+     * The `threshold` value control the minimum probability of a token for it to be removed.
+     *
+     * It's recommended to use it alongside `minP` for better results.
+     * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+     */
+    xtc?: {
+        /**
+         * A number between `0` and `1` representing the probability of applying Exclude Top Choices (XTC) at each token generation step.
+         */
+        probability: number,
+
+        /**
+         * A number between `0` and `1` representing the minimum probability
+         * of a token for it to be removed when applying Exclude Top Choices (XTC).
+         */
+        threshold: number
+    },
+
+    /**
      * Trim whitespace from the end of the generated text
      *
      * Defaults to `false`.
@@ -392,6 +415,7 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
     topK?: LLamaChatGenerateResponseOptions<Functions>["topK"],
     topP?: LLamaChatGenerateResponseOptions<Functions>["topP"],
     seed?: LLamaChatGenerateResponseOptions<Functions>["seed"],
+    xtc?: LLamaChatGenerateResponseOptions<Functions>["xtc"],
     trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
     repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
     tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
@@ -568,6 +592,7 @@ export class LlamaChat {
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -607,6 +632,7 @@ export class LlamaChat {
                 topK,
                 topP,
                 seed,
+                xtc,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
@@ -769,6 +795,7 @@ export class LlamaChat {
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -822,6 +849,7 @@ export class LlamaChat {
                 topK,
                 topP,
                 seed,
+                xtc,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
@@ -1623,6 +1651,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly topK: LLamaChatGenerateResponseOptions<Functions>["topK"];
     private readonly topP: LLamaChatGenerateResponseOptions<Functions>["topP"];
     private readonly seed: LLamaChatGenerateResponseOptions<Functions>["seed"];
+    private readonly xtc: LLamaChatGenerateResponseOptions<Functions>["xtc"];
     public readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
     private readonly trimWhitespaceSuffix: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"];
     private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
@@ -1739,6 +1768,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
@@ -1774,6 +1804,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.topK = topK;
         this.topP = topP;
         this.seed = seed;
+        this.xtc = xtc;
         this.grammar = grammar;
         this.trimWhitespaceSuffix = trimWhitespaceSuffix;
         this.tokenBias = tokenBias;
@@ -3030,6 +3061,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             topK: this.topK,
             topP: this.topP,
             seed: this.seed,
+            xtc: this.xtc,
             grammarEvaluationState: () => {
                 if (this.functionEvaluationMode !== false)
                     return this.functionsEvaluationState;

@@ -172,6 +172,29 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
     seed?: number,
 
     /**
+     * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+     * Using it leads to more creative responses, but also to increased hallucinations.
+     *
+     * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+     * The `threshold` value control the minimum probability of a token for it to be removed.
+     *
+     * It's recommended to use it alongside `minP` for better results.
+     * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+     */
+    xtc?: {
+        /**
+         * A number between `0` and `1` representing the probability of applying Exclude Top Choices (XTC) at each token generation step.
+         */
+        probability: number,
+
+        /**
+         * A number between `0` and `1` representing the minimum probability
+         * of a token for it to be removed when applying Exclude Top Choices (XTC).
+         */
+        threshold: number
+    },
+
+    /**
      * Trim whitespace from the end of the generated text
      * Disabled by default.
      */
@@ -288,6 +311,7 @@ export type LLamaChatCompletePromptOptions = {
     topK?: LLamaChatPromptOptions["topK"],
     topP?: LLamaChatPromptOptions["topP"],
     seed?: LLamaChatPromptOptions["seed"],
+    xtc?: LLamaChatPromptOptions["xtc"],
     trimWhitespaceSuffix?: LLamaChatPromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatPromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatPromptOptions["repeatPenalty"],
@@ -541,6 +565,7 @@ export class LlamaChatSession {
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = false,
             responsePrefix,
@@ -558,7 +583,7 @@ export class LlamaChatSession {
             onFunctionCallParamsChunk: onFunctionCallParamsChunk as undefined,
 
             onTextChunk, onToken, onResponseChunk, budgets, signal, stopOnAbortSignal, maxTokens,
-            temperature, minP, topK, topP, seed,
+            temperature, minP, topK, topP, seed, xtc,
             trimWhitespaceSuffix, responsePrefix, repeatPenalty, tokenBias, customStopTriggers
         });
 
@@ -586,6 +611,7 @@ export class LlamaChatSession {
         topK,
         topP,
         seed,
+        xtc,
         grammar,
         trimWhitespaceSuffix = false,
         responsePrefix,
@@ -690,6 +716,7 @@ export class LlamaChatSession {
                         topK,
                         topP,
                         seed,
+                        xtc,
                         tokenBias,
                         customStopTriggers,
                         maxTokens,
@@ -913,6 +940,7 @@ export class LlamaChatSession {
         topK,
         topP,
         seed,
+        xtc,
         grammar,
         trimWhitespaceSuffix = false,
         repeatPenalty,
@@ -1016,6 +1044,7 @@ export class LlamaChatSession {
                             topK,
                             topP,
                             seed,
+                            xtc,
                             tokenBias,
                             customStopTriggers,
                             maxTokens: maxTokens == null
@@ -1078,6 +1107,7 @@ export class LlamaChatSession {
                             topK,
                             topP,
                             seed,
+                            xtc,
                             tokenBias,
                             customStopTriggers,
                             maxTokens,
