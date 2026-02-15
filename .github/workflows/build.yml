@@ -184,6 +184,8 @@ jobs:
           # export VULKAN_VERSION="$(curl -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt)"
           # echo "Downloading Vulkan SDK version ${VULKAN_VERSION}"
           
+          sudo apt update
+          sudo apt install xz-utils
           mkdir -p "/opt/vulkan-sdk"
           curl --no-progress-meter "https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/linux/vulkan_sdk.tar.xz" | tar -Jx --strip-components=1 -C "/opt/vulkan-sdk"
           echo "VULKAN_SDK=/opt/vulkan-sdk/x86_64" >> $GITHUB_ENV

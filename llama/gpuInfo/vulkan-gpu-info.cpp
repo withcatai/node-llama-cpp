@@ -86,8 +86,8 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
 #endif
                 break;
             case VK_VENDOR_ID_QUALCOMM:
-                driver_priorities[vk::DriverId::eQualcommProprietary] = 1;
-                driver_priorities[vk::DriverId::eMesaTurnip] = 2;
+                driverPriorities[vk::DriverId::eQualcommProprietary] = 1;
+                driverPriorities[vk::DriverId::eMesaTurnip] = 2;
                 break;
         }
         driverPriorities[vk::DriverId::eMesaDozen] = 100;
