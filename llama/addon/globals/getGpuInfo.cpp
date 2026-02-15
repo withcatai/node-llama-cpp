@@ -99,7 +99,7 @@ std::pair<ggml_backend_dev_t, std::string> getGpuDevice() {
         ggml_backend_dev_t device = ggml_backend_dev_get(i);
         const auto deviceName = std::string(ggml_backend_dev_name(device));
 
-        if (deviceName == "Metal") {
+        if (std::string(deviceName).find("MTL") == 0 || deviceName == "Metal") {
             return std::pair<ggml_backend_dev_t, std::string>(device, "metal");
         } else if (std::string(deviceName).find("Vulkan") == 0) {
             return std::pair<ggml_backend_dev_t, std::string>(device, "vulkan");
