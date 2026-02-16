@@ -179,7 +179,7 @@ jobs:
       - name: Install Vulkan SDK on Ubuntu
         if: matrix.config.name == 'Ubuntu (1)'
         env:
-          VULKAN_VERSION: 1.4.313.2
+          VULKAN_VERSION: 1.4.341.1
         run: |
           # export VULKAN_VERSION="$(curl -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt)"
           # echo "Downloading Vulkan SDK version ${VULKAN_VERSION}"
