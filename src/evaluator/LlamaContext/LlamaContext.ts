@@ -98,15 +98,12 @@ export class LlamaContext {
         if (_model.disposed)
             throw new DisposedError();
 
-        const kvUnified = false;
         this._llama = _model._llama;
         this._model = _model;
         this._backendContextDisposeGuard = new DisposeGuard([this._model._backendModelDisposeGuard]);
         this._modelPreventDisposalHandle = this._model._backendModelDisposeGuard.createPreventDisposalHandle();
-        this._totalSequences = Math.max(1, Math.floor(sequences));
-        this._contextSize = kvUnified
-            ? Math.floor(padSafeContextSize(Math.max(2, contextSize) * this._totalSequences, "up") / this._totalSequences)
-            : padSafeContextSize(Math.max(2, contextSize), "up");
+        this._totalSequences = sequences;
+        this._contextSize = contextSize;
         this._batchSize = Math.max(batchSize, this._totalSequences);
         this._flashAttention = flashAttention;
         this._idealThreads = typeof threads === "number"
@@ -789,7 +786,9 @@ export class LlamaContext {
     public static async _create(options: LlamaContextOptions, {_model}: {
         _model: LlamaModel
     }): Promise<LlamaContext> {
-        const sequences = options.sequences ?? getDefaultContextSequences();
+        const kvUnified = false;
+
+        const sequences = Math.max(1, Math.floor(options.sequences ?? getDefaultContextSequences()));
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
@@ -824,6 +823,13 @@ export class LlamaContext {
                     ? options.contextSize
                     : shrinkRetriesMinContextSize;
         const {createSignal} = options;
+
+        const paddedContextSize = kvUnified
+            ? Math.floor(padSafeContextSize(Math.max(2, contextSize) * sequences, "up") / sequences)
+            : padSafeContextSize(Math.max(2, contextSize), "up");
+
+        if (contextSize <= _model.trainContextSize && paddedContextSize < _model.trainContextSize)
+            contextSize = paddedContextSize;
 
         async function createContext(contextSize: number) {
             const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
