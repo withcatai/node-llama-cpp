@@ -317,8 +317,9 @@ export type SequenceEvaluateOptions = {
      * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
      * The `threshold` value control the minimum probability of a token for it to be removed.
      *
-     * It's recommended to use it alongside `minP` for better results.
-     * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+     * Start with `{probability: 0.5, threshold: 0.1}` and adjust from there.
+     *
+     * Disabled by default.
      */
     xtc?: {
         /**
@@ -484,8 +485,9 @@ export type ControlledEvaluateInputItem = Token | [token: Token, options: {
              * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
              * The `threshold` value control the minimum probability of a token for it to be removed.
              *
-             * It's recommended to use it alongside `minP` for better results.
-             * Start with `{minP: 0.02, xtc: {probability: 0.5, threshold: 0.1}}` and adjust from there
+             * Start with `{probability: 0.5, threshold: 0.1}` and adjust from there.
+             *
+             * Disabled by default.
              */
             xtc?: {
                 /**
