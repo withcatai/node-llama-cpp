@@ -20,10 +20,10 @@ export function ModelMessageCopyButton({modelMessage}: ModelMessageCopyButtonPro
 
         navigator.clipboard.writeText(text)
             .then(() => {
-                setCopies(copies + 1);
+                setCopies((copies) => copies + 1);
 
                 setTimeout(() => {
-                    setCopies(copies - 1);
+                    setCopies((copies) => copies - 1);
                 }, showCopiedTime);
             })
             .catch((error) => {
