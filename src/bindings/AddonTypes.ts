@@ -189,6 +189,11 @@ export type AddonSampler = {
         repeatPenaltyTokens?: Uint32Array,
         repeatPenaltyPresencePenalty?: number, // alpha_presence
         repeatPenaltyFrequencyPenalty?: number, // alpha_frequency
+        dryRepeatPenaltyStrength?: number,
+        dryRepeatPenaltyBase?: number,
+        dryRepeatPenaltyAllowedLength?: number,
+        dryRepeatPenaltyLastTokens?: number,
+        dryRepeatPenaltySequenceBreakers?: false | string[],
         grammarEvaluationState?: AddonGrammarEvaluationState,
         tokenBiasKeys?: Uint32Array,
         tokenBiasValues?: Float32Array

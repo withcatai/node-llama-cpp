@@ -1,5 +1,5 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {LLamaContextualRepeatPenalty, Token} from "../types.js";
+import {LLamaContextualDryRepeatPenalty, LLamaContextualRepeatPenalty, Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {UnsupportedError} from "../utils/UnsupportedError.js";
@@ -151,6 +151,18 @@ export type LlamaCompletionGenerationOptions = {
     trimWhitespaceSuffix?: boolean,
 
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
+
+    /**
+     * DRY (Don't Repeat Yourself) penalty is a technique to reduce repetitions in the generated text
+     * by penalizing tokens based on recent token usage patterns.
+     *
+     * With the right parameters choice, it makes it impossible for the model to
+     * repeat itself verbatim with the same tokens in the same order (the model can still repeat itself by
+     * using different tokens or by paraphrasing, but that is far less of an issue than a broken-record looping).
+     *
+     * Disabled by default.
+     */
+    dryRepeatPenalty?: LLamaContextualDryRepeatPenalty,
 
     /**
      * Adjust the probability of tokens being generated.
@@ -630,6 +642,7 @@ export class LlamaCompletion {
             xtc,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = 5,
             grammar,
@@ -748,6 +761,7 @@ export class LlamaCompletion {
                     frequencyPenalty,
                     presencePenalty
                 },
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 yieldEogToken: true

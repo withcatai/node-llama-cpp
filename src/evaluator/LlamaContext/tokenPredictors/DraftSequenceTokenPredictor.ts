@@ -58,7 +58,7 @@ export class DraftSequenceTokenPredictor extends TokenPredictor {
          *
          * You can override any of the options for the prediction here.
          */
-        evaluateOptions?: Pick<SequenceEvaluateOptions, "temperature" | "minP" | "topK" | "topP" | "seed" | "xtc" | "repeatPenalty" | "tokenBias" | "evaluationPriority" | "contextShift">,
+        evaluateOptions?: Pick<SequenceEvaluateOptions, "temperature" | "minP" | "topK" | "topP" | "seed" | "xtc" | "repeatPenalty" | "dryRepeatPenalty" | "tokenBias" | "evaluationPriority" | "contextShift">,
 
         /**
          * Minimum token confidence (probability of the token to be generated, assigned by the model) to consider the token as a prediction.

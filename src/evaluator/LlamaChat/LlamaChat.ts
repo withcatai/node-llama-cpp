@@ -3,7 +3,8 @@ import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage, isChatModelResponseFunctionCall,
-    isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState
+    isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState,
+    LLamaContextualDryRepeatPenalty
 } from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
@@ -277,6 +278,18 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
 
     /**
+     * DRY (Don't Repeat Yourself) penalty is a technique to reduce repetitions in the generated text
+     * by penalizing tokens based on recent token usage patterns.
+     *
+     * With the right parameters choice, it makes it impossible for the model to
+     * repeat itself verbatim with the same tokens in the same order (the model can still repeat itself by
+     * using different tokens or by paraphrasing, but that is far less of an issue than a broken-record looping).
+     *
+     * Disabled by default.
+     */
+    dryRepeatPenalty?: LLamaContextualDryRepeatPenalty,
+
+    /**
      * Adjust the probability of tokens being generated.
      * Can be used to bias the model to generate tokens that you want it to lean towards,
      * or to avoid generating tokens that you want it to avoid.
@@ -419,6 +432,7 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
     xtc?: LLamaChatGenerateResponseOptions<Functions>["xtc"],
     trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
     repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
+    dryRepeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["dryRepeatPenalty"],
     tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
     evaluationPriority?: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"],
     contextShift?: LLamaChatGenerateResponseOptions<Functions>["contextShift"],
@@ -597,6 +611,7 @@ export class LlamaChat {
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -637,6 +652,7 @@ export class LlamaChat {
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 functions,
@@ -800,6 +816,7 @@ export class LlamaChat {
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -854,6 +871,7 @@ export class LlamaChat {
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 functions,
@@ -1672,6 +1690,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly resolvedRepeatPenalty: LLamaContextualRepeatPenalty & {
         lastTokens: number
     };
+    private readonly dryRepeatPenalty?: LLamaContextualDryRepeatPenalty;
     private readonly grammarEvaluationState: LlamaGrammarEvaluationState | undefined;
     private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
     private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
@@ -1773,6 +1792,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -1842,6 +1862,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 lastTokens: repeatPenalty?.lastTokens ?? defaultRepeatPenaltyLastTokens
             };
         this.repeatPenaltyEnabled = this.resolvedRepeatPenalty.lastTokens > 0;
+        this.dryRepeatPenalty = dryRepeatPenalty;
         this.grammarEvaluationState = this.grammar != null
             ? new LlamaGrammarEvaluationState({model: this.llamaChat.model, grammar: this.grammar})
             : undefined;
@@ -3085,6 +3106,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 frequencyPenalty: this.resolvedRepeatPenalty.frequencyPenalty,
                 presencePenalty: this.resolvedRepeatPenalty.presencePenalty
             },
+            dryRepeatPenalty: this.dryRepeatPenalty,
             tokenBias: this.tokenBias,
             evaluationPriority: this.evaluationPriority,
             yieldEogToken: true

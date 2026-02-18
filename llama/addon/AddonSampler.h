@@ -29,7 +29,7 @@ class AddonSampler : public Napi::ObjectWrap<AddonSampler> {
         llama_sampler * xtcSampler = nullptr;
         float xtcSampler_probability = 0;
         float xtcSampler_threshold = 0;
-        
+
         llama_sampler * seedSampler = nullptr;
         uint32_t seedSampler_seed = 0;
 
@@ -39,6 +39,14 @@ class AddonSampler : public Napi::ObjectWrap<AddonSampler> {
         float repeatPenalty_penalty = 1.10f;  // 1.0 = disabled
         float repeatPenalty_presencePenalty = 0.00f;  // 0.0 = disabled
         float repeatPenalty_frequencyPenalty = 0.00f;  // 0.0 = disabled
+
+        llama_sampler * dryRepeatPenaltySampler = nullptr;
+        float dryRepeatPenalty_strength = 0.00f; // 0.00f = disabled
+        float dryRepeatPenalty_base = 0.00f;
+        int32_t dryRepeatPenalty_allowedLength = 1;
+        int32_t dryRepeatPenalty_lastTokens = 1;
+        bool dryRepeatPenalty_lastTokensAll = true;
+        std::vector<std::string> dryRepeatPenalty_sequenceBreakers;
 
         llama_sampler * tokenBiasSampler = nullptr;
         std::vector<llama_logit_bias> tokenBiasSampler_biases;

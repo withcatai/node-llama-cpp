@@ -16,8 +16,8 @@ import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
-    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem, SequenceEvaluateMetadataOptions,
-    SequenceEvaluateOptions, SequenceEvaluateOutput
+    EvaluationPriority, LlamaContextOptions, LlamaContextSequenceDryRepeatPenalty, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem,
+    SequenceEvaluateMetadataOptions, SequenceEvaluateOptions, SequenceEvaluateOutput
 } from "./types.js";
 import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItemsPrioritizationStrategy.js";
 import {LlamaSampler} from "./LlamaSampler.js";
@@ -33,6 +33,7 @@ const defaultFailedCreationRemedy = {
     autoContextSizeShrink: 0.16
 } as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 const defaultEvaluationPriority: EvaluationPriority = 5;
+const defaultDryRepeatPenalitySequenceBreakers = ["\n", ":", '"', "*"];
 
 const decodeSyncWorkaround = {
     vulkanLock: {}
@@ -1367,6 +1368,7 @@ export class LlamaContextSequence {
             xtc,
             grammarEvaluationState,
             repeatPenalty,
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             contextShift: {
@@ -1388,6 +1390,7 @@ export class LlamaContextSequence {
                 xtc,
                 grammarEvaluationState,
                 repeatPenalty,
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 contextShiftOptions: {
@@ -1407,6 +1410,7 @@ export class LlamaContextSequence {
             xtc,
             grammarEvaluationState,
             repeatPenalty,
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority,
             contextShiftOptions: {
@@ -1589,6 +1593,7 @@ export class LlamaContextSequence {
                         seed: sampleOptions.seed,
                         xtc: sampleOptions.xtc,
                         repeatPenalty: sampleOptions.repeatPenalty,
+                        dryRepeatPenalty: sampleOptions.dryRepeatPenalty,
                         tokenBias: sampleOptions.tokenBias
                     });
 
@@ -1727,6 +1732,7 @@ export class LlamaContextSequence {
         xtc,
         grammarEvaluationState,
         repeatPenalty,
+        dryRepeatPenalty,
         tokenBias,
         evaluationPriority = defaultEvaluationPriority,
         generateNewTokens = true,
@@ -1738,7 +1744,8 @@ export class LlamaContextSequence {
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
-        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, dryRepeatPenalty?: LlamaContextSequenceDryRepeatPenalty,
+        tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, generateNewTokens?: boolean, contextShiftOptions: Required<ContextShiftOptions>,
         yieldEogToken?: boolean,
         _noSampling?: boolean,
@@ -1792,6 +1799,7 @@ export class LlamaContextSequence {
                                 xtc,
                                 grammarEvaluationState,
                                 repeatPenalty,
+                                dryRepeatPenalty,
                                 tokenBias
                             });
 
@@ -1867,6 +1875,7 @@ export class LlamaContextSequence {
         xtc,
         grammarEvaluationState,
         repeatPenalty,
+        dryRepeatPenalty,
         tokenBias,
         evaluationPriority = defaultEvaluationPriority,
         contextShiftOptions,
@@ -1875,7 +1884,8 @@ export class LlamaContextSequence {
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
-        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias),
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, dryRepeatPenalty?: LlamaContextSequenceDryRepeatPenalty,
+        tokenBias?: TokenBias | (() => TokenBias),
         evaluationPriority?: EvaluationPriority, contextShiftOptions: Required<ContextShiftOptions>,
         yieldEogToken?: boolean, tokenPredictor: TokenPredictor
     }): AsyncGenerator<SequenceEvaluateOutput<Metadata>, void, void | Token | Token[]> {
@@ -1958,6 +1968,7 @@ export class LlamaContextSequence {
                                     ? grammarEvaluationState()?.clone()
                                     : grammarEvaluationState?.clone(),
                                 repeatPenalty,
+                                dryRepeatPenalty,
                                 tokenBias,
                                 evaluationPriority,
                                 contextShift: contextShiftOptions,
@@ -2025,6 +2036,7 @@ export class LlamaContextSequence {
                                     xtc,
                                     grammarEvaluationState: resolvedGrammarEvaluationState,
                                     repeatPenalty,
+                                    dryRepeatPenalty,
                                     tokenBias
                                 });
 
@@ -2153,11 +2165,13 @@ export class LlamaContextSequence {
         xtc,
         grammarEvaluationState,
         repeatPenalty,
+        dryRepeatPenalty,
         tokenBias
     }: {
         temperature?: number, minP?: number, topK?: number, topP?: number, seed?: number, xtc?: SequenceEvaluateOptions["xtc"],
         grammarEvaluationState?: LlamaGrammarEvaluationState | (() => LlamaGrammarEvaluationState | undefined),
-        repeatPenalty?: LlamaContextSequenceRepeatPenalty, tokenBias?: TokenBias | (() => TokenBias)
+        repeatPenalty?: LlamaContextSequenceRepeatPenalty, dryRepeatPenalty?: LlamaContextSequenceDryRepeatPenalty,
+        tokenBias?: TokenBias | (() => TokenBias)
     }) {
         const repeatPenaltyTokens = repeatPenalty?.punishTokens instanceof Function
             ? repeatPenalty.punishTokens()
@@ -2201,6 +2215,15 @@ export class LlamaContextSequence {
                 : undefined,
             repeatPenaltyPresencePenalty: repeatPenalty?.presencePenalty,
             repeatPenaltyFrequencyPenalty: repeatPenalty?.frequencyPenalty,
+            dryRepeatPenaltyStrength: (dryRepeatPenalty?.strength == null || dryRepeatPenalty?.strength === 0)
+                ? undefined
+                : Math.max(0, dryRepeatPenalty?.strength),
+            dryRepeatPenaltyBase: dryRepeatPenalty?.base,
+            dryRepeatPenaltyAllowedLength: Math.max(1, dryRepeatPenalty?.allowedLength ?? 2),
+            dryRepeatPenaltyLastTokens: dryRepeatPenalty?.lastTokens == null
+                ? -1
+                : Math.max(0, dryRepeatPenalty?.lastTokens),
+            dryRepeatPenaltySequenceBreakers: dryRepeatPenalty?.sequenceBreakers ?? defaultDryRepeatPenalitySequenceBreakers,
             tokenBiasKeys,
             tokenBiasValues,
             grammarEvaluationState: resolvedGrammarEvaluationState?._state

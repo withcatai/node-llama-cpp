@@ -30,6 +30,7 @@ export type LLamaChatPromptCompletionEngineOptions = {
     trimWhitespaceSuffix?: LLamaChatCompletePromptOptions["trimWhitespaceSuffix"],
     evaluationPriority?: LLamaChatCompletePromptOptions["evaluationPriority"],
     repeatPenalty?: LLamaChatCompletePromptOptions["repeatPenalty"],
+    dryRepeatPenalty?: LLamaChatCompletePromptOptions["dryRepeatPenalty"],
     tokenBias?: LLamaChatCompletePromptOptions["tokenBias"],
     customStopTriggers?: LLamaChatCompletePromptOptions["customStopTriggers"],
     grammar?: LLamaChatCompletePromptOptions["grammar"],
