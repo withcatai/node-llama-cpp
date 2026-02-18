@@ -1479,8 +1479,8 @@ describe("functionary", () => {
                             totalRam: s1GB * 8,
                             freeRam: s1GB * 8
                         });
-                        expect(res.gpuLayers).to.toMatchInlineSnapshot("22");
-                        expect(res.contextSize).to.toMatchInlineSnapshot("5376");
+                        expect(res.gpuLayers).to.toMatchInlineSnapshot("21");
+                        expect(res.contextSize).to.toMatchInlineSnapshot("6656");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
