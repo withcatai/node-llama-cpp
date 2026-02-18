@@ -132,7 +132,7 @@ export type LlamaOptions = {
      * Recommended to ensure stability.
      * This only affects the calculations of `"auto"` in function options and is not reflected in the `getVramState` function.
      *
-     * Defaults to `6%` of the total VRAM or 1GB, whichever is lower.
+     * Defaults to `8%` of the total VRAM or 1.2GB, whichever is lower.
      * Set to `0` to disable.
      */
     vramPadding?: number | ((totalVram: number) => number),
@@ -306,7 +306,7 @@ export type LastBuildOptions = {
 
 export const getLlamaFunctionName = "getLlama";
 
-export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.06, 1024 * 1024 * 1024));
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.08, 1.2 * Math.pow(1024, 3)));
 export const defaultLlamaRamPadding = (totalRam: number) => {
     const platform = getPlatform();
 
