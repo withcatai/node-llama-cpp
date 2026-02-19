@@ -8,6 +8,7 @@ import type {Llama} from "../../bindings/Llama.js";
 export class LlamaSampler {
     /** @internal */ public readonly _llama: Llama;
     /** @internal */ public readonly _sampler: AddonSampler;
+    /** @internal */ public _drySequenceBreakersRef?: WeakRef<string[]>;
     /** @internal */ public disposed: boolean = false;
 
     public constructor(model: LlamaModel) {
@@ -28,6 +29,15 @@ export class LlamaSampler {
     }
 
     public applyConfig(config: Parameters<AddonSampler["applyConfig"]>[0]) {
+        if (config.dryRepeatPenaltyStrength != null &&
+            config.dryRepeatPenaltySequenceBreakers != null && config.dryRepeatPenaltySequenceBreakers !== false
+        ) {
+            if (config.dryRepeatPenaltySequenceBreakers === this._drySequenceBreakersRef?.deref())
+                config.dryRepeatPenaltySequenceBreakers = false;
+            else
+                this._drySequenceBreakersRef = new WeakRef(config.dryRepeatPenaltySequenceBreakers);
+        }
+
         return this._sampler.applyConfig(config);
     }
 

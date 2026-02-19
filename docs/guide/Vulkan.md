@@ -41,23 +41,25 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
   #### Windows: [Vulkan SDK installer](https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe) {#vulkan-sdk-windows}
   >
   #### Ubuntu {#vulkan-sdk-ubuntu}
-  ::: code-group
-  
-  ```shell [Ubuntu 24.04]
-  wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
-  sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
+  ```shell
   sudo apt update
-  sudo apt install vulkan-sdk
-  ```
+  sudo apt install curl wget xz-utils
   
-  ```shell [Ubuntu 22.04]
-  wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
-  sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-  sudo apt update
-  sudo apt install vulkan-sdk
-  ```
+  export VULKAN_VERSION="$(curl -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt)"                                                                                      
   
-  :::
+  echo "Downloading Vulkan SDK version ${VULKAN_VERSION}"
+  curl --progress-bar "https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/linux/vulkan_sdk.tar.xz" -o "/opt/vulkan-sdk.tar.xz"
+  
+  echo "Installing Vulkan SDK to /opt/vulkan-sdk"
+  rm -rf "/opt/vulkan-sdk" && mkdir -p "/opt/vulkan-sdk"
+  tar -Jxf "/opt/vulkan-sdk.tar.xz" --strip-components=1 -C "/opt/vulkan-sdk"
+  rm -f "/opt/vulkan-sdk.tar.xz"
+  
+  echo "Adding Vulkan SDK environment variables to shell profiles"
+  ([ ! -f "$HOME/.bashrc" ] || grep -qxF "source /opt/vulkan-sdk/setup-env.sh" "$HOME/.bashrc") || (echo "source /opt/vulkan-sdk/setup-env.sh" >> "$HOME/.bashrc")
+  ([ ! -f "$HOME/.zshrc" ] || grep -qxF "source /opt/vulkan-sdk/setup-env.sh" "$HOME/.zshrc") || (echo "source /opt/vulkan-sdk/setup-env.sh" >> "$HOME/.zshrc")
+  source /opt/vulkan-sdk/setup-env.sh
+  ```
 
 * :::details Windows only: enable long paths support
   Open cmd as Administrator and run this command:

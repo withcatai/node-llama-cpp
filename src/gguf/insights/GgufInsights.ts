@@ -365,6 +365,9 @@ export class GgufInsights {
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.phi3) {
                 // magic numbers for estimation. will be improved in the future
                 return (totalElements * 123 * (kvSize / 4096)) + defaultCalculationAdjustment;
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.cohere2) {
+                // magic numbers for estimation. will be improved in the future
+                return (totalElements * 148 * (kvSize / 4096)) + defaultCalculationAdjustment;
             }
 
             // magic numbers for estimation. will be improved in the future

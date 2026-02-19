@@ -28,6 +28,11 @@ void AddonSampler::dispose() {
     model->Unref();
     freeChain();
 
+    if (xtcSampler != nullptr) {
+        llama_sampler_free(xtcSampler);
+        xtcSampler = nullptr;
+    }
+
     if (temperatureSampler != nullptr) {
         llama_sampler_free(temperatureSampler);
         temperatureSampler = nullptr;
@@ -61,6 +66,11 @@ void AddonSampler::dispose() {
     if (repeatPenaltySampler != nullptr) {
         llama_sampler_free(repeatPenaltySampler);
         repeatPenaltySampler = nullptr;
+    }
+
+    if (dryRepeatPenaltySampler != nullptr) {
+        llama_sampler_free(dryRepeatPenaltySampler);
+        dryRepeatPenaltySampler = nullptr;
     }
 
     if (tokenBiasSampler != nullptr) {
@@ -108,11 +118,19 @@ void AddonSampler::rebuildChainIfNeeded() {
         llama_sampler_chain_add(chain, repeatPenaltySampler);
     }
 
+    if (dryRepeatPenaltySampler != nullptr) {
+        llama_sampler_chain_add(chain, dryRepeatPenaltySampler);
+    }
+
     if (grammarEvaluationState != nullptr) {
         llama_sampler_chain_add(chain, grammarEvaluationState->sampler);
     }
 
     if (greedySampler != nullptr) {
+        if (xtcSampler != nullptr) {
+            llama_sampler_chain_add(chain, xtcSampler);
+        }
+
         llama_sampler_chain_add(chain, greedySampler);
     } else {
         if (topKSampler != nullptr) {
@@ -125,6 +143,10 @@ void AddonSampler::rebuildChainIfNeeded() {
 
         if (minPSampler != nullptr) {
             llama_sampler_chain_add(chain, minPSampler);
+        }
+
+        if (xtcSampler != nullptr) {
+            llama_sampler_chain_add(chain, xtcSampler);
         }
 
         if (temperatureSampler != nullptr) {
@@ -141,6 +163,10 @@ void AddonSampler::acceptToken(llama_token token) {
     if (repeatPenaltySampler != nullptr) {
         llama_sampler_accept(repeatPenaltySampler, token);
         repeatPenalty_lastTokens.push_back(token);
+    }
+
+    if (dryRepeatPenaltySampler != nullptr) {
+        llama_sampler_accept(dryRepeatPenaltySampler, token);
     }
 
     if (grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr && !llama_vocab_is_eog(model->vocab, token)) {
@@ -282,6 +308,33 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         seedSampler = llama_sampler_init_dist(time(NULL));
     }
 
+    if (config.Has("xtcProbability") && config.Has("xtcThreshold")) {
+        auto xtcProbability = config.Get("xtcProbability").As<Napi::Number>().FloatValue();
+        auto xtcThreshold = config.Get("xtcThreshold").As<Napi::Number>().FloatValue();
+
+        if (xtcProbability != xtcSampler_probability || xtcThreshold != xtcSampler_threshold || xtcSampler == nullptr) {
+            xtcSampler_probability = xtcProbability;
+            xtcSampler_threshold = xtcThreshold;
+            freeChain();
+
+            if (xtcSampler != nullptr) {
+                llama_sampler_free(xtcSampler);
+                xtcSampler = nullptr;
+            }
+
+            xtcSampler = llama_sampler_init_xtc(
+                xtcSampler_probability,
+                xtcSampler_threshold,
+                0,
+                seedSampler == nullptr ? LLAMA_DEFAULT_SEED : seedSampler_seed
+            );
+        }
+    } else if (xtcSampler != nullptr) {
+        freeChain();
+        llama_sampler_free(xtcSampler);
+        xtcSampler = nullptr;
+    }
+
     if (config.Has("repeatPenaltyTokens")) {
         Napi::Uint32Array repeat_penalty_tokens_uint32_array = config.Get("repeatPenaltyTokens").As<Napi::Uint32Array>();
         auto repeatPenalty = config.Has("repeatPenalty")
@@ -372,6 +425,111 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         freeChain();
         llama_sampler_free(repeatPenaltySampler);
         repeatPenaltySampler = nullptr;
+    }
+
+    if (config.Has("dryRepeatPenaltyStrength")) {
+        float strength = config.Get("dryRepeatPenaltyStrength").As<Napi::Number>().FloatValue();
+        float base = config.Has("dryRepeatPenaltyBase")
+            ? config.Get("dryRepeatPenaltyBase").As<Napi::Number>().FloatValue()
+            : 0;
+        int32_t allowedLength = config.Has("dryRepeatPenaltyAllowedLength")
+            ? config.Get("dryRepeatPenaltyAllowedLength").As<Napi::Number>().Int32Value()
+            : 2;
+        int32_t lastTokens = config.Has("dryRepeatPenaltyLastTokens")
+            ? config.Get("dryRepeatPenaltyLastTokens").As<Napi::Number>().Int32Value()
+            : -1;
+
+        bool sequenceBreaksIsTheSame = (
+            config.Has("dryRepeatPenaltySequenceBreakers") &&
+            config.Get("dryRepeatPenaltySequenceBreakers").IsBoolean() &&
+            config.Get("dryRepeatPenaltySequenceBreakers").As<Napi::Boolean>().Value() == false
+        ) ? true : false;
+
+        std::vector<std::string> sequenceBreakers;
+        if (config.Has("dryRepeatPenaltySequenceBreakers") && config.Get("dryRepeatPenaltySequenceBreakers").IsArray()) {
+            Napi::Array sequenceBreakersArray = config.Get("dryRepeatPenaltySequenceBreakers").As<Napi::Array>();
+            sequenceBreaksIsTheSame = dryRepeatPenalty_sequenceBreakers.size() == sequenceBreakersArray.Length();
+
+            sequenceBreakers.reserve(sequenceBreakersArray.Length());
+            for (size_t i = 0; i < sequenceBreakersArray.Length(); i++) {
+                std::string breaker = sequenceBreakersArray.Get(i).As<Napi::String>().Utf8Value();
+                
+                if (sequenceBreaksIsTheSame && dryRepeatPenalty_sequenceBreakers[i] != breaker) {
+                    sequenceBreaksIsTheSame = false;
+                }
+
+                sequenceBreakers.push_back(std::move(breaker));
+            }
+        }
+
+        auto enabled = base != 0 && lastTokens != 0;
+        bool shouldCreateSampler = false;
+
+        if (!enabled) {
+            if (dryRepeatPenaltySampler != nullptr) {
+                freeChain();
+                llama_sampler_free(dryRepeatPenaltySampler);
+                dryRepeatPenaltySampler = nullptr;
+            }
+        } else if (dryRepeatPenaltySampler == nullptr) {
+            freeChain();
+            shouldCreateSampler = true;
+        } else {
+            bool existingSamplerMatchesConfig = true;
+            existingSamplerMatchesConfig &= dryRepeatPenalty_strength == strength;
+            existingSamplerMatchesConfig &= dryRepeatPenalty_base == base;
+            existingSamplerMatchesConfig &= dryRepeatPenalty_allowedLength == allowedLength;
+            existingSamplerMatchesConfig &= dryRepeatPenalty_lastTokens == lastTokens;
+            existingSamplerMatchesConfig &= sequenceBreaksIsTheSame;
+
+            if (!existingSamplerMatchesConfig) {
+                freeChain();
+                llama_sampler_free(dryRepeatPenaltySampler);
+                dryRepeatPenaltySampler = nullptr;
+
+                shouldCreateSampler = true;
+            }
+        }
+
+        if (shouldCreateSampler) {
+            std::vector<const char *> cSequenceBreakers;
+
+            if (sequenceBreaksIsTheSame) {
+                cSequenceBreakers.reserve(dryRepeatPenalty_sequenceBreakers.size());
+                for (const auto & str : dryRepeatPenalty_sequenceBreakers) {
+                    cSequenceBreakers.push_back(str.c_str());
+                }
+            } else {
+                cSequenceBreakers.reserve(sequenceBreakers.size());
+                for (const auto & str : sequenceBreakers) {
+                    cSequenceBreakers.push_back(str.c_str());
+                }
+            }
+
+            dryRepeatPenaltySampler = llama_sampler_init_dry(
+                model->vocab,
+                llama_model_n_ctx_train(model->model),
+                strength,
+                base,
+                allowedLength,
+                lastTokens,
+                cSequenceBreakers.data(),
+                cSequenceBreakers.size()
+            );
+
+            dryRepeatPenalty_strength = strength;
+            dryRepeatPenalty_base = base;
+            dryRepeatPenalty_allowedLength = allowedLength;
+            dryRepeatPenalty_lastTokens = lastTokens;
+
+            if (!sequenceBreaksIsTheSame) {
+                dryRepeatPenalty_sequenceBreakers.swap(sequenceBreakers);
+            }
+        }
+    } else if (dryRepeatPenaltySampler != nullptr) {
+        freeChain();
+        llama_sampler_free(dryRepeatPenaltySampler);
+        dryRepeatPenaltySampler = nullptr;
     }
 
     if (config.Has("tokenBiasKeys") && config.Has("tokenBiasValues")) {

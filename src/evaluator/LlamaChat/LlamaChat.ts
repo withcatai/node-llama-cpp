@@ -3,7 +3,8 @@ import {ChatWrapper} from "../../ChatWrapper.js";
 import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage, isChatModelResponseFunctionCall,
-    isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState
+    isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState,
+    LLamaContextualDryRepeatPenalty
 } from "../../types.js";
 import {GbnfJsonSchemaToType} from "../../utils/gbnfJson/types.js";
 import {LlamaGrammar} from "../LlamaGrammar.js";
@@ -244,6 +245,30 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     seed?: number,
 
     /**
+     * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+     * Using it leads to more creative responses, but also to increased hallucinations.
+     *
+     * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+     * The `threshold` value control the minimum probability of a token for it to be removed.
+     *
+     * Start with `{probability: 0.5, threshold: 0.1}` and adjust from there.
+     *
+     * Disabled by default.
+     */
+    xtc?: {
+        /**
+         * A number between `0` and `1` representing the probability of applying Exclude Top Choices (XTC) at each token generation step.
+         */
+        probability: number,
+
+        /**
+         * A number between `0` and `1` representing the minimum probability
+         * of a token for it to be removed when applying Exclude Top Choices (XTC).
+         */
+        threshold: number
+    },
+
+    /**
      * Trim whitespace from the end of the generated text
      *
      * Defaults to `false`.
@@ -251,6 +276,18 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
     trimWhitespaceSuffix?: boolean,
 
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
+
+    /**
+     * DRY (Don't Repeat Yourself) penalty is a technique to reduce repetitions in the generated text
+     * by penalizing tokens based on recent token usage patterns.
+     *
+     * With the right parameters choice, it makes it impossible for the model to
+     * repeat itself verbatim with the same tokens in the same order (the model can still repeat itself by
+     * using different tokens or by paraphrasing, but that is far less of an issue than a broken-record looping).
+     *
+     * Disabled by default.
+     */
+    dryRepeatPenalty?: LLamaContextualDryRepeatPenalty,
 
     /**
      * Adjust the probability of tokens being generated.
@@ -392,8 +429,10 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
     topK?: LLamaChatGenerateResponseOptions<Functions>["topK"],
     topP?: LLamaChatGenerateResponseOptions<Functions>["topP"],
     seed?: LLamaChatGenerateResponseOptions<Functions>["seed"],
+    xtc?: LLamaChatGenerateResponseOptions<Functions>["xtc"],
     trimWhitespaceSuffix?: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"],
     repeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["repeatPenalty"],
+    dryRepeatPenalty?: LLamaChatGenerateResponseOptions<Functions>["dryRepeatPenalty"],
     tokenBias?: LLamaChatGenerateResponseOptions<Functions>["tokenBias"],
     evaluationPriority?: LLamaChatGenerateResponseOptions<Functions>["evaluationPriority"],
     contextShift?: LLamaChatGenerateResponseOptions<Functions>["contextShift"],
@@ -568,9 +607,11 @@ export class LlamaChat {
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -607,9 +648,11 @@ export class LlamaChat {
                 topK,
                 topP,
                 seed,
+                xtc,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 functions,
@@ -769,9 +812,11 @@ export class LlamaChat {
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -822,9 +867,11 @@ export class LlamaChat {
                 topK,
                 topP,
                 seed,
+                xtc,
                 grammar: grammar as undefined, // this is a workaround to allow passing both `functions` and `grammar`
                 trimWhitespaceSuffix,
                 repeatPenalty,
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 functions,
@@ -1623,6 +1670,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly topK: LLamaChatGenerateResponseOptions<Functions>["topK"];
     private readonly topP: LLamaChatGenerateResponseOptions<Functions>["topP"];
     private readonly seed: LLamaChatGenerateResponseOptions<Functions>["seed"];
+    private readonly xtc: LLamaChatGenerateResponseOptions<Functions>["xtc"];
     public readonly grammar: LLamaChatGenerateResponseOptions<Functions>["grammar"];
     private readonly trimWhitespaceSuffix: LLamaChatGenerateResponseOptions<Functions>["trimWhitespaceSuffix"];
     private readonly tokenBias: LLamaChatGenerateResponseOptions<Functions>["tokenBias"];
@@ -1642,6 +1690,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     private readonly resolvedRepeatPenalty: LLamaContextualRepeatPenalty & {
         lastTokens: number
     };
+    private readonly dryRepeatPenalty?: LLamaContextualDryRepeatPenalty;
     private readonly grammarEvaluationState: LlamaGrammarEvaluationState | undefined;
     private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
     private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
@@ -1739,9 +1788,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             topK,
             topP,
             seed,
+            xtc,
             grammar,
             trimWhitespaceSuffix = defaultTrimWhitespaceSuffix,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = defaultEvaluationPriority,
             functions,
@@ -1774,6 +1825,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.topK = topK;
         this.topP = topP;
         this.seed = seed;
+        this.xtc = xtc;
         this.grammar = grammar;
         this.trimWhitespaceSuffix = trimWhitespaceSuffix;
         this.tokenBias = tokenBias;
@@ -1810,6 +1862,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 lastTokens: repeatPenalty?.lastTokens ?? defaultRepeatPenaltyLastTokens
             };
         this.repeatPenaltyEnabled = this.resolvedRepeatPenalty.lastTokens > 0;
+        this.dryRepeatPenalty = dryRepeatPenalty;
         this.grammarEvaluationState = this.grammar != null
             ? new LlamaGrammarEvaluationState({model: this.llamaChat.model, grammar: this.grammar})
             : undefined;
@@ -1830,16 +1883,21 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             StopGenerationDetector.resolveStopTriggers(this.grammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                 .map((stopTrigger) => this.stopGenerationDetector.addStopTrigger(stopTrigger));
 
-        if (this.functions != null && Object.keys(this.functions).length > 0 && !this.abortOnNonText)
-            this.functionSyntaxStartDetector.addStopTrigger(
-                StopGenerationDetector.resolveLlamaTextTrigger(
-                    LlamaText([
-                        this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
-                        this.chatWrapper.settings.functions.call.prefix
-                    ]),
-                    this.llamaChat.model.tokenizer
-                )
-            );
+        if (this.functions != null && Object.keys(this.functions).length > 0 && !this.abortOnNonText) {
+            for (const sectionPrefix of [
+                this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
+                ...(this.chatWrapper.settings.functions?.parallelism?.call.sectionPrefixAlternateMatches ?? [])
+            ])
+                this.functionSyntaxStartDetector.addStopTrigger(
+                    StopGenerationDetector.resolveLlamaTextTrigger(
+                        LlamaText([
+                            sectionPrefix,
+                            this.chatWrapper.settings.functions.call.prefix
+                        ]),
+                        this.llamaChat.model.tokenizer
+                    )
+                );
+        }
 
         const segmentDefinitions: ConstructorParameters<typeof SegmentHandler>[0]["segmentDefinitions"] = new Map();
         for (const segmentType of allSegmentTypes) {
@@ -1864,15 +1922,19 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         });
 
         if (this.abortOnNonText) {
-            this.stopGenerationDetector.addStopTrigger(
-                StopGenerationDetector.resolveLlamaTextTrigger(
-                    LlamaText([
-                        this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
-                        this.chatWrapper.settings.functions.call.prefix
-                    ]),
-                    this.llamaChat.model.tokenizer
-                )
-            );
+            for (const sectionPrefix of [
+                this.chatWrapper.settings.functions?.parallelism?.call?.sectionPrefix ?? "",
+                ...(this.chatWrapper.settings.functions?.parallelism?.call.sectionPrefixAlternateMatches ?? [])
+            ])
+                this.stopGenerationDetector.addStopTrigger(
+                    StopGenerationDetector.resolveLlamaTextTrigger(
+                        LlamaText([
+                            sectionPrefix,
+                            this.chatWrapper.settings.functions.call.prefix
+                        ]),
+                        this.llamaChat.model.tokenizer
+                    )
+                );
 
             for (const segmentType of allSegmentTypes) {
                 const segmentDefinition = getChatWrapperSegmentDefinition(this.chatWrapper.settings, segmentType);
@@ -3030,6 +3092,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             topK: this.topK,
             topP: this.topP,
             seed: this.seed,
+            xtc: this.xtc,
             grammarEvaluationState: () => {
                 if (this.functionEvaluationMode !== false)
                     return this.functionsEvaluationState;
@@ -3043,6 +3106,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 frequencyPenalty: this.resolvedRepeatPenalty.frequencyPenalty,
                 presencePenalty: this.resolvedRepeatPenalty.presencePenalty
             },
+            dryRepeatPenalty: this.dryRepeatPenalty,
             tokenBias: this.tokenBias,
             evaluationPriority: this.evaluationPriority,
             yieldEogToken: true

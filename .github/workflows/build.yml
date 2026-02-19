@@ -168,6 +168,9 @@ jobs:
         env:
           VULKAN_VERSION: 1.4.313.2
         run: |
+          # $env:VULKAN_VERSION = & curl.exe -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt
+          # Write-Host "Downloading Vulkan SDK version $env:VULKAN_VERSION"
+          
           curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
           & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
           Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
@@ -175,11 +178,20 @@ jobs:
 
       - name: Install Vulkan SDK on Ubuntu
         if: matrix.config.name == 'Ubuntu (1)'
+        env:
+          VULKAN_VERSION: 1.4.341.1
         run: |
-          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-          sudo apt update
-          sudo apt install vulkan-sdk
+          # export VULKAN_VERSION="$(curl -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt)"
+          # echo "Downloading Vulkan SDK version ${VULKAN_VERSION}"
+          
+          sudo apt-get update
+          sudo apt-get install xz-utils
+          curl --no-progress-meter "https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/linux/vulkan_sdk.tar.xz" -o "/opt/vulkan-sdk.tar.xz"
+          mkdir -p "/opt/vulkan-sdk"
+          tar -Jxf "/opt/vulkan-sdk.tar.xz" --strip-components=1 -C "/opt/vulkan-sdk"
+          rm -f "/opt/vulkan-sdk.tar.xz"
+          echo "VULKAN_SDK=/opt/vulkan-sdk/x86_64" >> $GITHUB_ENV
+          echo "/opt/vulkan-sdk/x86_64/bin" >> $GITHUB_PATH
 
       - name: Install dependencies on macOS
         if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'

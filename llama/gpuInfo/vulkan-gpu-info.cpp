@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <cstdint>
 #include <map>
 #include <vector>
 
@@ -8,6 +9,7 @@ constexpr std::uint32_t VK_VENDOR_ID_AMD = 0x1002;
 constexpr std::uint32_t VK_VENDOR_ID_APPLE = 0x106b;
 constexpr std::uint32_t VK_VENDOR_ID_INTEL = 0x8086;
 constexpr std::uint32_t VK_VENDOR_ID_NVIDIA = 0x10de;
+constexpr std::uint32_t VK_VENDOR_ID_QUALCOMM = 0x5143;
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
@@ -35,7 +37,7 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
         auto oldDevice = std::find_if(
             dedupedDevices.begin(),
             dedupedDevices.end(),
-            [&newId](const vk::PhysicalDevice& oldDevice) {
+            [&newId, &newDriver](const vk::PhysicalDevice& oldDevice) {
                 vk::PhysicalDeviceProperties2 oldProps;
                 vk::PhysicalDeviceDriverProperties oldDriver;
                 vk::PhysicalDeviceIDProperties oldId;
@@ -43,13 +45,14 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
                 oldDriver.pNext = &oldId;
                 oldDevice.getProperties2(&oldProps);
 
-                bool equals = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
-                equals = equals || (
+                bool sameUuid = std::equal(std::begin(oldId.deviceUUID), std::end(oldId.deviceUUID), std::begin(newId.deviceUUID));
+                sameUuid = sameUuid || (
                     oldId.deviceLUIDValid && newId.deviceLUIDValid &&
                     std::equal(std::begin(oldId.deviceLUID), std::end(oldId.deviceLUID), std::begin(newId.deviceLUID))
                 );
+                bool bothMoltenVk = (newDriver.driverID == vk::DriverId::eMoltenvk && oldDriver.driverID == vk::DriverId::eMoltenvk);
 
-                return equals;
+                return sameUuid && !bothMoltenVk;
             }
         );
 
@@ -83,8 +86,12 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
                 driverPriorities[vk::DriverId::eMesaNvk] = 2;
 #endif
                 break;
+            case VK_VENDOR_ID_QUALCOMM:
+                driverPriorities[vk::DriverId::eQualcommProprietary] = 1;
+                driverPriorities[vk::DriverId::eMesaTurnip] = 2;
+                break;
         }
-        driverPriorities[vk::DriverId::eMesaDozen] = 4;
+        driverPriorities[vk::DriverId::eMesaDozen] = 100;
 
         if (driverPriorities.count(oldDriver.driverID)) {
             oldPriority = driverPriorities[oldDriver.driverID];

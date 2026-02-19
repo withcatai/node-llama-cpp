@@ -1,5 +1,5 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
-import {LLamaContextualRepeatPenalty, Token} from "../types.js";
+import {LLamaContextualDryRepeatPenalty, LLamaContextualRepeatPenalty, Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {UnsupportedError} from "../utils/UnsupportedError.js";
@@ -121,12 +121,48 @@ export type LlamaCompletionGenerationOptions = {
     seed?: number,
 
     /**
+     * Exclude Top Choices (XTC) removes the top tokens from consideration and avoids more obvious and repetitive generations.
+     * Using it leads to more creative responses, but also to increased hallucinations.
+     *
+     * The `probability` value controls the chance that the top tokens will be removed in the next token generation step.
+     * The `threshold` value control the minimum probability of a token for it to be removed.
+     *
+     * Start with `{probability: 0.5, threshold: 0.1}` and adjust from there.
+     *
+     * Disabled by default.
+     */
+    xtc?: {
+        /**
+         * A number between `0` and `1` representing the probability of applying Exclude Top Choices (XTC) at each token generation step.
+         */
+        probability: number,
+
+        /**
+         * A number between `0` and `1` representing the minimum probability
+         * of a token for it to be removed when applying Exclude Top Choices (XTC).
+         */
+        threshold: number
+    },
+
+    /**
      * Trim whitespace from the end of the generated text
      * Disabled by default.
      */
     trimWhitespaceSuffix?: boolean,
 
     repeatPenalty?: false | LLamaContextualRepeatPenalty,
+
+    /**
+     * DRY (Don't Repeat Yourself) penalty is a technique to reduce repetitions in the generated text
+     * by penalizing tokens based on recent token usage patterns.
+     *
+     * With the right parameters choice, it makes it impossible for the model to
+     * repeat itself verbatim with the same tokens in the same order (the model can still repeat itself by
+     * using different tokens or by paraphrasing, but that is far less of an issue than a broken-record looping).
+     *
+     * Disabled by default.
+     */
+    dryRepeatPenalty?: LLamaContextualDryRepeatPenalty,
 
     /**
      * Adjust the probability of tokens being generated.
@@ -271,6 +307,7 @@ export class LlamaCompletion {
             topK,
             topP,
             seed,
+            xtc,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -359,6 +396,7 @@ export class LlamaCompletion {
                 topK,
                 topP,
                 seed,
+                xtc,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -416,6 +454,7 @@ export class LlamaCompletion {
             topK,
             topP,
             seed,
+            xtc,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
             tokenBias,
@@ -560,6 +599,7 @@ export class LlamaCompletion {
                 topK,
                 topP,
                 seed,
+                xtc,
                 trimWhitespaceSuffix,
                 repeatPenalty,
                 tokenBias,
@@ -599,8 +639,10 @@ export class LlamaCompletion {
             topK,
             topP,
             seed,
+            xtc,
             trimWhitespaceSuffix = false,
             repeatPenalty = {},
+            dryRepeatPenalty,
             tokenBias,
             evaluationPriority = 5,
             grammar,
@@ -710,7 +752,7 @@ export class LlamaCompletion {
             }
 
             const evaluationIterator = sequence.evaluate(inputTokens, removeNullFields({
-                temperature, minP, topK, topP, seed,
+                temperature, minP, topK, topP, seed, xtc,
                 grammarEvaluationState,
                 repeatPenalty: !repeatPenaltyEnabled ? undefined : {
                     punishTokens: getPenaltyTokens,
@@ -719,6 +761,7 @@ export class LlamaCompletion {
                     frequencyPenalty,
                     presencePenalty
                 },
+                dryRepeatPenalty,
                 tokenBias,
                 evaluationPriority,
                 yieldEogToken: true

@@ -198,25 +198,25 @@ export type GbnfJsonSchemaToTSType<T, Defs extends GbnfJsonDefList<NoInfer<Defs>
         ? undefined
         : undefined extends T
             ? undefined
-        : T extends GbnfJsonBasicStringSchema
-            ? GbnfJsonBasicStringSchemaToType<T>
-            : T extends GbnfJsonFormatStringSchema
-                ? string
-                : T extends GbnfJsonBasicSchema
-                    ? GbnfJsonBasicSchemaToType<T["type"]>
-                    : T extends GbnfJsonConstSchema
-                        ? T["const"]
-                        : T extends GbnfJsonEnumSchema
-                            ? T["enum"][number]
-                            : T extends GbnfJsonOneOfSchema<Record<any, any>>
-                                ? GbnfJsonSchemaToTSType<T["oneOf"][number], CombineDefs<NoInfer<Defs>, T["$defs"]>>
-                                : T extends GbnfJsonObjectSchema<string, Record<any, any>>
-                                    ? GbnfJsonObjectSchemaToType<T, NoInfer<Defs>>
-                                    : T extends GbnfJsonArraySchema<Record<any, any>>
-                                        ? ArrayTypeToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
-                                        : T extends GbnfJsonRefSchema<any>
-                                            ? GbnfJsonRefSchemaToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
-                                            : undefined;
+            : T extends GbnfJsonBasicStringSchema
+                ? GbnfJsonBasicStringSchemaToType<T>
+                : T extends GbnfJsonFormatStringSchema
+                    ? string
+                    : T extends GbnfJsonBasicSchema
+                        ? GbnfJsonBasicSchemaToType<T["type"]>
+                        : T extends GbnfJsonConstSchema
+                            ? T["const"]
+                            : T extends GbnfJsonEnumSchema
+                                ? T["enum"][number]
+                                : T extends GbnfJsonOneOfSchema<Record<any, any>>
+                                    ? GbnfJsonSchemaToTSType<T["oneOf"][number], CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                    : T extends GbnfJsonObjectSchema<string, Record<any, any>>
+                                        ? GbnfJsonObjectSchemaToType<T, NoInfer<Defs>>
+                                        : T extends GbnfJsonArraySchema<Record<any, any>>
+                                            ? ArrayTypeToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                            : T extends GbnfJsonRefSchema<any>
+                                                ? GbnfJsonRefSchemaToType<T, CombineDefs<NoInfer<Defs>, T["$defs"]>>
+                                                : undefined;
 
 type GbnfJsonBasicStringSchemaToType<T extends GbnfJsonBasicStringSchema> =
     T["maxLength"] extends 0
@@ -291,7 +291,7 @@ type ArrayTypeToType<
                                     GbnfJsonSchemaToTSType<T["items"], CombineDefs<Defs, T["$defs"]>>
                                 >
                                 : IndexRangeWithSkip<T["maxItems"], T["prefixItems"]["length"], GbnfJsonAnyValue>
-                            )
+                        )
                     ]
                     : [
                         ...GbnfJsonOrderedArrayTypes<T["prefixItems"], CombineDefs<Defs, T["$defs"]>>,

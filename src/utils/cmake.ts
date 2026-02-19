@@ -41,9 +41,16 @@ export async function getCmakePath() {
     } catch (err) {}
 
     try {
-        let resolvedPath = await which("cmake", {
-            path: path.join(llamaDirectory, "xpack", "xpacks", ".bin")
-        });
+        let resolvedPath = (
+            await which("cmake", {
+                path: path.join(llamaDirectory, "xpack", "xpacks", ".bin"),
+                nothrow: true
+            })
+        ) || (
+            await which("cmake", {
+                path: path.join(llamaDirectory, "xpack", "xpacks", "@xpack-dev-tools", "cmake", ".content", "bin")
+            })
+        );
 
         if (resolvedPath.toLowerCase().endsWith(".cmd"))
             resolvedPath = (await getBinFromWindowCmd(resolvedPath, "cmake.exe")) ?? "";

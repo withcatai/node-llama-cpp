@@ -80,7 +80,7 @@ export type LlamaModelOptions = {
      * Direct I/O is a method of reading and writing data to and from the storage device directly to the application memory,
      * bypassing OS in-memory caches.
      *
-     * It leads to improved model loading times and reduced RAM usage,
+     * It can lead to improved model loading times and reduced RAM usage,
      * on the expense of higher loading times when the model unloaded and loaded again repeatedly in a short period of time.
      *
      * When this option is enabled, if Direct I/O is supported by the system (and for the given file)
@@ -88,7 +88,7 @@ export type LlamaModelOptions = {
      *
      * Unsupported on macOS.
      *
-     * Defaults to `true`.
+     * Defaults to `false`.
      */
     useDirectIo?: boolean,
 
@@ -166,7 +166,7 @@ export type LlamaModelOptions = {
 };
 
 const defaultUseMmap = true;
-const defaultUseDirectIo = true;
+const defaultUseDirectIo = false;
 const defaultContextFlashAttentionEnabled = false;
 const defaultContextSwaFullCache = false;
 

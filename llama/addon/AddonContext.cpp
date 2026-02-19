@@ -942,11 +942,25 @@ Napi::Value AddonContext::EnsureDraftContextIsCompatibleForSpeculative(const Nap
     return info.Env().Undefined();
 }
 
-Napi::Value AddonContext::SetLora(const Napi::CallbackInfo& info) {
-    AddonModelLora* lora = Napi::ObjectWrap<AddonModelLora>::Unwrap(info[0].As<Napi::Object>());
-    float scale = info[1].As<Napi::Number>().FloatValue();
+Napi::Value AddonContext::SetLoras(const Napi::CallbackInfo& info) {
+    Napi::Array loraArray = info[0].As<Napi::Array>();
+    Napi::Array scaleArray = info[1].As<Napi::Array>();
 
-    llama_set_adapter_lora(ctx, lora->lora_adapter, scale);
+    std::vector<llama_adapter_lora *> loras;
+    std::vector<float> scales;
+
+    loras.reserve(loraArray.Length());
+    scales.reserve(scaleArray.Length());
+
+    for (size_t i = 0; i < loraArray.Length() && i < scaleArray.Length(); i++) {
+        AddonModelLora* lora = Napi::ObjectWrap<AddonModelLora>::Unwrap(loraArray.Get(i).As<Napi::Object>());
+        float scale = scaleArray.Get(i).As<Napi::Number>().FloatValue();
+
+        loras.push_back(lora->lora_adapter);
+        scales.push_back(scale);
+    }
+
+    llama_set_adapters_lora(ctx, loras.data(), loras.size(), scales.data());
 
     return info.Env().Undefined();
 }
@@ -977,7 +991,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("ensureDraftContextIsCompatibleForSpeculative", &AddonContext::EnsureDraftContextIsCompatibleForSpeculative),
                 InstanceMethod("saveSequenceStateToFile", &AddonContext::SaveSequenceStateToFile),
                 InstanceMethod("loadSequenceStateFromFile", &AddonContext::LoadSequenceStateFromFile),
-                InstanceMethod("setLora", &AddonContext::SetLora),
+                InstanceMethod("setLoras", &AddonContext::SetLoras),
                 InstanceMethod("dispose", &AddonContext::Dispose),
             }
         )
