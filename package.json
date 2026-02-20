@@ -197,7 +197,7 @@
     "filenamify": "^6.0.0",
     "fs-extra": "^11.3.0",
     "ignore": "^7.0.4",
-    "ipull": "^3.9.2",
+    "ipull": "^3.9.5",
     "is-unicode-supported": "^2.1.0",
     "lifecycle-utils": "^3.1.1",
     "log-symbols": "^7.0.1",
