@@ -21,12 +21,14 @@ import {
     type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
     type CustomBatchingDispatchSchedule, type CustomBatchingPrioritizationStrategy, type BatchItem, type PrioritizedBatchItem,
     type ContextShiftOptions, type ContextTokensDeleteRange, type EvaluationPriority, type SequenceEvaluateMetadataOptions,
-    type SequenceEvaluateOutput, type ControlledEvaluateInputItem, type ControlledEvaluateIndexOutput
+    type SequenceEvaluateOutput, type ControlledEvaluateInputItem, type ControlledEvaluateIndexOutput,
+    type LlamaContextSequenceDryRepeatPenalty
 } from "./evaluator/LlamaContext/types.js";
 import {TokenBias} from "./evaluator/TokenBias.js";
 import {
-    LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions,
-    type LLamaChatPromptOptions, type LLamaChatCompletePromptOptions, type LlamaChatSessionRepeatPenalty, type LLamaChatPreloadPromptOptions
+    LlamaChatSession, type LlamaChatSessionOptions, type LlamaChatSessionContextShiftOptions, type LLamaChatPromptOptions,
+    type LLamaChatCompletePromptOptions, type LlamaChatSessionRepeatPenalty, type LLamaChatPreloadPromptOptions,
+    type LlamaChatSessionDryRepeatPenalty
 } from "./evaluator/LlamaChatSession/LlamaChatSession.js";
 import {defineChatSessionFunction} from "./evaluator/LlamaChatSession/utils/defineChatSessionFunction.js";
 import {
@@ -98,7 +100,8 @@ import {
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, isChatModelResponseSegment,
     type LLamaContextualRepeatPenalty, type ChatWrapperSettings, type ChatWrapperSettingsSegment,
     type ChatWrapperGenerateContextStateOptions, type ChatWrapperGeneratedContextState, type ChatWrapperGeneratedPrefixTriggersContextState,
-    type ChatWrapperGeneratedInitiallyEngagedFunctionsContextState, type ChatWrapperGenerateInitialHistoryOptions
+    type ChatWrapperGeneratedInitiallyEngagedFunctionsContextState, type ChatWrapperGenerateInitialHistoryOptions,
+    type LLamaContextualDryRepeatPenalty
 } from "./types.js";
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
@@ -159,6 +162,7 @@ export {
     type SequenceEvaluateMetadataOptions,
     type SequenceEvaluateOutput,
     type LlamaContextSequenceRepeatPenalty,
+    type LlamaContextSequenceDryRepeatPenalty,
     type ControlledEvaluateInputItem,
     type ControlledEvaluateIndexOutput,
     TokenBias,
@@ -176,6 +180,7 @@ export {
     type LLamaChatPromptOptions,
     type LLamaChatCompletePromptOptions,
     type LlamaChatSessionRepeatPenalty,
+    type LlamaChatSessionDryRepeatPenalty,
     type LLamaChatPreloadPromptOptions,
     LlamaChat,
     type LlamaChatOptions,
@@ -183,6 +188,7 @@ export {
     type LLamaChatLoadAndCompleteUserMessageOptions,
     type LLamaChatContextShiftOptions,
     type LLamaContextualRepeatPenalty,
+    type LLamaContextualDryRepeatPenalty,
     type LlamaChatResponse,
     type LlamaChatResponseFunctionCall,
     type LlamaChatLoadAndCompleteUserResponse,
