@@ -199,6 +199,7 @@ jobs:
           brew install cmake ninja
           alias make=cmake
           cmake --version
+          uname -mprs
 
       - name: Setup & Build
         id: build
