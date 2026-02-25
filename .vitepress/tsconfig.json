@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "lib": ["es2022", "dom"],
-        "module": "es2022",
+        "module": "node16",
         "target": "es2022",
         "esModuleInterop": true,
         "noImplicitAny": true,
