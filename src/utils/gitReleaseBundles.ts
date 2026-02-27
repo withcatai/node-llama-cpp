@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs-extra";
-import simpleGit from "simple-git";
+import {simpleGit} from "simple-git";
 import {currentReleaseGitBundlePath, builtinLlamaCppGitHubRepo, llamaCppDirectory, enableRecursiveClone} from "../config.js";
 import {getBinariesGithubRelease} from "../bindings/utils/binariesGithubRelease.js";
 import {isGithubReleaseNeedsResolving} from "./resolveGithubRelease.js";

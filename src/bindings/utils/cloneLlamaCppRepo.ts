@@ -1,5 +1,5 @@
 import path from "path";
-import simpleGit, {SimpleGit} from "simple-git";
+import {simpleGit, SimpleGit} from "simple-git";
 import chalk from "chalk";
 import fs from "fs-extra";
 import which from "which";

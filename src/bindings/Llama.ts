@@ -16,6 +16,7 @@ import {
     LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma
 } from "./types.js";
 import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
+import {registerDisposeBeforeExit, unregisterDisposeBeforeExit} from "./utils/disposeBeforeExit.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -35,6 +36,7 @@ const defaultCPUMinThreadSplitterThreads = 4;
 export class Llama {
     /** @internal */ public readonly _bindings: BindingModule;
     /** @internal */ public readonly _backendDisposeGuard = new DisposeGuard();
+    /** @internal */ private readonly _selfWeakRef: WeakRef<Llama>;
     /** @internal */ public readonly _memoryLock = {};
     /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
@@ -106,6 +108,7 @@ export class Llama {
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
+        this._selfWeakRef = new WeakRef(this);
 
         const previouslyLoaded = bindings.markLoaded();
 
@@ -159,8 +162,9 @@ export class Llama {
             release: llamaCppRelease.release
         });
 
-        this._onExit = this._onExit.bind(this);
-        process.on("exit", this._onExit);
+        this._onBeforeExit = this._onBeforeExit.bind(this);
+        process.once("beforeExit", this._onBeforeExit);
+        registerDisposeBeforeExit(this._selfWeakRef);
     }
 
     public async dispose() {
@@ -171,6 +175,9 @@ export class Llama {
         this.onDispose.dispatchEvent();
         await this._backendDisposeGuard.acquireDisposeLock();
         await this._bindings.dispose();
+
+        process.off("beforeExit", this._onBeforeExit);
+        unregisterDisposeBeforeExit(this._selfWeakRef);
     }
 
     /** @hidden */
@@ -484,7 +491,7 @@ export class Llama {
     }
 
     /** @internal */
-    private _onExit() {
+    private _onBeforeExit() {
         if (this._pendingLog != null && this._pendingLogLevel != null) {
             this._callLogger(this._pendingLogLevel, this._pendingLog);
             this._pendingLog = null;

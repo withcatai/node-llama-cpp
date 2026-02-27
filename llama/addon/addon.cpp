@@ -12,7 +12,10 @@
 #include "globals/getMemoryInfo.h"
 
 #include <atomic>
+#include <cstdlib>
+#include <mutex>
 
+std::mutex backendMutex;
 bool backendInitialized = false;
 bool backendDisposed = false;
 
@@ -118,6 +121,8 @@ class AddonBackendLoadWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
+                std::lock_guard<std::mutex> lock(backendMutex);
+
                 llama_backend_init();
 
                 try {
@@ -163,6 +168,8 @@ class AddonBackendUnloadWorker : public Napi::AsyncWorker {
         Napi::Promise::Deferred deferred;
 
         void Execute() {
+            std::lock_guard<std::mutex> lock(backendMutex);
+
             try {
                 if (backendInitialized) {
                     backendInitialized = false;
@@ -234,6 +241,8 @@ Napi::Value markLoaded(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value addonInit(const Napi::CallbackInfo& info) {
+    std::lock_guard<std::mutex> lock(backendMutex);
+
     if (backendInitialized) {
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
         deferred.Resolve(info.Env().Undefined());
@@ -246,6 +255,8 @@ Napi::Value addonInit(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value addonDispose(const Napi::CallbackInfo& info) {
+    std::lock_guard<std::mutex> lock(backendMutex);
+
     if (backendDisposed) {
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
         deferred.Resolve(info.Env().Undefined());
@@ -259,7 +270,8 @@ Napi::Value addonDispose(const Napi::CallbackInfo& info) {
     return worker->GetPromise();
 }
 
-static void addonFreeLlamaBackend(Napi::Env env, int* data) {
+static void addonFreeLlamaBackend() {
+    std::lock_guard<std::mutex> lock(backendMutex);
     if (backendDisposed) {
         return;
     }
@@ -269,6 +281,9 @@ static void addonFreeLlamaBackend(Napi::Env env, int* data) {
         backendInitialized = false;
         llama_backend_free();
     }
+}
+static void addonFreeLlamaBackendFromFinalizer(Napi::Env env, int* data) {
+    addonFreeLlamaBackend();
 }
 
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
@@ -306,8 +321,8 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);
 
-    exports.AddFinalizer(addonFreeLlamaBackend, static_cast<int*>(nullptr));
-
+    exports.AddFinalizer(addonFreeLlamaBackendFromFinalizer, static_cast<int*>(nullptr));
+    env.AddCleanupHook(addonFreeLlamaBackend);
     return exports;
 }
 

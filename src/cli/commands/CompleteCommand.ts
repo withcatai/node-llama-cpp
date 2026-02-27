@@ -60,7 +60,7 @@ type CompleteCommand = {
     meter: boolean,
     timing: boolean,
     noMmap: boolean,
-    noDirectIo: boolean,
+    useDirectIo: boolean,
     printTimings: boolean
 };
 
@@ -285,10 +285,10 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 default: false,
                 description: "Disable mmap (memory-mapped file) usage"
             })
-            .option("noDirectIo", {
+            .option("useDirectIo", {
                 type: "boolean",
                 default: false,
-                description: "Disable Direct I/O usage when available"
+                description: "Use Direct I/O usage when available"
             })
             .option("printTimings", {
                 alias: "pt",
@@ -303,7 +303,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-        debug, numa, meter, timing, noMmap, noDirectIo, printTimings
+        debug, numa, meter, timing, noMmap, useDirectIo, printTimings
     }) {
         try {
             await RunCompletion({
@@ -311,7 +311,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
-                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, noDirectIo, printTimings
+                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -327,7 +327,7 @@ async function RunCompletion({
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
-    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, noDirectIo, printTimings
+    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
 }: CompleteCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -352,7 +352,6 @@ async function RunCompletion({
         });
     const logBatchSize = batchSize != null;
     const useMmap = !noMmap && llama.supportsMmap;
-    const useDirectIo = !noDirectIo;
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,

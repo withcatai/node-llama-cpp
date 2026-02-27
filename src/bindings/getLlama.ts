@@ -66,17 +66,34 @@ export type LlamaOptions = {
 
     /**
      * Set what build method to use.
-     * - **`"auto"`**: If a local build is found, use it.
-     * Otherwise, if a prebuilt binary is found, use it.
-     * Otherwise, build from source.
-     * - **`"never"`**: If a local build is found, use it.
-     * Otherwise, if a prebuilt binary is found, use it.
-     * Otherwise, throw a `NoBinaryFoundError` error.
+     * - **`"auto"`**:
+     *   Iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - If a local build is found, use it.
+     *     - Otherwise, if a prebuilt binary is found and working, use it.
+     *
+     *   Otherwise, if no binary is available for any GPU type, build from source.
+     * - **`"never"`**:
+     *   Iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - If a local build is found, use it.
+     *     - Otherwise, if a prebuilt binary is found and working, use it.
+     *
+     *   Otherwise, if no binary is available for any GPU type, throw a `NoBinaryFoundError` error.
      * - **`"forceRebuild"`**: Always build from source.
      * Be cautious with this option, as it will cause the build to fail on Windows when the binaries are in use by another process.
-     * - **`"try"`**: If a local build is found, use it.
-     * Otherwise, try to build from source and use the resulting binary.
-     * If building from source fails, use a prebuilt binary if found.
+     * - **`"try"`**:
+     *   Iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - If a local build is found, use it.
+     *
+     *   If no local build is found, iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - Try to build from source and use the resulting binary.
+     *
+     *   If no build was successful, iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - Use a prebuilt binary if found and working.
+     * - **`"autoAttempt"`**:
+     *   Iterate over all available {@link gpu} types from best to worst, and for each GPU type:
+     *     - If a local build is found, use it.
+     *     - Otherwise, if a prebuilt binary is found and working, use it.
+     *     - Otherwise, build from source and use the resulting binary.
      *
      * When running from inside an Asar archive in Electron, building from source is not possible, so it'll never build from source.
      * To allow building from source in Electron apps, make sure you ship `node-llama-cpp` as an unpacked module.
@@ -84,7 +101,7 @@ export type LlamaOptions = {
      * Defaults to `"auto"`.
      * On Electron, defaults to `"never"`.
      */
-    build?: "auto" | "never" | "forceRebuild" | "try",
+    build?: "auto" | "never" | "forceRebuild" | "try" | "autoAttempt",
 
     /**
      * Set custom CMake options for llama.cpp
@@ -522,7 +539,7 @@ export async function getLlamaForOptions({
             build = "auto";
     }
 
-    if (build === "auto" || build === "never") {
+    if (build === "auto" || build === "autoAttempt" || build === "never") {
         for (let i = 0; i < buildGpusToTry.length; i++) {
             const gpu = buildGpusToTry[i];
             const isLastItem = i === buildGpusToTry.length - 1;
@@ -571,13 +588,63 @@ export async function getLlamaForOptions({
 
                 return llama;
             }
+
+            if (canBuild && build === "autoAttempt") {
+                const llamaCppRepoCloned = await isLlamaCppRepoCloned();
+                if (!llamaCppRepoCloned && !skipDownload) {
+                    llamaCppInfo.repo = defaultLlamaCppGitHubRepo;
+                    llamaCppInfo.release = defaultLlamaCppRelease;
+
+                    if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
+                        const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
+                        llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
+                    }
+                }
+
+                let llama: Llama | undefined = undefined;
+                try {
+                    llama = await buildAndLoadLlamaBinary({
+                        buildOptions,
+                        skipDownload,
+                        logLevel,
+                        logger,
+                        updateLastBuildInfoOnCompile,
+                        maxThreads,
+                        vramPadding,
+                        ramPadding,
+                        skipLlamaInit,
+                        debug,
+                        numa
+                    });
+                } catch (err) {
+                    console.error(
+                        getConsoleLogPrefix() +
+                        `Failed to build llama.cpp with ${getPrettyBuildGpuName(gpu)} support. ` +
+                        (
+                            !isLastItem
+                                ? `falling back to ${getPrettyBuildGpuName(buildGpusToTry[i + 1])}. `
+                                : ""
+                        ) +
+                        "Error:",
+                        err
+                    );
+                    continue;
+                }
+
+                if (llama != null) {
+                    if (dryRun)
+                        await llama.dispose();
+
+                    return llama;
+                }
+            }
         }
     }
 
     if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs)
         await logNoGlibcWarning();
 
-    if (!canBuild)
+    if (!canBuild || build === "autoAttempt")
         throw new NoBinaryFoundError();
 
     const llamaCppRepoCloned = await isLlamaCppRepoCloned();

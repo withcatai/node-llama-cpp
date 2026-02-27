@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "lib": ["es2022"],
-        "module": "es2022",
+        "module": "node16",
         "target": "es2022",
         "esModuleInterop": true,
         "noImplicitAny": true,
@@ -15,7 +15,7 @@
         "noUncheckedIndexedAccess": true,
         "moduleDetection": "force",
         "skipLibCheck": true,
-        "moduleResolution": "node",
+        "moduleResolution": "node16",
         "resolveJsonModule": false,
         "strictNullChecks": true,
         "isolatedModules": true,

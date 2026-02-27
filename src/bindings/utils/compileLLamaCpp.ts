@@ -155,7 +155,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
 
                 if (ciMode) {
                     if (!cmakeCustomOptions.has("CMAKE_OSX_DEPLOYMENT_TARGET"))
-                        cmakeCustomOptions.set("CMAKE_OSX_DEPLOYMENT_TARGET", "14");
+                        cmakeCustomOptions.set("CMAKE_OSX_DEPLOYMENT_TARGET", "14.0");
 
                     if (!cmakeCustomOptions.has("GGML_OPENMP"))
                         cmakeCustomOptions.set("GGML_OPENMP", "OFF");
