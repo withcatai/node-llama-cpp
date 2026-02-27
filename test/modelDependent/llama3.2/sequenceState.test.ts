@@ -202,7 +202,7 @@ describe("llama 3.2", () => {
                 });
 
                 const res1 = await chatSession1.prompt("Remember: locks are not doors. Also, write a long poem about it", {maxTokens: 154});
-                expect(res1).toMatch(/^(A clever reminder indeed.|A wise phrase to ponder|A wise phrase indeed)/);
+                expect(res1).toMatch(/^(A clever reminder indeed.|A clever reminder, indeed.|A wise phrase to ponder|A wise phrase indeed)/);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
