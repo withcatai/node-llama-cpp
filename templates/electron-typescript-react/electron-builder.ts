@@ -113,4 +113,4 @@ export default {
 
         artifactName: "${name}.Linux.${version}.${arch}.${ext}"
     }
-} as Configuration;
+} satisfies Configuration as Configuration;

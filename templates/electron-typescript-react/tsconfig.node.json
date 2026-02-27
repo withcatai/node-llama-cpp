@@ -13,7 +13,7 @@
         "noUncheckedIndexedAccess": true,
         "moduleDetection": "force",
 
-        "moduleResolution": "bundler",
+        "moduleResolution": "node16",
         "resolveJsonModule": false,
         "isolatedModules": true,
         "composite": true,
