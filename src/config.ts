@@ -99,7 +99,7 @@ const documentationUrl = "https://node-llama-cpp.withcat.ai";
 const documentationCliUrl = documentationUrl + "/cli";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",
-    Vulkan: documentationUrl + "/guide/vulkan",
+    Vulkan: documentationUrl + "/guide/Vulkan",
     CLI: {
         index: documentationCliUrl,
         Pull: documentationCliUrl + "/pull",
