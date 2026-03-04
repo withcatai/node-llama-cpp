@@ -12,6 +12,13 @@ import {genericFilePartNumber} from "./parseModelUri.js";
 import {isFilePartText} from "./parseModelFileName.js";
 import {pushAll} from "./pushAll.js";
 
+/**
+ * In-flight download promises keyed by resolved file path.
+ * Prevents concurrent `resolveModelFile` calls from starting duplicate downloads
+ * to the same destination, which causes FileHandle GC errors on Node 22+
+ * when two ipull instances write to the same `.ipull` temp file.
+ */
+const inFlightDownloads = new Map<string, Promise<string>>();
 
 export type ResolveModelFileOptions = {
     /**
@@ -270,19 +277,35 @@ export async function resolveModelFile(
         }
     }
 
-    if (resolvedCli)
-        console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
-            downloader.splitBinaryParts != null
-                ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
-                : ""
-        }`);
+    const downloadKey = downloader.entrypointFilePath;
+    const existingDownload = inFlightDownloads.get(downloadKey);
+    if (existingDownload != null) {
+        await downloader.cancel({deleteTempFile: false});
+        return existingDownload;
+    }
 
-    await downloader.download({signal});
+    const downloadPromise = (async () => {
+        try {
+            if (resolvedCli)
+                console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
+                    downloader.splitBinaryParts != null
+                        ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
+                        : ""
+                }`);
 
-    if (resolvedCli)
-        console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+            await downloader.download({signal});
 
-    return downloader.entrypointFilePath;
+            if (resolvedCli)
+                console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+
+            return downloader.entrypointFilePath;
+        } finally {
+            inFlightDownloads.delete(downloadKey);
+        }
+    })();
+
+    inFlightDownloads.set(downloadKey, downloadPromise);
+    return downloadPromise;
 }
 
 async function findMatchingFilesInDirectory(dirPath: string, fileNames: (string | `${string}${typeof genericFilePartNumber}${string}`)[]) {
