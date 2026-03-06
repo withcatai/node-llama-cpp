@@ -26,6 +26,7 @@ import {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
 import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
 import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
+import {LlamaLogLevel} from "../../bindings/types.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -3081,6 +3082,25 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public async createNewEvaluationIterator() {
+        if (this.tokens.length === 0) {
+            if (this.evaluationIterator != null)
+                return;
+
+            const token = this.llamaChat.sequence.contextTokens.at(-1);
+            if (token == null)
+                throw new Error("No tokens to evaluate");
+
+            this.llamaChat.sequence.model._llama._log(
+                LlamaLogLevel.warn,
+                "Attempted to evaluate with no input, reevaluating the last context sequence token"
+            );
+            await this.llamaChat.sequence.eraseContextTokenRanges([{
+                start: this.llamaChat.sequence.contextTokens.length - 1,
+                end: this.llamaChat.sequence.contextTokens.length
+            }]);
+            this.tokens = [token];
+        }
+
         if (this.evaluationIterator != null)
             await this.evaluationIterator.return();
 

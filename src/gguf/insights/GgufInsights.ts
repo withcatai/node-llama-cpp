@@ -128,6 +128,7 @@ export class GgufInsights {
     }
 
     public get isRecurrent() {
+        // source: `llm_arch_is_recurrent` in `llama-arch.cpp`
         switch (this._ggufFileInfo.metadata?.general?.architecture) {
             case GgufArchitectureType.mamba:
             case GgufArchitectureType.mamba2:
@@ -135,6 +136,27 @@ export class GgufInsights {
             case GgufArchitectureType.rwkv6qwen2:
             case GgufArchitectureType.rwkv7:
             case GgufArchitectureType.arwkv7:
+                return true;
+        }
+
+        return false;
+    }
+
+    public get isHybrid() {
+        // source: `llm_arch_is_hybrid` in `llama-arch.cpp`
+        switch (this._ggufFileInfo.metadata?.general?.architecture) {
+            case GgufArchitectureType.jamba:
+            case GgufArchitectureType.falconH1:
+            case GgufArchitectureType.plamo2:
+            case GgufArchitectureType.granitehybrid:
+            case GgufArchitectureType.lfm2:
+            case GgufArchitectureType.lfm2moe:
+            case GgufArchitectureType.nemotronH:
+            case GgufArchitectureType.nemotronHMoe:
+            case GgufArchitectureType.qwen3next:
+            case GgufArchitectureType.kimiLinear:
+            case GgufArchitectureType.qwen35:
+            case GgufArchitectureType.qwen35moe:
                 return true;
         }
 
@@ -215,7 +237,10 @@ export class GgufInsights {
         const kvUnified = false;
         const usingSWA = !swaFullCache && slidingWindow > 0 && slidingWindow < contextSize &&
             (this.trainContextSize == null || slidingWindow < this.trainContextSize);
-        const swaPattern = getSwaPatternForArchitecture(this._ggufFileInfo.metadata?.general?.architecture);
+        const swaPattern = getSwaPatternForArchitecture(
+            this._ggufFileInfo.metadata?.general?.architecture,
+            this._ggufFileInfo.architectureMetadata?.attention?.sliding_window_pattern
+        );
         const nonSwaPercent = swaPattern <= 1
             ? 1
             : (1 / (swaPattern + (flashAttention ? -0.5 : -1)));
@@ -233,9 +258,27 @@ export class GgufInsights {
             : actualContextSize;
 
         const totalFileLayers = this._getTotalFileLayers();
+        const totalLayersIncludingOutput = totalFileLayers + 1;
+        const finalModelGpuLayers = Math.max(
+            0,
+            Math.min(modelGpuLayers ?? totalLayersIncludingOutput, totalLayersIncludingOutput)
+        );
         const finalGpuLayers = Math.max(0, Math.min(modelGpuLayers ?? totalFileLayers, totalFileLayers));
         const finalCpuLayers = totalFileLayers - finalGpuLayers;
-        const usingGpu = finalGpuLayers !== 0;
+        const usingGpu = finalModelGpuLayers !== 0;
+
+        const {
+            gpuKVCacheSize,
+            cpuKVCacheSize,
+            gpuRecurrentStateSize,
+            cpuRecurrentStateSize
+        } = this._estimateContextCacheMemorySplitInBytes({
+            kvSize,
+            sequences,
+            totalFileLayers,
+            finalModelGpuLayers,
+            usingGpu
+        });
 
         const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer?.ggml?.tokens?.length ?? 0;
         const embeddingSize = llmData.embedding_length ?? 0;
@@ -374,16 +417,6 @@ export class GgufInsights {
             return (totalElements * 77.655 * (kvSize / 4096)) + defaultCalculationAdjustment;
         };
 
-        const gpuKVCacheSize = usingGpu
-            ? this._estimateKvMemorySizeInBytes(
-                kvSize,
-                finalGpuLayers < totalFileLayers
-                    ? (finalGpuLayers + 1)
-                    : finalGpuLayers
-            )
-            : 0;
-        const cpuKVCacheSize = this._estimateKvMemorySizeInBytes(kvSize, finalCpuLayers);
-
         // source: `llama_context::graph_max_nodes` in `llama-context.cpp`
         const getMaxNodesMultiplier = (arch: GgufArchitectureType | undefined, nTokens: number): {min: number, multiplier: number} => {
             if (arch === GgufArchitectureType.qwen3next)
@@ -402,7 +435,9 @@ export class GgufInsights {
             Math.min(actualContextSize, batchSize)
         );
         const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * tensorInfo.length);
-        const cpuNodes = maxNodesMultiplier.multiplier * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
+        const cpuNodes = totalFileLayers === 0
+            ? 0
+            : maxNodesMultiplier.multiplier * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
         const gpuNodes = maxNodes - cpuNodes;
 
         const gpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * gpuNodes) +
@@ -413,15 +448,15 @@ export class GgufInsights {
         const graphOverheadMemory = (flashAttention || !includeGraphOverhead)
             ? 0
             : estimateGraphOverheadMemory();
-        const graphOverheadGpuSize = usingGpu
+        const graphOverheadGpuSize = (usingGpu && totalFileLayers > 0)
             ? Math.round(graphOverheadMemory * (finalGpuLayers / totalFileLayers))
             : 0;
         const graphOverheadCpuSize = graphOverheadMemory - graphOverheadGpuSize;
 
         const outputBufferSize = estimateOutput(sequences);
 
-        const gpuVram = gpuKVCacheSize + gpuComputeBufferSize + graphOverheadGpuSize + outputBufferSize;
-        const cpuRam = cpuKVCacheSize + cpuComputeBufferSize + graphOverheadCpuSize + outputBufferSize;
+        const gpuVram = gpuKVCacheSize + gpuRecurrentStateSize + gpuComputeBufferSize + graphOverheadGpuSize + outputBufferSize;
+        const cpuRam = cpuKVCacheSize + cpuRecurrentStateSize + cpuComputeBufferSize + graphOverheadCpuSize + outputBufferSize;
 
         return {
             cpuRam,
@@ -529,60 +564,145 @@ export class GgufInsights {
         return this._ggufFileInfo.architectureMetadata.block_count ?? this._determineNumberOfLayersFromTensorInfo();
     }
 
-    /** @internal */
-    public _estimateKvMemorySizeInBytes(kvSize: number, layers: number) {
+    private _estimateContextCacheMemorySplitInBytes({
+        kvSize,
+        sequences,
+        totalFileLayers,
+        finalModelGpuLayers,
+        usingGpu
+    }: {
+        kvSize: number,
+        sequences: number,
+        totalFileLayers: number,
+        finalModelGpuLayers: number,
+        usingGpu: boolean
+    }) {
         // source: `llama_kv_cache_init` in `llama.cpp`
+        const architecture = this._ggufFileInfo.metadata.general?.architecture;
         const nHead = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
         const nEmbd = this._ggufFileInfo.architectureMetadata.embedding_length ?? 0;
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
-
-        const ssmDConv = this._ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
-        const ssmDInner = this._ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
-        const modelNEmbdKS = (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0) !== 0
-            ? (this._ggufFileInfo.architectureMetadata.token_shift_count ?? 0) * nEmbd
-            : (ssmDConv > 0 ? (ssmDConv - 1) : 0) * ssmDInner;
-
-        const ssmDState = this._ggufFileInfo.architectureMetadata.ssm?.state_size ?? 0;
-        const modelNEmbdVS = (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0) !== 0
-            ? nEmbd * (this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0)
-            : ssmDState * ssmDInner;
-
-        let totalElementsK = 0;
-        let totalElementsV = 0;
-        for (let i = 0; i < layers; i++) {
-            const nHeadKvArrayItem: number = (typeof nHeadKv === "number")
-                ? nHeadKv
-                : nHeadKv[i] !== 0
-                    ? nHeadKv[i]
-                    : nHead;
-
-            const nEmbdKGqa = nEmbdHeadK * nHeadKvArrayItem;
-            const nEmbdVGqa = nEmbdHeadV * nHeadKvArrayItem;
-
-            const totalNEmbdKGqa = nEmbdKGqa + modelNEmbdKS;
-            const totalNEmbdVGqa = nEmbdVGqa + modelNEmbdVS;
-
-            totalElementsK += totalNEmbdKGqa * kvSize;
-            totalElementsV += totalNEmbdVGqa * kvSize;
-        }
-
-        const keyTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
+        const keyTypeSize = architecture === GgufArchitectureType.mamba
             // if `type_k` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size
             : this._llama._consts.ggmlTypeF16Size;
-        const valueTypeSize = this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.mamba
+        const valueTypeSize = architecture === GgufArchitectureType.mamba
             // if `type_v` of `llama_context_params` changes to be configurable in `LlamaContext`,
             // this would have to depend on that value
             ? this._llama._consts.ggmlTypeF32Size
             : this._llama._consts.ggmlTypeF16Size;
 
-        return (
-            (totalElementsK * keyTypeSize) +
-            (totalElementsV * valueTypeSize)
-        );
+        // source: `llama_model::load_tensors` in `llama-model.cpp`
+        // repeating layers are assigned to GPU from `i_gpu_start = n_layer + 1 - n_gpu_layers`
+        const gpuRepeatingLayerStart = Math.max(0, (totalFileLayers + 1) - finalModelGpuLayers);
+        const recurrentLayersByPattern = this.isRecurrent
+            ? "all"
+            : getRecurrentLayersPattern(architecture, this._ggufFileInfo.architectureMetadata);
+        let gpuKvElementsK = 0;
+        let gpuKvElementsV = 0;
+        let cpuKvElementsK = 0;
+        let cpuKvElementsV = 0;
+        let gpuRecurrentLayers = 0;
+        let cpuRecurrentLayers = 0;
+
+        for (let i = 0; i < totalFileLayers; i++) {
+            const isGpuLayer = i >= gpuRepeatingLayerStart;
+            const isRecurrentLayer = isLayerRecurrent(recurrentLayersByPattern, i);
+
+            if (isRecurrentLayer) {
+                if (isGpuLayer)
+                    gpuRecurrentLayers++;
+                else
+                    cpuRecurrentLayers++;
+            } else {
+                const nHeadKvLayer = resolveLayerHeadCountKv(nHeadKv, i, nHead);
+                const layerElementsK = nEmbdHeadK * nHeadKvLayer * kvSize;
+                const layerElementsV = nEmbdHeadV * nHeadKvLayer * kvSize;
+
+                if (isGpuLayer) {
+                    gpuKvElementsK += layerElementsK;
+                    gpuKvElementsV += layerElementsV;
+                } else {
+                    cpuKvElementsK += layerElementsK;
+                    cpuKvElementsV += layerElementsV;
+                }
+            }
+        }
+
+        const gpuKVCacheSize = usingGpu
+            ? ((gpuKvElementsK * keyTypeSize) + (gpuKvElementsV * valueTypeSize))
+            : 0;
+        const cpuKVCacheSize = (cpuKvElementsK * keyTypeSize) + (cpuKvElementsV * valueTypeSize);
+
+        const recurrentCellSize = Math.max(1, sequences);
+        const gpuRecurrentStateSize = usingGpu
+            ? this._estimateRecurrentStateMemorySizeInBytes(recurrentCellSize, gpuRecurrentLayers)
+            : 0;
+        const cpuRecurrentStateSize = this._estimateRecurrentStateMemorySizeInBytes(recurrentCellSize, cpuRecurrentLayers);
+
+        return {
+            gpuKVCacheSize,
+            cpuKVCacheSize,
+            gpuRecurrentStateSize,
+            cpuRecurrentStateSize
+        };
+    }
+
+    private _estimateRecurrentStateMemorySizeInBytes(recurrentCellSize: number, layers: number) {
+        if (layers <= 0 || recurrentCellSize <= 0)
+            return 0;
+
+        // source: `llama_memory_recurrent` + `llama_hparams::n_embd_r` / `llama_hparams::n_embd_s` in `llama.cpp`
+        const nHead = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
+        const nEmbd = this._ggufFileInfo.architectureMetadata.embedding_length ?? 0;
+        const wkvHeadSize = this._ggufFileInfo.architectureMetadata.wkv?.head_size ?? 0;
+        const tokenShiftCount = this._ggufFileInfo.architectureMetadata.token_shift_count ?? 0;
+        const ssmDConv = this._ggufFileInfo.architectureMetadata.ssm?.conv_kernel ?? 0;
+        const ssmDInner = this._ggufFileInfo.architectureMetadata.ssm?.inner_size ?? 0;
+        const ssmDState = this._ggufFileInfo.architectureMetadata.ssm?.state_size ?? 0;
+        const ssmGroupCount = this._ggufFileInfo.architectureMetadata.ssm?.group_count ?? 0;
+        const shortConvLCache = this._ggufFileInfo.architectureMetadata.shortconv?.l_cache ?? 0;
+        const kdaHeadDim = this._ggufFileInfo.architectureMetadata.kda?.head_dim ?? 0;
+        const shortConvHistoryShift = 1;
+        const kdaQkvStateCount = 3;
+        const kdaDefaultConvKernel = 3;
+        const ssmBcStatePairCount = 2;
+
+        const nEmbdR = wkvHeadSize !== 0
+            ? tokenShiftCount * nEmbd
+            : shortConvLCache !== 0
+                ? nEmbd * Math.max(0, shortConvLCache - shortConvHistoryShift)
+                : kdaHeadDim !== 0
+                    ? (
+                        kdaQkvStateCount * (
+                            ssmDConv > 0
+                                ? ssmDConv - shortConvHistoryShift
+                                : kdaDefaultConvKernel
+                        ) * (nHead * kdaHeadDim)
+                    )
+                    : (
+                        (
+                            ssmDConv > 0
+                                ? (ssmDConv - shortConvHistoryShift)
+                                : 0
+                        ) * (ssmDInner + (ssmBcStatePairCount * ssmGroupCount * ssmDState))
+                    );
+        const nEmbdS = wkvHeadSize !== 0
+            ? nEmbd * wkvHeadSize
+            : kdaHeadDim !== 0
+                ? kdaHeadDim * kdaHeadDim * nHead
+                : ssmDState * ssmDInner;
+
+        if (nEmbdR === 0 && nEmbdS === 0)
+            return 0;
+
+        const recurrentTypeSize = this._llama._consts.ggmlTypeF32Size;
+        const bytesPerLayer = (nEmbdR + nEmbdS) * recurrentTypeSize;
+
+        return layers * recurrentCellSize * bytesPerLayer;
     }
 
     /** @internal */
@@ -814,22 +934,37 @@ function ggmlPad(value: number, padding: number): number {
     return ((value + padding - 1) & ~(padding - 1));
 }
 
-function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): number {
+function getSwaPatternForArchitecture(architecture?: GgufArchitectureType, slidingWindowPattern?: number | number[]): number {
+    if (typeof slidingWindowPattern === "number")
+        return slidingWindowPattern;
+
     // source: `llama_model::load_hparams` in `llama-model.cpp` - calls to `hparams.set_swa_pattern`
     switch (architecture) {
         case GgufArchitectureType.llama4:
             return 4;
+        case GgufArchitectureType.afmoe:
+            return 4;
+        case GgufArchitectureType.modernBert:
+            return 3;
         case GgufArchitectureType.phi3:
             return 1;
+        case GgufArchitectureType.plamo3:
+            return 8;
         case GgufArchitectureType.gemma2:
             return 2;
         case GgufArchitectureType.gemma3:
             return 6;
         case GgufArchitectureType.gemma3n:
             return 5;
+        case GgufArchitectureType.gemmaEmbedding:
+            return 6;
         case GgufArchitectureType.cohere2:
             return 4;
+        case GgufArchitectureType.olmo2:
+            return 4;
         case GgufArchitectureType.exaone4:
+            return 4;
+        case GgufArchitectureType.exaoneMoe:
             return 4;
         case GgufArchitectureType.gptOss:
             return 2;
@@ -838,6 +973,107 @@ function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): numb
     }
 
     return 1;
+}
+
+function resolveLayerHeadCountKv(nHeadKv: number | number[], layerIndex: number, nHead: number): number {
+    if (typeof nHeadKv === "number")
+        return nHeadKv;
+
+    const layerHeadCountKv = nHeadKv[layerIndex];
+    if (layerHeadCountKv == null)
+        return nHead;
+
+    return layerHeadCountKv;
+}
+
+type RecurrentLayersPattern = "none" | "all" |
+    {type: "fullAttentionInterval", interval: number} |
+    {type: "headCountKvArray", values: number[]} |
+    {type: "headCountKvAndFeedForward", headCountKvValues: number[], feedForwardLength: number | number[] | undefined};
+
+function getRecurrentLayersPattern(
+    architecture: GgufArchitectureType | undefined,
+    architectureMetadata: GgufFileInfo["architectureMetadata"]
+): RecurrentLayersPattern {
+    const nHeadKv = architectureMetadata?.attention?.head_count_kv;
+    const feedForwardLength = architectureMetadata?.feed_forward_length as number | number[] | undefined;
+    const hasRecurrentHeadCountKvEntry = Array.isArray(nHeadKv) && nHeadKv.some((value) => value === 0);
+
+    if (architecture === GgufArchitectureType.falconH1)
+        // source: `llama_model::load_hparams` in `llama-model.cpp`:
+        // `case LLM_ARCH_FALCON_H1` does `std::fill(..., true)` for `recurrent_layer_arr`
+        return "all";
+
+    if (architecture === GgufArchitectureType.nemotronH || architecture === GgufArchitectureType.nemotronHMoe) {
+        // source: `llama_model::load_hparams` in `llama-model.cpp`:
+        // `case LLM_ARCH_NEMOTRON_H / LLM_ARCH_NEMOTRON_H_MOE`:
+        // `recurrent_layer_arr[i] = (n_head_kv(i) == 0 && n_ff(i) == 0)`
+        if (Array.isArray(nHeadKv))
+            return {
+                type: "headCountKvAndFeedForward",
+                headCountKvValues: nHeadKv,
+                feedForwardLength
+            };
+
+        if (nHeadKv === 0) {
+            if (typeof feedForwardLength === "number")
+                return feedForwardLength === 0
+                    ? "all"
+                    : "none";
+
+            return "none";
+        }
+    }
+
+    if (
+        typeof architectureMetadata?.full_attention_interval === "number" &&
+        Number.isFinite(architectureMetadata?.full_attention_interval) &&
+        architectureMetadata?.full_attention_interval > 0 &&
+        (
+            // source: `llama_model::load_hparams` in `llama-model.cpp`
+            // `case LLM_ARCH_QWEN3NEXT / LLM_ARCH_QWEN35 / LLM_ARCH_QWEN35MOE`:
+            // `hparams.recurrent_layer_arr[i] = ((i + 1) % full_attn_interval != 0)`
+            architecture === GgufArchitectureType.qwen3next ||
+            architecture === GgufArchitectureType.qwen35 ||
+            architecture === GgufArchitectureType.qwen35moe ||
+            hasRecurrentHeadCountKvEntry
+        )
+    )
+        return {
+            type: "fullAttentionInterval",
+            interval: Math.max(1, Math.floor(architectureMetadata?.full_attention_interval))
+        };
+
+    if (hasRecurrentHeadCountKvEntry)
+        return {
+            type: "headCountKvArray",
+            values: nHeadKv
+        };
+
+    return "none";
+}
+
+function isLayerRecurrent(pattern: RecurrentLayersPattern, layerIndex: number): boolean {
+    if (pattern === "all")
+        return true;
+    else if (pattern === "none")
+        return false;
+    else if (pattern.type === "fullAttentionInterval")
+        return (layerIndex + 1) % pattern.interval !== 0;
+    else if (pattern.type === "headCountKvAndFeedForward")
+        return pattern.headCountKvValues[layerIndex] === 0 &&
+            resolveLayerFeedForwardLength(pattern.feedForwardLength, layerIndex) === 0;
+
+    return pattern.values[layerIndex] === 0;
+}
+
+function resolveLayerFeedForwardLength(feedForwardLength: number | number[] | undefined, layerIndex: number): number {
+    if (typeof feedForwardLength === "number")
+        return feedForwardLength;
+    else if (Array.isArray(feedForwardLength))
+        return feedForwardLength[layerIndex] ?? 0;
+
+    return 0;
 }
 
 export function parseRankingTemplate(template: string | undefined | null): string | undefined {

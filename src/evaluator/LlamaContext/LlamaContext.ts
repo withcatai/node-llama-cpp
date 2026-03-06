@@ -1318,6 +1318,7 @@ export class LlamaContextSequence {
             const newSequenceTokens = this._contextTokens.slice();
             this._nextTokenIndex = 0;
             this._context._ctx.disposeSequence(this._sequenceId);
+            this._contextTokens = [];
 
             // wait for the evaluation outside the "context" lock to avoid deadlocks
             awaitPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
