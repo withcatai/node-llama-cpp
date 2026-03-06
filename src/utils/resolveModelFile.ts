@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import chalk from "chalk";
+import {acquireLock} from "lifecycle-utils";
 import {cliModelsDirectory} from "../config.js";
 import {getReadablePath} from "../cli/utils/getReadablePath.js";
 import {resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
@@ -11,14 +12,6 @@ import {createModelDownloader} from "./createModelDownloader.js";
 import {genericFilePartNumber} from "./parseModelUri.js";
 import {isFilePartText} from "./parseModelFileName.js";
 import {pushAll} from "./pushAll.js";
-
-/**
- * In-flight download promises keyed by resolved file path.
- * Prevents concurrent `resolveModelFile` calls from starting duplicate downloads
- * to the same destination, which causes FileHandle GC errors on Node 22+
- * when two ipull instances write to the same `.ipull` temp file.
- */
-const inFlightDownloads = new Map<string, Promise<string>>();
 
 export type ResolveModelFileOptions = {
     /**
@@ -277,35 +270,29 @@ export async function resolveModelFile(
         }
     }
 
-    const downloadKey = downloader.entrypointFilePath;
-    const existingDownload = inFlightDownloads.get(downloadKey);
-    if (existingDownload != null) {
-        await downloader.cancel({deleteTempFile: false});
-        return existingDownload;
-    }
-
-    const downloadPromise = (async () => {
-        try {
-            if (resolvedCli)
-                console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
-                    downloader.splitBinaryParts != null
-                        ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
-                        : ""
-                }`);
-
-            await downloader.download({signal});
-
-            if (resolvedCli)
-                console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
-
+    const lock = await acquireLock([resolveModelFile, "download", downloader.entrypointFilePath]);
+    try {
+        if (await fs.pathExists(downloader.entrypointFilePath)) {
+            await downloader.cancel({deleteTempFile: false});
             return downloader.entrypointFilePath;
-        } finally {
-            inFlightDownloads.delete(downloadKey);
         }
-    })();
 
-    inFlightDownloads.set(downloadKey, downloadPromise);
-    return downloadPromise;
+        if (resolvedCli)
+            console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
+                downloader.splitBinaryParts != null
+                    ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
+                    : ""
+            }`);
+
+        await downloader.download({signal});
+
+        if (resolvedCli)
+            console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+
+        return downloader.entrypointFilePath;
+    } finally {
+        lock.dispose();
+    }
 }
 
 async function findMatchingFilesInDirectory(dirPath: string, fileNames: (string | `${string}${typeof genericFilePartNumber}${string}`)[]) {
