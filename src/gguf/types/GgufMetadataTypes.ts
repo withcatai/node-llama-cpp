@@ -18,6 +18,7 @@ export const enum GgufArchitectureType {
     neoBert = "neo-bert",
     jinaBertV2 = "jina-bert-v2",
     jinaBertV3 = "jina-bert-v3",
+    eurobert = "eurobert",
     bloom = "bloom",
     stablelm = "stablelm",
     qwen = "qwen",
@@ -71,6 +72,7 @@ export const enum GgufArchitectureType {
     t5 = "t5",
     t5encoder = "t5encoder",
     jais = "jais",
+    jais2 = "jais2",
     nemotron = "nemotron",
     nemotronH = "nemotron_h",
     nemotronHMoe = "nemotron_h_moe",
@@ -112,10 +114,12 @@ export const enum GgufArchitectureType {
     rnd1 = "rnd1",
     panguEmbedded = "pangu-embedded",
     mistral3 = "mistral3",
+    paddleocr = "paddleocr",
     mimo2 = "mimo2",
     step35 = "step35",
     llamaEmbed = "llama-embed",
     maincoder = "maincoder",
+    kimiLinear = "kimi-linear",
     clip = "clip",
     unknown = "(unknown)"
 }
@@ -298,7 +302,8 @@ export type GgufMetadataTokenizer = {
             "pixtral" | "mpt" | "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" |
             "jina-v2-code" | "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" |
             "viking" | "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "exaone4" | "chameleon" |
-            "minerva-7b" | "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | "a.x-4.0" | "mellum" | string,
+            "minerva-7b" | "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | "a.x-4.0" | "mellum" | "modern-bert" |
+            "roberta-bpe" | "deepseek-r1-qwen" | "kormo" | "qwen35" | string,
         readonly tokens: readonly string[],
         readonly token_type: GgufMetadataTokenizerTokenType[],
         readonly token_type_count?: number,
@@ -352,6 +357,7 @@ export type GgufMetadataDefaultArchitectureType = {
     readonly context_length?: number,
     readonly embedding_length?: number,
     readonly block_count?: number,
+    readonly full_attention_interval?: number,
     readonly feed_forward_length?: number,
     readonly use_parallel_residual?: boolean,
     readonly tensor_data_layout?: string,
@@ -371,12 +377,14 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly key_length?: number,
         readonly value_length?: number,
         readonly sliding_window?: number,
+        readonly sliding_window_pattern?: number | number[],
         readonly causal?: boolean
     },
 
     readonly rope?: {
         readonly dimension_count?: number,
         readonly freq_base?: number,
+        readonly freq_base_swa?: number,
         readonly scale_linear?: number,
         readonly scaling?: {
             readonly type?: "none" | "linear" | "yarn" | string,
@@ -390,7 +398,16 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly conv_kernel?: number,
         readonly inner_size?: number,
         readonly state_size?: number,
-        readonly time_step_rank?: number
+        readonly time_step_rank?: number,
+        readonly group_count?: number
+    },
+
+    readonly kda?: {
+        readonly head_dim?: number
+    },
+
+    readonly shortconv?: {
+        readonly l_cache?: number
     },
 
     readonly wkv?: {
