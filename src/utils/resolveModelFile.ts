@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import chalk from "chalk";
+import {acquireLock} from "lifecycle-utils";
 import {cliModelsDirectory} from "../config.js";
 import {getReadablePath} from "../cli/utils/getReadablePath.js";
 import {resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
@@ -11,7 +12,6 @@ import {createModelDownloader} from "./createModelDownloader.js";
 import {genericFilePartNumber} from "./parseModelUri.js";
 import {isFilePartText} from "./parseModelFileName.js";
 import {pushAll} from "./pushAll.js";
-
 
 export type ResolveModelFileOptions = {
     /**
@@ -270,19 +270,29 @@ export async function resolveModelFile(
         }
     }
 
-    if (resolvedCli)
-        console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
-            downloader.splitBinaryParts != null
-                ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
-                : ""
-        }`);
+    const lock = await acquireLock([resolveModelFile, "download", downloader.entrypointFilePath]);
+    try {
+        if (await fs.pathExists(downloader.entrypointFilePath)) {
+            await downloader.cancel({deleteTempFile: false});
+            return downloader.entrypointFilePath;
+        }
 
-    await downloader.download({signal});
+        if (resolvedCli)
+            console.info(`Downloading to ${chalk.yellow(getReadablePath(resolvedDirectory))}${
+                downloader.splitBinaryParts != null
+                    ? chalk.gray(` (combining ${downloader.splitBinaryParts} parts into a single file)`)
+                    : ""
+            }`);
 
-    if (resolvedCli)
-        console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+        await downloader.download({signal});
 
-    return downloader.entrypointFilePath;
+        if (resolvedCli)
+            console.info(`Downloaded to ${chalk.yellow(getReadablePath(downloader.entrypointFilePath))}`);
+
+        return downloader.entrypointFilePath;
+    } finally {
+        lock.dispose();
+    }
 }
 
 async function findMatchingFilesInDirectory(dirPath: string, fileNames: (string | `${string}${typeof genericFilePartNumber}${string}`)[]) {
