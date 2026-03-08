@@ -18,7 +18,7 @@ export type LlamaGrammarEvaluationStateOptions = {
  */
 export class LlamaGrammarEvaluationState {
     /** @internal */ public readonly _llama: Llama;
-    /** @internal */ public readonly _state: AddonGrammarEvaluationState;
+    /** @internal */ public _state: AddonGrammarEvaluationState;
 
     public constructor(options: LlamaGrammarEvaluationStateOptions);
     public constructor(existingState: LlamaGrammarEvaluationState);
@@ -40,5 +40,13 @@ export class LlamaGrammarEvaluationState {
     /** Clone the grammar evaluation state */
     public clone(): LlamaGrammarEvaluationState {
         return new LlamaGrammarEvaluationState(this);
+    }
+
+    /** @internal */
+    public _cloneInto(other: LlamaGrammarEvaluationState) {
+        if (this._llama !== other._llama)
+            throw new Error("Cannot clone into a state from a different Llama instance");
+
+        other._state = new this._llama._bindings.AddonGrammarEvaluationState(this._state);
     }
 }

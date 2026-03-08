@@ -1692,6 +1692,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     };
     private readonly dryRepeatPenalty?: LLamaContextualDryRepeatPenalty;
     private readonly grammarEvaluationState: LlamaGrammarEvaluationState | undefined;
+    private readonly _initialGrammarEvaluationState: LlamaGrammarEvaluationState | undefined;
     private readonly functionNameGrammar?: FunctionCallNameGrammar<NonNullable<Functions>>;
     private functionsGrammar?: FunctionCallNameGrammar<NonNullable<Functions>> | FunctionCallParamsGrammar<NonNullable<Functions>>;
     private functionsEvaluationState: LlamaGrammarEvaluationState | undefined;
@@ -1866,6 +1867,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.grammarEvaluationState = this.grammar != null
             ? new LlamaGrammarEvaluationState({model: this.llamaChat.model, grammar: this.grammar})
             : undefined;
+        this._initialGrammarEvaluationState = this.grammarEvaluationState?.clone();
         this.functionNameGrammar = this.functionsEnabled
             ? new FunctionCallNameGrammar(this.llamaChat.model._llama, this.functions as NonNullable<Functions>, this.chatWrapper)
             : undefined;
@@ -2517,9 +2519,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     await injectTokens(this.noPrefixTrigger.inject, true);
 
                     this.segmentHandler.openSegment(this.noPrefixTrigger.segmentType);
-                } else if (this.noPrefixTrigger?.type === "response")
+                } else if (this.noPrefixTrigger?.type === "response") {
+                    if (this.grammarEvaluationState != null && this._initialGrammarEvaluationState != null)
+                        this._initialGrammarEvaluationState._cloneInto(this.grammarEvaluationState);
                     await injectTokens(this.noPrefixTrigger.inject, true);
-                else
+                } else
                     this.streamRegulator.addChunk({
                         tokens: generatedTokens,
                         text: this.llamaChat.model.detokenize(generatedTokens, false, this.getLastTokens())
