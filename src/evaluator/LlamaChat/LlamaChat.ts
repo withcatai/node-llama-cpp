@@ -1756,6 +1756,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         trigger: Exclude<ChatWrapperGeneratedContextState["prefixTriggers"], undefined>[number]
     }> = new Map();
     public noPrefixTrigger: ChatWrapperGeneratedContextState["noPrefixTrigger"] = undefined;
+    public responsePrefix: LlamaText | undefined = undefined;
     public rerenderTriggers: LlamaText[] = [];
     public rerenderTriggerDetector: StopGenerationDetector = new StopGenerationDetector();
     public rerenderActions: Exclude<ChatWrapperGeneratedContextState["rerender"], undefined>["action"] = undefined;
@@ -2259,6 +2260,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     )
                         continue;
 
+                    if (this.responsePrefix == null && trigger.type === "response" && trigger.triggers.length > 0 &&
+                        (trigger.triggers[0]?.values?.length ?? 0) > 0
+                    )
+                        this.responsePrefix = LlamaText([trigger.triggers[0] ?? "", trigger.inject ?? ""]);
+
                     const prefixDetector = new StopGenerationDetector();
                     StopGenerationDetector.resolveStopTriggers(trigger.triggers, this.llamaChat.model.tokenizer)
                         .forEach((stopTrigger) => prefixDetector.addStopTrigger(stopTrigger));
@@ -2292,6 +2298,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     this.segmentHandler.getSegmentTokensCount(noPrefixTrigger.segmentType) >= noPrefixTriggerSegmentBudget
                 )
                     this.noPrefixTrigger = undefined;
+                else if (noPrefixTrigger?.type === "response")
+                    this.responsePrefix = noPrefixTrigger.inject;
 
                 this.rerenderTriggers = rerender?.triggers ?? [];
                 this.rerenderTriggerDetector.clearInProgressStops();
@@ -2391,6 +2399,13 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             if (alignStateTokens)
                 await reloadTokens();
         };
+
+        if (this.grammar != null) {
+            if (this.responsePrefix != null)
+                await injectTokens(this.responsePrefix, true);
+
+            return undefined;
+        }
 
         if (this.prefixTriggerDetectors.size === 0) {
             if (this.abortOnNonText && this.noPrefixTrigger != null && this.noPrefixTrigger.type !== "response") {
