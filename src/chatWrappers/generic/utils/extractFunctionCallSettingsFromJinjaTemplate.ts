@@ -12,10 +12,12 @@ export type ExtractFunctionCallSettingsRenderTemplate = (options: {
 
 export function extractFunctionCallSettingsFromJinjaTemplate({
     idsGenerator,
-    renderTemplate
+    renderTemplate,
+    examineNonFirstFunctionCall = false
 }: {
     idsGenerator: UniqueIdGenerator,
-    renderTemplate: ExtractFunctionCallSettingsRenderTemplate
+    renderTemplate: ExtractFunctionCallSettingsRenderTemplate,
+    examineNonFirstFunctionCall?: boolean
 }): {
     settings: ChatWrapperSettings["functions"] | null,
     stringifyParams: boolean,
@@ -79,6 +81,13 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         type: "user",
         text: userMessage1
     }];
+    const dummyChatTurn: ChatHistoryItem[] = [{
+        type: "user",
+        text: "Hi"
+    }, {
+        type: "model",
+        response: ["Hey"]
+    }];
     const chatHistory1Call: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -95,7 +104,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistoryOnlyCall: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -111,7 +120,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistory2Calls: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -135,7 +144,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistory2CallsNewChunk: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -159,7 +168,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
 
     const additionalParams = {
         "bos_token": bosTokenId,

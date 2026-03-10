@@ -105,7 +105,10 @@ export type JinjaTemplateChatWrapperOptions = {
     tokenizer?: Tokenizer,
 
     /** @internal */
-    _requireFunctionCallSettingsExtraction?: boolean
+    _requireFunctionCallSettingsExtraction?: boolean,
+
+    /** @internal */
+    _functionCallExtractionExamineNonFirst?: boolean
 };
 
 export type JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
@@ -185,7 +188,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             additionalRenderParameters,
             segments,
             tokenizer,
-            _requireFunctionCallSettingsExtraction = false
+            _requireFunctionCallSettingsExtraction = false,
+            _functionCallExtractionExamineNonFirst = false
         } = options;
 
         if (template == null)
@@ -359,7 +363,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 this._wrapFunctionParamsInsideMapKey = detectNeedToWrapFunctionArgumentsWithMap({idsGenerator, renderTemplate});
                 const extractedSettings = extractFunctionCallSettingsFromJinjaTemplate({
                     idsGenerator,
-                    renderTemplate
+                    renderTemplate,
+                    examineNonFirstFunctionCall: _functionCallExtractionExamineNonFirst
                 });
                 functionCallSettings = extractedSettings.settings;
 
