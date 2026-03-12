@@ -208,7 +208,27 @@ export type LlamaOptions = {
      *
      * Defaults to `false` (no NUMA policy).
      */
-    numa?: LlamaNuma
+    numa?: LlamaNuma,
+
+    /**
+     * A list of directories to use for internal cache to speed up processes and reduce memory usage.
+     * Cache created by this process will be automatically cleaned up when it's no longer needed,
+     * on process exit, and on the disposal of the Llama instance.
+     *
+     * The first directory that is writable from this list will be used.
+     *
+     * If no directories are provided or non are writable, these fallback will be used instead:
+     * - The directory of where `node-llama-cpp` is installed inside `node_modules`.
+     * - A `nlc.` prefixed directory under the OS's temp dir (e.g. `/tmp` on Linux).
+     * - A `.node-llama-cpp/.temp` directory under the home directory of the current user.
+     *
+     * To disable the usage of any temporary directory and caching, set this option to `false`.
+     *
+     *
+     * Hidden since currently unused - defaults to `false` for now
+     * @internal
+     */
+    tempDir?: string | string[] | false
 };
 
 export type LastBuildOptions = {
@@ -318,7 +338,27 @@ export type LastBuildOptions = {
      *
      * Defaults to `false` (no NUMA policy).
      */
-    numa?: LlamaNuma
+    numa?: LlamaNuma,
+
+    /**
+     * A list of directories to use for internal cache to speed up processes and reduce memory usage.
+     * Cache created by this process will be automatically cleaned up when it's no longer needed,
+     * on process exit, and on the disposal of the Llama instance.
+     *
+     * The first directory that is writable from this list will be used.
+     *
+     * If no directories are provided or non are writable, these fallback will be used instead:
+     * - The directory of where `node-llama-cpp` is installed inside `node_modules`.
+     * - A `nlc.` prefixed directory under the OS's temp dir (e.g. `/tmp` on Linux).
+     * - A `.node-llama-cpp/.temp` directory under the home directory of the current user.
+     *
+     * To disable the usage of any temporary directory and caching, set this option to `false`.
+     *
+     *
+     * Hidden since currently unused - defaults to `false` for now
+     * @internal
+     */
+    tempDir?: string | string[] | false
 };
 
 export const getLlamaFunctionName = "getLlama";
@@ -335,6 +375,7 @@ export const defaultLlamaRamPadding = (totalRam: number) => {
 const defaultBuildOption: Exclude<LlamaOptions["build"], undefined> = runningInElectron
     ? "never"
     : "auto";
+const defaultTempDir: LlamaOptions["tempDir"] = false;
 
 /**
  * Get a `llama.cpp` binding.
@@ -377,6 +418,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
             debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
             numa: lastBuildOptions?.numa,
+            tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
             dryRun
         };
 
@@ -405,6 +447,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     ramPadding: lastBuildOptions?.ramPadding ?? defaultLlamaRamPadding,
                     debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
                     numa: lastBuildOptions?.numa,
+                    tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
                     skipLlamaInit: dryRun
                 });
 
@@ -440,6 +483,7 @@ export async function getLlamaForOptions({
     ramPadding = defaultLlamaRamPadding,
     debug = defaultLlamaCppDebugMode,
     numa = false,
+    tempDir = defaultTempDir,
     dryRun = false
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
@@ -514,6 +558,7 @@ export async function getLlamaForOptions({
                     ramPadding,
                     debug,
                     numa,
+                    tempDir,
                     dryRun
                 });
             } catch (err) {
@@ -532,6 +577,7 @@ export async function getLlamaForOptions({
                     ramPadding,
                     debug,
                     numa,
+                    tempDir,
                     dryRun
                 });
             }
@@ -579,6 +625,7 @@ export async function getLlamaForOptions({
                     ),
                 debug,
                 numa,
+                tempDir,
                 pipeBinaryTestErrorLogs
             });
 
@@ -614,7 +661,8 @@ export async function getLlamaForOptions({
                         ramPadding,
                         skipLlamaInit,
                         debug,
-                        numa
+                        numa,
+                        tempDir
                     });
                 } catch (err) {
                     console.error(
@@ -691,7 +739,8 @@ export async function getLlamaForOptions({
                 ramPadding,
                 skipLlamaInit,
                 debug,
-                numa
+                numa,
+                tempDir
             });
         } catch (err) {
             console.error(
@@ -737,6 +786,7 @@ async function loadExistingLlamaBinary({
     fallbackMessage,
     debug,
     numa,
+    tempDir,
     pipeBinaryTestErrorLogs
 }: {
     buildOptions: BuildOptions,
@@ -754,6 +804,7 @@ async function loadExistingLlamaBinary({
     fallbackMessage: string | null,
     debug: boolean,
     numa?: LlamaNuma,
+    tempDir: LlamaOptions["tempDir"],
     pipeBinaryTestErrorLogs: boolean
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
@@ -791,7 +842,8 @@ async function loadExistingLlamaBinary({
                     ramPadding,
                     skipLlamaInit,
                     debug,
-                    numa
+                    numa,
+                    tempDir
                 });
             } else if (progressLogs) {
                 console.warn(
@@ -857,7 +909,8 @@ async function loadExistingLlamaBinary({
                         ramPadding,
                         skipLlamaInit,
                         debug,
-                        numa
+                        numa,
+                        tempDir
                     });
                 } else if (progressLogs) {
                     const binaryDescription = describeBinary({
@@ -913,7 +966,8 @@ async function buildAndLoadLlamaBinary({
     ramPadding,
     skipLlamaInit,
     debug,
-    numa
+    numa,
+    tempDir
 }: {
     buildOptions: BuildOptions,
     skipDownload: boolean,
@@ -925,7 +979,8 @@ async function buildAndLoadLlamaBinary({
     ramPadding: Required<LlamaOptions>["ramPadding"],
     skipLlamaInit: boolean,
     debug: boolean,
-    numa?: LlamaNuma
+    numa?: LlamaNuma,
+    tempDir: LlamaOptions["tempDir"]
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -960,7 +1015,8 @@ async function buildAndLoadLlamaBinary({
         ramPadding,
         skipLlamaInit,
         debug,
-        numa
+        numa,
+        tempDir
     });
 }
 
