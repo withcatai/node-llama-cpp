@@ -112,43 +112,43 @@ export class QwenChatWrapper extends ChatWrapper {
                     }
                 }
             };
-
-        this.settings = {
-            supportsSystemMessages: true,
-            functions: {
-                call: {
-                    optionalPrefixSpace: true,
-                    prefix: LlamaText(new SpecialTokensText("<tool_call>\n<function=")),
-                    paramsPrefix: ">\n<parameter=params>\n",
-                    suffix: LlamaText(new SpecialTokensText("\n</parameter>\n</function>\n</tool_call>")),
-                    emptyCallParamsPlaceholder: {}
-                },
-                result: {
-                    prefix: LlamaText(new SpecialTokensText("\n<tool_response>\n")),
-                    suffix: LlamaText(new SpecialTokensText("\n</tool_response>"))
-                },
-                parallelism: {
+        else
+            this.settings = {
+                supportsSystemMessages: true,
+                functions: {
                     call: {
-                        sectionPrefix: _lineBreakBeforeFunctionCallPrefix
-                            ? "\n\n"
-                            : "",
-                        betweenCalls: "\n",
-                        sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n"))
+                        optionalPrefixSpace: true,
+                        prefix: LlamaText(new SpecialTokensText("<tool_call>\n<function=")),
+                        paramsPrefix: ">\n<parameter=params>\n",
+                        suffix: LlamaText(new SpecialTokensText("\n</parameter>\n</function>\n</tool_call>")),
+                        emptyCallParamsPlaceholder: {}
                     },
                     result: {
-                        sectionPrefix: LlamaText(new SpecialTokensText("<|im_start|>user")),
-                        sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n<|im_start|>assistant\n"))
+                        prefix: LlamaText(new SpecialTokensText("\n<tool_response>\n")),
+                        suffix: LlamaText(new SpecialTokensText("\n</tool_response>"))
+                    },
+                    parallelism: {
+                        call: {
+                            sectionPrefix: _lineBreakBeforeFunctionCallPrefix
+                                ? "\n\n"
+                                : "",
+                            betweenCalls: "\n",
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n"))
+                        },
+                        result: {
+                            sectionPrefix: LlamaText(new SpecialTokensText("<|im_start|>user")),
+                            sectionSuffix: LlamaText(new SpecialTokensText("<|im_end|>\n<|im_start|>assistant\n"))
+                        }
+                    }
+                },
+                segments: {
+                    reiterateStackAfterFunctionCalls: true,
+                    thought: {
+                        prefix: LlamaText(new SpecialTokensText("<think>\n")),
+                        suffix: LlamaText(new SpecialTokensText("\n</think>"))
                     }
                 }
-            },
-            segments: {
-                reiterateStackAfterFunctionCalls: true,
-                thought: {
-                    prefix: LlamaText(new SpecialTokensText("<think>\n")),
-                    suffix: LlamaText(new SpecialTokensText("\n</think>"))
-                }
-            }
-        };
+            };
     }
 
     public override generateContextState({
@@ -311,45 +311,45 @@ export class QwenChatWrapper extends ChatWrapper {
                 '{"name": <function-name>, "arguments": <args-json-object>}',
                 LlamaText(new SpecialTokensText("</tool_call>"))
             ]);
-
-        return LlamaText.joinValues("\n", [
-            "# Tools",
-            "",
-            "You have access to the following functions:",
-            "",
-            LlamaText(new SpecialTokensText("<tools>")),
-            functionsDocumentationGenerator.getQwenFunctionSignatures({documentParams}),
-            LlamaText(new SpecialTokensText("</tools>")),
-            "",
-            LlamaText("If you choose to call a function ONLY reply in the following format with NO suffix:"),
-            "",
-            LlamaText(new SpecialTokensText("<tool_call>")),
-            LlamaText(new SpecialTokensText("<function="), "example_function_name", new SpecialTokensText(">")),
-            LlamaText(new SpecialTokensText("<parameter="), "example_parameter_1", new SpecialTokensText(">")),
-            "value_1",
-            LlamaText(new SpecialTokensText("</parameter>")),
-            LlamaText(new SpecialTokensText("<parameter="), "example_parameter_2", new SpecialTokensText(">")),
-            "This is the value for the second parameter",
-            "that can span",
-            "multiple lines",
-            LlamaText(new SpecialTokensText("</parameter>")),
-            LlamaText(new SpecialTokensText("</function>")),
-            LlamaText(new SpecialTokensText("</tool_call>")),
-            "",
-            LlamaText(new SpecialTokensText("<IMPORTANT>")),
-            "Reminder:",
-            LlamaText([
-                "- Function calls MUST follow the specified format: an inner ",
-                new SpecialTokensText("<function=...></function>"),
-                " block must be nested within ",
-                new SpecialTokensText("<tool_call></tool_call>"),
-                " XML tags"
-            ]),
-            "- Required parameters MUST be specified",
-            "- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after",
-            "- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls",
-            LlamaText(new SpecialTokensText("</IMPORTANT>"))
-        ]);
+        else
+            return LlamaText.joinValues("\n", [
+                "# Tools",
+                "",
+                "You have access to the following functions:",
+                "",
+                LlamaText(new SpecialTokensText("<tools>")),
+                functionsDocumentationGenerator.getQwenFunctionSignatures({documentParams}),
+                LlamaText(new SpecialTokensText("</tools>")),
+                "",
+                LlamaText("If you choose to call a function ONLY reply in the following format with NO suffix:"),
+                "",
+                LlamaText(new SpecialTokensText("<tool_call>")),
+                LlamaText(new SpecialTokensText("<function="), "example_function_name", new SpecialTokensText(">")),
+                LlamaText(new SpecialTokensText("<parameter="), "example_parameter_1", new SpecialTokensText(">")),
+                "value_1",
+                LlamaText(new SpecialTokensText("</parameter>")),
+                LlamaText(new SpecialTokensText("<parameter="), "example_parameter_2", new SpecialTokensText(">")),
+                "This is the value for the second parameter",
+                "that can span",
+                "multiple lines",
+                LlamaText(new SpecialTokensText("</parameter>")),
+                LlamaText(new SpecialTokensText("</function>")),
+                LlamaText(new SpecialTokensText("</tool_call>")),
+                "",
+                LlamaText(new SpecialTokensText("<IMPORTANT>")),
+                "Reminder:",
+                LlamaText([
+                    "- Function calls MUST follow the specified format: an inner ",
+                    new SpecialTokensText("<function=...></function>"),
+                    " block must be nested within ",
+                    new SpecialTokensText("<tool_call></tool_call>"),
+                    " XML tags"
+                ]),
+                "- Required parameters MUST be specified",
+                "- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after",
+                "- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls",
+                LlamaText(new SpecialTokensText("</IMPORTANT>"))
+            ]);
     }
 
     /** @internal */
