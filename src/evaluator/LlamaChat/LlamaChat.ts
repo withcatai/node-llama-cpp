@@ -1,6 +1,6 @@
 import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {ChatWrapper} from "../../ChatWrapper.js";
-import {LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
+import {internalCheckpoints, LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatModelResponse, ChatModelSegmentType, ChatUserMessage, isChatModelResponseFunctionCall,
     isChatModelResponseSegment, LLamaContextualRepeatPenalty, Token, Tokenizer, allSegmentTypes, ChatWrapperGeneratedContextState,
@@ -675,6 +675,8 @@ export class LlamaChat {
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatResponse<Functions>> => {
             try {
+                let tookInitialCheckpoint = false;
+
                 generateResponseState.ensureLastHistoryItemIsModel();
                 generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
 
@@ -733,6 +735,11 @@ export class LlamaChat {
                     await generateResponseState.createNewEvaluationIterator();
 
                     while (await generateResponseState.iterateEvaluation()) {
+                        if (!tookInitialCheckpoint && this.sequence.needsCheckpoints) {
+                            await this.sequence.takeCheckpoint();
+                            tookInitialCheckpoint = true;
+                        }
+
                         if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
                             generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
@@ -747,7 +754,11 @@ export class LlamaChat {
                                     return functionsCallsRes;
                             }
 
-                            generateResponseState.recordStopGenerationEvaluation();
+                            {
+                                const resPromise = generateResponseState.recordStopGenerationEvaluation();
+                                if (resPromise instanceof Promise)
+                                    await resPromise;
+                            }
 
                             generateResponseState.popStreamRegulatorFreeTokens();
                             generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
@@ -793,6 +804,9 @@ export class LlamaChat {
                 throw new Error("The context size is too small to generate a response");
             } finally {
                 await generateResponseState.dispose();
+
+                if (this.sequence.needsCheckpoints)
+                    void this.sequence.takeCheckpoint();
             }
         });
     }
@@ -892,6 +906,7 @@ export class LlamaChat {
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatLoadAndCompleteUserResponse> => {
             try {
+                let tookInitialCheckpoint = false;
                 generateResponseState.ensureLastHistoryItemIsUser();
 
                 while (true) {
@@ -958,11 +973,21 @@ export class LlamaChat {
                     }
 
                     await generateResponseState.createNewEvaluationIterator();
+
                     while (await generateResponseState.iterateEvaluation()) {
+                        if (!tookInitialCheckpoint && this.sequence.needsCheckpoints) {
+                            await this.sequence.takeCheckpoint();
+                            tookInitialCheckpoint = true;
+                        }
+
                         if (!generateResponseState.holdPartialTokensForNextEvaluation()) {
                             generateResponseState.waitOnPartialCharactersOrWhiteSpaceTokens();
 
-                            generateResponseState.recordStopGenerationEvaluation();
+                            {
+                                const resPromise = generateResponseState.recordStopGenerationEvaluation();
+                                if (resPromise instanceof Promise)
+                                    await resPromise;
+                            }
 
                             generateResponseState.popStreamRegulatorFreeTokens();
 
@@ -2435,8 +2460,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         const generatedTokens: Token[] = [];
         let isFirstToken = true;
         let continueGeneration = true;
+        let tookInitialCheckpoint = false;
 
         for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+            if (!tookInitialCheckpoint && this.llamaChat.sequence.needsCheckpoints) {
+                await this.llamaChat.sequence._takeNamedCheckpoint(
+                    internalCheckpoints.chatSequenceStart.name,
+                    internalCheckpoints.chatSequenceStart.maxCheckpoints
+                );
+                tookInitialCheckpoint = true;
+            }
+
             pushAll(generatedTokens, tokens);
 
             for (const [triggerDetector, {trigger, inject}] of [...this.prefixTriggerDetectors.entries()]) {
@@ -2618,7 +2652,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
+                let tookInitialCheckpoint = false;
                 for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    if (!tookInitialCheckpoint && this.llamaChat.sequence.needsCheckpoints) {
+                        await this.llamaChat.sequence._takeNamedCheckpoint(
+                            internalCheckpoints.chatSequenceStart.name,
+                            internalCheckpoints.chatSequenceStart.maxCheckpoints
+                        );
+                        tookInitialCheckpoint = true;
+                    }
+
                     const stopGenerationTriggerRes = this.handleStopGenerationTrigger("model");
                     if (stopGenerationTriggerRes != null)
                         return stopGenerationTriggerRes;
@@ -2670,7 +2713,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                             tokens: this.currentTokens,
                             text: this.currentText
                         });
-                        this.recordStopGenerationEvaluation();
+                        {
+                            const resPromise = this.recordStopGenerationEvaluation();
+                            if (resPromise instanceof Promise)
+                                await resPromise;
+                        }
                     }
 
                     this.currentFunctionCallCurrentPartTokens.length = 0;
@@ -2754,7 +2801,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     }
                 }
 
+                let tookInitialCheckpoint = false;
                 for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    if (!tookInitialCheckpoint && this.llamaChat.sequence.needsCheckpoints) {
+                        await this.llamaChat.sequence._takeNamedCheckpoint(
+                            internalCheckpoints.chatSequenceStart.name,
+                            internalCheckpoints.chatSequenceStart.maxCheckpoints
+                        );
+                        tookInitialCheckpoint = true;
+                    }
+
                     pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     functionNameGenerationDoneDetector.recordGeneration({
@@ -2832,11 +2888,29 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                             done: false
                         });
 
+                    let tookInitialCheckpoint = false;
                     for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                        if (!tookInitialCheckpoint && this.llamaChat.sequence.needsCheckpoints) {
+                            await this.llamaChat.sequence._takeNamedCheckpoint(
+                                internalCheckpoints.chatSequenceStart.name,
+                                internalCheckpoints.chatSequenceStart.maxCheckpoints
+                            );
+                            tookInitialCheckpoint = true;
+                        }
+
+                        const hadInProgressTriggers = functionParamsGenerationDoneDetector.hasInProgressStops;
                         functionParamsGenerationDoneDetector.recordGeneration({
                             text: this.currentText,
                             tokens: this.currentTokens
                         });
+
+                        if (!hadInProgressTriggers && functionParamsGenerationDoneDetector.hasInProgressStops &&
+                            this.llamaChat.sequence.needsCheckpoints
+                        )
+                            await this.llamaChat.sequence._takeNamedCheckpoint(
+                                internalCheckpoints.chatGrammarEnd.name,
+                                internalCheckpoints.chatGrammarEnd.maxCheckpoints
+                            );
 
                         this.onFunctionCallParamsChunk?.({
                             callIndex: this.resFunctionCalls.length,
@@ -2920,7 +2994,16 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 ], this.llamaChat.model.tokenizer)
                     .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
 
+                let tookInitialCheckpoint = false;
                 for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
+                    if (!tookInitialCheckpoint && this.llamaChat.sequence.needsCheckpoints) {
+                        await this.llamaChat.sequence._takeNamedCheckpoint(
+                            internalCheckpoints.chatSequenceStart.name,
+                            internalCheckpoints.chatSequenceStart.maxCheckpoints
+                        );
+                        tookInitialCheckpoint = true;
+                    }
+
                     pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     sectionSuffixDetector.recordGeneration({
@@ -3263,7 +3346,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         }
     }
 
-    public recordStopGenerationEvaluation() {
+    public recordStopGenerationEvaluation(): Promise<void> | void {
+        const hadInProgressStopTrigger = this.stopGenerationDetector.hasInProgressStops;
         this.rerenderTriggerDetector.recordGeneration({
             text: this.currentText,
             tokens: this.currentTokens,
@@ -3282,6 +3366,14 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
         if (this.llamaChat.model.isEogToken(this.currentToken))
             this.currentQueuedTokenRelease?.createTokenIndexLock(0);
+
+        if (this.grammar != null && !hadInProgressStopTrigger && this.stopGenerationDetector.hasInProgressStops &&
+            this.llamaChat.sequence.needsCheckpoints
+        )
+            return this.llamaChat.sequence._takeNamedCheckpoint(
+                internalCheckpoints.chatGrammarEnd.name,
+                internalCheckpoints.chatGrammarEnd.maxCheckpoints
+            );
     }
 
     public popStreamRegulatorFreeTokens() {

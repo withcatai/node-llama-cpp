@@ -317,6 +317,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
     AddonContext::init(exports);
+    AddonContextSequenceCheckpoint::init(exports);
     AddonSampler::init(exports);
 
     llama_log_set(addonLlamaCppLogCallback, nullptr);

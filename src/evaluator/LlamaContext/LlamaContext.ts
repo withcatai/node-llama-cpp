@@ -14,6 +14,7 @@ import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
+import {LlamaLogLevel} from "../../bindings/types.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
     EvaluationPriority, LlamaContextOptions, LlamaContextSequenceDryRepeatPenalty, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem,
@@ -23,6 +24,7 @@ import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItems
 import {LlamaSampler} from "./LlamaSampler.js";
 import {TokenPredictor} from "./TokenPredictor.js";
 import {padSafeContextSize} from "./utils/padSafeContextSize.js";
+import {LlamaContextSequenceCheckpoints} from "./LlamaContextSequenceCheckpoints.js";
 import type {Llama} from "../../bindings/Llama.js";
 
 const defaultLoraScale = 1;
@@ -34,6 +36,26 @@ const defaultFailedCreationRemedy = {
 } as const satisfies Required<LlamaContextOptions["failedCreationRemedy"]>;
 const defaultEvaluationPriority: EvaluationPriority = 5;
 const defaultDryRepeatPenalitySequenceBreakers = ["\n", ":", '"', "*"];
+const defaultCheckpointOptions: Required<SequenceCheckpointOptions> = {
+    max: 32,
+    interval: 8192,
+    maxMemory: null
+};
+
+export const internalCheckpoints = {
+    speculative: {
+        name: "speculative",
+        maxCheckpoints: 2
+    },
+    chatSequenceStart: {
+        name: "sequenceStart",
+        maxCheckpoints: 1
+    },
+    chatGrammarEnd: {
+        name: "grammarEnd",
+        maxCheckpoints: 1
+    }
+};
 
 const decodeSyncWorkaround = {
     vulkanLock: {}
@@ -55,7 +77,7 @@ export class LlamaContext {
     /** @internal */ private readonly _totalSequences: number;
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
-    /** @internal */ private readonly _swaFullCache: boolean = false;
+    /** @internal */ public readonly _swaFullCache: boolean = false;
     /** @internal */ private readonly _queuedDecodeSequenceIds = new Set<number>();
     /** @internal */ private readonly _queuedDecodes: InternalQueuedDecode[] = [];
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -266,6 +288,50 @@ export class LlamaContext {
          */
         tokenPredictor?: TokenPredictor,
 
+        /**
+         * The maximum number of checkpoint to keep for the sequence when needed.
+         *
+         * When reusing a prefix evaluation state is not possible for the context sequence
+         * (like in contexts from recurrent and hybrid models,
+         * or with models that use SWA (Sliding Window Attention) when the `swaFullCache` option is not enabled on the context),
+         * storing checkpoints allows reusing the context state at certain points in the sequence
+         * to speed up the evaluation when erasing parts of the context state that come after those points.
+         * Those checkpoints will automatically be used when trying to erase parts of the context state that
+         * come after a checkpointed state, and be freed from memory when no longer relevant.
+         *
+         * Those checkpoints are relatively lightweight compared to saving the entire state,
+         * but taking too many checkpoints can increase memory usage.
+         * Checkpoints are stored in the RAM (not VRAM).
+         *
+         * See {@link LlamaContextSequence.takeCheckpoint} for more details on how checkpoints are taken and used.
+         */
+        checkpoints?: {
+            /**
+             * The maximum number of checkpoints to keep for the sequence when needed.
+             *
+             * Defaults to `32`.
+             */
+            max?: number,
+
+            /**
+             * Take a checkpoint every `interval` tokens when the sequence needs taking checkpoints.
+             *
+             * Defaults to `8192`.
+             */
+            interval?: number | false,
+
+            /**
+             * The maximum memory in bytes to use for checkpoints for the sequence when needed.
+             *
+             * When taking a checkpoint causes the checkpoints pool memory to exceed this value,
+             * older checkpoints will be pruned until the total checkpoints memory usage is under this limit,
+             * while ensuring that at least one checkpoint is kept.
+             *
+             * Defaults to `null` (no memory limit).
+             */
+            maxMemory?: number | null
+        },
+
         /** @internal */
         _tokenMeter?: TokenMeter
     } = {}): LlamaContextSequence {
@@ -275,6 +341,7 @@ export class LlamaContext {
                 strategy: contextShiftStrategy = "eraseBeginning"
             } = {},
             tokenPredictor,
+            checkpoints,
 
             _tokenMeter
         } = options;
@@ -293,7 +360,8 @@ export class LlamaContext {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
             },
-            tokenPredictor
+            tokenPredictor,
+            checkpoints
         });
     }
 
@@ -406,6 +474,7 @@ export class LlamaContext {
                     batchLogitIndexes: Uint32Array,
                     batchLogitTokenIndexes: number[],
                     firstTokenIndex: number,
+                    sequenceStateLength: number,
                     returnResults?: true
                 }> = [];
                 const queuedDecodesToDelete = new Set<InternalQueuedDecode>();
@@ -445,15 +514,17 @@ export class LlamaContext {
                             batchLogitIndexes,
                             batchLogitTokenIndexes: tokenIndexesWithLogitsToProcess,
                             firstTokenIndex: queuedDecode.firstTokenSequenceIndex,
+                            sequenceStateLength: queuedDecode.firstTokenSequenceIndex + processAmount + 1,
                             returnResults: true
                         });
                     } else {
-                        if (batchLogitIndexes.length > 0)
+                        if (batchLogitIndexes.length > 0 || queuedDecode.afterBatchAction != null)
                             afterDecodeActions.push({
                                 queuedDecode,
                                 batchLogitIndexes,
                                 batchLogitTokenIndexes: tokenIndexesWithLogitsToProcess,
-                                firstTokenIndex: queuedDecode.firstTokenSequenceIndex
+                                firstTokenIndex: queuedDecode.firstTokenSequenceIndex,
+                                sequenceStateLength: queuedDecode.firstTokenSequenceIndex + processAmount + 1
                             });
 
                         queuedDecode.tokens = queuedDecode.tokens.slice(processAmount);
@@ -553,6 +624,12 @@ export class LlamaContext {
                 });
 
                 await Promise.all(afterDecodeActionResults);
+
+                for (const action of afterDecodeActions) {
+                    const resPromise = action.queuedDecode.afterBatchAction?.(action.sequenceStateLength);
+                    if (resPromise instanceof Promise)
+                        await resPromise;
+                }
             };
 
             const prioritizationStrategy = resolvePrioritizationStrategy();
@@ -617,10 +694,11 @@ export class LlamaContext {
 
     /** @internal */
     public async _decodeTokens<T>({
-        sequenceId, firstTokenSequenceIndex, tokens, logits, evaluationPriority = defaultEvaluationPriority, tokenMeter
+        sequenceId, firstTokenSequenceIndex, tokens, logits, evaluationPriority = defaultEvaluationPriority, tokenMeter, afterBatchAction
     }: {
         sequenceId: number, firstTokenSequenceIndex: number, tokens: Token[], logits: (true | undefined)[],
-        evaluationPriority?: EvaluationPriority, tokenMeter: TokenMeter
+        evaluationPriority?: EvaluationPriority, tokenMeter: TokenMeter,
+        afterBatchAction?: ((sequenceStateLength: number) => Promise<void> | void)
     }, logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => T | Promise<T>)): Promise<[index: number, value: T][]> {
         return await new Promise((accept, reject) => {
             this._queuedDecodes.push({
@@ -631,7 +709,8 @@ export class LlamaContext {
                 evaluationPriority,
                 tokenMeter,
                 response: [accept, reject],
-                logitDataMapper
+                logitDataMapper,
+                afterBatchAction
             });
             this._queuedDecodeSequenceIds.add(sequenceId);
 
@@ -937,6 +1016,8 @@ export class LlamaContextSequence {
     /** @internal */ private readonly _context: LlamaContext;
     /** @internal */ private readonly _contextShift: Required<ContextShiftOptions>;
     /** @internal */ private readonly _tokenPredictor?: TokenPredictor;
+    /** @internal */ private readonly _checkpoints = new LlamaContextSequenceCheckpoints();
+    /** @internal */ private readonly _checkpointOptions: Required<SequenceCheckpointOptions>;
     /** @internal */ private readonly _tokenMeter: TokenMeter;
     /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
     /** @internal */ private readonly _lock = {};
@@ -957,19 +1038,25 @@ export class LlamaContextSequence {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        sequenceId, context, tokenMeter, contextShift, tokenPredictor
+        sequenceId, context, tokenMeter, contextShift, tokenPredictor, checkpoints
     }: {
         sequenceId: number,
         context: LlamaContext,
         tokenMeter?: TokenMeter,
         contextShift: Required<ContextShiftOptions>,
-        tokenPredictor?: TokenPredictor
+        tokenPredictor?: TokenPredictor,
+        checkpoints?: SequenceCheckpointOptions
     }) {
         this._sequenceId = sequenceId;
         this._context = context;
         this._tokenMeter = tokenMeter ?? new TokenMeter();
         this._contextShift = contextShift;
         this._tokenPredictor = tokenPredictor;
+        this._checkpointOptions = {
+            max: checkpoints?.max ?? defaultCheckpointOptions.max,
+            interval: checkpoints?.interval ?? defaultCheckpointOptions.interval,
+            maxMemory: checkpoints?.maxMemory ?? defaultCheckpointOptions.maxMemory
+        };
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
         this._gcRegistry.register(this, sequenceId);
@@ -983,11 +1070,14 @@ export class LlamaContextSequence {
             )
         );
         this._disposeAggregator.add(() => {
+            this._checkpoints.clearAllCheckpoints();
             this._context._reclaimUnusedSequenceId(this._sequenceId);
         });
 
         if (this._tokenPredictor != null)
             this._disposeAggregator.add(this._tokenPredictor);
+
+        this._takeIntervalCheckpointIfNeededAfterBatch = this._takeIntervalCheckpointIfNeededAfterBatch.bind(this);
     }
 
     public dispose() {
@@ -1312,8 +1402,26 @@ export class LlamaContextSequence {
             if (canResetTokenPredictor && removedTokens > 0)
                 await this._abortTokenPredictor(true);
 
+            this._checkpoints.pruneFromEndToIndex(this._contextTokens.length - 1);
+
             if (deletionSuccessful)
                 return;
+
+            const existingCheckpoint = this._checkpoints.getLastCheckpoint(this._contextTokens.length - 1);
+            if (existingCheckpoint != null && existingCheckpoint.index > 0 && existingCheckpoint.index < this._contextTokens.length) {
+                const checkpointIndex = existingCheckpoint.index;
+
+                const restoredSuccessfully = await this._context._ctx.restoreCheckpoint(existingCheckpoint);
+                if (restoredSuccessfully) {
+                    const tokensToEvaluate = this._contextTokens.slice(checkpointIndex + 1);
+                    this._contextTokens = this._contextTokens.slice(0, checkpointIndex + 1);
+                    this._nextTokenIndex = checkpointIndex + 1;
+
+                    // wait for the evaluation outside the "context" lock to avoid deadlocks
+                    awaitPromise = this.evaluateWithoutGeneratingNewTokens(tokensToEvaluate, {_skipLock: skipLock});
+                    return;
+                }
+            }
 
             const newSequenceTokens = this._contextTokens.slice();
             this._nextTokenIndex = 0;
@@ -1324,8 +1432,12 @@ export class LlamaContextSequence {
             awaitPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
 
-        if (awaitPromise != null)
+        if (awaitPromise != null) {
             await awaitPromise;
+
+            if (this.needsCheckpoints && this._checkpoints.lastCheckpointIndex !== this._nextTokenIndex - 1)
+                await this.takeCheckpoint();
+        }
     }
 
     /**
@@ -1629,7 +1741,8 @@ export class LlamaContextSequence {
 
                         return output;
                     });
-                }
+                },
+                this._takeIntervalCheckpointIfNeededAfterBatch
             );
         } finally {
             evaluatorLock.dispose();
@@ -1654,6 +1767,7 @@ export class LlamaContextSequence {
         try {
             this._ensureNotDisposed();
 
+            // TODO: save checkpoints to disk
             const fileSize = await this._context._ctx.saveSequenceStateToFile(
                 resolvedPath,
                 this._sequenceId,
@@ -1721,6 +1835,118 @@ export class LlamaContextSequence {
             contextLock.dispose();
             evaluatorLock.dispose();
         }
+    }
+
+    /**
+     * When reusing a prefix evaluation state is not possible for the current context sequence
+     * (like in contexts from recurrent and hybrid models,
+     * or with models that use SWA (Sliding Window Attention) when the `swaFullCache` option is not enabled on the context),
+     * you can use this method to checkpoint the current context sequence state.
+     * Those checkpoints will automatically be used when trying to erase parts of the context state that come after a checkpointed state,
+     * and be freed from memory when no longer relevant.
+     *
+     * Those checkpoints are relatively lightweight compared to saving the entire state,
+     * but taking too many checkpoints can increase memory usage.
+     * Checkpoints are stored in the RAM (not VRAM).
+     *
+     * Calling this method on a context sequence from a model that natively supports prefix evaluation state reuse will have no effect.
+     *
+     * > **Note:** to check whether the current context sequence needs taking checkpoints,
+     * > you can use the {@link needsCheckpoints `.needsCheckpoints`} property.
+     */
+    public async takeCheckpoint() {
+        if (!this.needsCheckpoints)
+            return;
+
+        return await withLock([this._context, "context"], () => {
+            return this._takeCheckpoint(undefined, this._checkpointOptions.max);
+        });
+    }
+
+    /** @internal */
+    public async _takeNamedCheckpoint(name: string, maxNamedCheckpoints: number) {
+        if (!this.needsCheckpoints)
+            return;
+
+        return await withLock([this._context, "context"], () => {
+            return this._takeCheckpoint(name, maxNamedCheckpoints);
+        });
+    }
+
+    /**
+     * Whether the current context sequence needs taking checkpoints of the context state to be able to reuse
+     * it as a prefix evaluation state in the future.
+     *
+     * See {@link takeCheckpoint `.takeCheckpoint()`} for more details.
+     */
+    public get needsCheckpoints() {
+        if (this.model.fileInsights.isHybrid || this.model.fileInsights.isRecurrent)
+            return true;
+        else if (this.model.fileInsights.swaSize != null && !this._context._swaFullCache)
+            return true;
+
+        return false;
+    }
+
+    /**
+     * The index of the last taken checkpoint that's available for prefix reuse
+     */
+    public get lastCheckpointIndex() {
+        return this._checkpoints.lastCheckpointIndex;
+    }
+
+    /**
+     * The total memory usage in bytes of all the checkpoints currently held for this context sequence
+     */
+    public get checkpointsMemoryUsage() {
+        return this._checkpoints.memoryUsage;
+    }
+
+    /** @internal */
+    private async _takeCheckpoint(name: string | undefined, maxNamedCheckpoints: number) {
+        if (!this.needsCheckpoints || this._nextTokenIndex === 0 || this._checkpoints.hasCheckpoint(name, this._nextTokenIndex - 1))
+            return;
+
+        if (this._checkpointOptions.maxMemory != null)
+            this._checkpoints.prepareMemoryForIncomingCheckpoint(this._checkpointOptions.maxMemory);
+
+        const checkpoint = new this.model._llama._bindings.AddonContextSequenceCheckpoint();
+        await checkpoint.init(this._context._ctx, this._sequenceId);
+        if (this._nextTokenIndex - 1 !== checkpoint.index)
+            this.model._llama._log(
+                LlamaLogLevel.warn,
+                `Checkpoint index mismatch: expected ${this._nextTokenIndex - 1}, got ${checkpoint.index}`
+            );
+
+        this._checkpoints.storeCheckpoint({
+            name,
+            maxNamedCheckpoints,
+            checkpoint,
+            currentIndex: this._nextTokenIndex - 1
+        });
+
+        if (this._checkpointOptions.maxMemory != null)
+            this._checkpoints.pruneToKeepUnderMemoryUsage(this._checkpointOptions.maxMemory);
+    }
+
+    /** @internal */
+    private _takeIntervalCheckpointIfNeeded(currentIndex: number = this._nextTokenIndex - 1): Promise<void> | void {
+        if (!this.needsCheckpoints)
+            return;
+
+        const lastCheckpointIndex = this._checkpoints.getLastNamedCheckpointIndex(undefined);
+        if (this._checkpointOptions.interval === false || currentIndex - lastCheckpointIndex < this._checkpointOptions.interval)
+            return;
+
+        return this._takeCheckpoint(undefined, this._checkpointOptions.max);
+    }
+
+    /** @internal */
+    private _takeIntervalCheckpointIfNeededAfterBatch(sequenceStateLength: number): Promise<void> | void {
+        if (sequenceStateLength === 0)
+            return;
+
+        return this._takeIntervalCheckpointIfNeeded(sequenceStateLength - 1);
     }
 
     /** @internal */
@@ -1819,7 +2045,8 @@ export class LlamaContextSequence {
                                 else
                                     return this._context._ctx.sampleToken(batchLogitIndex, sampler._sampler);
                             });
-                        }
+                        },
+                        this._takeIntervalCheckpointIfNeededAfterBatch
                     );
 
                     const lastDecodeResult = decodeResult[evalTokens.length - 1];
@@ -1953,6 +2180,22 @@ export class LlamaContextSequence {
                             {canResetTokenPredictor: true, canRemovePredictionTokens: true, skipLock: true}
                         );
                         this._loadedTokenPredictions.length = 0;
+
+                        if (this.needsCheckpoints) {
+                            await this._takeCheckpoint(
+                                internalCheckpoints.speculative.name,
+                                internalCheckpoints.speculative.maxCheckpoints
+                            );
+
+                            await this._takeIntervalCheckpointIfNeeded();
+                        }
+                    } else if (this._tokenPredictorOwner === tokenPredictorOwner && this.needsCheckpoints) {
+                        await this._takeCheckpoint(
+                            internalCheckpoints.speculative.name,
+                            internalCheckpoints.speculative.maxCheckpoints
+                        );
+
+                        await this._takeIntervalCheckpointIfNeeded();
                     }
 
                     if (this._resetTokenPredictor) {
@@ -2241,7 +2484,8 @@ export class LlamaContextSequence {
         evaluationPriority: EvaluationPriority,
         tokenMeter: TokenMeter,
         contextShiftOptions: Required<ContextShiftOptions>,
-        logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => T | Promise<T>)
+        logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => T | Promise<T>),
+        afterBatchAction?: ((sequenceStateLength: number) => Promise<void> | void)
     ): Promise<Array<undefined | T>> {
         this._ensureNotDisposed();
 
@@ -2276,7 +2520,8 @@ export class LlamaContextSequence {
                 firstTokenSequenceIndex: this._nextTokenIndex,
                 logits: tokensLogits,
                 evaluationPriority,
-                tokenMeter
+                tokenMeter,
+                afterBatchAction
             }, normalizedLogitDataMapper);
 
             for (const [index, value] of generatedLogits)
@@ -2344,13 +2589,15 @@ export class LlamaContextSequence {
             size: contextShiftSize = Math.min(100, Math.ceil(context.contextSize / 2)),
             strategy: contextShiftStrategy = "eraseBeginning"
         } = {},
-        tokenPredictor
+        tokenPredictor,
+        checkpoints
     }: {
         sequenceId: number,
         context: LlamaContext,
         tokenMeter?: TokenMeter,
         contextShift?: ContextShiftOptions,
-        tokenPredictor?: TokenPredictor
+        tokenPredictor?: TokenPredictor,
+        checkpoints?: SequenceCheckpointOptions
     }): LlamaContextSequence {
         return new LlamaContextSequence({
             sequenceId,
@@ -2360,7 +2607,8 @@ export class LlamaContextSequence {
                 size: contextShiftSize,
                 strategy: contextShiftStrategy
             },
-            tokenPredictor
+            tokenPredictor,
+            checkpoints
         });
     }
 }
@@ -2373,12 +2621,19 @@ type InternalQueuedDecode = {
     evaluationPriority: EvaluationPriority,
     tokenMeter: TokenMeter,
     response: [accept: (res: any) => void, reject: (reason: unknown) => void],
-    logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => any | Promise<any>)
+    logitDataMapper: ((batchLogitIndex: BatchLogitIndex, tokenIndex: number) => any | Promise<any>),
+    afterBatchAction?: ((sequenceStateLength: number) => Promise<void> | void)
 };
 
 type CurrentBatchItem = {
     queuedDecode: InternalQueuedDecode,
     processAmount: number
+};
+
+type SequenceCheckpointOptions = {
+    max?: number,
+    interval?: number | false,
+    maxMemory?: number | null
 };
 
 function getTokenBiasesForAddon(tokenBias: undefined | TokenBias | (() => TokenBias), currentModel: LlamaModel) {
