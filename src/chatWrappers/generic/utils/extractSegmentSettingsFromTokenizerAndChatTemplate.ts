@@ -78,6 +78,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate(
         thought: tryMatchPrefixSuffixPair([
             ["<think>", "</think>"], // DeepSeek, QwQ
             ["<thought>", "</thought>"], // EXAONE Deep
+            ["[THINK]", "[/THINK]"], // Mistral
             ["<|START_THINKING|>", "<|END_THINKING|>"], // Command R7B
             ["<|begin_of_thought|>", "<|end_of_thought|>"] // JoyAI
         ])
