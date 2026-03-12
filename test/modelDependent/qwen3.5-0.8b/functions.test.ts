@@ -55,19 +55,19 @@ describe("qwen3.5 0.8b", () => {
             const initialMeterState = chatSession.sequence.tokenMeter.getState();
             const res2 = await chatSession.prompt("Explain what this word means", {
                 ...promptOptions,
-                maxTokens: 40
+                maxTokens: 20
             });
 
             const diffMeterState = chatSession.sequence.tokenMeter.diff(initialMeterState);
             expect(res2).to.toMatchInlineSnapshot(`
               "
 
-              The word "secret" means something that is hidden or kept from others. It can also refer to a secret knowledge, a secret weapon, or a secret place."
+              The word "secret" means something that is hidden or kept from others. It"
             `);
             expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("73");
             expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(80);
             expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("414");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("452");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("434");
         });
     });
 });
