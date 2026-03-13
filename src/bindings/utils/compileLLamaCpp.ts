@@ -531,7 +531,21 @@ async function resolvePrebuiltBinaryPath(prebuiltBinaryDirectoryPath: string) {
     return null;
 }
 
-function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: BuildOptions) {
+export async function checkWhetherPrebuiltBinariesModuleIsInstalled(gpu: BuildGpu) {
+    const prebuiltBinariesPaths = await getPrebuiltBinariesPackageDirectoryForBuildOptions({
+        platform: getPlatform(),
+        arch: process.arch,
+        gpu
+    });
+
+    return prebuiltBinariesPaths != null;
+}
+
+function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
+    platform: BinaryPlatform,
+    arch: typeof process.arch,
+    gpu: BuildGpu
+}) {
     async function getBinariesPathFromModules(moduleImport: () => Promise<{getBinsDir(): {binsDir: string, packageVersion: string}}>) {
         try {
             const [

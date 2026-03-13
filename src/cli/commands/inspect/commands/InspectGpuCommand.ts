@@ -16,6 +16,8 @@ import {isRunningUnderRosetta} from "../../../utils/isRunningUnderRosetta.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {getBinariesGithubRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
 import {getClonedLlamaCppRepoReleaseInfo} from "../../../../bindings/utils/cloneLlamaCppRepo.js";
+import {checkWhetherPrebuiltBinariesModuleIsInstalled} from "../../../../bindings/utils/compileLLamaCpp.js";
+import {getCurrentNpmrcConfig, getNpmrcRegistry} from "../../../utils/resolveNpmrcConfig.js";
 
 type InspectGpuCommand = {
     // no options for now
@@ -34,6 +36,7 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         const gpusToLogVramUsageOf: BuildGpu[] = [];
         const gpuToLlama = new Map<BuildGpu, Llama | undefined>();
         let lastLlama: Llama | undefined;
+        let missingPrebuiltBinaryModules: boolean = false;
 
         async function loadLlamaForGpu(gpu: BuildGpu) {
             if (!gpuToLlama.has(gpu)) {
@@ -113,7 +116,11 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             const llama = await loadLlamaForGpu("metal");
 
             if (llama == null) {
-                console.info(`${chalk.yellow("Metal:")} ${chalk.red("Metal is detected, but using it failed")}`);
+                if (!(await checkWhetherPrebuiltBinariesModuleIsInstalled("metal"))) {
+                    console.info(`${chalk.yellow("Metal:")} ${chalk.red("The Metal prebuilt binaries module is missing")}`);
+                    missingPrebuiltBinaryModules = true;
+                } else
+                    console.info(`${chalk.yellow("Metal:")} ${chalk.red("Metal is detected, but using it failed")}`);
             } else {
                 console.info(`${chalk.yellow("Metal:")} ${chalk.green("available")}`);
                 gpusToLogVramUsageOf.push("metal");
@@ -134,7 +141,11 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
 
             const llama = await loadLlamaForGpu(false);
             if (llama == null) {
-                console.info(`${chalk.yellow("CPU:")} ${chalk.red("Loading a binding with only CPU support failed")}`);
+                if (!(await checkWhetherPrebuiltBinariesModuleIsInstalled(false))) {
+                    console.info(`${chalk.yellow("CPU:")} ${chalk.red("The CPU-only prebuilt binaries module is missing")}`);
+                    missingPrebuiltBinaryModules = true;
+                } else
+                    console.info(`${chalk.yellow("CPU:")} ${chalk.red("Loading a binding with only CPU support failed")}`);
             }
         }
 
@@ -148,7 +159,12 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             const llama = await loadLlamaForGpu("cuda");
 
             if (llama == null) {
-                console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA is detected, but using it failed")}`);
+                if (!(await checkWhetherPrebuiltBinariesModuleIsInstalled("cuda"))) {
+                    console.info(`${chalk.yellow("CUDA:")} ${chalk.red("The CUDA prebuilt binaries modules are missing")}`);
+                    missingPrebuiltBinaryModules = true;
+                } else
+                    console.info(`${chalk.yellow("CUDA:")} ${chalk.red("CUDA is detected, but using it failed")}`);
+
                 console.info(chalk.yellow("To resolve errors related to CUDA, see the CUDA guide: ") + documentationPageUrls.CUDA);
             } else {
                 console.info(`${chalk.yellow("CUDA:")} ${chalk.green("available")}`);
@@ -163,7 +179,12 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
             const llama = await loadLlamaForGpu("vulkan");
 
             if (llama == null) {
-                console.info(`${chalk.yellow("Vulkan:")} ${chalk.red("Vulkan is detected, but using it failed")}`);
+                if (!(await checkWhetherPrebuiltBinariesModuleIsInstalled("vulkan"))) {
+                    console.info(`${chalk.yellow("Vulkan:")} ${chalk.red("The Vulkan prebuilt binaries module is missing")}`);
+                    missingPrebuiltBinaryModules = true;
+                } else
+                    console.info(`${chalk.yellow("Vulkan:")} ${chalk.red("Vulkan is detected, but using it failed")}`);
+
                 console.info(chalk.yellow("To resolve errors related to Vulkan, see the Vulkan guide: ") + documentationPageUrls.Vulkan);
             } else {
                 console.info(`${chalk.yellow("Vulkan:")} ${chalk.green("available")}`);
@@ -194,6 +215,39 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         if (lastLlama != null) {
             await logSwapUsage(lastLlama);
             console.info(`${chalk.yellow("mmap:")} ${lastLlama.supportsMmap ? "supported" : "unsupported"}`);
+        } else {
+            if (!(await checkWhetherPrebuiltBinariesModuleIsInstalled(false))) {
+                console.info();
+                console.info(chalk.yellow("The CPU-only prebuilt binaries module is missing"));
+                missingPrebuiltBinaryModules = true;
+            }
+        }
+
+        if (missingPrebuiltBinaryModules) {
+            const npmrcConfig = await getCurrentNpmrcConfig();
+            const npmRegistry = getNpmrcRegistry(npmrcConfig);
+            if (!npmRegistry.isDefault) {
+                console.info();
+                console.info(chalk.yellow("npm registry: ") + npmRegistry.registryUrl);
+                console.info(
+                    chalk.yellow(
+                        "It seems that you have a custom npm registry configured. " +
+                        "The prebuilt binary modules may be missing in that registry. " + (
+                            "Consider switching to the default npm registry" +
+                            (
+                                lastLlama != null
+                                    ? ""
+                                    : " or building from source"
+                            ) +
+                            " if you're having issues."
+                        )
+                    )
+                );
+
+                // only show a link to the building from source guide when a URL for the CUDA or Vulkan guides was not already provided
+                if (lastLlama == null)
+                    console.info(chalk.yellow("To build from source, see the Building From Source guide: ") + documentationPageUrls.BuildingFromSource);
+            }
         }
     }
 };
