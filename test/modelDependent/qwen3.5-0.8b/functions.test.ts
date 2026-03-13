@@ -55,19 +55,19 @@ describe("qwen3.5 0.8b", () => {
             const initialMeterState = chatSession.sequence.tokenMeter.getState();
             const res2 = await chatSession.prompt("Explain what this word means", {
                 ...promptOptions,
-                maxTokens: 20
+                maxTokens: 15
             });
 
             const diffMeterState = chatSession.sequence.tokenMeter.diff(initialMeterState);
             expect(res2).to.toMatchInlineSnapshot(`
               "
 
-              The word "secret" means something that is hidden or kept from others. It"
+              The word "secret" means something that is hidden or"
             `);
             expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("73");
             expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(80);
             expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("414");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("434");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("429");
         });
     });
 });
