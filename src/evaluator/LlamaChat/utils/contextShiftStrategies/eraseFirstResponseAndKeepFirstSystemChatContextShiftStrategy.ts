@@ -6,6 +6,9 @@ import {truncateLlamaTextAndRoundToWords, truncateTextAndRoundToWords} from "../
 import {ChatWrapper} from "../../../../ChatWrapper.js";
 import {LlamaText} from "../../../../utils/LlamaText.js";
 
+const minKeepCurrentModelResponseSegmentChars = 256;
+
+
 export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy({
     chatHistory,
     maxTokensCount,
@@ -249,8 +252,16 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                             charactersLeftToRemove -= functionCallAndResultTokenUsage * estimatedCharactersPerToken;
                         } else if (isChatModelResponseSegment(item)) {
                             if (item.text !== "") {
-                                const newText = truncateTextAndRoundToWords(item.text, charactersLeftToRemove, undefined, true);
-                                if (newText === "" && item.ended) {
+                                const keepChars = isLastHistoryItem
+                                    ? Math.max(minKeepCurrentModelResponseSegmentChars, Math.ceil(item.text.length / 2))
+                                    : 0;
+                                const removeChars = Math.max(
+                                    0,
+                                    Math.min(item.text.length - keepChars, charactersLeftToRemove)
+                                );
+                                const newText = truncateTextAndRoundToWords(item.text, removeChars, undefined, true);
+
+                                if (newText === "" && item.ended && !(isLastHistoryItem && t >= historyItem.response.length - 1 - 2)) {
                                     const emptySegmentTokenUsage = chatWrapper.generateModelResponseText([{...item, text: ""}], true)
                                         .tokenize(tokenizer, "trimLeadingSpace").length;
 
@@ -260,6 +271,7 @@ export async function eraseFirstResponseAndKeepFirstSystemChatContextShiftStrate
                                 } else {
                                     charactersLeftToRemove -= item.text.length - newText.length;
                                     item.text = newText;
+                                    delete item.raw;
                                 }
                             }
                         } else
