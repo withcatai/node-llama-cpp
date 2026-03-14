@@ -1304,7 +1304,7 @@ export class LlamaContextSequence {
     ) {
         this._ensureNotDisposed();
 
-        let awaitPromise: Promise<void> | undefined;
+        let awaitEvaluationPromise: Promise<void> | undefined;
 
         await withLock([this._context, "context"], async () => {
             this._ensureNotDisposed();
@@ -1407,18 +1407,21 @@ export class LlamaContextSequence {
             if (deletionSuccessful)
                 return;
 
-            const existingCheckpoint = this._checkpoints.getLastCheckpoint(this._contextTokens.length - 1);
-            if (existingCheckpoint != null && existingCheckpoint.index > 0 && existingCheckpoint.index < this._contextTokens.length) {
-                const checkpointIndex = existingCheckpoint.index;
-
-                const restoredSuccessfully = await this._context._ctx.restoreCheckpoint(existingCheckpoint);
+            const restoreCheckpointIndex = this._contextTokens.length - 1;
+            const existingCheckpoint = this._checkpoints.getLastCheckpoint(restoreCheckpointIndex);
+            if (existingCheckpoint != null &&
+                restoreCheckpointIndex >= existingCheckpoint.minPos &&
+                restoreCheckpointIndex <= existingCheckpoint.maxPos
+            ) {
+                const restoredSuccessfully = await this._context._ctx.restoreCheckpoint(existingCheckpoint, restoreCheckpointIndex);
                 if (restoredSuccessfully) {
-                    const tokensToEvaluate = this._contextTokens.slice(checkpointIndex + 1);
-                    this._contextTokens = this._contextTokens.slice(0, checkpointIndex + 1);
-                    this._nextTokenIndex = checkpointIndex + 1;
+                    const tokensToEvaluate = this._contextTokens.slice(restoreCheckpointIndex + 1);
+                    this._contextTokens = this._contextTokens.slice(0, restoreCheckpointIndex + 1);
+                    this._nextTokenIndex = restoreCheckpointIndex + 1;
 
                     // wait for the evaluation outside the "context" lock to avoid deadlocks
-                    awaitPromise = this.evaluateWithoutGeneratingNewTokens(tokensToEvaluate, {_skipLock: skipLock});
+                    if (tokensToEvaluate.length > 0)
+                        awaitEvaluationPromise = this.evaluateWithoutGeneratingNewTokens(tokensToEvaluate, {_skipLock: skipLock});
                     return;
                 }
             }
@@ -1429,11 +1432,12 @@ export class LlamaContextSequence {
             this._contextTokens = [];
 
             // wait for the evaluation outside the "context" lock to avoid deadlocks
-            awaitPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
+            if (newSequenceTokens.length > 0)
+                awaitEvaluationPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
 
-        if (awaitPromise != null) {
-            await awaitPromise;
+        if (awaitEvaluationPromise != null) {
+            await awaitEvaluationPromise;
 
             if (this.needsCheckpoints && this._checkpoints.lastCheckpointIndex !== this._nextTokenIndex - 1)
                 await this.takeCheckpoint();
@@ -1892,7 +1896,7 @@ export class LlamaContextSequence {
      * The index of the last taken checkpoint that's available for prefix reuse
      */
     public get lastCheckpointIndex() {
-        return this._checkpoints.lastCheckpointIndex;
+        return Math.max(0, Math.min(this._checkpoints.lastCheckpointIndex, this.nextTokenIndex - 1));
     }
 
     /**
@@ -1912,17 +1916,17 @@ export class LlamaContextSequence {
 
         const checkpoint = new this.model._llama._bindings.AddonContextSequenceCheckpoint();
         await checkpoint.init(this._context._ctx, this._sequenceId);
-        if (this._nextTokenIndex - 1 !== checkpoint.index)
+        if (this._nextTokenIndex - 1 !== checkpoint.maxPos)
             this.model._llama._log(
                 LlamaLogLevel.warn,
-                `Checkpoint index mismatch: expected ${this._nextTokenIndex - 1}, got ${checkpoint.index}`
+                `Checkpoint max position mismatch: expected ${this._nextTokenIndex - 1}, got ${checkpoint.maxPos}`
             );
 
         this._checkpoints.storeCheckpoint({
             name,
             maxNamedCheckpoints,
             checkpoint,
-            currentIndex: this._nextTokenIndex - 1
+            currentMaxPos: checkpoint.maxPos
         });
 
         if (this._checkpointOptions.maxMemory != null)

@@ -969,12 +969,14 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
     public:
         AddonContext* context;
         AddonContextSequenceCheckpoint* checkpoint;
+        std::size_t maxPosIndex;
         bool restoreSuccess = false;
 
-        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint)
+        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, std::size_t maxPosIndex)
             : Napi::AsyncWorker(info.Env(), "RestoreCheckpointWorker"),
               context(context),
               checkpoint(checkpoint),
+              maxPosIndex(maxPosIndex),
               deferred(Napi::Promise::Deferred::New(info.Env())) {
             context->Ref();
             checkpoint->Ref();
@@ -997,7 +999,12 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
 
                 std::size_t dataSize = checkpoint->data.size();
                 std::size_t restoreSize = llama_state_seq_set_data_ext(context->ctx, checkpoint->data.data(), dataSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
-                restoreSuccess = restoreSize == dataSize;
+                if (restoreSize == dataSize) {
+                    restoreSuccess = (
+                        llama_memory_seq_rm(llama_get_memory(context->ctx), checkpoint->sequenceId, maxPosIndex + 1, -1) &&
+                        llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId) == maxPosIndex
+                    );
+                }
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -1014,8 +1021,9 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
 
 Napi::Value AddonContext::RestoreCheckpoint(const Napi::CallbackInfo& info) {
     AddonContextSequenceCheckpoint* checkpoint = Napi::ObjectWrap<AddonContextSequenceCheckpoint>::Unwrap(info[0].As<Napi::Object>());
+    std::size_t maxPosIndex = info[1].As<Napi::Number>().Int32Value();
 
-    RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint);
+    RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint, maxPosIndex);
     worker->Queue();
     return worker->GetPromise();
 }
@@ -1088,11 +1096,11 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                checkpoint->index = llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId);
+                checkpoint->minPos = llama_memory_seq_pos_min(llama_get_memory(context->ctx), checkpoint->sequenceId);
+                checkpoint->maxPos = llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId);
                 const size_t checkpointSize = llama_state_seq_get_size_ext(context->ctx, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
                 
-                checkpoint->data.reserve(checkpointSize);
-                checkpoint->data.resize(checkpointSize);
+                checkpoint->data.resize(checkpointSize, 0);
                 llama_state_seq_get_data_ext(context->ctx, checkpoint->data.data(), checkpointSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
             } catch (const std::exception& e) {
                 SetError(e.what());
@@ -1132,8 +1140,12 @@ Napi::Value AddonContextSequenceCheckpoint::GetSize(const Napi::CallbackInfo& in
     return Napi::Number::New(info.Env(), data.size());
 }
 
-Napi::Value AddonContextSequenceCheckpoint::GetIndex(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), index);
+Napi::Value AddonContextSequenceCheckpoint::GetMinPos(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), minPos);
+}
+
+Napi::Value AddonContextSequenceCheckpoint::GetMaxPos(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), maxPos);
 }
 
 void AddonContextSequenceCheckpoint::init(Napi::Object exports) {
@@ -1147,7 +1159,8 @@ void AddonContextSequenceCheckpoint::init(Napi::Object exports) {
                 InstanceMethod("dispose", &AddonContextSequenceCheckpoint::Dispose),
 
                 InstanceAccessor("size", &AddonContextSequenceCheckpoint::GetSize, nullptr),
-                InstanceAccessor("index", &AddonContextSequenceCheckpoint::GetIndex, nullptr),
+                InstanceAccessor("minPos", &AddonContextSequenceCheckpoint::GetMinPos, nullptr),
+                InstanceAccessor("maxPos", &AddonContextSequenceCheckpoint::GetMaxPos, nullptr),
             }
         )
     );

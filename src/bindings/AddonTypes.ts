@@ -164,7 +164,7 @@ export type AddonContext = {
     loadSequenceStateFromFile(filePath: string, sequenceId: number, maxContextSize: number): Promise<Uint32Array>,
     setLoras(loras: AddonModelLora[], scales: number[]): void,
 
-    restoreCheckpoint(checkpoint: AddonContextSequenceCheckpoint): Promise<boolean>
+    restoreCheckpoint(checkpoint: AddonContextSequenceCheckpoint, maxPosIndex: number): Promise<boolean>
 };
 
 export type AddonContextSequenceCheckpoint = {
@@ -172,7 +172,8 @@ export type AddonContextSequenceCheckpoint = {
     dispose(): void,
 
     get size(): number,
-    get index(): number
+    get minPos(): number,
+    get maxPos(): number
 };
 
 export type BatchLogitIndex = number & {

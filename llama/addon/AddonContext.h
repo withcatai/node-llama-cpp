@@ -66,7 +66,8 @@ class AddonContextSequenceCheckpoint : public Napi::ObjectWrap<AddonContextSeque
         std::mutex dataMutex;
         std::vector<uint8_t> data;
         llama_seq_id sequenceId = 0;
-        std::size_t index = 0;
+        std::size_t minPos = 0;
+        std::size_t maxPos = 0;
 
         AddonContextSequenceCheckpoint(const Napi::CallbackInfo& info);
         ~AddonContextSequenceCheckpoint();
@@ -77,7 +78,8 @@ class AddonContextSequenceCheckpoint : public Napi::ObjectWrap<AddonContextSeque
         void dispose();
 
         Napi::Value GetSize(const Napi::CallbackInfo& info);
-        Napi::Value GetIndex(const Napi::CallbackInfo& info);
+        Napi::Value GetMinPos(const Napi::CallbackInfo& info);
+        Napi::Value GetMaxPos(const Napi::CallbackInfo& info);
 
         static void init(Napi::Object exports);
 };

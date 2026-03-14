@@ -9,16 +9,16 @@ export class LlamaContextSequenceCheckpoints {
         name,
         maxNamedCheckpoints,
         checkpoint,
-        currentIndex
+        currentMaxPos
     }: {
         name: string | undefined,
         maxNamedCheckpoints: number,
         checkpoint: AddonContextSequenceCheckpoint,
-        currentIndex: number
+        currentMaxPos: number
     }) {
         // TODO: if a named checkpoint is on the same index as the current checkpoint,
         //  reuse the same underlying checkpoint data instead of having it get duplicated
-        if (this.hasCheckpoint(name, currentIndex))
+        if (this.hasCheckpoint(name, currentMaxPos))
             return;
 
         const existingCheckpointsCount = this._getCheckpointsCount(name);
@@ -28,24 +28,29 @@ export class LlamaContextSequenceCheckpoints {
         this._memoryUsage += checkpoint.size;
     }
 
-    public hasCheckpoint(name: string | undefined, index: number) {
+    public hasCheckpoint(name: string | undefined, maxPos: number) {
         for (let i = this._checkpoints.length - 1; i >= 0; i--) {
             const [checkpointName, checkpoint] = this._checkpoints[i]!;
-            if (checkpointName === name && checkpoint.index === index)
+            if (checkpointName === name && checkpoint.maxPos === maxPos)
                 return true;
 
-            if (checkpoint.index < index)
+            if (checkpoint.maxPos < maxPos)
                 break;
         }
 
         return false;
     }
 
-    public getLastCheckpoint(maxIndex: number) {
+    public getLastCheckpoint(restoreIndex: number) {
+        if (restoreIndex <= 0)
+            return null;
+
         for (let i = this._checkpoints.length - 1; i >= 0; i--) {
             const [, checkpoint] = this._checkpoints[i]!;
-            if (checkpoint.index <= maxIndex)
+            if (restoreIndex <= checkpoint.maxPos && restoreIndex >= checkpoint.minPos)
                 return checkpoint;
+            else if (restoreIndex < checkpoint.minPos)
+                return null;
         }
 
         return null;
@@ -65,7 +70,7 @@ export class LlamaContextSequenceCheckpoints {
         if (checkpoint == null)
             return -1;
 
-        return checkpoint.index;
+        return checkpoint.maxPos;
     }
 
     public getLastNamedCheckpointIndex(name: string | undefined): number {
@@ -75,7 +80,7 @@ export class LlamaContextSequenceCheckpoints {
         for (let i = this._checkpoints.length - 1; i >= 0; i--) {
             const [checkpointName, checkpoint] = this._checkpoints[i]!;
             if (checkpointName === name)
-                return checkpoint.index;
+                return checkpoint.maxPos;
         }
 
         return -1;
@@ -116,10 +121,10 @@ export class LlamaContextSequenceCheckpoints {
     /**
      * Prune checkpoints that come after the specified index (keep the specified index checkpoint)
      */
-    public pruneFromEndToIndex(minIndex: number) {
+    public pruneFromEndToIndex(minMaxPos: number) {
         while (this._checkpoints.length > 0) {
             const [name, checkpoint] = this._checkpoints.at(-1) ?? [];
-            if (checkpoint == null || checkpoint.index <= minIndex)
+            if (checkpoint == null || checkpoint.maxPos <= minMaxPos)
                 break;
 
             this._memoryUsage -= checkpoint.size;
