@@ -357,14 +357,20 @@ export type LLamaChatGenerateResponseOptions<Functions extends ChatModelFunction
         /**
          * Budget for thought tokens.
          *
-         * Defaults to `Infinity`.
+         * Set to `Infinity` for unlimited budget.
+         *
+         * Defaults to 75% of the context size.
+         * When the context size is smaller than `8192`, defaults to 50% of the context size.
          */
         thoughtTokens?: number,
 
         /**
          * Budget for comment tokens.
          *
-         * Defaults to `Infinity`.
+         * Set to `Infinity` for unlimited budget.
+         *
+         * Defaults to 75% of the context size.
+         * When the context size is smaller than `8192`, defaults to 50% of the context size.
          */
         commentTokens?: number
     },
@@ -511,6 +517,11 @@ const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
 const defaultRepeatPenaltyLastTokens = 64;
 const defaultTrimWhitespaceSuffix = false;
 const defaultEvaluationPriority: EvaluationPriority = 5;
+const defaultSegmentBudgetSize = (contextSize: number) => (
+    contextSize < 8192
+        ? contextSize * 0.5
+        : contextSize * 0.75
+);
 
 
 export class LlamaChat {
@@ -3549,9 +3560,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public getSegmentBudget(segmentType: ChatModelSegmentType) {
         const getBudget = (budget: number | undefined) => (
-            (budget == null || budget === Infinity)
-                ? null
-                : budget
+            budget == null
+                ? Math.ceil(defaultSegmentBudgetSize(this.llamaChat.sequence.contextSize))
+                : budget === Infinity
+                    ? null
+                    : budget
         );
 
         if (this.budgets == null)

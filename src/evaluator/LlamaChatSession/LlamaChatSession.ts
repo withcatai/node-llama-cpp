@@ -263,14 +263,20 @@ export type LLamaChatPromptOptions<Functions extends ChatSessionModelFunctions |
         /**
          * Budget for thought tokens.
          *
-         * Defaults to `Infinity`.
+         * Set to `Infinity` for unlimited budget.
+         *
+         * Defaults to 75% of the context size.
+         * When the context size is smaller than `8192`, defaults to 50% of the context size.
          */
         thoughtTokens?: number,
 
         /**
          * Budget for comment tokens.
          *
-         * Defaults to `Infinity`.
+         * Set to `Infinity` for unlimited budget.
+         *
+         * Defaults to 75% of the context size.
+         * When the context size is smaller than `8192`, defaults to 50% of the context size.
          */
         commentTokens?: number
     }
