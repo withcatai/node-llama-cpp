@@ -674,6 +674,7 @@ export class LlamaChat {
             throw new Error("Using both grammar and functions is not supported yet");
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatResponse<Functions>> => {
+            let hadError = false;
             try {
                 let tookInitialCheckpoint = false;
 
@@ -802,10 +803,13 @@ export class LlamaChat {
                 }
 
                 throw new Error("The context size is too small to generate a response");
+            } catch (err) {
+                hadError = true;
+                throw err;
             } finally {
                 await generateResponseState.dispose();
 
-                if (this.sequence.needsCheckpoints)
+                if (!hadError && this.sequence.needsCheckpoints)
                     void this.sequence.takeCheckpoint();
             }
         });
