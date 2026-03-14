@@ -1407,12 +1407,13 @@ export class LlamaContextSequence {
             if (deletionSuccessful)
                 return;
 
-            const restoreCheckpointIndex = this._contextTokens.length - 1;
-            const existingCheckpoint = this._checkpoints.getLastCheckpoint(restoreCheckpointIndex);
+            let restoreCheckpointIndex = this._contextTokens.length - 1;
+            const existingCheckpoint = this._checkpoints.getLastCheckpoint(restoreCheckpointIndex, this.contextSize);
             if (existingCheckpoint != null &&
                 restoreCheckpointIndex >= existingCheckpoint.minPos &&
-                restoreCheckpointIndex <= existingCheckpoint.maxPos
+                existingCheckpoint.maxPos <= this.contextSize
             ) {
+                restoreCheckpointIndex = Math.min(restoreCheckpointIndex, existingCheckpoint.maxPos);
                 const restoredSuccessfully = await this._context._ctx.restoreCheckpoint(existingCheckpoint, restoreCheckpointIndex);
                 if (restoredSuccessfully) {
                     const tokensToEvaluate = this._contextTokens.slice(restoreCheckpointIndex + 1);

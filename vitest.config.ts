@@ -6,9 +6,7 @@ export default defineConfig({
             ...configDefaults.exclude,
             "./llama"
         ],
-        pool: (process.platform === "darwin" && process.arch === "arm64")
-            ? "threads"
-            : "forks",
+        pool: "forks",
         maxWorkers: 1,
         maxConcurrency: 1,
         snapshotSerializers: [

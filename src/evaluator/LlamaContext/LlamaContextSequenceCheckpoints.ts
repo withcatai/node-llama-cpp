@@ -41,13 +41,13 @@ export class LlamaContextSequenceCheckpoints {
         return false;
     }
 
-    public getLastCheckpoint(restoreIndex: number) {
+    public getLastCheckpoint(restoreIndex: number, contextSize: number) {
         if (restoreIndex <= 0)
             return null;
 
         for (let i = this._checkpoints.length - 1; i >= 0; i--) {
             const [, checkpoint] = this._checkpoints[i]!;
-            if (restoreIndex <= checkpoint.maxPos && restoreIndex >= checkpoint.minPos)
+            if (restoreIndex >= checkpoint.minPos && checkpoint.maxPos <= contextSize)
                 return checkpoint;
             else if (restoreIndex < checkpoint.minPos)
                 return null;
