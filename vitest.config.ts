@@ -6,7 +6,7 @@ export default defineConfig({
             ...configDefaults.exclude,
             "./llama"
         ],
-        pool: "forks",
+        pool: "threads",
         maxWorkers: 1,
         maxConcurrency: 1,
         snapshotSerializers: [
@@ -14,7 +14,10 @@ export default defineConfig({
             "./test/utils/helpers/SpecialTokensTextSerializer.ts",
             "./test/utils/helpers/SpecialTokenSerializer.ts"
         ],
-        setupFiles: ["./test/utils/helpers/testSetup.ts"]
+        setupFiles: ["./test/utils/helpers/testSetup.ts"],
+        experimental: {
+            nodeLoader: false
+        }
 
         // uncomment for profiling
         // execArgv: [
