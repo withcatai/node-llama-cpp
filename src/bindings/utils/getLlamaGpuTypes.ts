@@ -18,6 +18,9 @@ export async function getLlamaGpuTypes(include: "supported" | "allValid"): Promi
     const platform = getPlatform();
     const arch = process.arch;
 
+    if (include == null)
+        include = "supported";
+
     if (include === "supported") {
         const gpuTypes = new Set(await getGpuTypesToUseForOption("auto"));
 

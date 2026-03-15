@@ -10,6 +10,7 @@ import {LlamaJsonSchemaGrammar} from "../evaluator/LlamaJsonSchemaGrammar.js";
 import {LlamaGrammar, LlamaGrammarOptions} from "../evaluator/LlamaGrammar.js";
 import {ThreadsSplitter} from "../utils/ThreadsSplitter.js";
 import {getLlamaClasses, LlamaClasses} from "../utils/getLlamaClasses.js";
+import {getTempDir, FsPathHandle} from "../utils/getTempDir.js";
 import {BindingModule} from "./AddonTypes.js";
 import {
     BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel,
@@ -46,6 +47,8 @@ export class Llama {
     /** @internal */ public readonly _swapOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _debug: boolean;
     /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
+    /** @internal */ public readonly _tempDir?: FsPathHandle;
+    /** @internal */ private _tempDirNextId: number = 0;
     /** @internal */ public _hadErrorLogs: boolean = false;
     /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _numa: LlamaNuma;
@@ -74,7 +77,7 @@ export class Llama {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, numa, buildGpu,
+        bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, tempDir, numa, buildGpu,
         maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator, skipLlamaInit
     }: {
         bindings: BindingModule,
@@ -89,6 +92,7 @@ export class Llama {
             release: string
         },
         debug: boolean,
+        tempDir?: FsPathHandle,
         numa?: LlamaNuma,
         buildGpu: BuildGpu,
         maxThreads?: number,
@@ -104,6 +108,7 @@ export class Llama {
 
         this._bindings = bindings;
         this._debug = debug;
+        this._tempDir = tempDir;
         this._numa = numa ?? false;
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
@@ -175,6 +180,7 @@ export class Llama {
         this.onDispose.dispatchEvent();
         await this._backendDisposeGuard.acquireDisposeLock();
         await this._bindings.dispose();
+        await this._tempDir?.dispose();
 
         process.off("beforeExit", this._onBeforeExit);
         unregisterDisposeBeforeExit(this._selfWeakRef);
@@ -414,6 +420,15 @@ export class Llama {
     }
 
     /** @internal */
+    public _createTempFilePath() {
+        if (this._tempDir == null)
+            return undefined;
+
+        const fileId = this._tempDirNextId++;
+        return new FsPathHandle(path.join(this._tempDir.path, fileId + ".nlc"));
+    }
+
+    /** @internal */
     private _onAddonLog(level: number, message: string) {
         const llamaLogLevel = addonLogLevelToLlamaLogLevel.get(level) ?? LlamaLogLevel.fatal;
 
@@ -507,7 +522,7 @@ export class Llama {
     /** @internal */
     public static async _create({
         bindings, bindingPath, extBackendsPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads,
-        skipLlamaInit = false, debug, numa
+        skipLlamaInit = false, debug, numa, tempDir
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -521,7 +536,8 @@ export class Llama {
         ramPadding: number | ((totalRam: number) => number),
         skipLlamaInit?: boolean,
         debug: boolean,
-        numa?: LlamaNuma
+        numa?: LlamaNuma,
+        tempDir?: string | string[] | false
     }) {
         const vramOrchestrator = new MemoryOrchestrator(() => {
             const {total, used, unifiedSize} = bindings.getGpuVramInfo();
@@ -566,6 +582,14 @@ export class Llama {
         else
             resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding);
 
+        const resolvedTempDir = tempDir === false
+            ? undefined
+            : await getTempDir(
+                typeof tempDir === "string"
+                    ? [tempDir]
+                    : tempDir
+            );
+
         const llama = new Llama({
             bindings,
             bindingPath,
@@ -579,6 +603,7 @@ export class Llama {
             logLevel,
             logger,
             debug,
+            tempDir: resolvedTempDir,
             numa,
             buildGpu: buildMetadata.buildOptions.gpu,
             vramOrchestrator,

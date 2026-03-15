@@ -4,16 +4,20 @@ import {LlamaText, SpecialToken, SpecialTokensText} from "../../../utils/LlamaTe
 import {UniqueIdGenerator} from "./UniqueIdGenerator.js";
 import {getFirstValidResult} from "./getFirstValidResult.js";
 
+export type ExtractFunctionCallSettingsRenderTemplate = (options: {
+    chatHistory: ChatHistoryItem[], functions: ChatModelFunctions, additionalParams: Record<string, unknown>,
+    stringifyFunctionParams: boolean, stringifyFunctionResults: boolean, combineModelMessageAndToolCalls: boolean,
+    squashModelTextResponses?: boolean
+}) => string;
+
 export function extractFunctionCallSettingsFromJinjaTemplate({
     idsGenerator,
-    renderTemplate
+    renderTemplate,
+    examineNonFirstFunctionCall = false
 }: {
     idsGenerator: UniqueIdGenerator,
-    renderTemplate({}: {
-        chatHistory: ChatHistoryItem[], functions: ChatModelFunctions, additionalParams: Record<string, unknown>,
-        stringifyFunctionParams: boolean, stringifyFunctionResults: boolean, combineModelMessageAndToolCalls: boolean,
-        squashModelTextResponses?: boolean
-    }): string
+    renderTemplate: ExtractFunctionCallSettingsRenderTemplate,
+    examineNonFirstFunctionCall?: boolean
 }): {
     settings: ChatWrapperSettings["functions"] | null,
     stringifyParams: boolean,
@@ -77,6 +81,13 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         type: "user",
         text: userMessage1
     }];
+    const dummyChatTurn: ChatHistoryItem[] = [{
+        type: "user",
+        text: "Hi"
+    }, {
+        type: "model",
+        response: ["Hey"]
+    }];
     const chatHistory1Call: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -93,7 +104,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistoryOnlyCall: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -109,7 +120,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistory2Calls: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -133,7 +144,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
     const chatHistory2CallsNewChunk: ChatHistoryItem[] = [...baseChatHistory, {
         type: "model",
         response: [
@@ -157,7 +168,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             },
             modelMessage2
         ]
-    }];
+    }, ...(examineNonFirstFunctionCall ? dummyChatTurn : [])];
 
     const additionalParams = {
         "bos_token": bosTokenId,
@@ -540,6 +551,121 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             }
         }
     };
+}
+
+export function detectNeedToWrapFunctionArgumentsWithMap({
+    idsGenerator,
+    renderTemplate
+}: {
+    idsGenerator: UniqueIdGenerator,
+    renderTemplate: ExtractFunctionCallSettingsRenderTemplate
+}): string | undefined {
+    const funcName = idsGenerator.generateId();
+    const paramsValue = idsGenerator.generateId(true);
+    const paramsMapKey = "params";
+
+    const functions: ChatModelFunctions = {
+        [funcName]: {
+            description: idsGenerator.generateId(),
+            params: {
+                type: "string"
+            }
+        }
+    } as ChatModelFunctions;
+    const functionsWithParamMap: ChatModelFunctions = {
+        [funcName]: {
+            description: idsGenerator.generateId(),
+            params: {
+                type: "object",
+                properties: {
+                    [paramsMapKey]: {
+                        type: "string"
+                    }
+                }
+            }
+        }
+    } as ChatModelFunctions;
+    const testChatHistory: ChatHistoryItem[] = [{
+        type: "system",
+        text: idsGenerator.generateId()
+    }, {
+        type: "user",
+        text: idsGenerator.generateId()
+    }, {
+        type: "model",
+        response: [
+            idsGenerator.generateId(),
+            {
+                type: "functionCall",
+                name: funcName,
+
+                // convert to number since this will go through JSON.stringify,
+                // and we want to avoid escaping characters in the rendered output
+                params: paramsValue,
+                result: idsGenerator.generateId(),
+                startsNewChunk: true
+            },
+            idsGenerator.generateId()
+        ]
+    }];
+    const testChatHistoryWithParamsMap: ChatHistoryItem[] = [{
+        type: "system",
+        text: idsGenerator.generateId()
+    }, {
+        type: "user",
+        text: idsGenerator.generateId()
+    }, {
+        type: "model",
+        response: [
+            idsGenerator.generateId(),
+            {
+                type: "functionCall",
+                name: funcName,
+
+                // convert to number since this will go through JSON.stringify,
+                // and we want to avoid escaping characters in the rendered output
+                params: {[paramsMapKey]: paramsValue},
+                result: idsGenerator.generateId(),
+                startsNewChunk: true
+            },
+            idsGenerator.generateId()
+        ]
+    }];
+    const additionalParams = {
+        "bos_token": idsGenerator.generateId(),
+        "eos_token": idsGenerator.generateId(),
+        "eot_token": idsGenerator.generateId()
+    };
+
+    try {
+        const rendered = renderTemplate({
+            chatHistory: testChatHistory,
+            functions,
+            additionalParams,
+            stringifyFunctionParams: false,
+            stringifyFunctionResults: false,
+            combineModelMessageAndToolCalls: false,
+            squashModelTextResponses: true
+        });
+        if (rendered.includes(paramsValue))
+            return undefined;
+
+        const renderedWithParamsMap = renderTemplate({
+            chatHistory: testChatHistoryWithParamsMap,
+            functions: functionsWithParamMap,
+            additionalParams,
+            stringifyFunctionParams: false,
+            stringifyFunctionResults: false,
+            combineModelMessageAndToolCalls: false,
+            squashModelTextResponses: true
+        });
+        if (renderedWithParamsMap.includes(paramsValue))
+            return paramsMapKey;
+    } catch (err) {
+        // do nothing
+    }
+
+    return undefined;
 }
 
 function getTextBetweenIds(

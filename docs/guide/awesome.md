@@ -12,8 +12,8 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
 * [CatAI](https://github.com/withcatai/catai) - a simplified AI assistant API for Node.js, with REST API support
   <br /><DataBadge title="License" content="MIT"/>
 
-* [Manzoni](https://manzoni.app/) ([GitHub](https://github.com/gems-platforms/manzoni-app)) - a text editor running local LLMs
-  <br /><DataBadge title="License" content="AGPL-3.0"/>
+* [QMD](https://github.com/tobi/qmd) (Query Markup Documents) - an on-device search engine for your markdown notes, meeting transcripts, documentation, and knowledge bases. Search with keywords or natural language
+  <br /><DataBadge title="License" content="MIT"/>
 
 * [Clippy](https://felixrieseberg.github.io/clippy/) ([GitHub](https://github.com/felixrieseberg/clippy)) - Clippy, resurrected from the 1990s, now with some AI
   <br /><DataBadge title="License" content="MIT"/>
@@ -24,6 +24,8 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
   <br /><DataBadge title="Partially open source" content="Source available" href="https://github.com/wosherco/bashbuddy/blob/main/LICENSE.md"/>
 
 * [nutshell](https://withnutshell.com) - Private AI meeting notes processed completely on your device
+
+* [Manzoni](https://manzoni.app/) ([GitHub](https://github.com/gems-platforms/manzoni-app)) - a text editor running local LLMs
 
 
 

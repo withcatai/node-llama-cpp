@@ -14,7 +14,10 @@ export default defineConfig({
             "./test/utils/helpers/SpecialTokensTextSerializer.ts",
             "./test/utils/helpers/SpecialTokenSerializer.ts"
         ],
-        setupFiles: ["./test/utils/helpers/testSetup.ts"]
+        setupFiles: ["./test/utils/helpers/testSetup.ts"],
+        experimental: {
+            nodeLoader: false
+        }
 
         // uncomment for profiling
         // execArgv: [

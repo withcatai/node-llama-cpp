@@ -304,7 +304,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 alias: ["tb", "thinkingBudget", "thoughtsBudget"],
                 type: "number",
                 default: -1,
-                defaultDescription: "Unlimited",
+                defaultDescription: "75% of the context size",
                 description: "Maximum number of tokens the model can use for thoughts. Set to `0` to disable reasoning"
             })
             .option("noHistory", {

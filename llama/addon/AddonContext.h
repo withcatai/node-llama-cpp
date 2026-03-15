@@ -1,4 +1,7 @@
 #pragma once
+
+#include <mutex>
+
 #include "llama.h"
 #include "napi.h"
 #include "addonGlobals.h"
@@ -53,6 +56,30 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         Napi::Value EnsureDraftContextIsCompatibleForSpeculative(const Napi::CallbackInfo& info);
 
         Napi::Value SetLoras(const Napi::CallbackInfo& info);
+        Napi::Value RestoreCheckpoint(const Napi::CallbackInfo& info);
+
+        static void init(Napi::Object exports);
+};
+
+class AddonContextSequenceCheckpoint : public Napi::ObjectWrap<AddonContextSequenceCheckpoint> {
+    public:
+        std::mutex dataMutex;
+        std::vector<uint8_t> data;
+        llama_seq_id sequenceId = 0;
+        std::size_t minPos = 0;
+        std::size_t maxPos = 0;
+
+        AddonContextSequenceCheckpoint(const Napi::CallbackInfo& info);
+        ~AddonContextSequenceCheckpoint();
+
+        Napi::Value Init(const Napi::CallbackInfo& info);
+        Napi::Value Dispose(const Napi::CallbackInfo& info);
+
+        void dispose();
+
+        Napi::Value GetSize(const Napi::CallbackInfo& info);
+        Napi::Value GetMinPos(const Napi::CallbackInfo& info);
+        Napi::Value GetMaxPos(const Napi::CallbackInfo& info);
 
         static void init(Napi::Object exports);
 };

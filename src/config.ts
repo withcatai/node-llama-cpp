@@ -20,11 +20,13 @@ export const llamaPrebuiltBinsDirectory = path.join(__dirname, "..", "bins");
 export const llamaLocalBuildBinsDirectory = path.join(llamaDirectory, "localBuilds");
 export const llamaBinsGrammarsDirectory = path.join(__dirname, "..", "llama", "grammars");
 export const projectTemplatesDirectory = path.join(__dirname, "..", "templates");
+export const localTempDirectory = path.join(__dirname, "..", ".temp");
 export const packedProjectTemplatesDirectory = path.join(projectTemplatesDirectory, "packed");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", nanoid());
 export const cliHomedirDirectory = path.join(os.homedir(), ".node-llama-cpp");
+export const cliHomedirTempDirectory = path.join(os.homedir(), ".node-llama-cpp", ".temp");
 export const chatCommandHistoryFilePath = path.join(cliHomedirDirectory, ".chat_repl_history");
 export const cliModelsDirectory = path.join(cliHomedirDirectory, "models");
 export const lastBuildInfoJsonPath = path.join(llamaDirectory, "lastBuild.json");
@@ -100,6 +102,7 @@ const documentationCliUrl = documentationUrl + "/cli";
 export const documentationPageUrls = {
     CUDA: documentationUrl + "/guide/CUDA",
     Vulkan: documentationUrl + "/guide/Vulkan",
+    BuildingFromSource: documentationUrl + "/guide/building-from-source",
     CLI: {
         index: documentationCliUrl,
         Pull: documentationCliUrl + "/pull",

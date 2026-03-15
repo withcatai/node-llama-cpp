@@ -965,6 +965,69 @@ Napi::Value AddonContext::SetLoras(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+class RestoreCheckpointWorker : public Napi::AsyncWorker {
+    public:
+        AddonContext* context;
+        AddonContextSequenceCheckpoint* checkpoint;
+        std::size_t maxPosIndex;
+        bool restoreSuccess = false;
+
+        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, std::size_t maxPosIndex)
+            : Napi::AsyncWorker(info.Env(), "RestoreCheckpointWorker"),
+              context(context),
+              checkpoint(checkpoint),
+              maxPosIndex(maxPosIndex),
+              deferred(Napi::Promise::Deferred::New(info.Env())) {
+            context->Ref();
+            checkpoint->Ref();
+        }
+        ~RestoreCheckpointWorker() {
+            context->Unref();
+            checkpoint->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                std::lock_guard<std::mutex> lock(checkpoint->dataMutex);
+
+                std::size_t dataSize = checkpoint->data.size();
+                std::size_t restoreSize = llama_state_seq_set_data_ext(context->ctx, checkpoint->data.data(), dataSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                if (restoreSize == dataSize) {
+                    restoreSuccess = (
+                        llama_memory_seq_rm(llama_get_memory(context->ctx), checkpoint->sequenceId, maxPosIndex + 1, -1) &&
+                        llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId) == maxPosIndex
+                    );
+                }
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_state_seq_set_data_ext\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Napi::Boolean::New(Env(), restoreSuccess));
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+
+Napi::Value AddonContext::RestoreCheckpoint(const Napi::CallbackInfo& info) {
+    AddonContextSequenceCheckpoint* checkpoint = Napi::ObjectWrap<AddonContextSequenceCheckpoint>::Unwrap(info[0].As<Napi::Object>());
+    std::size_t maxPosIndex = info[1].As<Napi::Number>().Int32Value();
+
+    RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint, maxPosIndex);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
 void AddonContext::init(Napi::Object exports) {
     exports.Set(
         "AddonContext",
@@ -992,7 +1055,112 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("saveSequenceStateToFile", &AddonContext::SaveSequenceStateToFile),
                 InstanceMethod("loadSequenceStateFromFile", &AddonContext::LoadSequenceStateFromFile),
                 InstanceMethod("setLoras", &AddonContext::SetLoras),
+                InstanceMethod("restoreCheckpoint", &AddonContext::RestoreCheckpoint),
                 InstanceMethod("dispose", &AddonContext::Dispose),
+            }
+        )
+    );
+}
+
+AddonContextSequenceCheckpoint::AddonContextSequenceCheckpoint(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonContextSequenceCheckpoint>(info) {
+    
+}
+AddonContextSequenceCheckpoint::~AddonContextSequenceCheckpoint() {
+    dispose();
+}
+
+class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
+    public:
+    AddonContextSequenceCheckpoint* checkpoint;
+        AddonContext* context;
+
+        AddonContextSequenceCheckpointInitWorker(const Napi::CallbackInfo& info, AddonContextSequenceCheckpoint* checkpoint, AddonContext* context)
+            : Napi::AsyncWorker(info.Env(), "AddonContextSequenceCheckpointInitWorker"),
+            checkpoint(checkpoint),
+              context(context),
+              deferred(Napi::Promise::Deferred::New(info.Env())) {
+            checkpoint->Ref();
+            context->Ref();
+        }
+        ~AddonContextSequenceCheckpointInitWorker() {
+            checkpoint->Unref();
+            context->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() {
+            try {
+                checkpoint->minPos = llama_memory_seq_pos_min(llama_get_memory(context->ctx), checkpoint->sequenceId);
+                checkpoint->maxPos = llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId);
+                const size_t checkpointSize = llama_state_seq_get_size_ext(context->ctx, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                
+                checkpoint->data.resize(checkpointSize, 0);
+                llama_state_seq_get_data_ext(context->ctx, checkpoint->data.data(), checkpointSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch(...) {
+                SetError("Unknown error when calling \"llama_state_seq_get_data_ext\"");
+            }
+        }
+        void OnOK() {
+            deferred.Resolve(Env().Undefined());
+        }
+        void OnError(const Napi::Error& err) {
+            deferred.Reject(err.Value());
+        }
+};
+
+Napi::Value AddonContextSequenceCheckpoint::Init(const Napi::CallbackInfo& info) {
+    AddonContext * context = Napi::ObjectWrap<AddonContext>::Unwrap(info[0].As<Napi::Object>());
+    sequenceId = info[1].As<Napi::Number>().Int32Value();
+
+    AddonContextSequenceCheckpointInitWorker* worker = new AddonContextSequenceCheckpointInitWorker(info, this, context);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
+Napi::Value AddonContextSequenceCheckpoint::Dispose(const Napi::CallbackInfo& info) {
+    dispose();
+    return info.Env().Undefined();
+}
+
+void AddonContextSequenceCheckpoint::dispose() {
+    std::lock_guard<std::mutex> lock(dataMutex);
+    data.clear();
+    data.resize(0);
+}
+
+Napi::Value AddonContextSequenceCheckpoint::GetSize(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), data.size());
+}
+
+Napi::Value AddonContextSequenceCheckpoint::GetMinPos(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), minPos);
+}
+
+Napi::Value AddonContextSequenceCheckpoint::GetMaxPos(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), maxPos);
+}
+
+void AddonContextSequenceCheckpoint::init(Napi::Object exports) {
+    exports.Set(
+        "AddonContextSequenceCheckpoint",
+        DefineClass(
+            exports.Env(),
+            "AddonContextSequenceCheckpoint",
+            {
+                InstanceMethod("init", &AddonContextSequenceCheckpoint::Init),
+                InstanceMethod("dispose", &AddonContextSequenceCheckpoint::Dispose),
+
+                InstanceAccessor("size", &AddonContextSequenceCheckpoint::GetSize, nullptr),
+                InstanceAccessor("minPos", &AddonContextSequenceCheckpoint::GetMinPos, nullptr),
+                InstanceAccessor("maxPos", &AddonContextSequenceCheckpoint::GetMaxPos, nullptr),
             }
         )
     );
