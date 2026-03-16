@@ -7,13 +7,7 @@ export async function resolvePackageJsonConfig(startDir: string) {
 
     let currentDirPath = path.resolve(startDir);
     while (true) {
-        const packageJsonPath = path.join(currentDirPath, "package.json");
-        try {
-            if (await fs.pathExists(packageJsonPath))
-                applyConfig(currentConfig, await readPackageJsonConfig(packageJsonPath));
-        } catch (err) {
-            // do nothing
-        }
+        applyConfig(currentConfig, await readPackageJsonConfig(path.join(currentDirPath, "package.json")));
 
         const parentDirPath = path.dirname(currentDirPath);
         if (parentDirPath === currentDirPath)
@@ -21,6 +15,10 @@ export async function resolvePackageJsonConfig(startDir: string) {
 
         currentDirPath = parentDirPath;
     }
+
+    const npmPackageJsonPath = process.env["npm_package_json"] ?? "";
+    if (npmPackageJsonPath !== "")
+        applyConfig(currentConfig, await readPackageJsonConfig(npmPackageJsonPath));
 
     return currentConfig;
 }
@@ -45,9 +43,12 @@ export type NlcPackageJsonConfig = {
     nodeLlamaCppPostinstall?: NodeLlamaCppPostinstallBehavior
 };
 
-function readPackageJsonConfig(packageJsonPath: string) {
+async function readPackageJsonConfig(packageJsonPath: string) {
     try {
-        const packageJsonContent = fs.readFileSync(packageJsonPath, "utf8");
+        if (!(await fs.pathExists(packageJsonPath)))
+            return {};
+
+        const packageJsonContent = await fs.readFile(packageJsonPath, "utf8");
         const packageJson = JSON.parse(packageJsonContent);
         const config = packageJson?.config;
         if (typeof config === "object")
