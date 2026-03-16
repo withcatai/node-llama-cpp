@@ -179,7 +179,7 @@ If you want to customize the `postinstall` behavior, you can do so using any of 
 * Setting the `NODE_LLAMA_CPP_POSTINSTALL` environment variable to `<behavior>` before running `npm install`.
 * Configuring `config.nodeLlamaCppPostinstall` on your project's `package.json` to `<behavior>`.
   <br/>
-  This will only work when your module is installed globally using `npm -g` or for a non-library project when you run `npm install` in the project root; it will not work when your module is installed as a dependency of another module.
+  This will only work when your module is installed globally using `npm install -g` or for a non-library project when you run `npm install` in the project root; it will not work when your module is installed as a dependency of another module.
 
 Where `<behavior>` can be one of the following options:
 * **`auto` (default)**: the default behavior explained above.
