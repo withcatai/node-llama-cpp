@@ -60,8 +60,8 @@ function readPackageJsonConfig(packageJsonPath: string) {
 }
 
 function applyConfig(baseConfig: Record<string, any>, newConfig: Record<string, any>) {
-    for (const key in newConfig) {
-        if (key in baseConfig)
+    for (const key of Object.keys(newConfig)) {
+        if (Object.hasOwn(baseConfig, key))
             continue;
 
         baseConfig[key] = newConfig[key];
