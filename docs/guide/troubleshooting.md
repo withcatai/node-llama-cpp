@@ -178,6 +178,8 @@ If you want to customize the `postinstall` behavior, you can do so using any of 
 * Passing the `--node-llama-cpp-postinstall=<behavior>` flag to the `npm install` command.
 * Setting the `NODE_LLAMA_CPP_POSTINSTALL` environment variable to `<behavior>` before running `npm install`.
 * Configuring `config.nodeLlamaCppPostinstall` on your project's `package.json` to `<behavior>`.
+  <br/>
+  This will only work when your module is installed globally using `npm -g` or for a non-library project when you run `npm install` in the project root; it will not work when your module is installed as a dependency of another module.
 
 Where `<behavior>` can be one of the following options:
 * **`auto` (default)**: the default behavior explained above.
@@ -187,3 +189,25 @@ Where `<behavior>` can be one of the following options:
 * **`skip`**: skip the entire `postinstall` script.
     If the prebuilt binaries are incompatible with the current machine,
     using [`getLlama`](../api/functions/getLlama.md) for the first time will attempt building from source by default.
+
+::: code-group
+```shell [<code>npm install</code> flag]
+npm install --node-llama-cpp-postinstall=ignoreFailedBuild
+```
+
+```shell [env var (bash)]
+NODE_LLAMA_CPP_POSTINSTALL=ignoreFailedBuild npm install
+```
+
+```shell [env var (using <code>cross-env</code>)]
+npx --yes cross-env NODE_LLAMA_CPP_POSTINSTALL=ignoreFailedBuild npm install
+```
+
+```json [<code>package.json</code>]
+{
+    "config": {
+        "nodeLlamaCppPostinstall": "ignoreFailedBuild"
+    }
+}
+```
+:::
