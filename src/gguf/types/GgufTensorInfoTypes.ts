@@ -60,5 +60,6 @@ export const enum GgmlType {
     IQ4_NL_4_4 = 36,
     IQ4_NL_4_8 = 37,
     IQ4_NL_8_8 = 38,
-    MXFP4 = 39 // MXFP4 (1 block)
+    MXFP4 = 39, // MXFP4 (1 block)
+    NVFP4 = 40 // NVFP4 (4 blocks, E4M3 scale)
 }
