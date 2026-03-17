@@ -114,6 +114,7 @@ export const enum GgufArchitectureType {
     rnd1 = "rnd1",
     panguEmbedded = "pangu-embedded",
     mistral3 = "mistral3",
+    mistral4 = "mistral4",
     paddleocr = "paddleocr",
     mimo2 = "mimo2",
     step35 = "step35",
