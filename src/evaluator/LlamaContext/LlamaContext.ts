@@ -113,8 +113,8 @@ export class LlamaContext {
         } = {},
         swaFullCache = _model.defaultContextSwaFullCache,
         performanceTracking = false,
-        kvCacheKeyType,
-        kvCacheValueType,
+        experimentalKvCacheKeyType,
+        experimentalKvCacheValueType,
         _embeddings,
         _ranking
     }: LlamaContextOptions & {
@@ -122,8 +122,8 @@ export class LlamaContext {
         contextSize: number,
         batchSize: number,
         flashAttention: boolean,
-        kvCacheKeyType: GgmlType,
-        kvCacheValueType: GgmlType
+        experimentalKvCacheKeyType: GgmlType,
+        experimentalKvCacheValueType: GgmlType
     }) {
         if (_model.disposed)
             throw new DisposedError();
@@ -152,8 +152,8 @@ export class LlamaContext {
                 : this._llama._threadsSplitter.normalizeThreadsValue(threads?.min ?? 1)
         );
         this._performanceTracking = !!performanceTracking;
-        this._kvCacheKeyType = kvCacheKeyType;
-        this._kvCacheValueType = kvCacheValueType;
+        this._kvCacheKeyType = experimentalKvCacheKeyType;
+        this._kvCacheValueType = experimentalKvCacheValueType;
         this._swaFullCache = !!swaFullCache;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: padSafeContextSize(this._contextSize * this._totalSequences, "up"), // each sequence needs its own <contextSize> of cells
@@ -891,12 +891,12 @@ export class LlamaContext {
         const flashAttention = _model.flashAttentionSupported
             ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
             : false;
-        const kvCacheKeyType = options.kvCacheKeyType === "currentQuant"
+        const kvCacheKeyType = options.experimentalKvCacheKeyType === "currentQuant"
             ? _model.fileInsights.dominantTensorType ?? _model.defaultContextKvCacheKeyType
-            : resolveGgmlTypeOption(options.kvCacheKeyType) ?? _model.defaultContextKvCacheKeyType;
-        const kvCacheValueType = options.kvCacheValueType === "currentQuant"
+            : resolveGgmlTypeOption(options.experimentalKvCacheKeyType) ?? _model.defaultContextKvCacheKeyType;
+        const kvCacheValueType = options.experimentalKvCacheValueType === "currentQuant"
             ? _model.fileInsights.dominantTensorType ?? _model.defaultContextKvCacheValueType
-            : resolveGgmlTypeOption(options.kvCacheValueType) ?? _model.defaultContextKvCacheValueType;
+            : resolveGgmlTypeOption(options.experimentalKvCacheValueType) ?? _model.defaultContextKvCacheValueType;
         const swaFullCache = options.swaFullCache ?? _model.defaultContextSwaFullCache;
         const loraOptions = typeof options.lora === "string"
             ? {adapters: [{filePath: options.lora}]} satisfies LlamaContextOptions["lora"]
@@ -953,7 +953,14 @@ export class LlamaContext {
             });
 
             const context = new LlamaContext({_model}, {
-                ...options, contextSize, batchSize, sequences, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache
+                ...options,
+                contextSize,
+                batchSize,
+                sequences,
+                flashAttention,
+                experimentalKvCacheKeyType: kvCacheKeyType,
+                experimentalKvCacheValueType: kvCacheValueType,
+                swaFullCache
             });
             const contextCreationVramReservation = options.ignoreMemorySafetyChecks
                 ? null

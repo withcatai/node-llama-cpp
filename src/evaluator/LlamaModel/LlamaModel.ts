@@ -134,9 +134,15 @@ export type LlamaModelOptions = {
      * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
      *
      * Defaults to `F16`.
-     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
      */
-    defaultContextKvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+    experimentalDefaultContextKvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * The default type of the value for the KV cache tensors used for contexts created with this model.
@@ -144,9 +150,15 @@ export type LlamaModelOptions = {
      * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
      *
      * Defaults to `F16`.
-     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
      */
-    defaultContextKvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+    experimentalDefaultContextKvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * When using SWA (Sliding Window Attention) on a supported model,
@@ -744,7 +756,12 @@ export class LlamaModel {
     }: {
         _llama: Llama
     }) {
-        const {loadSignal, defaultContextFlashAttention, defaultContextKvCacheKeyType, defaultContextKvCacheValueType} = modelOptions;
+        const {
+            loadSignal,
+            defaultContextFlashAttention,
+            experimentalDefaultContextKvCacheKeyType,
+            experimentalDefaultContextKvCacheValueType
+        } = modelOptions;
         const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
         const useDirectIo = modelOptions.useDirectIo ?? defaultUseDirectIo;
 
@@ -759,12 +776,12 @@ export class LlamaModel {
             ? (defaultContextFlashAttention ?? defaultContextFlashAttentionEnabled)
             : false;
         const resolvedDefaultContextSwaFullCache = modelOptions.defaultContextSwaFullCache ?? defaultContextSwaFullCache;
-        const resolvedDefaultContextKvCacheKeyType = defaultContextKvCacheKeyType === "currentQuant"
+        const resolvedDefaultContextKvCacheKeyType = experimentalDefaultContextKvCacheKeyType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(defaultContextKvCacheKeyType) ?? GgmlType.F16;
-        const resolvedDefaultContextKvCacheValueType = defaultContextKvCacheValueType === "currentQuant"
+            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheKeyType) ?? GgmlType.F16;
+        const resolvedDefaultContextKvCacheValueType = experimentalDefaultContextKvCacheValueType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(defaultContextKvCacheValueType) ?? GgmlType.F16;
+            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheValueType) ?? GgmlType.F16;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
             defaultContextFlashAttention: resolvedDefaultContextFlashAttention,

@@ -111,9 +111,15 @@ export type LlamaContextOptions = {
      * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
      *
      * Defaults to `F16` (inherited from the model option `defaultContextKvCacheKeyType`).
-     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
      */
-    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+    experimentalKvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * The type of the value for the KV cache tensors used in this context.
@@ -121,9 +127,15 @@ export type LlamaContextOptions = {
      * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
      *
      * Defaults to `F16` (inherited from the model option `defaultContextKvCacheValueType`).
-     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
      */
-    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+    experimentalKvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * When using SWA (Sliding Window Attention) on a supported model,

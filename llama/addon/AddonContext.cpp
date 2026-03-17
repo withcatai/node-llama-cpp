@@ -446,14 +446,14 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         if (options.Has("kvCacheKeyType") && options.Get("kvCacheKeyType").IsNumber()) {
             auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
             if (keyType >= 0 && keyType < GGML_TYPE_COUNT) {
-                context_params.type_k = keyType;
+                context_params.type_k = static_cast<ggml_type>(keyType);
             }
         }
 
         if (options.Has("kvCacheValueType") && options.Get("kvCacheValueType").IsNumber()) {
             auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
             if (valueType >= 0 && valueType < GGML_TYPE_COUNT) {
-                context_params.type_v = valueType;
+                context_params.type_v = static_cast<ggml_type>(valueType);
             }
         }
 

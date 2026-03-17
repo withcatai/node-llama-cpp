@@ -117,18 +117,20 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 type: "string",
                 choices: [
                     "currentQuant",
-                    ...Object.keys(GgmlType).filter((key) => typeof key === "string") as (keyof typeof GgmlType)[]
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
                 ] as const,
-                description: "The type of the key for the context KV cache tensors"
+                default: "F16" as const,
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
             })
             .option("kvCacheValueType", {
                 alias: "kvcvt",
                 type: "string",
                 choices: [
                     "currentQuant",
-                    ...Object.keys(GgmlType).filter((key) => typeof key === "string") as (keyof typeof GgmlType)[]
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
                 ] as const,
-                description: "The type of the value for the context KV cache tensors"
+                default: "F16" as const,
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
             })
             .option("swaFullCache", {
                 alias: "noSwa",
@@ -833,8 +835,8 @@ async function runTestWorkerLogic() {
                     ),
                     ignoreMemorySafetyChecks: currentContextSizeCheck != null,
                     flashAttention,
-                    kvCacheKeyType,
-                    kvCacheValueType,
+                    experimentalKvCacheKeyType: kvCacheKeyType,
+                    experimentalKvCacheValueType: kvCacheValueType,
                     swaFullCache,
                     batchSize,
                     failedCreationRemedy: false
@@ -907,8 +909,8 @@ async function runTestWorkerLogic() {
                 useDirectIo,
                 gpuLayers,
                 defaultContextFlashAttention: flashAttention,
-                defaultContextKvCacheKeyType: kvCacheKeyType,
-                defaultContextKvCacheValueType: kvCacheValueType,
+                experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                 defaultContextSwaFullCache: swaFullCache,
                 ignoreMemorySafetyChecks: true
             });
