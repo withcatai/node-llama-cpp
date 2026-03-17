@@ -23,6 +23,7 @@ import {documentationPageUrls} from "../../config.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
 import {ParsedXtcArg, parseXtcArg} from "../utils/parseXtcArg.js";
+import {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 
 type CompleteCommand = {
     modelPath?: string,
@@ -34,6 +35,8 @@ type CompleteCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
     threads?: number,
     temperature: number,
@@ -128,6 +131,24 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("kvCacheKeyType", {
+                alias: "kvckt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => typeof key === "string") as (keyof typeof GgmlType)[]
+                ] as const,
+                description: "The type of the key for the context KV cache tensors"
+            })
+            .option("kvCacheValueType", {
+                alias: "kvcvt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => typeof key === "string") as (keyof typeof GgmlType)[]
+                ] as const,
+                description: "The type of the value for the context KV cache tensors"
             })
             .option("swaFullCache", {
                 alias: "noSwa",
@@ -299,7 +320,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
-        flashAttention, swaFullCache, threads, temperature, minP, topK,
+        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
@@ -307,7 +328,8 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     }) {
         try {
             await RunCompletion({
-                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
+                modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
+                kvCacheKeyType, kvCacheValueType, swaFullCache,
                 threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
@@ -323,7 +345,8 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
 
 
 async function RunCompletion({
-    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention, swaFullCache,
+    modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
+    kvCacheKeyType, kvCacheValueType, swaFullCache,
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
@@ -356,13 +379,17 @@ async function RunCompletion({
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
         swaFullCache,
-        useMmap
+        useMmap,
+        kvCacheKeyType,
+        kvCacheValueType
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
             swaFullCache,
             useMmap,
+            kvCacheKeyType,
+            kvCacheValueType,
             consoleTitle: "Draft model file"
         })
         : undefined;
@@ -400,6 +427,8 @@ async function RunCompletion({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                defaultContextKvCacheKeyType: kvCacheKeyType,
+                defaultContextKvCacheValueType: kvCacheValueType,
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 useDirectIo,
@@ -435,6 +464,8 @@ async function RunCompletion({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    defaultContextKvCacheKeyType: kvCacheKeyType,
+                    defaultContextKvCacheValueType: kvCacheValueType,
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     useDirectIo,

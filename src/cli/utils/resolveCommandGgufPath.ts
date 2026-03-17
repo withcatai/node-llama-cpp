@@ -8,14 +8,18 @@ import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
 import {ggufQuantNames} from "../../gguf/utils/ggufQuantNames.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {isModelUri} from "../../utils/parseModelUri.js";
+import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "./ConsoleInteraction.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
-    targetDirectory = cliModelsDirectory, flashAttention = false, swaFullCache = false, useMmap, consoleTitle = "File"
+    targetDirectory = cliModelsDirectory, flashAttention = false, swaFullCache = false, useMmap, consoleTitle = "File",
+    kvCacheKeyType, kvCacheValueType
 }: {
-    targetDirectory?: string, flashAttention?: boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string
+    targetDirectory?: string, flashAttention?: boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType
 } = {}) {
     if (ggufPath == null)
         ggufPath = await interactivelyAskForModel({
@@ -25,7 +29,13 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             downloadIntent: true,
             flashAttention,
             swaFullCache,
-            useMmap
+            useMmap,
+            kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                ? "currentQuant"
+                : resolveGgmlTypeOption(kvCacheKeyType),
+            kvCacheValueType: kvCacheValueType === "currentQuant"
+                ? "currentQuant"
+                : resolveGgmlTypeOption(kvCacheValueType)
         });
 
     const resolvedModelDestination = resolveModelDestination(ggufPath);

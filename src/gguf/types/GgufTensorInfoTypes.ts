@@ -20,7 +20,7 @@ export type GgufTensorInfo = {
     readonly filePart: number
 };
 
-export const enum GgmlType {
+export enum GgmlType {
     F32 = 0,
     F16 = 1,
     Q4_0 = 2,
@@ -62,4 +62,16 @@ export const enum GgmlType {
     IQ4_NL_8_8 = 38,
     MXFP4 = 39, // MXFP4 (1 block)
     NVFP4 = 40 // NVFP4 (4 blocks, E4M3 scale)
+}
+
+export function resolveGgmlTypeOption(option?: keyof typeof GgmlType | GgmlType) {
+    if (option == null)
+        return undefined;
+
+    if (typeof option === "number" && Object.hasOwn(GgmlType, option))
+        return option as GgmlType;
+    else if (typeof option === "string" && Object.hasOwn(GgmlType, option))
+        return GgmlType[option as keyof typeof GgmlType];
+
+    return undefined;
 }

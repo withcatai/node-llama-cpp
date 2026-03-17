@@ -19,6 +19,7 @@ import {GgufArchitectureType, GgufMetadata} from "../../gguf/types/GgufMetadataT
 import {OverridesObject} from "../../utils/OverridesObject.js";
 import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {LlamaRankingContext, LlamaRankingContextOptions} from "../LlamaRankingContext.js";
+import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
@@ -128,6 +129,26 @@ export type LlamaModelOptions = {
     defaultContextFlashAttention?: boolean,
 
     /**
+     * The default type of the key for the KV cache tensors used for contexts created with this model.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16`.
+     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     */
+    defaultContextKvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+
+    /**
+     * The default type of the value for the KV cache tensors used for contexts created with this model.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16`.
+     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     */
+    defaultContextKvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+
+    /**
      * When using SWA (Sliding Window Attention) on a supported model,
      * extend the sliding window size to the current context size (meaning practically disabling SWA)
      * by default for contexts created with this model.
@@ -187,6 +208,8 @@ export class LlamaModel {
     /** @internal */ private readonly _defaultContextFlashAttentionOptionEnabled: boolean;
     /** @internal */ private readonly _defaultContextFlashAttention: boolean;
     /** @internal */ private readonly _defaultContextSwaFullCache: boolean;
+    /** @internal */ private readonly _defaultContextKvCacheKeyType: GgmlType;
+    /** @internal */ private readonly _defaultContextKvCacheValueType: GgmlType;
     /** @internal */ private readonly _flashAttentionSupported: boolean;
     /** @internal */ private readonly _loraAdapters = new Map<string, AddonModelLora>();
     /** @internal */ private _typeDescription?: ModelTypeDescription;
@@ -208,6 +231,8 @@ export class LlamaModel {
         _defaultContextFlashAttentionOptionEnabled,
         _defaultContextFlashAttention,
         _defaultContextSwaFullCache,
+        _defaultContextKvCacheKeyType,
+        _defaultContextKvCacheValueType,
         _flashAttentionSupported
     }: {
         _llama: Llama,
@@ -216,6 +241,8 @@ export class LlamaModel {
         _defaultContextFlashAttentionOptionEnabled: boolean,
         _defaultContextFlashAttention: boolean,
         _defaultContextSwaFullCache: boolean,
+        _defaultContextKvCacheKeyType: GgmlType,
+        _defaultContextKvCacheValueType: GgmlType,
         _flashAttentionSupported: boolean
     }) {
         this._llama = _llama;
@@ -229,6 +256,8 @@ export class LlamaModel {
         this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
         this._defaultContextFlashAttention = _defaultContextFlashAttention;
         this._defaultContextSwaFullCache = _defaultContextSwaFullCache;
+        this._defaultContextKvCacheKeyType = _defaultContextKvCacheKeyType;
+        this._defaultContextKvCacheValueType = _defaultContextKvCacheValueType;
         this._flashAttentionSupported = _flashAttentionSupported;
         const overridesList = ggufMetadataOverridesToList(metadataOverrides);
         this._model = new this._llama._bindings.AddonModel(this._modelPath, removeNullFields({
@@ -355,6 +384,14 @@ export class LlamaModel {
 
     public get defaultContextSwaFullCache() {
         return this._defaultContextSwaFullCache;
+    }
+
+    public get defaultContextKvCacheKeyType() {
+        return this._defaultContextKvCacheKeyType;
+    }
+
+    public get defaultContextKvCacheValueType() {
+        return this._defaultContextKvCacheValueType;
     }
 
     /**
@@ -707,7 +744,7 @@ export class LlamaModel {
     }: {
         _llama: Llama
     }) {
-        const {loadSignal, defaultContextFlashAttention} = modelOptions;
+        const {loadSignal, defaultContextFlashAttention, defaultContextKvCacheKeyType, defaultContextKvCacheValueType} = modelOptions;
         const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
         const useDirectIo = modelOptions.useDirectIo ?? defaultUseDirectIo;
 
@@ -722,10 +759,18 @@ export class LlamaModel {
             ? (defaultContextFlashAttention ?? defaultContextFlashAttentionEnabled)
             : false;
         const resolvedDefaultContextSwaFullCache = modelOptions.defaultContextSwaFullCache ?? defaultContextSwaFullCache;
+        const resolvedDefaultContextKvCacheKeyType = defaultContextKvCacheKeyType === "currentQuant"
+            ? ggufInsights.dominantTensorType ?? GgmlType.F16
+            : resolveGgmlTypeOption(defaultContextKvCacheKeyType) ?? GgmlType.F16;
+        const resolvedDefaultContextKvCacheValueType = defaultContextKvCacheValueType === "currentQuant"
+            ? ggufInsights.dominantTensorType ?? GgmlType.F16
+            : resolveGgmlTypeOption(defaultContextKvCacheValueType) ?? GgmlType.F16;
         const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
             ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
             defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
             defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
+            defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
             useMmap
         });
         const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({
@@ -740,7 +785,9 @@ export class LlamaModel {
             _defaultContextFlashAttentionOptionEnabled: defaultContextFlashAttention ?? false,
             _flashAttentionSupported: flashAttentionSupported,
             _defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
-            _defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache
+            _defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
+            _defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
+            _defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType
         });
         const modelCreationVramReservation = modelOptions.ignoreMemorySafetyChecks
             ? null

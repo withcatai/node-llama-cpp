@@ -1,4 +1,5 @@
-import {PickOptions} from "../../utils/utilTypes.js";
+import type {PickOptions} from "../../utils/utilTypes.js";
+import type {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 import type {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import type {TokenBias} from "../TokenBias.js";
 import type {Token} from "../../types.js";
@@ -103,6 +104,26 @@ export type LlamaContextOptions = {
      * See {@link BatchingOptions} for more information.
      */
     batching?: BatchingOptions,
+
+    /**
+     * The type of the key for the KV cache tensors used in this context.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16` (inherited from the model option `defaultContextKvCacheKeyType`).
+     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     */
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+
+    /**
+     * The type of the value for the KV cache tensors used in this context.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16` (inherited from the model option `defaultContextKvCacheValueType`).
+     * @experimental - this option is experimental. it may not work as intended, and may change in the future
+     */
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * When using SWA (Sliding Window Attention) on a supported model,
