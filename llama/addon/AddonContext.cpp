@@ -443,6 +443,20 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
             context_params.no_perf = !(options.Get("performanceTracking").As<Napi::Boolean>().Value());
         }
 
+        if (options.Has("kvCacheKeyType") && options.Get("kvCacheKeyType").IsNumber()) {
+            auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
+            if (keyType >= 0 && keyType < GGML_TYPE_COUNT) {
+                context_params.type_k = static_cast<ggml_type>(keyType);
+            }
+        }
+
+        if (options.Has("kvCacheValueType") && options.Get("kvCacheValueType").IsNumber()) {
+            auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
+            if (valueType >= 0 && valueType < GGML_TYPE_COUNT) {
+                context_params.type_v = static_cast<ggml_type>(valueType);
+            }
+        }
+
         if (options.Has("swaFullCache")) {
             context_params.swa_full = options.Get("swaFullCache").As<Napi::Boolean>().Value();
         }
@@ -1063,7 +1077,7 @@ void AddonContext::init(Napi::Object exports) {
 }
 
 AddonContextSequenceCheckpoint::AddonContextSequenceCheckpoint(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonContextSequenceCheckpoint>(info) {
-    
+
 }
 AddonContextSequenceCheckpoint::~AddonContextSequenceCheckpoint() {
     dispose();
@@ -1099,7 +1113,7 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
                 checkpoint->minPos = llama_memory_seq_pos_min(llama_get_memory(context->ctx), checkpoint->sequenceId);
                 checkpoint->maxPos = llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId);
                 const size_t checkpointSize = llama_state_seq_get_size_ext(context->ctx, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
-                
+
                 checkpoint->data.resize(checkpointSize, 0);
                 llama_state_seq_get_data_ext(context->ctx, checkpoint->data.data(), checkpointSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
             } catch (const std::exception& e) {

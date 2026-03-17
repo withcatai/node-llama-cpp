@@ -1,4 +1,5 @@
-import {PickOptions} from "../../utils/utilTypes.js";
+import type {PickOptions} from "../../utils/utilTypes.js";
+import type {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 import type {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import type {TokenBias} from "../TokenBias.js";
 import type {Token} from "../../types.js";
@@ -103,6 +104,38 @@ export type LlamaContextOptions = {
      * See {@link BatchingOptions} for more information.
      */
     batching?: BatchingOptions,
+
+    /**
+     * The type of the key for the KV cache tensors used in this context.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16` (inherited from the model option `defaultContextKvCacheKeyType`).
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
+     */
+    experimentalKvCacheKeyType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
+
+    /**
+     * The type of the value for the KV cache tensors used in this context.
+     *
+     * Set to `"currentQuant"` to use the same type as the current quantization of the model weights tensors.
+     *
+     * Defaults to `F16` (inherited from the model option `defaultContextKvCacheValueType`).
+     * @deprecated - this option is experimental and highly unstable.
+     * Only use with a hard-coded model and on specific hardware that you verify where the type passed to this option works correctly.
+     * Avoid allowing end users to configure this option, as it's highly unstable.
+     * @experimental - this option is experimental and highly unstable.
+     * It may not work as intended or even crash the process.
+     * Use with caution.
+     * This option may change or get removed in the future without a breaking change version.
+     */
+    experimentalKvCacheValueType?: "currentQuant" | keyof typeof GgmlType | GgmlType,
 
     /**
      * When using SWA (Sliding Window Attention) on a supported model,

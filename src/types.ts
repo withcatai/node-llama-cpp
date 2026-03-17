@@ -477,3 +477,5 @@ export type LLamaContextualDryRepeatPenalty = {
      */
     sequenceBreakers?: string[]
 };
+
+export type NodeLlamaCppPostinstallBehavior = "auto" | "ignoreFailedBuild" | "skip";

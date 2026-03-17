@@ -5,17 +5,21 @@ import {findBestOption} from "../../../utils/findBestOption.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 import {minAllowedContextSizeInCalculations} from "../../../config.js";
 import {scoreLevels} from "./scoreLevels.js";
+import type {GgmlType} from "../../types/GgufTensorInfoTypes.js";
 import type {GgufInsights} from "../GgufInsights.js";
 
 const fitContextExtraMemoryPaddingPercentage = 0.5;
 
 export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
     ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
-    llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention, defaultContextSwaFullCache, useMmap
+    llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention,
+    defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache, useMmap
 }: {
     ggufInsights: GgufInsights, ignoreMemorySafetyChecks?: boolean,
     getVramState(): Promise<{total: number, free: number}>, llamaVramPaddingSize: number, llamaGpu: BuildGpu,
-    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: boolean, defaultContextSwaFullCache: boolean, useMmap?: boolean
+    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: boolean,
+    defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache: boolean,
+    useMmap?: boolean
 }): Promise<number> {
     if (gpuLayers == null)
         gpuLayers = "auto";
@@ -37,6 +41,8 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
             ggufInsights,
             currentVram: vramState.free,
             defaultContextFlashAttention,
+            defaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType,
             defaultContextSwaFullCache,
             useMmap
         });
@@ -74,6 +80,8 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
                 ? gpuLayers.max
                 : undefined,
             defaultContextFlashAttention,
+            defaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType,
             defaultContextSwaFullCache,
             useMmap
         });
@@ -97,6 +105,8 @@ function getBestGpuLayersForFreeVram({
     minGpuLayers,
     maxGpuLayers,
     defaultContextFlashAttention,
+    defaultContextKvCacheKeyType,
+    defaultContextKvCacheValueType,
     defaultContextSwaFullCache,
     useMmap
 }: {
@@ -106,6 +116,8 @@ function getBestGpuLayersForFreeVram({
     minGpuLayers?: number,
     maxGpuLayers?: number,
     defaultContextFlashAttention: boolean,
+    defaultContextKvCacheKeyType?: GgmlType,
+    defaultContextKvCacheValueType?: GgmlType,
     defaultContextSwaFullCache: boolean,
     useMmap?: boolean
 }) {
@@ -128,6 +140,8 @@ function getBestGpuLayersForFreeVram({
                 fitContext,
                 defaultContextFlashAttention,
                 defaultContextSwaFullCache,
+                defaultContextKvCacheKeyType,
+                defaultContextKvCacheValueType,
                 useMmap
             });
 
@@ -187,10 +201,12 @@ function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayer
 }
 
 function getVramRequiredForGpuLayers({
-    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = false, defaultContextSwaFullCache = false, useMmap
+    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = false,
+    defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache = false, useMmap
 }: {
     gpuLayers: number, ggufInsights: GgufInsights, currentVram: number, fitContext?: {contextSize?: number, embeddingContext?: boolean},
-    defaultContextFlashAttention: boolean, defaultContextSwaFullCache: boolean, useMmap?: boolean
+    defaultContextFlashAttention: boolean, defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType,
+    defaultContextSwaFullCache: boolean, useMmap?: boolean
 }) {
     const modelVram = ggufInsights.estimateModelResourceRequirements({
         gpuLayers,
@@ -208,6 +224,8 @@ function getVramRequiredForGpuLayers({
             sequences: 1,
             isEmbeddingContext: fitContext.embeddingContext ?? false,
             flashAttention: defaultContextFlashAttention,
+            kvCacheKeyType: defaultContextKvCacheKeyType,
+            kvCacheValueType: defaultContextKvCacheValueType,
             swaFullCache: defaultContextSwaFullCache
         }).gpuVram;
 
@@ -228,6 +246,8 @@ function getVramRequiredForGpuLayers({
         vram: currentVram - modelVram,
         isEmbeddingContext: fitContext?.embeddingContext ?? false,
         flashAttention: defaultContextFlashAttention,
+        kvCacheKeyType: defaultContextKvCacheKeyType,
+        kvCacheValueType: defaultContextKvCacheValueType,
         swaFullCache: defaultContextSwaFullCache
     });
 
@@ -241,8 +261,11 @@ function getVramRequiredForGpuLayers({
     };
 }
 
-function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, swaFullCache}: {
-    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean, swaFullCache: boolean
+function findMaxPossibleContextSizeForVram({
+    gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache
+}: {
+    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean,
+    kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache: boolean
 }) {
     const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
 
@@ -258,6 +281,8 @@ function findMaxPossibleContextSizeForVram({gpuLayers, ggufInsights, vram, isEmb
                 sequences: 1,
                 isEmbeddingContext,
                 flashAttention,
+                kvCacheKeyType,
+                kvCacheValueType,
                 swaFullCache
             }).gpuVram;
 

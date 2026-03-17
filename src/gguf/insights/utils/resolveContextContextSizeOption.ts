@@ -5,11 +5,13 @@ import {minAllowedContextSizeInCalculations} from "../../../config.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 import {InsufficientMemoryError} from "../../../utils/InsufficientMemoryError.js";
 import {getRamUsageFromUnifiedVram} from "./getRamUsageFromUnifiedVram.js";
+import type {GgmlType} from "../../types/GgufTensorInfoTypes.js";
 
 const defaultMaxContextSizeSwapUse = 2048;
 
 export async function resolveContextContextSizeOption({
-    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, flashAttention, swaFullCache,
+    contextSize, batchSize, sequences, modelFileInsights, modelGpuLayers, modelTrainContextSize, flashAttention,
+    kvCacheKeyType, kvCacheValueType, swaFullCache,
     getVramState, getRamState, getSwapState, ignoreMemorySafetyChecks = false, isEmbeddingContext = false,
     maxContextSizeSwapUse = defaultMaxContextSizeSwapUse
 }: {
@@ -20,6 +22,8 @@ export async function resolveContextContextSizeOption({
     modelGpuLayers: number,
     modelTrainContextSize: number,
     flashAttention: boolean,
+    kvCacheKeyType?: GgmlType,
+    kvCacheValueType?: GgmlType,
     swaFullCache: boolean,
     getVramState(): Promise<{total: number, free: number, unifiedSize: number}>,
     getRamState(): Promise<{total: number, free: number}>,
@@ -53,6 +57,8 @@ export async function resolveContextContextSizeOption({
             modelGpuLayers: modelGpuLayers,
             sequences,
             flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
             swaFullCache,
             isEmbeddingContext
         });
@@ -99,6 +105,8 @@ export async function resolveContextContextSizeOption({
                 modelGpuLayers: modelGpuLayers,
                 sequences,
                 flashAttention,
+                kvCacheKeyType,
+                kvCacheValueType,
                 swaFullCache,
                 isEmbeddingContext
             });
@@ -148,6 +156,8 @@ export async function resolveContextContextSizeOption({
             modelGpuLayers: modelGpuLayers,
             sequences,
             flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
             swaFullCache,
             isEmbeddingContext
         });

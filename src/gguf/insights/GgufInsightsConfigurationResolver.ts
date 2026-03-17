@@ -3,6 +3,7 @@ import {LlamaModelOptions} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
 import {getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {InsufficientMemoryError} from "../../utils/InsufficientMemoryError.js";
+import {GgmlType} from "../types/GgufTensorInfoTypes.js";
 import {resolveModelGpuLayersOption} from "./utils/resolveModelGpuLayersOption.js";
 import {resolveContextContextSizeOption} from "./utils/resolveContextContextSizeOption.js";
 import {scoreLevels} from "./utils/scoreLevels.js";
@@ -39,6 +40,8 @@ export class GgufInsightsConfigurationResolver {
         targetContextSize,
         embeddingContext = false,
         flashAttention = false,
+        kvCacheKeyType,
+        kvCacheValueType,
         swaFullCache = false,
         useMmap = this._ggufInsights._llama.supportsMmap
     }: {
@@ -46,6 +49,8 @@ export class GgufInsightsConfigurationResolver {
         targetContextSize?: number,
         embeddingContext?: boolean,
         flashAttention?: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType,
         swaFullCache?: boolean,
         useMmap?: boolean
     } = {}, {
@@ -65,6 +70,8 @@ export class GgufInsightsConfigurationResolver {
     } = {}) {
         const compatibilityScore = await this.scoreModelConfigurationCompatibility({
             flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
             swaFullCache,
             contextSize: targetContextSize,
             embeddingContext,
@@ -108,6 +115,8 @@ export class GgufInsightsConfigurationResolver {
         contextSize = Math.min(4096, this._ggufInsights.trainContextSize ?? 4096),
         embeddingContext = false,
         flashAttention = false,
+        kvCacheKeyType,
+        kvCacheValueType,
         swaFullCache = false,
         maximumFittedContextSizeMultiplier = 100,
         maximumUnfitConfigurationResourceMultiplier = 100,
@@ -118,6 +127,8 @@ export class GgufInsightsConfigurationResolver {
         contextSize?: number,
         embeddingContext?: boolean,
         flashAttention?: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType,
         swaFullCache?: boolean,
         maximumFittedContextSizeMultiplier?: number,
         maximumUnfitConfigurationResourceMultiplier?: number,
@@ -215,6 +226,8 @@ export class GgufInsightsConfigurationResolver {
                     llamaSupportsGpuOffloading,
                     defaultContextFlashAttention: flashAttention,
                     defaultContextSwaFullCache: swaFullCache,
+                    defaultContextKvCacheKeyType: kvCacheKeyType,
+                    defaultContextKvCacheValueType: kvCacheValueType,
                     ignoreMemorySafetyChecks: forceGpuLayers != null,
                     useMmap
                 }
@@ -272,6 +285,8 @@ export class GgufInsightsConfigurationResolver {
                 modelTrainContextSize: this._ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes,
                 ignoreMemorySafetyChecks: forceStrictContextSize,
                 flashAttention,
+                kvCacheKeyType,
+                kvCacheValueType,
                 swaFullCache
             });
             contextFitsMemory = true;
@@ -292,7 +307,9 @@ export class GgufInsightsConfigurationResolver {
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers,
             flashAttention,
-            swaFullCache
+            swaFullCache,
+            kvCacheKeyType,
+            kvCacheValueType
         });
 
         const rankPoints = {
@@ -388,12 +405,15 @@ export class GgufInsightsConfigurationResolver {
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize, llamaGpu = this._ggufInsights._llama.gpu,
         llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading,
         defaultContextFlashAttention = false,
+        defaultContextKvCacheKeyType,
+        defaultContextKvCacheValueType,
         defaultContextSwaFullCache = false,
         useMmap = this._ggufInsights._llama.supportsMmap
     }: {
         ignoreMemorySafetyChecks?: boolean, getVramState?(): Promise<{total: number, free: number}>,
         llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: boolean,
-        defaultContextSwaFullCache?: boolean, useMmap?: boolean
+        defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache?: boolean,
+        useMmap?: boolean
     } = {}) {
         return resolveModelGpuLayersOption(gpuLayers, {
             ggufInsights: this._ggufInsights,
@@ -403,6 +423,8 @@ export class GgufInsightsConfigurationResolver {
             llamaGpu,
             llamaSupportsGpuOffloading,
             defaultContextFlashAttention,
+            defaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType,
             defaultContextSwaFullCache,
             useMmap
         });
@@ -418,6 +440,8 @@ export class GgufInsightsConfigurationResolver {
         batchSize,
         modelTrainContextSize,
         flashAttention = false,
+        kvCacheKeyType,
+        kvCacheValueType,
         swaFullCache = false,
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
@@ -430,6 +454,8 @@ export class GgufInsightsConfigurationResolver {
         modelGpuLayers: number,
         modelTrainContextSize: number,
         flashAttention?: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType,
         swaFullCache?: boolean,
         batchSize?: LlamaContextOptions["batchSize"],
         sequences?: number,
@@ -448,6 +474,8 @@ export class GgufInsightsConfigurationResolver {
             modelGpuLayers,
             modelTrainContextSize,
             flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
             swaFullCache,
             getVramState,
             getRamState,

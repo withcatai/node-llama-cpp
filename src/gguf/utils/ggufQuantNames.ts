@@ -4,6 +4,7 @@ export const ggufQuantNames = new Map<string, GgufFileType>([
     ["Q4_0", GgufFileType.MOSTLY_Q4_0],
     ["Q4_1", GgufFileType.MOSTLY_Q4_1],
     ["MXFP4", GgufFileType.MOSTLY_MXFP4_MOE],
+    ["NVFP4", GgufFileType.MOSTLY_MXFP4_MOE],
     ["Q5_0", GgufFileType.MOSTLY_Q5_0],
     ["Q5_1", GgufFileType.MOSTLY_Q5_1],
     ["IQ2_XXS", GgufFileType.MOSTLY_IQ2_XXS],

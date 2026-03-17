@@ -15,6 +15,7 @@ import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {GgufInsightsConfigurationResolver} from "../../gguf/insights/GgufInsightsConfigurationResolver.js";
 import {isUrl} from "../../utils/isUrl.js";
 import {isModelUri, parseModelUri} from "../../utils/parseModelUri.js";
+import {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {resolveModelRecommendationFileOptions} from "./resolveModelRecommendationFileOptions.js";
 import {getReadablePath} from "./getReadablePath.js";
 import {basicChooseFromListConsoleInteraction} from "./basicChooseFromListConsoleInteraction.js";
@@ -61,7 +62,9 @@ export async function interactivelyAskForModel({
     downloadIntent = true,
     flashAttention = false,
     swaFullCache = false,
-    useMmap
+    useMmap,
+    kvCacheKeyType,
+    kvCacheValueType
 }: {
     llama: Llama,
     modelsDirectory?: string,
@@ -69,7 +72,9 @@ export async function interactivelyAskForModel({
     downloadIntent?: boolean,
     flashAttention?: boolean,
     swaFullCache?: boolean,
-    useMmap?: boolean
+    useMmap?: boolean,
+    kvCacheKeyType?: "currentQuant" | GgmlType,
+    kvCacheValueType?: "currentQuant" | GgmlType
 }): Promise<string> {
     let localModelFileOptions: (ModelOption & {type: "localModel"})[] = [];
     const recommendedModelOptions: (ModelOption & {type: "recommendedModel"})[] = [];
@@ -123,7 +128,13 @@ export async function interactivelyAskForModel({
                         const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
                             flashAttention: flashAttention && ggufInsights?.flashAttentionSupported,
                             swaFullCache,
-                            useMmap
+                            useMmap,
+                            kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                                ? ggufInsights?.dominantTensorType
+                                : kvCacheKeyType,
+                            kvCacheValueType: kvCacheValueType === "currentQuant"
+                                ? ggufInsights?.dominantTensorType
+                                : kvCacheValueType
                         });
 
                         return {
@@ -296,7 +307,8 @@ export async function interactivelyAskForModel({
                 items: options,
                 renderItem(item, focused, rerender) {
                     return renderSelectionItem(
-                        item, focused, rerender, activeInteractionController.signal, llama, flashAttention, swaFullCache, useMmap
+                        item, focused, rerender, activeInteractionController.signal, llama, flashAttention, swaFullCache, useMmap,
+                        kvCacheKeyType, kvCacheValueType
                     );
                 },
                 canFocusItem(item) {
@@ -413,7 +425,8 @@ async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string |
 
 function renderSelectionItem(
     item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean,
-    swaFullCache: boolean, useMmap?: boolean
+    swaFullCache: boolean, useMmap: boolean | undefined,
+    kvCacheKeyType?: "currentQuant" | GgmlType, kvCacheValueType?: "currentQuant" | GgmlType
 ) {
     if (item.type === "localModel") {
         let modelText = item.title instanceof Function
@@ -441,7 +454,9 @@ function renderSelectionItem(
                     llama,
                     flashAttention,
                     swaFullCache,
-                    useMmap
+                    useMmap,
+                    kvCacheKeyType,
+                    kvCacheValueType
                 });
             }
 
@@ -563,7 +578,7 @@ function renderRecommendedModelTechnicalInfo(
 }
 
 async function selectFileForModelRecommendation({
-    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention, swaFullCache, useMmap
+    recommendedModelOption, llama, abortSignal, rerenderOption, flashAttention, swaFullCache, useMmap, kvCacheKeyType, kvCacheValueType
 }: {
     recommendedModelOption: ModelOption & {type: "recommendedModel"},
     llama: Llama,
@@ -571,7 +586,9 @@ async function selectFileForModelRecommendation({
     rerenderOption(): void,
     flashAttention: boolean,
     swaFullCache: boolean,
-    useMmap?: boolean
+    useMmap?: boolean,
+    kvCacheKeyType?: "currentQuant" | GgmlType,
+    kvCacheValueType?: "currentQuant" | GgmlType
 }) {
     try {
         let bestScore: number | undefined = undefined;
@@ -594,7 +611,13 @@ async function selectFileForModelRecommendation({
                 const compatibilityScore = await ggufInsights.configurationResolver.scoreModelConfigurationCompatibility({
                     flashAttention,
                     swaFullCache,
-                    useMmap
+                    useMmap,
+                    kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                        ? ggufInsights.dominantTensorType
+                        : kvCacheKeyType,
+                    kvCacheValueType: kvCacheValueType === "currentQuant"
+                        ? ggufInsights.dominantTensorType
+                        : kvCacheValueType
                 });
 
                 if (bestScore == null || compatibilityScore.compatibilityScore > bestScore) {

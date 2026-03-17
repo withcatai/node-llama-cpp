@@ -31,6 +31,7 @@ import {withCliCommandDescriptionDocsUrl} from "../utils/withCliCommandDescripti
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
 import {ParsedXtcArg, parseXtcArg} from "../utils/parseXtcArg.js";
+import {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 
 type ChatCommand = {
     modelPath?: string,
@@ -46,6 +47,8 @@ type ChatCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
@@ -171,6 +174,26 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("kvCacheKeyType", {
+                alias: "kvckt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
+            .option("kvCacheValueType", {
+                alias: "kvcvt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
             })
             .option("swaFullCache", {
                 alias: "noSwa",
@@ -379,7 +402,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
-        promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, swaFullCache,
+        promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache,
         noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
@@ -390,8 +413,8 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads,
-                temperature, minP, topK, topP, seed, xtc,
+                batchSize, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile,
+                threads, temperature, minP, topK, topP, seed, xtc,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
@@ -408,7 +431,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
-    contextSize, batchSize, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
+    contextSize, batchSize, kvCacheKeyType, kvCacheValueType, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
     jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
@@ -444,12 +467,16 @@ async function RunChat({
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
         swaFullCache,
+        kvCacheKeyType,
+        kvCacheValueType,
         useMmap
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
             swaFullCache,
+            kvCacheKeyType,
+            kvCacheValueType,
             useMmap,
             consoleTitle: "Draft model file"
         })
@@ -495,6 +522,8 @@ async function RunChat({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 useDirectIo,
@@ -530,6 +559,8 @@ async function RunChat({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                    experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     useDirectIo,

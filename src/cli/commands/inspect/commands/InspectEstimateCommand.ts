@@ -24,6 +24,7 @@ import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
 import {isModelUri} from "../../../../utils/parseModelUri.js";
+import {GgmlType, resolveGgmlTypeOption} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 
 type InspectEstimateCommand = {
     modelPath: string,
@@ -33,6 +34,8 @@ type InspectEstimateCommand = {
     contextSize?: number | "train",
     embedding?: boolean,
     noMmap?: boolean,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean
 };
 
@@ -117,6 +120,26 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 default: false,
                 description: "Disable mmap (memory-mapped file) usage"
             })
+            .option("kvCacheKeyType", {
+                alias: "kvckt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
+            .option("kvCacheValueType", {
+                alias: "kvcvt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
             .option("swaFullCache", {
                 alias: "noSwa",
                 type: "boolean",
@@ -125,7 +148,8 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap, swaFullCache
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap,
+        kvCacheKeyType, kvCacheValueType, swaFullCache
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
         if (gpuLayers === -2) gpuLayers = "max";
@@ -189,6 +213,12 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 targetGpuLayers: gpuLayers,
                 embeddingContext: embedding,
                 useMmap,
+                kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheKeyType),
+                kvCacheValueType: kvCacheValueType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheValueType),
                 swaFullCache
             });
         }

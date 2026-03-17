@@ -2,7 +2,7 @@ import {Llama} from "../../bindings/Llama.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
 import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
-import {GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
+import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {padSafeContextSize} from "../../evaluator/LlamaContext/utils/padSafeContextSize.js";
@@ -19,6 +19,7 @@ export class GgufInsights {
     /** @internal */ private readonly _modelSize: number;
     /** @internal */ private _totalFileLayers: number | null = null;
     /** @internal */ private _supportsRanking?: boolean;
+    /** @internal */ private _dominantTensorType?: GgmlType;
     /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
     /** @internal */ private readonly _tokens: GgufInsightsTokens;
@@ -163,6 +164,16 @@ export class GgufInsights {
         return false;
     }
 
+    /**
+     * Get the dominant tensor type used in the model file
+     */
+    public get dominantTensorType(): GgmlType | undefined {
+        if (this._dominantTensorType == null)
+            this._dominantTensorType = getDominantTensorType(this._ggufFileInfo.fullTensorInfo ?? []);
+
+        return this._dominantTensorType;
+    }
+
     public get supportsRanking() {
         if (this._supportsRanking != null)
             return this._supportsRanking;
@@ -223,10 +234,12 @@ export class GgufInsights {
      */
     public estimateContextResourceRequirements({
         contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false,
-        swaFullCache = false
+        swaFullCache = false,
+        kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16
     }: {
         contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        flashAttention?: boolean, includeGraphOverhead?: boolean, swaFullCache?: boolean
+        flashAttention?: boolean, includeGraphOverhead?: boolean, swaFullCache?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType
     }): GgufInsightsResourceRequirements {
         if (sequences == null) sequences = getDefaultContextSequences();
         if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
@@ -277,7 +290,9 @@ export class GgufInsights {
             sequences,
             totalFileLayers,
             finalModelGpuLayers,
-            usingGpu
+            usingGpu,
+            kvCacheKeyType,
+            kvCacheValueType
         });
 
         const vocabularySize = llmData.vocab_size ?? this._ggufFileInfo.metadata.tokenizer?.ggml?.tokens?.length ?? 0;
@@ -569,13 +584,17 @@ export class GgufInsights {
         sequences,
         totalFileLayers,
         finalModelGpuLayers,
-        usingGpu
+        usingGpu,
+        kvCacheKeyType = GgmlType.F16,
+        kvCacheValueType = GgmlType.F16
     }: {
         kvSize: number,
         sequences: number,
         totalFileLayers: number,
         finalModelGpuLayers: number,
-        usingGpu: boolean
+        usingGpu: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType
     }) {
         // source: `llama_kv_cache_init` in `llama.cpp`
         const architecture = this._ggufFileInfo.metadata.general?.architecture;
@@ -584,16 +603,8 @@ export class GgufInsights {
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
-        const keyTypeSize = architecture === GgufArchitectureType.mamba
-            // if `type_k` of `llama_context_params` changes to be configurable in `LlamaContext`,
-            // this would have to depend on that value
-            ? this._llama._consts.ggmlTypeF32Size
-            : this._llama._consts.ggmlTypeF16Size;
-        const valueTypeSize = architecture === GgufArchitectureType.mamba
-            // if `type_v` of `llama_context_params` changes to be configurable in `LlamaContext`,
-            // this would have to depend on that value
-            ? this._llama._consts.ggmlTypeF32Size
-            : this._llama._consts.ggmlTypeF16Size;
+        const keyTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheKeyType) ?? this._llama._consts.ggmlTypeF16Size;
+        const valueTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheValueType) ?? this._llama._consts.ggmlTypeF16Size;
 
         // source: `llama_model::load_tensors` in `llama-model.cpp`
         // repeating layers are assigned to GPU from `i_gpu_start = n_layer + 1 - n_gpu_layers`
@@ -1087,4 +1098,25 @@ export function parseRankingTemplate(template: string | undefined | null): strin
 
 export function isRankingTemplateValid(template: string | undefined | null): boolean {
     return template != null && template.includes("{{query}}") && template.includes("{{document}}");
+}
+
+export function getDominantTensorType(tensorInfo: GgufTensorInfo[]): GgmlType | undefined {
+    const tensorTypes: number[] = [];
+    for (const tensor of tensorInfo)
+        tensorTypes[tensor.ggmlType] = (
+            (tensorTypes[tensor.ggmlType] ?? 0) +
+            tensor.dimensions.map(((dim) => Number(dim))).reduce((a, b) => a * b, 1)
+        );
+
+    let dominantType: GgmlType | undefined = undefined;
+    let maxCount = 0;
+
+    for (const [type, count] of tensorTypes.entries()) {
+        if (count > maxCount) {
+            maxCount = count;
+            dominantType = type;
+        }
+    }
+
+    return dominantType;
 }

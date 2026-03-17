@@ -8,6 +8,7 @@ import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.j
 import {
     nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption, nodeLlamaCppGpuOffStringOptions
 } from "./bindings/types.js";
+import type {NodeLlamaCppPostinstallBehavior} from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,6 +76,15 @@ export const defaultLlamaCppDebugMode = env.get("NODE_LLAMA_CPP_DEBUG")
 export const defaultSkipDownload = env.get("NODE_LLAMA_CPP_SKIP_DOWNLOAD")
     .default("false")
     .asBool();
+
+// set via a `--node-llama-cpp-postinstall=ignoreFailedBuild` flag on an `npm install` command
+export const defaultNodeLlamaCppPostinstall = env.get("NODE_LLAMA_CPP_POSTINSTALL")
+    .default(
+        env.get("npm_config_node_llama_cpp_postinstall")
+            .default("auto")
+            .asEnum(["auto", "ignoreFailedBuild", "skip"] as const satisfies NodeLlamaCppPostinstallBehavior[])
+    )
+    .asEnum(["auto", "ignoreFailedBuild", "skip"] as const satisfies NodeLlamaCppPostinstallBehavior[]);
 export const defaultBindingTestLogLevel = env.get("NODE_LLAMA_CPP_BINDING_TEST_LOG_LEVEL")
     .default(LlamaLogLevel.error)
     .asEnum(LlamaLogLevelValues);
@@ -125,7 +135,8 @@ export const documentationPageUrls = {
         }
     },
     troubleshooting: {
-        RosettaIllegalHardwareInstruction: documentationUrl + "/guide/troubleshooting#illegal-hardware-instruction"
+        RosettaIllegalHardwareInstruction: documentationUrl + "/guide/troubleshooting#illegal-hardware-instruction",
+        PostinstallBehavior: documentationUrl + "/guide/troubleshooting#postinstall-behavior"
     }
 } as const;
 export const newGithubIssueUrl = "https://github.com/withcatai/node-llama-cpp/issues";

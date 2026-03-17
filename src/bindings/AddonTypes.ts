@@ -31,6 +31,8 @@ export type BindingModule = {
             ranking?: boolean,
             threads?: number,
             performanceTracking?: boolean,
+            kvCacheKeyType?: number,
+            kvCacheValueType?: number,
             swaFullCache?: boolean
         }): AddonContext
     },

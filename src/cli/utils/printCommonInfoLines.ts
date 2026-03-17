@@ -2,6 +2,7 @@ import chalk from "chalk";
 import {getPrettyBuildGpuName} from "../../bindings/consts.js";
 import {LlamaContext} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {getPlatform} from "../../bindings/utils/getPlatform.js";
+import {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {printInfoLine} from "./printInfoLine.js";
 import {toBytes} from "./toBytes.js";
 
@@ -125,6 +126,10 @@ export async function printCommonInfoLines({
             show: tokenMeterEnabled,
             title: "Token meter",
             value: "enabled"
+        }, {
+            show: context.kvCacheKeyType !== GgmlType.F16 || context.kvCacheValueType !== GgmlType.F16,
+            title: "KV cache",
+            value: GgmlType[context.kvCacheKeyType] + " " + GgmlType[context.kvCacheValueType]
         }]
     });
 
@@ -180,6 +185,10 @@ export async function printCommonInfoLines({
                 show: tokenMeterEnabled,
                 title: "Token meter",
                 value: "enabled"
+            }, {
+                show: draftContext.kvCacheKeyType !== GgmlType.F16 || draftContext.kvCacheValueType !== GgmlType.F16,
+                title: "KV cache",
+                value: GgmlType[draftContext.kvCacheKeyType] + " " + GgmlType[draftContext.kvCacheValueType]
             }]
         });
     }

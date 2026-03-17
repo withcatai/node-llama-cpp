@@ -23,6 +23,7 @@ import {Llama} from "../../../../bindings/Llama.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
+import {GgmlType, resolveGgmlTypeOption} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -33,6 +34,8 @@ type InspectMeasureCommand = {
     minContextSize: number,
     maxContextSize?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
     batchSize?: number,
     measures: number,
@@ -109,6 +112,26 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: false,
                 description: "Enable flash attention for the context"
             })
+            .option("kvCacheKeyType", {
+                alias: "kvckt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
+            .option("kvCacheValueType", {
+                alias: "kvcvt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
             .option("swaFullCache", {
                 alias: "noSwa",
                 type: "boolean",
@@ -161,7 +184,8 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, swaFullCache,
+        modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention,
+        kvCacheKeyType, kvCacheValueType, swaFullCache,
         batchSize, measures = 10, memory: measureMemoryType, noMmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
         repeatEvaluateText
     }: InspectMeasureCommand) {
@@ -186,7 +210,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         const useMmap = !noMmap && llama.supportsMmap;
         const useDirectIo = !noDirectIo;
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers, {
-            flashAttention, swaFullCache, useMmap
+            flashAttention, swaFullCache, useMmap, kvCacheKeyType, kvCacheValueType
         });
 
         console.info(`${chalk.yellow("File:")} ${getReadablePath(resolvedGgufPath)}`);
@@ -221,6 +245,16 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         let lastGpuLayers = maxLayers ?? ggufInsights.totalLayers;
         let previousContextSizeCheck: undefined | number = undefined;
 
+        const resolvedKvCacheKeyType = kvCacheKeyType === "currentQuant"
+            ? ggufInsights.dominantTensorType ?? GgmlType.F16
+            : resolveGgmlTypeOption(kvCacheKeyType) ?? GgmlType.F16;
+        const resolvedKvCacheValueType = kvCacheValueType === "currentQuant"
+            ? ggufInsights.dominantTensorType ?? GgmlType.F16
+            : resolveGgmlTypeOption(kvCacheValueType) ?? GgmlType.F16;
+
+        if (resolvedKvCacheKeyType != GgmlType.F16 || resolvedKvCacheValueType != GgmlType.F16)
+            console.info(`${chalk.yellow("KV cache:")} ${GgmlType[resolvedKvCacheKeyType] + " " + GgmlType[resolvedKvCacheValueType]}`);
+
         const measureTable = getMeasureTable(measureMemoryType);
 
         measureTable.logHeader({drawRowSeparator: !printHeaderBeforeEachLayer});
@@ -249,6 +283,8 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 maxContextSize,
                 minContextSize,
                 flashAttention,
+                kvCacheKeyType: resolvedKvCacheKeyType,
+                kvCacheValueType: resolvedKvCacheValueType,
                 swaFullCache,
                 batchSize,
                 tests: measures,
@@ -533,7 +569,7 @@ const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
     modelPath, useMmap, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers,
-    flashAttention, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, onInfo
+    flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, onInfo
 }: {
     modelPath: string,
     useMmap?: boolean,
@@ -546,6 +582,8 @@ async function measureModel({
     maxGpuLayers: number,
     minGpuLayers?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: GgmlType,
+    kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
     batchSize?: number,
     evaluateText?: string,
@@ -656,6 +694,8 @@ async function measureModel({
                         maxGpuLayers,
                         minGpuLayers,
                         flashAttention,
+                        kvCacheKeyType,
+                        kvCacheValueType,
                         swaFullCache,
                         batchSize,
                         evaluateText,
@@ -759,11 +799,12 @@ async function runTestWorkerLogic() {
     }
 
     async function testContextSizes({
-        model, modelVramUsage, modelRamUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention, swaFullCache,
-        batchSize, evaluateText, exitAfterMeasurement = false
+        model, modelVramUsage, modelRamUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention,
+        kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false
     }: {
         model: LlamaModel, modelVramUsage: number, modelRamUsage: number, startContextSize?: number, maxContextSize?: number,
-        minContextSize?: number, tests: number, flashAttention?: boolean, swaFullCache?: boolean, batchSize?: number, evaluateText?: string,
+        minContextSize?: number, tests: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        swaFullCache?: boolean, batchSize?: number, evaluateText?: string,
         exitAfterMeasurement?: boolean
     }) {
         let measurementsDone: number = 0;
@@ -794,6 +835,8 @@ async function runTestWorkerLogic() {
                     ),
                     ignoreMemorySafetyChecks: currentContextSizeCheck != null,
                     flashAttention,
+                    experimentalKvCacheKeyType: kvCacheKeyType,
+                    experimentalKvCacheValueType: kvCacheValueType,
                     swaFullCache,
                     batchSize,
                     failedCreationRemedy: false
@@ -849,11 +892,12 @@ async function runTestWorkerLogic() {
     }
 
     async function testWithGpuLayers({
-        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, swaFullCache,
-        batchSize, evaluateText, exitAfterMeasurement = false
+        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention,
+        kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false
     }: {
         modelPath: string, useMmap?: boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
-        maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, swaFullCache?: boolean, batchSize?: number,
+        maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        swaFullCache?: boolean, batchSize?: number,
         evaluateText?: string, exitAfterMeasurement?: boolean
     }) {
         try {
@@ -865,6 +909,8 @@ async function runTestWorkerLogic() {
                 useDirectIo,
                 gpuLayers,
                 defaultContextFlashAttention: flashAttention,
+                experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                 defaultContextSwaFullCache: swaFullCache,
                 ignoreMemorySafetyChecks: true
             });
@@ -888,6 +934,8 @@ async function runTestWorkerLogic() {
                 maxContextSize,
                 minContextSize,
                 flashAttention,
+                kvCacheKeyType,
+                kvCacheValueType,
                 swaFullCache,
                 batchSize,
                 tests,
@@ -939,6 +987,8 @@ async function runTestWorkerLogic() {
                     maxContextSize: message.maxContextSize,
                     minContextSize: message.minContextSize,
                     flashAttention: message.flashAttention,
+                    kvCacheKeyType: message.kvCacheKeyType,
+                    kvCacheValueType: message.kvCacheValueType,
                     swaFullCache: message.swaFullCache,
                     batchSize: message.batchSize,
                     evaluateText: message.evaluateText,
@@ -1033,6 +1083,8 @@ type ParentToChildMessage = {
     maxGpuLayers: number,
     minGpuLayers?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: GgmlType,
+    kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
     batchSize?: number,
     initialMaxContextSize?: number,

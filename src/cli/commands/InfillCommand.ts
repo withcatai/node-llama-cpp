@@ -23,6 +23,7 @@ import {documentationPageUrls} from "../../config.js";
 import {ConsoleInteraction, ConsoleInteractionKey} from "../utils/ConsoleInteraction.js";
 import {DraftSequenceTokenPredictor} from "../../evaluator/LlamaContext/tokenPredictors/DraftSequenceTokenPredictor.js";
 import {ParsedXtcArg, parseXtcArg} from "../utils/parseXtcArg.js";
+import {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 
 type InfillCommand = {
     modelPath?: string,
@@ -36,6 +37,8 @@ type InfillCommand = {
     contextSize?: number,
     batchSize?: number,
     flashAttention?: boolean,
+    kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
+    kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
     threads?: number,
     temperature: number,
@@ -138,6 +141,26 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention"
+            })
+            .option("kvCacheKeyType", {
+                alias: "kvckt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+            })
+            .option("kvCacheValueType", {
+                alias: "kvcvt",
+                type: "string",
+                choices: [
+                    "currentQuant",
+                    ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
+                ] as const,
+                default: "F16" as const,
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
             })
             .option("swaFullCache", {
                 alias: "noSwa",
@@ -309,7 +332,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
-        flashAttention, swaFullCache, threads, temperature, minP, topK,
+        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
@@ -318,7 +341,8 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
         try {
             await RunInfill({
                 modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-                swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
+                kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
+                lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
                 tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
@@ -334,7 +358,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 async function RunInfill({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-    swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
+    kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
     tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
@@ -366,13 +390,17 @@ async function RunInfill({
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
         swaFullCache,
-        useMmap
+        useMmap,
+        kvCacheKeyType,
+        kvCacheValueType
     });
     const resolvedDraftModelPath = (tokenPredictionDraftModel != null && tokenPredictionDraftModel !== "")
         ? await resolveCommandGgufPath(tokenPredictionDraftModel, llama, headers, {
             flashAttention,
             swaFullCache,
             useMmap,
+            kvCacheKeyType,
+            kvCacheValueType,
             consoleTitle: "Draft model file"
         })
         : undefined;
@@ -424,6 +452,8 @@ async function RunInfill({
                         ? {fitContext: {contextSize}}
                         : undefined,
                 defaultContextFlashAttention: flashAttention,
+                experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 useDirectIo,
@@ -459,6 +489,8 @@ async function RunInfill({
                 return await llama.loadModel({
                     modelPath: resolvedDraftModelPath,
                     defaultContextFlashAttention: flashAttention,
+                    experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                    experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     useDirectIo,

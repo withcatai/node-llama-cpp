@@ -64,7 +64,7 @@ function prettyPrintArray(arr: any[], indent: number = 4, options: PrettyPrintOb
     const arrayItems = slicedArray.map((item) => prettyPrintObject(item, indent, options))
         .concat(
             hiddenItems > 0
-                ? [chalk.white("..." + hiddenItems + " more item" + (hiddenItems !== 1 ? "s" : ""))]
+                ? [chalk.white("..." + hiddenItems.toLocaleString("en-US") + " more item" + (hiddenItems !== 1 ? "s" : ""))]
                 : []
         );
     const oneLineJoinedArrayItems = arrayItems.join(chalk.whiteBright(", "));

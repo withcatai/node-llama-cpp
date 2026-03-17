@@ -164,3 +164,50 @@ Ensure you're not using the `Administrator` user for `npm install` nor to run th
 To do that, go to `Settings > Update & Security > For developers` and enable `Developer mode`.
 
 After that, delete the `.cache` folder under your user directory and try building the app again.
+
+## Customizing `postinstall` Behavior {#postinstall-behavior}
+When installing `node-llama-cpp`, its `postinstall` script checks whether the prebuilt binaries
+are compatible with current machine (which they almost always are, at least the CPU-only ones which are the last resort fallback),
+and when not, attempts [building the native bindings from source](./building-from-source.md).
+
+When attempting to [build from source](./building-from-source.md), if the machine lacks the required build tools,
+the build will fail and indicative error messages will direct you to the specific commands you need to run
+or packages you need to install in order for the build process to succeed.
+
+If you want to customize the `postinstall` behavior, you can do so using any of the following methods:
+* Passing the `--node-llama-cpp-postinstall=<behavior>` flag to the `npm install` command.
+* Setting the `NODE_LLAMA_CPP_POSTINSTALL` environment variable to `<behavior>` before running `npm install`.
+* Configuring `config.nodeLlamaCppPostinstall` on your project's `package.json` to `<behavior>`.
+  <br/>
+  This will only work when your module is installed globally using `npm install -g` or for a non-library project when you run `npm install` in the project root; it will not work when your module is installed as a dependency of another module.
+
+Where `<behavior>` can be one of the following options:
+* **`auto` (default)**: the default behavior explained above.
+* **`ignoreFailedBuild`**: same as the default behavior,
+    but a failed build will not throw an error and will be ignored, which means the installation will succeed.
+    Using [`getLlama`](../api/functions/getLlama.md) for the first time will attempt building from source again by default.
+* **`skip`**: skip the entire `postinstall` script.
+    If the prebuilt binaries are incompatible with the current machine,
+    using [`getLlama`](../api/functions/getLlama.md) for the first time will attempt building from source by default.
+
+::: code-group
+```shell [<code>npm install</code> flag]
+npm install --node-llama-cpp-postinstall=ignoreFailedBuild
+```
+
+```shell [env var (bash)]
+NODE_LLAMA_CPP_POSTINSTALL=ignoreFailedBuild npm install
+```
+
+```shell [env var (using <code>cross-env</code>)]
+npx --yes cross-env NODE_LLAMA_CPP_POSTINSTALL=ignoreFailedBuild npm install
+```
+
+```json [<code>package.json</code>]
+{
+    "config": {
+        "nodeLlamaCppPostinstall": "ignoreFailedBuild"
+    }
+}
+```
+:::

@@ -114,6 +114,7 @@ export const enum GgufArchitectureType {
     rnd1 = "rnd1",
     panguEmbedded = "pangu-embedded",
     mistral3 = "mistral3",
+    mistral4 = "mistral4",
     paddleocr = "paddleocr",
     mimo2 = "mimo2",
     step35 = "step35",
@@ -193,7 +194,8 @@ export enum GgufFileType {
     MOSTLY_Q4_0_8_8 = 35, // deprecated
     MOSTLY_TQ1_0 = 36,
     MOSTLY_TQ2_0 = 37,
-    MOSTLY_MXFP4_MOE = 38
+    MOSTLY_MXFP4_MOE = 38,
+    MOSTLY_NVFP4 = 39
 }
 
 

@@ -14,10 +14,11 @@ import withOra from "../../../../utils/withOra.js";
 import {resolveModelArgToFilePathOrUrl} from "../../../../utils/resolveModelDestination.js";
 import {printModelDestination} from "../../../utils/printModelDestination.js";
 import {getGgufMetadataKeyValue} from "../../../../gguf/utils/getGgufMetadataKeyValue.js";
-import {GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
+import {GgmlType, GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTypes.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
 import {isModelUri} from "../../../../utils/parseModelUri.js";
+import {getDominantTensorType} from "../../../../gguf/insights/GgufInsights.js";
 
 const chatTemplateKey = ".chatTemplate";
 
@@ -224,11 +225,17 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
             if (parsedMetadata.splicedParts > 1)
                 console.info(`${chalk.yellow("Spliced parts:")} ${parsedMetadata.splicedParts}`);
 
+            const dominantTensorType = getDominantTensorType(parsedMetadata.fullTensorInfo ?? []);
+
             console.info(`${chalk.yellow("GGUF version:")} ${parsedMetadata.version}`);
             console.info(`${chalk.yellow("Tensor count:")} ${parsedMetadata.totalTensorCount.toLocaleString("en-US", numberLocaleFormattingOptions)}`);
             console.info(`${chalk.yellow("Metadata size:")} ${toBytes(parsedMetadata.totalMetadataSize)}`);
             console.info(`${chalk.yellow("Tensor info size:")} ${toBytes(parsedMetadata.totalTensorInfoSize!)}`);
             console.info(`${chalk.yellow("File type:")} ${fileTypeName ?? ""} ${chalk.white(`(${parsedMetadata.metadata.general?.file_type})`)}`);
+
+            if (dominantTensorType != null)
+                console.info(`${chalk.yellow("Dominant tensor type:")} ${dominantTensorType} (${GgmlType[dominantTensorType]})`);
+
             console.info(`${chalk.yellow("Metadata:")} ${prettyPrintObject(parsedMetadata.metadata, undefined, metadataPrettyPrintOptions)}`);
             console.info(`${chalk.yellow("Tensor info:")} ${prettyPrintObject(parsedMetadata.fullTensorInfo, undefined, tensorInfoPrettyPrintOptions)}`);
         }
