@@ -47,6 +47,7 @@ export const enum GgufArchitectureType {
     gemma2 = "gemma2",
     gemma3 = "gemma3",
     gemma3n = "gemma3n",
+    gemma4 = "gemma4",
     gemmaEmbedding = "gemma-embedding",
     starcoder2 = "starcoder2",
     mamba = "mamba",

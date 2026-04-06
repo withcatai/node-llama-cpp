@@ -122,6 +122,10 @@ class LlamaText {
         return LlamaTextConstructor.compare(this, other);
     }
 
+    public trim(): LlamaText {
+        return this.trimStart().trimEnd();
+    }
+
     public trimStart(): LlamaText {
         const newValues = this.values.slice();
 

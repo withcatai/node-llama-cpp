@@ -53,6 +53,7 @@ const chatWrappersOrder = [
     "Llama3ChatWrapper",
     "Llama2ChatWrapper",
     "MistralChatWrapper",
+    "Gemma4ChatWrapper",
     "GemmaChatWrapper",
     "ChatMLChatWrapper",
     "FalconChatWrapper",

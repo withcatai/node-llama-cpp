@@ -7,6 +7,7 @@ import {FalconChatWrapper} from "../FalconChatWrapper.js";
 import {FunctionaryChatWrapper} from "../FunctionaryChatWrapper.js";
 import {AlpacaChatWrapper} from "../AlpacaChatWrapper.js";
 import {GemmaChatWrapper} from "../GemmaChatWrapper.js";
+import {Gemma4ChatWrapper} from "../Gemma4ChatWrapper.js";
 import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../generic/JinjaTemplateChatWrapper.js";
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
@@ -27,7 +28,7 @@ import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 
 export const specializedChatWrapperTypeNames = Object.freeze([
     "general", "deepSeek", "qwen", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary",
-    "chatML", "falconChat", "gemma", "harmony", "seed"
+    "chatML", "falconChat", "gemma4", "gemma", "harmony", "seed"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -56,6 +57,7 @@ export const chatWrappers = Object.freeze({
     "functionary": FunctionaryChatWrapper,
     "chatML": ChatMLChatWrapper,
     "falconChat": FalconChatWrapper,
+    "gemma4": Gemma4ChatWrapper,
     "gemma": GemmaChatWrapper,
     "harmony": HarmonyChatWrapper,
     "seed": SeedChatWrapper,
@@ -70,7 +72,8 @@ const chatWrapperToConfigType = new Map(
 );
 
 const specializedChatWrapperRelatedTexts = {
-    "harmony": ["gpt", "gpt-oss"]
+    "harmony": ["gpt", "gpt-oss"],
+    "gemma4": ["gemma 4", "gemma-4"]
 } satisfies Partial<Record<ResolvableChatWrapperTypeName, string[]>>;
 
 export type BuiltInChatWrapperType = InstanceType<typeof chatWrappers[keyof typeof chatWrappers]>;
@@ -364,6 +367,8 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(Llama3ChatWrapper);
         else if (includesText(modelNames, ["Mistral", "Mistral Large", "Mistral Large Instruct", "Mistral-Large", "Codestral"]))
             return createSpecializedChatWrapper(MistralChatWrapper);
+        else if (includesText(modelNames, ["Gemma 4", "Gemma-4", "gemma-4"]))
+            return createSpecializedChatWrapper(Gemma4ChatWrapper);
         else if (includesText(modelNames, ["Gemma", "Gemma 2"]))
             return createSpecializedChatWrapper(GemmaChatWrapper);
         else if (includesText(modelNames, ["gpt-oss", "Gpt Oss", "Gpt-Oss", "openai_gpt-oss", "Openai_Gpt Oss", "openai.gpt-oss", "Openai.Gpt Oss"]))
@@ -381,6 +386,8 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(SeedChatWrapper);
         else if (modelJinjaTemplate.includes("<|start|>") && modelJinjaTemplate.includes("<|channel|>"))
             return createSpecializedChatWrapper(HarmonyChatWrapper);
+        else if (modelJinjaTemplate.includes("<|turn>") && modelJinjaTemplate.includes("<|tool_call>call:"))
+            return createSpecializedChatWrapper(Gemma4ChatWrapper);
         else if (modelJinjaTemplate.includes("<|im_start|>"))
             return createSpecializedChatWrapper(ChatMLChatWrapper);
         else if (modelJinjaTemplate.includes("[INST]"))
@@ -430,9 +437,12 @@ export function resolveChatWrapper(
                 return createSpecializedChatWrapper(FunctionaryChatWrapper);
             else if (lowercaseName === "dolphin" && splitLowercaseSubType.includes("mistral"))
                 return createSpecializedChatWrapper(ChatMLChatWrapper);
-            else if (lowercaseName === "gemma")
+            else if (lowercaseName === "gemma") {
+                if (firstSplitLowercaseSubType === "4")
+                    return createSpecializedChatWrapper(Gemma4ChatWrapper);
+
                 return createSpecializedChatWrapper(GemmaChatWrapper);
-            else if (splitLowercaseSubType.includes("chatml"))
+            } else if (splitLowercaseSubType.includes("chatml"))
                 return createSpecializedChatWrapper(ChatMLChatWrapper);
         }
     }
@@ -454,6 +464,8 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(FalconChatWrapper);
         else if (arch === "gemma" || arch === "gemma2")
             return createSpecializedChatWrapper(GemmaChatWrapper);
+        else if (arch === "gemma4")
+            return createSpecializedChatWrapper(Gemma4ChatWrapper);
     }
 
     return null;
