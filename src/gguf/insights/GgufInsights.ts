@@ -248,29 +248,48 @@ export class GgufInsights {
         const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
         const slidingWindow = this.swaSize ?? 0;
         const kvUnified = false;
-        const usingSWA = !swaFullCache && slidingWindow > 0 && slidingWindow < contextSize &&
+        const totalFileLayers = this._getTotalFileLayers();
+        const hasSwaAttention = slidingWindow > 0;
+        const usingReducedSWA = hasSwaAttention && !swaFullCache && slidingWindow < contextSize &&
             (this.trainContextSize == null || slidingWindow < this.trainContextSize);
-        const swaPattern = getSwaPatternForArchitecture(
-            this._ggufFileInfo.metadata?.general?.architecture,
-            this._ggufFileInfo.architectureMetadata?.attention?.sliding_window_pattern
-        );
-        const nonSwaPercent = swaPattern <= 1
-            ? 1
-            : (1 / (swaPattern + (flashAttention ? -0.5 : -1)));
+        let graphRelevantTensorCount = 0;
+        let graphRelevantTensorElements = 0;
+        let totalTensorElements = 0;
 
-        // source: `llama_kv_cache_unified::get_padding` in `llama-kv-cache.cpp`
-        const kvCachePadding = 1;
+        for (const singleTensorInfo of tensorInfo) {
+            let tensorElements = 0;
+            for (const dim of singleTensorInfo.dimensions)
+                tensorElements += Number(dim);
+
+            totalTensorElements += tensorElements;
+
+            if (!isGraphRelevantTensor(singleTensorInfo.name))
+                continue;
+
+            graphRelevantTensorCount++;
+            graphRelevantTensorElements += tensorElements;
+        }
+
+        const effectiveGraphTensorCount = graphRelevantTensorCount > 0
+            ? graphRelevantTensorCount
+            : tensorInfo.length;
+        const effectiveGraphTensorElements = graphRelevantTensorCount > 0
+            ? graphRelevantTensorElements
+            : totalTensorElements;
+
+        const paddedContextSize = padSafeContextSize(contextSize, "up");
         const actualContextSize = kvUnified
             ? padSafeContextSize(sequences * contextSize, "up")
-            : sequences * padSafeContextSize(contextSize, "up");
-        const kvSize = usingSWA
-            ? (
-                (1 - nonSwaPercent) * Math.min(actualContextSize, ggmlPad(sequences * slidingWindow + batchSize, kvCachePadding)) +
-                nonSwaPercent * actualContextSize
-            )
-            : actualContextSize;
-
-        const totalFileLayers = this._getTotalFileLayers();
+            : sequences * paddedContextSize;
+        const fullAttentionKvSize = actualContextSize;
+        const swaBatchSize = hasSwaAttention && !swaFullCache
+            ? batchSize + 1
+            : batchSize;
+        const swaKvSize = !hasSwaAttention
+            ? actualContextSize
+            : !usingReducedSWA
+                ? actualContextSize
+                : Math.min(actualContextSize, ggmlPad((sequences * slidingWindow) + swaBatchSize, 256));
         const totalLayersIncludingOutput = totalFileLayers + 1;
         const finalModelGpuLayers = Math.max(
             0,
@@ -284,13 +303,17 @@ export class GgufInsights {
             gpuKVCacheSize,
             cpuKVCacheSize,
             gpuRecurrentStateSize,
-            cpuRecurrentStateSize
+            cpuRecurrentStateSize,
+            maxAttentionLayerKvSize,
+            maxAttentionLayerHeadCountKv
         } = this._estimateContextCacheMemorySplitInBytes({
-            kvSize,
+            fullAttentionKvSize,
+            swaKvSize,
             sequences,
             totalFileLayers,
             finalModelGpuLayers,
             usingGpu,
+            flashAttention,
             kvCacheKeyType,
             kvCacheValueType
         });
@@ -324,37 +347,82 @@ export class GgufInsights {
 
         const estimateGraphOverheadMemory = (): number => {
             const s1MB = Math.pow(1024, 2);
-            const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
             const expertCount = llmData?.expert_count ?? 0;
             const headCount = llmData?.attention?.head_count ?? 0;
             const embeddingLength = llmData?.embedding_length ?? 0;
+            const activeGraphTokens = roundUpToMultiple(
+                Math.max(1, Math.min(paddedContextSize, batchSize)),
+                Math.max(1, sequences)
+            );
+            const graphContextSize = resolveGraphContextSizeForOverheadEstimation({
+                fullAttentionKvSize,
+                trainContextSize: this.trainContextSize,
+                flashAttention,
+                headCount,
+                batchSize,
+                paddedContextSize,
+                sequences
+            });
 
             let defaultCalculationAdjustment = 0;
+            const totalElements = effectiveGraphTensorCount === 0
+                ? this.totalLayers * (
+                    (
+                        (llmData.embedding_length ?? 0) +
+                        (llmData.feed_forward_length ?? 0)
+                    ) / 2
+                )
+                : effectiveGraphTensorElements;
+            const tensorBasedGraphOverhead = (tensorElementMultiplier: number) => (
+                (totalElements * tensorElementMultiplier * (graphContextSize / 4096)) + defaultCalculationAdjustment
+            );
+            const batchLocalTensorBasedGraphOverhead = (tensorElementMultiplier: number) => (
+                (totalElements * tensorElementMultiplier * (activeGraphTokens / 4096)) + defaultCalculationAdjustment
+            );
 
             if (batchSize == null)
                 return 0;
+
+            const genericNonFlashAttentionWorkspaceEstimate = !flashAttention
+                ? estimateNonFlashAttentionWorkspace({
+                    trainContextSize: this.trainContextSize,
+                    fullAttentionKvSize,
+                    swaKvSize,
+                    hasSwaAttention,
+                    maxAttentionLayerKvSize,
+                    maxAttentionLayerHeadCountKv,
+                    activeGraphTokens,
+                    headCount
+                })
+                : 0;
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.llama) {
                 if (expertCount > 0) {
                     const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
-                    return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
+                    return Math.max(
+                        int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (graphContextSize * headCount)),
+                        genericNonFlashAttentionWorkspaceEstimate
+                    );
                 }
 
-                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (embeddingLength + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen2) {
                 if (modelGpuLayers === this.totalLayers) {
                     defaultCalculationAdjustment -= (s1MB * 340) * (
                         this.trainContextSize == null
                             ? 1
-                            : kvSize / this.trainContextSize
+                            : graphContextSize / this.trainContextSize
                     );
                 } else {
                     defaultCalculationAdjustment -= (s1MB * 250) + (
                         (s1MB * 50) * (
                             this.trainContextSize == null
                                 ? 1
-                                : kvSize / this.trainContextSize
+                                : graphContextSize / this.trainContextSize
                         )
                     );
                 }
@@ -367,7 +435,7 @@ export class GgufInsights {
                         (s1MB * 270) * (
                             this.trainContextSize == null
                                 ? 1
-                                : kvSize / this.trainContextSize
+                                : graphContextSize / this.trainContextSize
                         )
                     );
                 } else {
@@ -375,14 +443,25 @@ export class GgufInsights {
                         (s1MB * 150) * (
                             this.trainContextSize == null
                                 ? 1
-                                : Math.max(0, (1 - (kvSize / this.trainContextSize)))
+                                : Math.max(0, (1 - (graphContextSize / this.trainContextSize)))
                         )
                     );
                 }
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.gemma3) {
+                const trainContextSize = Math.max(1, this.trainContextSize ?? graphContextSize);
+                const contextRatio = Math.min(1, Math.max(0, graphContextSize / trainContextSize));
+
+                return Math.max(
+                    int32TBytes * batchSize * graphContextSize * headCount * (0.08 + Math.pow(contextRatio, 2)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.stablelm) {
                 const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
 
-                return (int32TBytes * batchSize * kvSize * headCount) - (50 * s1MB);
+                return Math.max(
+                    (int32TBytes * batchSize * graphContextSize * headCount) - (50 * s1MB),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
 
                 // if (modelGpuLayers === this.totalLayers) {
                 //     defaultCalculationAdjustment += -(s1MB * 20) + (
@@ -402,34 +481,58 @@ export class GgufInsights {
                 //     );
                 // }
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen3) {
-                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (embeddingLength + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.gemma4) {
+                const trainContextSize = Math.max(1, this.trainContextSize ?? graphContextSize);
+                const contextRatio = Math.min(1, Math.max(0, graphContextSize / trainContextSize));
+                const gemma4DenseShortContextScale = 0.4;
+                const gemma4DenseContextScaleExponent = 3;
+                const gemma4DenseEstimate = int32TBytes * batchSize * graphContextSize * headCount *
+                    (gemma4DenseShortContextScale + Math.pow(contextRatio, gemma4DenseContextScaleExponent));
+
+                // Gemma 4 non-FA contexts allocate noticeably less temporary attention workspace than the
+                // generic heuristic predicts for the dense models. The MoE variants keep a larger
+                // tensor-driven graph reserve, so blend the dense fit with the tensor-size heuristic.
+                // `gemma4DenseShortContextScale` is a calibration floor from `inspect measure` runs for dense Gemma 4 models.
+                if (expertCount > 0) {
+                    const tensorBasedEstimate = tensorBasedGraphOverhead(77.655);
+                    const moeBlendWeight = Math.sqrt(contextRatio);
+
+                    return Math.max(
+                        gemma4DenseEstimate,
+                        (gemma4DenseEstimate + ((tensorBasedEstimate - gemma4DenseEstimate) * moeBlendWeight)) * 1.01,
+                        genericNonFlashAttentionWorkspaceEstimate
+                    );
+                }
+
+                return Math.max(gemma4DenseEstimate, genericNonFlashAttentionWorkspaceEstimate);
             } else if (expertCount > 0) {
                 const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
-                return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             }
-
-            const totalElements = tensorInfo.length === 0
-                ? this.totalLayers * (
-                    (
-                        (llmData.embedding_length ?? 0) +
-                        (llmData.feed_forward_length ?? 0)
-                    ) / 2
-                )
-                : tensorInfo.reduce((res, tensor) => {
-                    return res + tensor.dimensions.reduce((res: number, dim) => res + Number(dim), 0);
-                }, 0);
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.phi3) {
                 // magic numbers for estimation. will be improved in the future
-                return (totalElements * 123 * (kvSize / 4096)) + defaultCalculationAdjustment;
+                return Math.max(tensorBasedGraphOverhead(123), genericNonFlashAttentionWorkspaceEstimate);
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.cohere2) {
                 // magic numbers for estimation. will be improved in the future
-                return (totalElements * 148 * (kvSize / 4096)) + defaultCalculationAdjustment;
+                return Math.max(tensorBasedGraphOverhead(148), genericNonFlashAttentionWorkspaceEstimate);
             }
 
             // magic numbers for estimation. will be improved in the future
-            return (totalElements * 77.655 * (kvSize / 4096)) + defaultCalculationAdjustment;
+            return Math.max(
+                !flashAttention
+                    ? batchLocalTensorBasedGraphOverhead(77.655)
+                    : tensorBasedGraphOverhead(77.655),
+                genericNonFlashAttentionWorkspaceEstimate
+            );
         };
 
         // source: `llama_context::graph_max_nodes` in `llama-context.cpp`
@@ -449,10 +552,10 @@ export class GgufInsights {
             this._ggufFileInfo.metadata?.general?.architecture,
             Math.min(actualContextSize, batchSize)
         );
-        const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * tensorInfo.length);
+        const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * effectiveGraphTensorCount);
         const cpuNodes = totalFileLayers === 0
             ? 0
-            : maxNodesMultiplier.multiplier * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
+            : maxNodesMultiplier.multiplier * (effectiveGraphTensorCount * (finalCpuLayers / totalFileLayers));
         const gpuNodes = maxNodes - cpuNodes;
 
         const gpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * gpuNodes) +
@@ -460,7 +563,7 @@ export class GgufInsights {
         const cpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * cpuNodes) +
             this._llama._bindings.getGgmlGraphOverheadCustom(cpuNodes, false);
 
-        const graphOverheadMemory = (flashAttention || !includeGraphOverhead)
+        const graphOverheadMemory = !includeGraphOverhead
             ? 0
             : estimateGraphOverheadMemory();
         const graphOverheadGpuSize = (usingGpu && totalFileLayers > 0)
@@ -580,19 +683,23 @@ export class GgufInsights {
     }
 
     private _estimateContextCacheMemorySplitInBytes({
-        kvSize,
+        fullAttentionKvSize,
+        swaKvSize,
         sequences,
         totalFileLayers,
         finalModelGpuLayers,
         usingGpu,
+        flashAttention,
         kvCacheKeyType = GgmlType.F16,
         kvCacheValueType = GgmlType.F16
     }: {
-        kvSize: number,
+        fullAttentionKvSize: number,
+        swaKvSize: number,
         sequences: number,
         totalFileLayers: number,
         finalModelGpuLayers: number,
         usingGpu: boolean,
+        flashAttention: boolean,
         kvCacheKeyType?: GgmlType,
         kvCacheValueType?: GgmlType
     }) {
@@ -603,8 +710,24 @@ export class GgufInsights {
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+        const nEmbdHeadKSwa = this._ggufFileInfo.architectureMetadata.attention?.key_length_swa;
+        const nEmbdHeadVSwa = this._ggufFileInfo.architectureMetadata.attention?.value_length_swa;
+        const sharedKvLayers = this._ggufFileInfo.architectureMetadata.attention?.shared_kv_layers;
+        const slidingWindowPattern = this._ggufFileInfo.architectureMetadata.attention?.sliding_window_pattern;
         const keyTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheKeyType) ?? this._llama._consts.ggmlTypeF16Size;
         const valueTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheValueType) ?? this._llama._consts.ggmlTypeF16Size;
+        const nHeadKvValues = nHeadKv as unknown;
+        let maxLayerValueEmbedding = 0;
+
+        if (!flashAttention && nHeadKvValues instanceof Array) {
+            for (let i = 0; i < totalFileLayers; i++) {
+                const layerHeadCountKv = resolveLayerHeadCountKv(nHeadKvValues, i, nHead);
+                const isSwaLayer = isSwaLayerAtIndex(architecture, slidingWindowPattern, i);
+                const layerValueEmbedding = resolveLayerHeadDimension(nEmbdHeadV, nEmbdHeadVSwa, isSwaLayer) * layerHeadCountKv;
+
+                maxLayerValueEmbedding = Math.max(maxLayerValueEmbedding, layerValueEmbedding);
+            }
+        }
 
         // source: `llama_model::load_tensors` in `llama-model.cpp`
         // repeating layers are assigned to GPU from `i_gpu_start = n_layer + 1 - n_gpu_layers`
@@ -618,6 +741,8 @@ export class GgufInsights {
         let cpuKvElementsV = 0;
         let gpuRecurrentLayers = 0;
         let cpuRecurrentLayers = 0;
+        let maxAttentionLayerKvSize = 0;
+        let maxAttentionLayerHeadCountKv = 0;
 
         for (let i = 0; i < totalFileLayers; i++) {
             const isGpuLayer = i >= gpuRepeatingLayerStart;
@@ -629,9 +754,22 @@ export class GgufInsights {
                 else
                     cpuRecurrentLayers++;
             } else {
+                if (!doesLayerOwnKvCache(totalFileLayers, i, sharedKvLayers))
+                    continue;
+
                 const nHeadKvLayer = resolveLayerHeadCountKv(nHeadKv, i, nHead);
-                const layerElementsK = nEmbdHeadK * nHeadKvLayer * kvSize;
-                const layerElementsV = nEmbdHeadV * nHeadKvLayer * kvSize;
+                const isSwaLayer = isSwaLayerAtIndex(architecture, slidingWindowPattern, i);
+                const layerKvSize = isSwaLayer
+                    ? swaKvSize
+                    : fullAttentionKvSize;
+                maxAttentionLayerKvSize = Math.max(maxAttentionLayerKvSize, layerKvSize);
+                maxAttentionLayerHeadCountKv = Math.max(maxAttentionLayerHeadCountKv, nHeadKvLayer);
+                const layerElementsK = resolveLayerHeadDimension(nEmbdHeadK, nEmbdHeadKSwa, isSwaLayer) * nHeadKvLayer * layerKvSize;
+                const layerElementsV = layerKvSize * (
+                    maxLayerValueEmbedding > 0
+                        ? maxLayerValueEmbedding
+                        : (resolveLayerHeadDimension(nEmbdHeadV, nEmbdHeadVSwa, isSwaLayer) * nHeadKvLayer)
+                );
 
                 if (isGpuLayer) {
                     gpuKvElementsK += layerElementsK;
@@ -658,7 +796,9 @@ export class GgufInsights {
             gpuKVCacheSize,
             cpuKVCacheSize,
             gpuRecurrentStateSize,
-            cpuRecurrentStateSize
+            cpuRecurrentStateSize,
+            maxAttentionLayerKvSize,
+            maxAttentionLayerHeadCountKv
         };
     }
 
@@ -941,49 +1081,212 @@ function isTokenEmbedLayer(layerName: string) {
     return firstPart === "token_embd";
 }
 
+function isGraphRelevantTensor(tensorName: string): boolean {
+    return isInputLayer(tensorName) ||
+        isOutputLayer(tensorName) ||
+        tensorName.startsWith("blk.") ||
+        tensorName.startsWith("enc.blk.") ||
+        tensorName.startsWith("dec.blk.");
+}
+
 function ggmlPad(value: number, padding: number): number {
     return ((value + padding - 1) & ~(padding - 1));
 }
 
-function getSwaPatternForArchitecture(architecture?: GgufArchitectureType, slidingWindowPattern?: number | number[]): number {
-    if (typeof slidingWindowPattern === "number")
-        return slidingWindowPattern;
+function roundUpToMultiple(value: number, multiple: number): number {
+    if (multiple <= 1)
+        return value;
 
+    return Math.ceil(value / multiple) * multiple;
+}
+
+function resolveGraphContextSizeForOverheadEstimation({
+    fullAttentionKvSize,
+    trainContextSize,
+    flashAttention,
+    headCount,
+    batchSize,
+    paddedContextSize,
+    sequences
+}: {
+    fullAttentionKvSize: number,
+    trainContextSize: number | undefined,
+    flashAttention: boolean,
+    headCount: number,
+    batchSize: number,
+    paddedContextSize: number,
+    sequences: number
+}) {
+    // heuristic coefficients fit to estimate llama.cpp graph-reserve behavior
+    const flashAttentionMinContextMultiplier = 0.5;
+    const flashAttentionMaxContextMultiplier = 0.78;
+    const flashAttentionMinHeadCountForScaling = 4;
+    const flashAttentionContextRatioLog2Cap = 2;
+    const flashAttentionContextRatioLog2Scale = 0.05;
+    const longContextOverflowStartRatio = 1.25;
+    const longContextOverflowGrowthScale = 0.1;
+    const longContextMaxMultiplierIncrease = 0.4;
+
+    const normalizedTrainContextSize = trainContextSize == null || trainContextSize <= 0
+        ? Math.max(1, fullAttentionKvSize)
+        : trainContextSize;
+    const contextRatio = Math.max(1, fullAttentionKvSize / normalizedTrainContextSize);
+
+    if (flashAttention) {
+        const activeGraphTokens = roundUpToMultiple(
+            Math.max(1, Math.min(paddedContextSize, batchSize)),
+            Math.max(1, sequences)
+        );
+        const flashContextMultiplierBase =
+            flashAttentionMinContextMultiplier + (1 / Math.max(flashAttentionMinHeadCountForScaling, headCount));
+        const flashContextMultiplierLongContextAdjustment =
+            Math.min(flashAttentionContextRatioLog2Cap, Math.log2(contextRatio)) * flashAttentionContextRatioLog2Scale;
+        const flashContextMultiplier = Math.max(
+            flashAttentionMinContextMultiplier,
+            Math.min(
+                flashAttentionMaxContextMultiplier,
+                flashContextMultiplierBase + flashContextMultiplierLongContextAdjustment
+            )
+        );
+
+        return activeGraphTokens * flashContextMultiplier;
+    }
+
+    const contextOverflow = Math.max(0, contextRatio - longContextOverflowStartRatio);
+    const longContextMultiplier = 1 + Math.min(
+        longContextMaxMultiplierIncrease,
+        longContextOverflowGrowthScale * contextOverflow * contextOverflow
+    );
+
+    return fullAttentionKvSize * longContextMultiplier;
+}
+
+function estimateNonFlashAttentionWorkspace({
+    trainContextSize,
+    fullAttentionKvSize,
+    swaKvSize,
+    hasSwaAttention,
+    maxAttentionLayerKvSize,
+    maxAttentionLayerHeadCountKv,
+    activeGraphTokens,
+    headCount
+}: {
+    trainContextSize: number | undefined,
+    fullAttentionKvSize: number,
+    swaKvSize: number,
+    hasSwaAttention: boolean,
+    maxAttentionLayerKvSize: number,
+    maxAttentionLayerHeadCountKv: number,
+    activeGraphTokens: number,
+    headCount: number
+}) {
+    const floatBytes = 4; // sizeof(float)
+    const strongGqaMaxKvToQHeadRatio = 0.5;
+    const minAttentionScoreWorkspaceScale = 0.4;
+    const additionalAttentionScoreWorkspaceScale = 0.6;
+
+    if (maxAttentionLayerKvSize <= 0 || activeGraphTokens <= 0 || headCount <= 0)
+        return 0;
+
+    const attentionScoresWorkspace = floatBytes * activeGraphTokens * maxAttentionLayerKvSize * headCount;
+    const attentionMaskWorkspace = floatBytes * activeGraphTokens * (
+        hasSwaAttention
+            ? fullAttentionKvSize + swaKvSize
+            : maxAttentionLayerKvSize
+    );
+
+    if (!hasSwaAttention)
+        // source: non-FA reserve path in `llm_graph_context::build_attn_mha` + `build_attn_inp_kq_mask` in `llama-graph.cpp`
+        // reserves the full KQ tensor and the matching F32 attention mask for the ubatch-local graph
+        return attentionScoresWorkspace + attentionMaskWorkspace;
+
+    // the explicit KQ workspace floor matches the non-FA reserve path well for MHA-like layouts,
+    // but it becomes too aggressive for strong GQA / MQA hybrid models where KV heads are much fewer than Q heads
+    if (maxAttentionLayerHeadCountKv / headCount < strongGqaMaxKvToQHeadRatio)
+        return attentionMaskWorkspace;
+
+    const normalizedTrainContextSize = Math.max(1, trainContextSize ?? maxAttentionLayerKvSize);
+    const contextRatio = Math.min(1, Math.max(0, maxAttentionLayerKvSize / normalizedTrainContextSize));
+    const attentionScoreWorkspaceScale =
+        minAttentionScoreWorkspaceScale + (additionalAttentionScoreWorkspaceScale * contextRatio);
+
+    return (attentionScoresWorkspace * attentionScoreWorkspaceScale) + attentionMaskWorkspace;
+}
+
+function isSwaLayerAtIndex(
+    architecture: GgufArchitectureType | undefined,
+    slidingWindowPattern: number | number[] | undefined,
+    layerIndex: number
+): boolean {
+    if (layerIndex < 0)
+        return false;
+
+    if (slidingWindowPattern instanceof Array)
+        return Boolean(slidingWindowPattern[layerIndex]);
+
+    const [defaultPattern, denseFirst] = getSwaPatternForArchitecture(architecture);
+    const pattern = typeof slidingWindowPattern === "number"
+        ? Math.max(0, Math.floor(slidingWindowPattern))
+        : defaultPattern;
+
+    if (pattern === 0)
+        return true;
+
+    return denseFirst
+        ? (layerIndex % pattern !== 0)
+        : (layerIndex % pattern < (pattern - 1));
+}
+
+function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): [pattern: number, denseFirst: boolean] {
     // source: `llama_model::load_hparams` in `llama-model.cpp` - calls to `hparams.set_swa_pattern`
     switch (architecture) {
         case GgufArchitectureType.llama4:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.afmoe:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.modernBert:
-            return 3;
+            return [3, true];
         case GgufArchitectureType.phi3:
-            return 1;
+            return [1, false];
         case GgufArchitectureType.plamo3:
-            return 8;
+            return [8, false];
         case GgufArchitectureType.gemma2:
-            return 2;
+            return [2, false];
         case GgufArchitectureType.gemma3:
-            return 6;
+            return [6, false];
         case GgufArchitectureType.gemma3n:
-            return 5;
+            return [5, false];
         case GgufArchitectureType.gemmaEmbedding:
-            return 6;
+            return [6, false];
         case GgufArchitectureType.cohere2:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.olmo2:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.exaone4:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.exaoneMoe:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.gptOss:
-            return 2;
+            return [2, false];
         case GgufArchitectureType.smallthinker:
-            return 4;
+            return [4, true];
     }
 
-    return 1;
+    return [1, false];
+}
+
+function resolveLayerHeadDimension(defaultValue: number, swaValue: number | undefined, isSwaLayer: boolean): number {
+    if (isSwaLayer && swaValue != null)
+        return swaValue;
+
+    return defaultValue;
+}
+
+function doesLayerOwnKvCache(totalLayers: number, layerIndex: number, sharedKvLayers: number | undefined): boolean {
+    if (sharedKvLayers == null || sharedKvLayers <= 0)
+        return true;
+
+    return layerIndex < Math.max(0, totalLayers - sharedKvLayers);
 }
 
 function resolveLayerHeadCountKv(nHeadKv: number | number[], layerIndex: number, nHead: number): number {
@@ -1007,8 +1310,9 @@ function getRecurrentLayersPattern(
     architectureMetadata: GgufFileInfo["architectureMetadata"]
 ): RecurrentLayersPattern {
     const nHeadKv = architectureMetadata?.attention?.head_count_kv;
+    const nHeadKvValues: number | number[] | undefined = nHeadKv;
     const feedForwardLength = architectureMetadata?.feed_forward_length as number | number[] | undefined;
-    const hasRecurrentHeadCountKvEntry = Array.isArray(nHeadKv) && nHeadKv.some((value) => value === 0);
+    const hasRecurrentHeadCountKvEntry = nHeadKvValues instanceof Array && nHeadKvValues.some((value: number) => value === 0);
 
     if (architecture === GgufArchitectureType.falconH1)
         // source: `llama_model::load_hparams` in `llama-model.cpp`:
@@ -1019,10 +1323,10 @@ function getRecurrentLayersPattern(
         // source: `llama_model::load_hparams` in `llama-model.cpp`:
         // `case LLM_ARCH_NEMOTRON_H / LLM_ARCH_NEMOTRON_H_MOE`:
         // `recurrent_layer_arr[i] = (n_head_kv(i) == 0 && n_ff(i) == 0)`
-        if (Array.isArray(nHeadKv))
+        if (nHeadKvValues instanceof Array)
             return {
                 type: "headCountKvAndFeedForward",
-                headCountKvValues: nHeadKv,
+                headCountKvValues: nHeadKvValues,
                 feedForwardLength
             };
 
@@ -1055,10 +1359,10 @@ function getRecurrentLayersPattern(
             interval: Math.max(1, Math.floor(architectureMetadata?.full_attention_interval))
         };
 
-    if (hasRecurrentHeadCountKvEntry)
+    if (nHeadKvValues instanceof Array && hasRecurrentHeadCountKvEntry)
         return {
             type: "headCountKvArray",
-            values: nHeadKv
+            values: nHeadKvValues
         };
 
     return "none";
@@ -1081,7 +1385,7 @@ function isLayerRecurrent(pattern: RecurrentLayersPattern, layerIndex: number): 
 function resolveLayerFeedForwardLength(feedForwardLength: number | number[] | undefined, layerIndex: number): number {
     if (typeof feedForwardLength === "number")
         return feedForwardLength;
-    else if (Array.isArray(feedForwardLength))
+    else if (feedForwardLength instanceof Array)
         return feedForwardLength[layerIndex] ?? 0;
 
     return 0;
