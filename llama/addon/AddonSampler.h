@@ -64,6 +64,8 @@ class AddonSampler : public Napi::ObjectWrap<AddonSampler> {
         void freeChain();
         void rebuildChainIfNeeded();
         void acceptToken(llama_token token);
+        void sample(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP, bool forceGrammar);
+        void setTokenCandidates(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP);
 
         Napi::Value Dispose(const Napi::CallbackInfo& info);
         Napi::Value ApplyConfig(const Napi::CallbackInfo& info);

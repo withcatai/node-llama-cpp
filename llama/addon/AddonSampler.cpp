@@ -122,10 +122,6 @@ void AddonSampler::rebuildChainIfNeeded() {
         llama_sampler_chain_add(chain, dryRepeatPenaltySampler);
     }
 
-    if (grammarEvaluationState != nullptr) {
-        llama_sampler_chain_add(chain, grammarEvaluationState->sampler);
-    }
-
     if (greedySampler != nullptr) {
         if (xtcSampler != nullptr) {
             llama_sampler_chain_add(chain, xtcSampler);
@@ -172,6 +168,96 @@ void AddonSampler::acceptToken(llama_token token) {
     if (grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr && !llama_vocab_is_eog(model->vocab, token)) {
         llama_sampler_accept(grammarEvaluationState->sampler, token);
     }
+}
+
+void AddonSampler::sample(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP, bool forceGrammar) {
+    setTokenCandidates(llamaContext, batchLogitIndex, curP);
+
+    if (forceGrammar && grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr) {
+        llama_sampler_apply(grammarEvaluationState->sampler, &curP);
+        llama_sampler_apply(chain, &curP);
+        return;
+    }
+
+    if (grammarEvaluationState == nullptr || grammarEvaluationState->sampler == nullptr) {
+        llama_sampler_apply(chain, &curP);
+        return;
+    }
+
+    // test whether the sampled token would be accepted by the grammar,
+    // and otherwise apply the grammar first and then the rest of the chain
+    {
+        llama_sampler_apply(chain, &curP);
+        if (!(curP.selected >= 0 && curP.selected < (int32_t)curP.size)) {
+            return;
+        }
+
+        llama_token_data singleTokenData = { curP.data[curP.selected].id, 1.0f, 0.0f };
+        llama_token_data_array singleTokenDataArray = { &singleTokenData, 1, -1, false };
+
+        llama_sampler_apply(grammarEvaluationState->sampler, &singleTokenDataArray);
+
+        const bool isValid = singleTokenData.logit != -INFINITY;
+        if (isValid) {
+            return;
+        }
+
+        setTokenCandidates(llamaContext, batchLogitIndex, curP);
+
+        llama_sampler_apply(grammarEvaluationState->sampler, &curP);
+        llama_sampler_apply(chain, &curP);
+    }
+}
+
+void AddonSampler::setTokenCandidates(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP) {
+    const float* sampledProbs = llama_get_sampled_probs_ith(llamaContext, batchLogitIndex);
+    const float* sampledLogits = llama_get_sampled_logits_ith(llamaContext, batchLogitIndex);
+    const llama_token* sampledIds = llama_get_sampled_candidates_ith(llamaContext, batchLogitIndex);
+
+    const llama_model* model = llama_get_model(llamaContext);
+    const llama_vocab* vocab = llama_model_get_vocab(model);
+
+    if (sampledProbs != nullptr) {
+        const uint32_t sampledProbsSize = llama_get_sampled_probs_count_ith(llamaContext, batchLogitIndex);
+        curP.size = sampledProbsSize;
+
+        if (tokenCandidates.size() < sampledProbsSize) {
+            tokenCandidates.resize(sampledProbsSize);
+        }
+
+        for (uint32_t i = 0; i < sampledProbsSize; i++) {
+            tokenCandidates[i] = llama_token_data { sampledIds[i], sampledLogits[i], sampledProbs[i] };
+        }
+    } else if (sampledLogits != nullptr) {
+        const uint32_t sampledLogitsSize = llama_get_sampled_logits_count_ith(llamaContext, batchLogitIndex);
+        curP.size = sampledLogitsSize;
+        if (tokenCandidates.size() < sampledLogitsSize) {
+            tokenCandidates.resize(sampledLogitsSize);
+        }
+
+        for (uint32_t i = 0; i < sampledLogitsSize; i++) {
+            tokenCandidates[i] = llama_token_data { sampledIds[i], sampledLogits[i], 0.0f };
+        }
+    } else {
+        const auto* logits = llama_get_logits_ith(llamaContext, batchLogitIndex);
+        if (logits != nullptr) {
+            const auto vocabLength = llama_vocab_n_tokens(vocab);
+            curP.size = vocabLength;
+            if (tokenCandidates.size() < vocabLength) {
+                tokenCandidates.resize(vocabLength);
+            }
+
+            for (llama_token tokenId = 0; tokenId < vocabLength; tokenId++) {
+                tokenCandidates[tokenId] = llama_token_data { tokenId, logits[tokenId], 0.0f };
+            }
+        } else {
+            curP.size = 0;
+        }
+    }
+
+    curP.data = tokenCandidates.data();
+    curP.selected = -1;
+    curP.sorted = false;
 }
 
 Napi::Value AddonSampler::Dispose(const Napi::CallbackInfo& info) {
@@ -584,8 +670,6 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             Napi::ObjectWrap<AddonGrammarEvaluationState>::Unwrap(config.Get("grammarEvaluationState").As<Napi::Object>());
 
         if (grammarEvaluationState != configGrammarEvaluationState) {
-            freeChain();
-
             if (grammarEvaluationState != nullptr) {
                 grammarEvaluationState->Unref();
                 grammarEvaluationState = nullptr;
@@ -595,7 +679,6 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             grammarEvaluationState->Ref();
         }
     } else if (grammarEvaluationState != nullptr) {
-        freeChain();
         grammarEvaluationState->Unref();
         grammarEvaluationState = nullptr;
     }

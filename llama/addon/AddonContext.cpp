@@ -254,22 +254,8 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             sampler->rebuildChainIfNeeded();
 
-            const auto * logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
-            const int n_vocab = llama_vocab_n_tokens(ctx->model->vocab);
-
-            auto & candidates = sampler->tokenCandidates;
-            for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
-            }
-
-            llama_token_data_array cur_p = {
-                /* .data       = */ candidates.data(),
-                /* .size       = */ candidates.size(),
-                /* .selected   = */ -1,
-                /* .sorted     = */ false,
-            };
-
-            llama_sampler_apply(sampler->chain, &cur_p);
+            llama_token_data_array cur_p;
+            sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence);
 
             if (!(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;
