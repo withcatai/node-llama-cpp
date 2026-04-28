@@ -235,6 +235,9 @@ export class Gemma4ChatWrapper extends ChatWrapper {
 
         addPendingFunctions();
 
+        if (!isLastItem)
+            res.push(LlamaText(new SpecialTokensText("<turn|>\n")));
+
         return LlamaText(res);
     }
 
@@ -244,7 +247,7 @@ export class Gemma4ChatWrapper extends ChatWrapper {
             [{}, {}],
             [{reasoning: false}, {}],
             [
-                {reasoning: true},
+                {},
                 {},
                 {additionalRenderParameters: {"enable_thinking": true}}
             ]
