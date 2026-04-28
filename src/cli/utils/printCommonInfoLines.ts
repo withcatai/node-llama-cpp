@@ -23,7 +23,7 @@ export async function printCommonInfoLines({
     context: LlamaContext,
     draftContext?: LlamaContext,
     minTitleLength?: number,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     useDirectIo?: boolean,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
@@ -109,9 +109,13 @@ export async function printCommonInfoLines({
             title: "mmap",
             value: !model._llama.supportsMmap
                 ? "unsupported"
-                : (useMmap || useMmap == null)
+                : useMmap === true
                     ? "enabled"
-                    : "disabled"
+                    : (useMmap === "auto" || useMmap == null)
+                        ? model.useMmap
+                            ? "auto (enabled)"
+                            : "auto (disabled)"
+                        : "disabled"
         }, {
             title: "Direct I/O",
             show: platform !== "mac", // Direct IO is not supported on macOS

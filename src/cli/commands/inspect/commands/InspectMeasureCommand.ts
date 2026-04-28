@@ -43,7 +43,7 @@ type InspectMeasureCommand = {
     batchSize?: number,
     measures: number,
     memory: "vram" | "ram" | "all",
-    noMmap: boolean,
+    mmap?: boolean,
     noDirectIo: boolean,
     printHeaderBeforeEachLayer?: boolean,
     evaluateText?: string,
@@ -168,10 +168,9 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: "vram" as const,
                 description: "Type of memory to measure"
             })
-            .option("noMmap", {
+            .option("mmap", {
                 type: "boolean",
-                default: false,
-                description: "Disable mmap (memory-mapped file) usage"
+                description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
             .option("noDirectIo", {
                 type: "boolean",
@@ -199,7 +198,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
-        batchSize, measures = 10, memory: measureMemoryType, noMmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
+        batchSize, measures = 10, memory: measureMemoryType, mmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
         repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
@@ -226,7 +225,11 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         await llama.setRamCap(resolvedMaxRam ?? null);
 
         const platform = getPlatform();
-        const useMmap = !noMmap && llama.supportsMmap;
+        const useMmap = !llama.supportsMmap
+            ? false
+            : typeof mmap === "boolean"
+                ? mmap
+                : "auto";
         const useDirectIo = !noDirectIo;
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers, {
             flashAttention, swaFullCache, useMmap, kvCacheKeyType, kvCacheValueType
@@ -237,9 +240,11 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         console.info(chalk.yellow("mmap:") + " " + (
             !llama.supportsMmap
                 ? "unsupported"
-                : useMmap
-                    ? "enabled"
-                    : "disabled"
+                : useMmap === "auto"
+                    ? "auto"
+                    : useMmap === true
+                        ? "enabled"
+                        : "disabled"
         ));
 
         if (platform !== "mac") // Direct I/O is not supported on macOS
@@ -264,14 +269,14 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         let lastGpuLayers = maxLayers ?? (
             resolvedMaxVram == null
                 ? ggufInsights.totalLayers
-                : await ggufInsights.configurationResolver.resolveModelGpuLayers({
+                : (await ggufInsights.configurationResolver.resolveModelGpuLayersV2({
                     fitContext: {
                         contextSize: minAllowedContextSizeInCalculations
                     }
                 }, {
                     useMmap,
                     defaultContextFlashAttention: flashAttention ?? undefined
-                })
+                })).gpuLayers
         );
         let previousContextSizeCheck: undefined | number = undefined;
 
@@ -370,7 +375,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
                         const modelResourceEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
                             gpuLayers: lastGpuLayers,
-                            useMmap
+                            useMmap: result.useMmap
                         });
                         const modelVramEstimation = modelResourceEstimation.gpuVram;
                         const modelVramEstimationDiffBytes = (modelVramEstimation < result.modelVramUsage ? "-" : "") +
@@ -431,7 +436,11 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                             type: previousContextSizeCheck == null
                                 ? "Model"
                                 : "Context",
-                            gpuLayers: String(lastGpuLayers),
+                            gpuLayers: String(lastGpuLayers).padEnd("Layers".length - 1, " ") + (
+                                result.useMmap
+                                    ? chalk.gray("M")
+                                    : " "
+                            ),
                             contextSize: previousContextSizeCheck != null
                                 ? String(previousContextSizeCheck)
                                 : undefined,
@@ -605,7 +614,7 @@ async function measureModel({
     onInfo
 }: {
     modelPath: string,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     useDirectIo?: boolean,
     gpu?: BuildGpu | "auto",
     tests: number,
@@ -637,6 +646,7 @@ async function measureModel({
             modelVramUsage: number,
             modelRamUsage: number,
             contextSize?: number,
+            useMmap: boolean,
             contextVramUsage?: number,
             contextRamUsage?: number,
             contextStateSize?: number,
@@ -771,6 +781,7 @@ async function measureModel({
                             modelVramUsage: message.modelVramUsage,
                             modelRamUsage: message.modelRamUsage,
                             contextSize: message.contextSize,
+                            useMmap: message.useMmap,
                             contextVramUsage: message.contextVramUsage,
                             contextRamUsage: message.contextRamUsage,
                             contextStateSize: message.contextStateSize,
@@ -894,6 +905,7 @@ async function runTestWorkerLogic() {
                     modelVramUsage,
                     modelRamUsage,
                     contextSize: context.contextSize,
+                    useMmap: model.useMmap,
                     contextVramUsage: postContextVramUsage - preContextVramUsage,
                     contextRamUsage: postContextRamUsage - preContextRamUsage,
                     contextStateSize: context.stateSize,
@@ -932,7 +944,7 @@ async function runTestWorkerLogic() {
         modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention,
         kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false
     }: {
-        modelPath: string, useMmap?: boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
+        modelPath: string, useMmap?: "auto" | boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
         maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
         swaFullCache?: boolean, batchSize?: number,
         evaluateText?: string, exitAfterMeasurement?: boolean
@@ -957,6 +969,7 @@ async function runTestWorkerLogic() {
             sendInfoBack({
                 type: "stats",
                 gpuLayers: model.gpuLayers,
+                useMmap: model.useMmap,
                 modelVramUsage: postModelVramUsage - preModelVramUsage,
                 modelRamUsage: postModelRamUsage - preModelRamUsage,
                 totalVramUsage: postModelVramUsage,
@@ -1117,7 +1130,7 @@ function getNextItemInCheckContextSizesPlan(plan: number[], currentSize: number)
 type ParentToChildMessage = {
     type: "start",
     modelPath: string,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     useDirectIo?: boolean,
     tests: number,
     maxGpuLayers: number,
@@ -1146,6 +1159,7 @@ type ChildToParentMessage = {
     modelVramUsage: number,
     modelRamUsage: number,
     contextSize?: number,
+    useMmap: boolean,
     contextVramUsage?: number,
     contextRamUsage?: number,
     contextStateSize?: number,

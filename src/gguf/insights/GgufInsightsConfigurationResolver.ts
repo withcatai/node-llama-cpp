@@ -43,7 +43,7 @@ export class GgufInsightsConfigurationResolver {
         kvCacheKeyType,
         kvCacheValueType,
         swaFullCache = false,
-        useMmap = this._ggufInsights._defaultUseMmap ?? this._ggufInsights._llama.supportsMmap
+        useMmap = "auto"
     }: {
         targetGpuLayers?: number | "max",
         targetContextSize?: number,
@@ -52,7 +52,7 @@ export class GgufInsightsConfigurationResolver {
         kvCacheKeyType?: GgmlType,
         kvCacheValueType?: GgmlType,
         swaFullCache?: boolean,
-        useMmap?: boolean
+        useMmap?: "auto" | boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
@@ -122,7 +122,7 @@ export class GgufInsightsConfigurationResolver {
         maximumUnfitConfigurationResourceMultiplier = 100,
         forceStrictContextSize = false,
         forceGpuLayers,
-        useMmap = this._ggufInsights._defaultUseMmap ?? this._ggufInsights._llama.supportsMmap
+        useMmap = "auto"
     }: {
         contextSize?: number,
         embeddingContext?: boolean,
@@ -141,7 +141,7 @@ export class GgufInsightsConfigurationResolver {
         forceStrictContextSize?: boolean,
 
         forceGpuLayers?: number | "max",
-        useMmap?: boolean
+        useMmap?: "auto" | boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
         getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
@@ -179,6 +179,7 @@ export class GgufInsightsConfigurationResolver {
         resolvedValues: {
             gpuLayers: number,
             contextSize: number,
+            useMmap: boolean,
 
             modelRamUsage: number,
             contextRamUsage: number,
@@ -201,11 +202,14 @@ export class GgufInsightsConfigurationResolver {
         let resolvedGpuLayers = (forceGpuLayers == null || forceGpuLayers == "max")
             ? this.ggufInsights.totalLayers
             : forceGpuLayers;
+        let resolvedUseMmap = useMmap === "auto"
+            ? this._ggufInsights._getUseMmap()
+            : useMmap;
         let gpuLayersFitMemory = false;
         const simulatorSession = this._ggufInsights._createSimulatorSession();
 
         try {
-            resolvedGpuLayers = await this.resolveModelGpuLayers(
+            const layersResolution = await this.resolveModelGpuLayersV2(
                 forceGpuLayers != null
                     ? forceGpuLayers
                     : embeddingContext
@@ -235,6 +239,8 @@ export class GgufInsightsConfigurationResolver {
                     _simulatorSession: simulatorSession
                 }
             );
+            resolvedGpuLayers = layersResolution.gpuLayers;
+            resolvedUseMmap = layersResolution.useMmap;
             gpuLayersFitMemory = true;
         } catch (err) {
             if (!(err instanceof InsufficientMemoryError))
@@ -244,7 +250,7 @@ export class GgufInsightsConfigurationResolver {
         const canUseGpu = llamaSupportsGpuOffloading && llamaGpu !== false;
         const estimatedModelResourceUsage = await this._ggufInsights.estimateModelResourceRequirementsV2({
             gpuLayers: resolvedGpuLayers,
-            useMmap,
+            useMmap: resolvedUseMmap,
 
             _simulatorSession: simulatorSession
         });
@@ -293,7 +299,7 @@ export class GgufInsightsConfigurationResolver {
                 kvCacheKeyType,
                 kvCacheValueType,
                 swaFullCache,
-                useMmap,
+                useMmap: resolvedUseMmap,
 
                 _simulatorSession: simulatorSession
             });
@@ -320,7 +326,7 @@ export class GgufInsightsConfigurationResolver {
             kvCacheValueType,
 
             _simulatorSession: simulatorSession,
-            _useMmap: useMmap
+            useMmap: resolvedUseMmap
         });
 
         const rankPoints = {
@@ -398,6 +404,7 @@ export class GgufInsightsConfigurationResolver {
             resolvedValues: {
                 gpuLayers: resolvedGpuLayers,
                 contextSize: resolvedContextSize,
+                useMmap: resolvedUseMmap,
 
                 modelRamUsage: estimatedModelResourceUsage.cpuRam,
                 contextRamUsage: estimatedContextResourceUsage.cpuRam,
@@ -410,11 +417,45 @@ export class GgufInsightsConfigurationResolver {
         };
     }
 
+    /**
+     * @deprecated use `resolveModelGpuLayersV2` instead
+     */
     public async resolveModelGpuLayers(gpuLayers?: LlamaModelOptions["gpuLayers"], options: {
         ignoreMemorySafetyChecks?: boolean, getVramState?(): Promise<{total: number, free: number}>,
         llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: LlamaContextOptions["flashAttention"],
         defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache?: boolean,
-        useMmap?: boolean,
+        useMmap?: boolean
+    } = {}) {
+        const {
+            ignoreMemorySafetyChecks = false,
+            getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
+            llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize, llamaGpu = this._ggufInsights._llama.gpu,
+            llamaSupportsGpuOffloading = this._ggufInsights._llama.supportsGpuOffloading,
+            defaultContextFlashAttention = "auto",
+            defaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType,
+            defaultContextSwaFullCache = false,
+            useMmap = this._ggufInsights._defaultUseMmap ?? this._ggufInsights._llama.supportsMmap
+        } = options;
+
+        return (await this.resolveModelGpuLayersV2(gpuLayers, {
+            ignoreMemorySafetyChecks,
+            getVramState,
+            llamaVramPaddingSize, llamaGpu,
+            llamaSupportsGpuOffloading,
+            defaultContextFlashAttention,
+            defaultContextKvCacheKeyType,
+            defaultContextKvCacheValueType,
+            defaultContextSwaFullCache,
+            useMmap
+        })).gpuLayers;
+    }
+
+    public async resolveModelGpuLayersV2(gpuLayers?: LlamaModelOptions["gpuLayers"], options: {
+        ignoreMemorySafetyChecks?: boolean, getVramState?(): Promise<{total: number, free: number}>,
+        llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: LlamaContextOptions["flashAttention"],
+        defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache?: boolean,
+        useMmap?: "auto" | boolean,
 
         /** @internal */
         _simulatorSession?: GgufInsightsSimulatorSession
@@ -428,7 +469,7 @@ export class GgufInsightsConfigurationResolver {
             defaultContextKvCacheKeyType,
             defaultContextKvCacheValueType,
             defaultContextSwaFullCache = false,
-            useMmap = this._ggufInsights._defaultUseMmap ?? this._ggufInsights._llama.supportsMmap,
+            useMmap = "auto",
 
             _simulatorSession
         } = options;

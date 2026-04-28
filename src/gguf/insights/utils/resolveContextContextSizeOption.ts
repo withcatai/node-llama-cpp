@@ -77,7 +77,7 @@ export async function resolveContextContextSizeOption(options: {
                 isEmbeddingContext,
 
                 _simulatorSession: simulatorSession,
-                _useMmap: useMmap
+                useMmap
             });
 
             if (contextResourceRequirements.gpuVram > vramState.free)
@@ -128,7 +128,7 @@ export async function resolveContextContextSizeOption(options: {
                     isEmbeddingContext,
 
                     _simulatorSession: simulatorSession,
-                    _useMmap: useMmap
+                    useMmap
                 });
 
                 if (contextResourceRequirements.gpuVram <= vramState.free &&
@@ -185,7 +185,7 @@ export async function resolveContextContextSizeOption(options: {
                 isEmbeddingContext,
 
                 _simulatorSession: simulatorSession,
-                _useMmap: useMmap
+                useMmap
             });
 
             const unifiedRamUsage = getRamUsageFromUnifiedVram(minContextSizeResourceRequirements.gpuVram, vramState);

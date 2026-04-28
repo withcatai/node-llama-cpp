@@ -266,7 +266,7 @@ export class GgufInsights {
      * @deprecated Use `estimateModelResourceRequirementsV2` instead
      */
     public estimateModelResourceRequirements({
-        gpuLayers, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
+        gpuLayers, useMmap = this._getUseMmap(), gpuSupportsMmap = this._llama.gpuSupportsMmap
     }: {
         gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean
     }): GgufInsightsResourceRequirements {
@@ -285,7 +285,7 @@ export class GgufInsights {
         _simulatorSession?: GgufInsightsSimulatorSession
     }): Promise<GgufInsightsResourceRequirements> {
         const {
-            gpuLayers, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap,
+            gpuLayers, useMmap = this._getUseMmap(), gpuSupportsMmap = this._llama.gpuSupportsMmap,
 
             _simulatorSession
         } = options;
@@ -327,7 +327,7 @@ export class GgufInsights {
     /** @internal */
     public async _simulateModelResourceUsage({
         gpuLayers,
-        useMmap = this._defaultUseMmap ?? this._llama.supportsMmap,
+        useMmap = this._getUseMmap(),
         simulatorSession = this._simulationSession
     }: {
         gpuLayers: number,
@@ -345,7 +345,7 @@ export class GgufInsights {
             if (cachedValue != null)
                 return {...cachedValue};
 
-            const simulatorSource = await this._resolveSimulatorSource(useMmap);
+            const simulatorSource = await this._resolveSimulatorSource();
             if (simulatorSource == null)
                 return null;
     
@@ -725,20 +725,18 @@ export class GgufInsights {
         contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
         flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean,
         kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        useMmap?: boolean,
 
         /** @internal */
-        _simulatorSession?: GgufInsightsSimulatorSession,
-
-        /** @internal */
-        _useMmap?: boolean
+        _simulatorSession?: GgufInsightsSimulatorSession
     }): Promise<GgufInsightsResourceRequirements> {
         const {
             contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
             swaFullCache = false,
             kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
+            useMmap,
 
-            _simulatorSession,
-            _useMmap
+            _simulatorSession
         } = options;
 
         try {
@@ -750,7 +748,7 @@ export class GgufInsights {
                 isEmbeddingContext,
                 flashAttention,
                 swaFullCache,
-                useMmap: _useMmap,
+                useMmap,
                 simulatorSession: _simulatorSession,
                 kvCacheKeyType,
                 kvCacheValueType
@@ -775,9 +773,14 @@ export class GgufInsights {
     }
 
     /** @internal */
+    public _getUseMmap(useMmapOption?: boolean) {
+        return useMmapOption ?? this._defaultUseMmap ?? this._llama.supportsMmap;
+    }
+
+    /** @internal */
     public async _simulateContextResourceUsage({
         contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
-        swaFullCache = false, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap,
+        swaFullCache = false, useMmap = this._getUseMmap(),
         kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
         simulatorSession = this._simulationSession
     }: {
@@ -813,7 +816,7 @@ export class GgufInsights {
             if (cachedValue != null)
                 return {...cachedValue};
 
-            const simulatorSource = await this._resolveSimulatorSource(useMmap);
+            const simulatorSource = await this._resolveSimulatorSource();
             if (simulatorSource == null)
                 return null;
     
@@ -1131,7 +1134,7 @@ export class GgufInsights {
     }
 
     /** @internal */
-    private async _resolveSimulatorSource(useMmap: boolean = this._defaultUseMmap ?? false): Promise<string | AddonGgufMetadata | null> {
+    private async _resolveSimulatorSource(): Promise<string | AddonGgufMetadata | null> {
         const addonMetadata = await this._getAddonMetadata();
         if (addonMetadata != null)
             return addonMetadata;

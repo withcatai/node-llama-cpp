@@ -60,6 +60,7 @@ exports[`gguf > parser > should parse remote gguf model 1`] = `
       "offset": 1097564160,
     },
   ],
+  "infoEndOffset": 2585504,
   "metadata": {
     "falcon": {
       "attention": {
@@ -135,6 +136,15 @@ exports[`gguf > parser > should parse remote gguf model 1`] = `
     },
   },
   "metadataSize": 2547826,
+  "sourceData": [
+    {
+      "buffer": {
+        "_type": "buffer",
+        "length": 2585504,
+      },
+      "type": "buffer",
+    },
+  ],
   "splicedParts": 1,
   "tensorCount": 644,
   "tensorInfo": [
@@ -206,6 +216,7 @@ exports[`gguf > parser > should parse remote gguf model without tensor info 1`] 
     "tensor_data_layout": "jploski",
   },
   "fullTensorInfo": undefined,
+  "infoEndOffset": undefined,
   "metadata": {
     "falcon": {
       "attention": {
@@ -281,6 +292,7 @@ exports[`gguf > parser > should parse remote gguf model without tensor info 1`] 
     },
   },
   "metadataSize": 2547826,
+  "sourceData": [],
   "splicedParts": 1,
   "tensorCount": 644,
   "tensorInfo": undefined,

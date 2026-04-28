@@ -83,7 +83,7 @@ type ChatCommand = {
     numa?: LlamaNuma,
     meter: boolean,
     timing: boolean,
-    noMmap: boolean,
+    mmap?: boolean,
     useDirectIo: boolean,
     printTimings: boolean
 };
@@ -395,10 +395,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Print how how long it took to generate each response"
             })
-            .option("noMmap", {
+            .option("mmap", {
                 type: "boolean",
-                default: false,
-                description: "Disable mmap (memory-mapped file) usage"
+                description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
             .option("useDirectIo", {
                 type: "boolean",
@@ -419,7 +418,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory,
-        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo,
+        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo,
         printTimings
     }) {
         try {
@@ -430,7 +429,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-                debug, numa, meter, timing, noMmap, useDirectIo, printTimings
+                debug, numa, meter, timing, mmap, useDirectIo, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -448,7 +447,7 @@ async function RunChat({
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
     dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
-    tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
+    tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -477,7 +476,11 @@ async function RunChat({
             numa
         });
     const logBatchSize = batchSize != null;
-    const useMmap = !noMmap && llama.supportsMmap;
+    const useMmap = !llama.supportsMmap
+        ? false
+        : typeof mmap === "boolean"
+            ? mmap
+            : "auto";
 
     await llama.setVramCap(resolvedMaxVram ?? null);
     await llama.setRamCap(resolvedMaxRam ?? null);

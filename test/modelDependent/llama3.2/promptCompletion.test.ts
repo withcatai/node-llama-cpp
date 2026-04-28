@@ -24,7 +24,7 @@ describe("llama 3.2", () => {
                 chatWrapper: resolveChatWrapper(model, {
                     customWrapperSettings: {
                         "llama3.2-lightweight": {
-                            todayDate: new Date("2025-01-01T00:00:00Z")
+                            todayDate: new Date("2025-01-01T00:00:00")
                         }
                     }
                 })
@@ -34,7 +34,7 @@ describe("llama 3.2", () => {
                 chatWrapper: resolveChatWrapper(model, {
                     customWrapperSettings: {
                         "llama3.2-lightweight": {
-                            todayDate: new Date("2025-01-01T00:00:00Z")
+                            todayDate: new Date("2025-01-01T00:00:00")
                         }
                     }
                 })

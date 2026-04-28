@@ -34,7 +34,7 @@ type InspectEstimateCommand = {
     gpuLayers?: number | "max",
     contextSize?: number | "train",
     embedding?: boolean,
-    noMmap?: boolean,
+    mmap?: boolean,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
@@ -118,10 +118,9 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 default: false,
                 group: "Optional:"
             })
-            .option("noMmap", {
+            .option("mmap", {
                 type: "boolean",
-                default: false,
-                description: "Disable mmap (memory-mapped file) usage"
+                description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -166,7 +165,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap,
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, mmap,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
@@ -206,7 +205,11 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
         await llama.setVramCap(resolvedMaxVram ?? null);
         await llama.setRamCap(resolvedMaxRam ?? null);
 
-        const useMmap = !noMmap && llama.supportsMmap;
+        const useMmap = !llama.supportsMmap
+            ? false
+            : typeof mmap === "boolean"
+                ? mmap
+                : "auto";
         printModelDestination(resolvedModelDestination);
 
         if (embedding)
@@ -302,7 +305,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 value: getReadableContextSize(ggufInsights.trainContextSize ?? 0)
             }]
         });
-        if (resolvedMaxRam != null || resolvedMaxVram != null || noMmap || swaFullCache)
+        if (resolvedMaxRam != null || resolvedMaxVram != null || mmap != null || swaFullCache)
             printInfoLine({
                 title: "Options",
                 padTitle: longestTitle,
@@ -315,14 +318,14 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                     title: "Max VRAM",
                     value: toBytes(resolvedMaxVram ?? 0)
                 }, {
-                    show: noMmap,
+                    show: mmap != null,
                     title: "mmap",
-                    value: useMmap
-                        ? "enabled"
-                        : noMmap
-                            ? "disabled"
-                            : !llama.supportsMmap
-                                ? "unsupported"
+                    value: !llama.supportsMmap
+                        ? "unsupported"
+                        : useMmap === "auto"
+                            ? "auto"
+                            : useMmap === true
+                                ? "enabled"
                                 : "disabled"
                 }, {
                     show: swaFullCache,
@@ -378,6 +381,12 @@ function logCompatibilityScore(
             show: flashAttention,
             title: "Flash attention",
             value: "enabled"
+        }, {
+            show: llama.supportsMmap,
+            title: "mmap",
+            value: compatibilityScore.resolvedValues.useMmap
+                ? "enabled"
+                : "disabled"
         }]
     });
 }

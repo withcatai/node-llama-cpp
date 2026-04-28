@@ -4,7 +4,7 @@ import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
 describe("HarmonyChatWrapper", () => {
-    const todayDate = new Date("2025-08-05T00:00:00Z");
+    const todayDate = new Date("2025-08-05T00:00:00");
 
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",

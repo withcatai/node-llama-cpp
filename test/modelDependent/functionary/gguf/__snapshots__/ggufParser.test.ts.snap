@@ -63,6 +63,7 @@ exports[`gguf > parser > should fetch GGUF metadata 1`] = `
       "offset": 328548352,
     },
   ],
+  "infoEndOffset": 7836512,
   "metadata": {
     "general": {
       "architecture": "llama",
@@ -156,6 +157,23 @@ exports[`gguf > parser > should fetch GGUF metadata 1`] = `
     },
   },
   "metadataSize": 7819208,
+  "source": {
+    "path": {
+      "_type": "path",
+      "path": "<prefix>/functionary-small-v2.5.Q4_0.gguf",
+    },
+    "type": "path",
+  },
+  "sourceData": [
+    {
+      "length": 7836512,
+      "path": {
+        "_type": "path",
+        "path": "<prefix>/functionary-small-v2.5.Q4_0.gguf",
+      },
+      "type": "path",
+    },
+  ],
   "splicedParts": 1,
   "tensorCount": 291,
   "tensorInfo": [
@@ -274,6 +292,7 @@ exports[`gguf > parser > should parse local gguf model 1`] = `
       "offset": 328548352,
     },
   ],
+  "infoEndOffset": 7836512,
   "metadata": {
     "general": {
       "architecture": "llama",
@@ -367,6 +386,16 @@ exports[`gguf > parser > should parse local gguf model 1`] = `
     },
   },
   "metadataSize": 7819208,
+  "sourceData": [
+    {
+      "length": 7836512,
+      "path": {
+        "_type": "path",
+        "path": "<prefix>/functionary-small-v2.5.Q4_0.gguf",
+      },
+      "type": "path",
+    },
+  ],
   "splicedParts": 1,
   "tensorCount": 291,
   "tensorInfo": [

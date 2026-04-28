@@ -73,10 +73,12 @@ export type LlamaModelOptions = {
      *
      * When using mmap, you might notice a delay the first time you actually use the model,
      * which is caused by the OS itself loading the model into memory.
+     * 
+     * When this option is set to `"auto"`, mmap may be disabled in scenarios where doing so allows more layers to be offloaded to the GPU.
      *
-     * Defaults to `true` if the current system supports it.
+     * Defaults to `"auto"` if the current system supports it.
      */
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
 
     /**
      * Direct I/O is a method of reading and writing data to and from the storage device directly to the application memory,
@@ -194,7 +196,7 @@ export type LlamaModelOptions = {
     metadataOverrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 };
 
-const defaultUseMmap = true;
+const defaultUseMmap = "auto" as const satisfies NonNullable<LlamaModelOptions["useMmap"]>;
 const defaultUseDirectIo = false;
 const defaultContextFlashAttentionOptionDefault = "auto" as const satisfies NonNullable<LlamaModelOptions["defaultContextFlashAttention"]>;
 const defaultContextSwaFullCache = false;
@@ -234,7 +236,8 @@ export class LlamaModel {
     private constructor({
         modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
     }: LlamaModelOptions & {
-        gpuLayers: number
+        gpuLayers: number,
+        useMmap: boolean
     }, {
         _llama,
         _fileInfo,
@@ -375,6 +378,16 @@ export class LlamaModel {
      */
     public get gpuLayers(): number {
         return this._gpuLayers;
+    }
+
+    /**
+     * Whether the model is loaded using mmap (memory-mapped file) or not.
+     * 
+     * When Direct I/O (setting the `useDirectIo` option to `true`) is used it'll override mmap and this value may be out of sync
+     * with the actual usage of mmap for the loading of this model instance.
+     */
+    public get useMmap(): boolean {
+        return this._useMmap;
     }
 
     /**
@@ -764,7 +777,11 @@ export class LlamaModel {
             experimentalDefaultContextKvCacheKeyType,
             experimentalDefaultContextKvCacheValueType
         } = modelOptions;
-        const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
+        const useMmap = !_llama.supportsMmap
+            ? false
+            : typeof modelOptions.useMmap === "boolean"
+                ? modelOptions.useMmap
+                : defaultUseMmap;
         const useDirectIo = modelOptions.useDirectIo ?? defaultUseDirectIo;
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
@@ -773,7 +790,9 @@ export class LlamaModel {
         });
         applyGgufMetadataOverrides(fileInfo, modelOptions.metadataOverrides);
         const ggufInsights = await GgufInsights.from(fileInfo, _llama);
-        ggufInsights._defaultUseMmap = useMmap;
+        ggufInsights._defaultUseMmap = useMmap === "auto"
+            ? true
+            : useMmap;
         const flashAttentionSupported = ggufInsights.flashAttentionSupported;
         const resolvedDefaultContextFlashAttention = flashAttentionSupported
             ? defaultContextFlashAttention ?? defaultContextFlashAttentionOptionDefault
@@ -787,10 +806,11 @@ export class LlamaModel {
             : resolveGgmlTypeOption(experimentalDefaultContextKvCacheValueType) ?? GgmlType.F16;
         
         let gpuLayers: number;
+        let resolvedUseMmap: boolean;
         let resourceRequirementsEstimation: GgufInsightsResourceRequirements;
         const simulatorSession = ggufInsights._createSimulatorSession();
         try {
-            gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
+            const layersResolution = await ggufInsights.configurationResolver.resolveModelGpuLayersV2(modelOptions.gpuLayers, {
                 ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
                 defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
                 defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
@@ -800,9 +820,11 @@ export class LlamaModel {
     
                 _simulatorSession: simulatorSession
             });
+            gpuLayers = layersResolution.gpuLayers;
+            resolvedUseMmap = layersResolution.useMmap;
             resourceRequirementsEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
                 gpuLayers,
-                useMmap,
+                useMmap: resolvedUseMmap,
                 
                 _simulatorSession: simulatorSession
             });
@@ -810,7 +832,7 @@ export class LlamaModel {
             simulatorSession.dispose();
         }
 
-        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap, useDirectIo}, {
+        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap: resolvedUseMmap, useDirectIo}, {
             _fileInfo: fileInfo,
             _fileInsights: ggufInsights,
             _llama,

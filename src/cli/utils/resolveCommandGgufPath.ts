@@ -17,7 +17,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
     targetDirectory = cliModelsDirectory, flashAttention = "auto", swaFullCache = false, useMmap, consoleTitle = "File",
     kvCacheKeyType, kvCacheValueType
 }: {
-    targetDirectory?: string, flashAttention?: "auto" | boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string,
+    targetDirectory?: string, flashAttention?: "auto" | boolean, swaFullCache?: boolean, useMmap?: "auto" | boolean, consoleTitle?: string,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType
 } = {}) {

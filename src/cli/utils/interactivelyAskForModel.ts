@@ -72,7 +72,7 @@ export async function interactivelyAskForModel({
     downloadIntent?: boolean,
     flashAttention?: "auto" | boolean,
     swaFullCache?: boolean,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     kvCacheKeyType?: "currentQuant" | GgmlType,
     kvCacheValueType?: "currentQuant" | GgmlType
 }): Promise<string> {
@@ -431,7 +431,7 @@ async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string |
 
 function renderSelectionItem(
     item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: "auto" | boolean,
-    swaFullCache: boolean, useMmap: boolean | undefined,
+    swaFullCache: boolean, useMmap: "auto" | boolean | undefined,
     kvCacheKeyType?: "currentQuant" | GgmlType, kvCacheValueType?: "currentQuant" | GgmlType
 ) {
     if (item.type === "localModel") {
@@ -592,7 +592,7 @@ async function selectFileForModelRecommendation({
     rerenderOption(): void,
     flashAttention: "auto" | boolean,
     swaFullCache: boolean,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     kvCacheKeyType?: "currentQuant" | GgmlType,
     kvCacheValueType?: "currentQuant" | GgmlType
 }) {
