@@ -6,6 +6,7 @@ import os from "os";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import stripAnsi from "strip-ansi";
+import bytes from "bytes";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveCommandGgufPath} from "../../../utils/resolveCommandGgufPath.js";
 import {getLlama} from "../../../../bindings/getLlama.js";
@@ -18,7 +19,7 @@ import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getReadablePath} from "../../../utils/getReadablePath.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
-import {documentationPageUrls} from "../../../../config.js";
+import {documentationPageUrls, minAllowedContextSizeInCalculations} from "../../../../config.js";
 import {Llama} from "../../../../bindings/Llama.js";
 import {toBytes} from "../../../utils/toBytes.js";
 import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
@@ -37,6 +38,8 @@ type InspectMeasureCommand = {
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
+    maxRam?: string,
+    maxVram?: string,
     batchSize?: number,
     measures: number,
     memory: "vram" | "ram" | "all",
@@ -138,6 +141,16 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: false,
                 description: "Disable SWA (Sliding Window Attention) on supported models"
             })
+            .option("maxRam", {
+                alias: ["ram"],
+                type: "string",
+                description: "Maximum RAM to use for all the resources allocated by `node-llama-cpp`"
+            })
+            .option("maxVram", {
+                alias: ["vram"],
+                type: "string",
+                description: "Maximum VRAM to use for all the resources allocated by `node-llama-cpp`"
+            })
             .option("batchSize", {
                 alias: "b",
                 type: "number",
@@ -185,13 +198,16 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     },
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention,
-        kvCacheKeyType, kvCacheValueType, swaFullCache,
+        kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
         batchSize, measures = 10, memory: measureMemoryType, noMmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
         repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
         if (maxContextSize === -1) maxContextSize = undefined;
         if (minLayers < 1) minLayers = 1;
+
+        const resolvedMaxRam = (typeof maxRam === "string" && maxRam !== "") ? (bytes.parse(maxRam) ?? undefined) : undefined;
+        const resolvedMaxVram = (typeof maxVram === "string" && maxVram !== "") ? (bytes.parse(maxVram) ?? undefined) : undefined;
 
         const exitAfterEachMeasurement = measureMemoryType === "ram" || measureMemoryType === "all";
         const headers = resolveHeaderFlag(headerArg);
@@ -205,6 +221,9 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 gpu,
                 logLevel: LlamaLogLevel.error
             });
+
+        await llama.setVramCap(resolvedMaxVram ?? null);
+        await llama.setRamCap(resolvedMaxRam ?? null);
 
         const platform = getPlatform();
         const useMmap = !noMmap && llama.supportsMmap;
@@ -242,7 +261,18 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         const totalVram = (await llama.getVramState()).total;
         const totalRam = os.totalmem();
 
-        let lastGpuLayers = maxLayers ?? ggufInsights.totalLayers;
+        let lastGpuLayers = maxLayers ?? (
+            resolvedMaxVram == null
+                ? ggufInsights.totalLayers
+                : await ggufInsights.configurationResolver.resolveModelGpuLayers({
+                    fitContext: {
+                        contextSize: minAllowedContextSizeInCalculations
+                    }
+                }, {
+                    useMmap,
+                    defaultContextFlashAttention: flashAttention ?? undefined
+                })
+        );
         let previousContextSizeCheck: undefined | number = undefined;
 
         const resolvedKvCacheKeyType = kvCacheKeyType === "currentQuant"
@@ -286,13 +316,15 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 kvCacheKeyType: resolvedKvCacheKeyType,
                 kvCacheValueType: resolvedKvCacheValueType,
                 swaFullCache,
+                maxRam: resolvedMaxRam,
+                maxVram: resolvedMaxVram,
                 batchSize,
                 tests: measures,
                 evaluateText: evaluateText == null
                     ? undefined
                     : evaluateText.repeat(repeatEvaluateText ?? 1),
                 exitAfterMeasurement: exitAfterEachMeasurement,
-                onInfo({gpuLayers, result}) {
+                async onInfo({gpuLayers, result}) {
                     if (lastGpuLayers !== gpuLayers) {
                         lastGpuLayers = gpuLayers;
                         previousContextSizeCheck = undefined;
@@ -336,7 +368,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                         previousContextSizeCheck = result.contextSize;
                         hadSuccessInThisProcess = true;
 
-                        const modelResourceEstimation = ggufInsights.estimateModelResourceRequirements({
+                        const modelResourceEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
                             gpuLayers: lastGpuLayers,
                             useMmap
                         });
@@ -354,7 +386,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
                         const contextResourceEstimation = previousContextSizeCheck == null
                             ? undefined
-                            : ggufInsights.estimateContextResourceRequirements({
+                            : await ggufInsights.estimateContextResourceRequirementsV2({
                                 contextSize: previousContextSizeCheck,
                                 modelGpuLayers: lastGpuLayers,
                                 flashAttention,
@@ -569,7 +601,8 @@ const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
     modelPath, useMmap, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers,
-    flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, onInfo
+    flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, batchSize, evaluateText, exitAfterMeasurement = false,
+    onInfo
 }: {
     modelPath: string,
     useMmap?: boolean,
@@ -585,6 +618,8 @@ async function measureModel({
     kvCacheKeyType?: GgmlType,
     kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
+    maxRam?: number,
+    maxVram?: number,
     batchSize?: number,
     evaluateText?: string,
     exitAfterMeasurement?: boolean,
@@ -608,7 +643,7 @@ async function measureModel({
             totalVramUsage: number,
             totalRamUsage: number
         }
-    }): void
+    }): void | Promise<void>
 }) {
     if (!detectedFileName.startsWith(expectedFileName)) {
         console.warn(
@@ -679,7 +714,7 @@ async function measureModel({
                 cleanup();
             }
 
-            subProcess.on("message", (message: ChildToParentMessage) => {
+            subProcess.on("message", async (message: ChildToParentMessage) => {
                 if (message.type === "ready") {
                     forkSucceeded = true;
                     subProcess.send({
@@ -697,6 +732,8 @@ async function measureModel({
                         kvCacheKeyType,
                         kvCacheValueType,
                         swaFullCache,
+                        maxRam,
+                        maxVram,
                         batchSize,
                         evaluateText,
                         exitAfterMeasurement
@@ -716,7 +753,7 @@ async function measureModel({
                 } else if (message.type === "error") {
                     lastGpuLayers = message.gpuLayers;
 
-                    onInfo({
+                    await onInfo({
                         gpuLayers: lastGpuLayers,
                         result: {
                             type: "error",
@@ -727,7 +764,7 @@ async function measureModel({
                 } else if (message.type === "stats") {
                     lastGpuLayers = message.gpuLayers;
 
-                    onInfo({
+                    await onInfo({
                         gpuLayers: message.gpuLayers,
                         result: {
                             type: "success",
@@ -746,7 +783,7 @@ async function measureModel({
 
             subProcess.on("exit", (code) => {
                 if (code !== 0 || !isPlannedExit)
-                    onInfo({
+                    void onInfo({
                         gpuLayers: lastGpuLayers,
                         result: {
                             type: "crash",
@@ -759,7 +796,7 @@ async function measureModel({
 
             if (subProcess.killed || subProcess.exitCode != null) {
                 if (subProcess.exitCode !== 0 || !isPlannedExit)
-                    onInfo({
+                    void onInfo({
                         gpuLayers: lastGpuLayers,
                         result: {
                             type: "crash",
@@ -975,6 +1012,9 @@ async function runTestWorkerLogic() {
                         continue;
                 }
 
+                await llama.setVramCap(message.maxVram ?? null);
+                await llama.setRamCap(message.maxRam ?? null);
+
                 const measurementsDone = await testWithGpuLayers({
                     modelPath: message.modelPath,
                     useMmap: message.useMmap,
@@ -1086,6 +1126,8 @@ type ParentToChildMessage = {
     kvCacheKeyType?: GgmlType,
     kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
+    maxRam?: number,
+    maxVram?: number,
     batchSize?: number,
     initialMaxContextSize?: number,
     maxContextSize?: number,

@@ -1,4 +1,5 @@
 #include "addonGlobals.h"
+#include "AddonGgufMetadata.h"
 #include "AddonModel.h"
 #include "AddonModelLora.h"
 #include "AddonGrammar.h"
@@ -15,7 +16,7 @@
 #include <cstdlib>
 #include <mutex>
 
-std::mutex backendMutex;
+    std::mutex backendMutex;
 bool backendInitialized = false;
 bool backendDisposed = false;
 
@@ -236,7 +237,7 @@ Napi::Value addonSetNuma(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value markLoaded(const Napi::CallbackInfo& info) {
-    static std::atomic_bool loaded = false;
+    static std::atomic_bool loaded(false);
     return Napi::Boolean::New(info.Env(), loaded.exchange(true));
 }
 
@@ -312,6 +313,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });
+    AddonGgufMetadata::init(exports);
     AddonModel::init(exports);
     AddonModelLora::init(exports);
     AddonGrammar::init(exports);

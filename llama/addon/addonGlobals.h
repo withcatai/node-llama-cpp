@@ -1,6 +1,7 @@
 #pragma once
 #include "napi.h"
 
+class AddonGgufMetadata;
 class AddonModel;
 class AddonModelLora;
 class AddonModelData;

@@ -46,6 +46,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
         Napi::Value GetEmbedding(const Napi::CallbackInfo& info);
         Napi::Value GetStateSize(const Napi::CallbackInfo& info);
+        Napi::Value GetMemoryBreakdown(const Napi::CallbackInfo& info);
         Napi::Value GetThreads(const Napi::CallbackInfo& info);
         Napi::Value SetThreads(const Napi::CallbackInfo& info);
 

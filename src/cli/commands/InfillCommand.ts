@@ -5,6 +5,7 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import prettyMilliseconds from "pretty-ms";
+import bytes from "bytes";
 import {getLlama} from "../../bindings/getLlama.js";
 import {
     BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaNuma, llamaNumaOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption,
@@ -40,6 +41,8 @@ type InfillCommand = {
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
+    maxRam?: string,
+    maxVram?: string,
     threads?: number,
     temperature: number,
     minP: number,
@@ -139,8 +142,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
             .option("flashAttention", {
                 alias: "fa",
                 type: "boolean",
-                default: false,
-                description: "Enable flash attention"
+                description: "Force enable flash attention. Flash attention is enabled by default when supported. You can force disable flash attention via `--no-fa`"
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -167,6 +169,16 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Disable SWA (Sliding Window Attention) on supported models"
+            })
+            .option("maxRam", {
+                alias: ["ram"],
+                type: "string",
+                description: "Maximum RAM to use for all the resources allocated by `node-llama-cpp`"
+            })
+            .option("maxVram", {
+                alias: ["vram"],
+                type: "string",
+                description: "Maximum VRAM to use for all the resources allocated by `node-llama-cpp`"
             })
             .option("threads", {
                 type: "number",
@@ -332,7 +344,7 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize,
-        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK,
+        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
@@ -341,8 +353,8 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
         try {
             await RunInfill({
                 modelPath, header, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-                kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
-                lastTokensRepeatPenalty,
+                kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
+                threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
                 tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
@@ -358,13 +370,16 @@ export const InfillCommand: CommandModule<object, InfillCommand> = {
 
 async function RunInfill({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, prefix, prefixFile, suffix, suffixFile, contextSize, batchSize, flashAttention,
-    kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
+    kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
     tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
 }: InfillCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
+
+    const resolvedMaxRam = (typeof maxRam === "string" && maxRam !== "") ? bytes.parse(maxRam) ?? undefined : undefined;
+    const resolvedMaxVram = (typeof maxVram === "string" && maxVram !== "") ? bytes.parse(maxVram) ?? undefined : undefined;
 
     const headers = resolveHeaderFlag(headerArg);
 
@@ -386,6 +401,9 @@ async function RunInfill({
         });
     const logBatchSize = batchSize != null;
     const useMmap = !noMmap && llama.supportsMmap;
+
+    await llama.setVramCap(resolvedMaxVram ?? null);
+    await llama.setRamCap(resolvedMaxRam ?? null);
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
@@ -574,7 +592,10 @@ async function RunInfill({
         useMmap,
         useDirectIo,
         logBatchSize,
-        tokenMeterEnabled: meter
+        tokenMeterEnabled: meter,
+        resolvedMaxRam,
+        resolvedMaxVram,
+        swaFullCache
     });
     printInfoLine({
         title: "Infill",

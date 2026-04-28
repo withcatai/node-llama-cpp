@@ -4,9 +4,12 @@
 #include "globals/addonProgress.h"
 #include "common/common.h"
 #include "llama.h"
+#include "llama-model.h"
+#include "gguf.h"
 #include "AddonModel.h"
 #include "AddonModelData.h"
 #include "AddonModelLora.h"
+#include "AddonGgufMetadata.h"
 
 static Napi::Value getNapiToken(const Napi::CallbackInfo& info, const llama_vocab* vocab, llama_token token) {
     if (token < 0 || token == LLAMA_TOKEN_NULL) {
@@ -69,18 +72,37 @@ static bool llamaModelParamsProgressCallback(float progress, void * user_data) {
     return !(addonModel->abortModelLoad);
 }
 
+struct ModelEstimatorTensorAccessState {
+    bool accessedTensorData = false;
+};
+
+static void markUnexpectedTensorDataAccess(struct ggml_tensor * /* tensor */, void * userData) {
+    auto * tensorAccessState = static_cast<ModelEstimatorTensorAccessState *>(userData);
+    if (tensorAccessState != nullptr) {
+        tensorAccessState->accessedTensorData = true;
+    }
+}
+
 class AddonModelLoadModelWorker : public Napi::AsyncWorker {
     public:
         AddonModel* model;
+        AddonGgufMetadata* ggufMetadata = nullptr;
 
-        AddonModelLoadModelWorker(const Napi::Env& env, AddonModel* model)
+        AddonModelLoadModelWorker(const Napi::Env& env, AddonModel* model, AddonGgufMetadata* ggufMetadata)
             : Napi::AsyncWorker(env, "AddonModelLoadModelWorker"),
               model(model),
+              ggufMetadata(ggufMetadata),
               deferred(Napi::Promise::Deferred::New(env)) {
             model->Ref();
+            if (ggufMetadata != nullptr) {
+                ggufMetadata->Ref();
+            }
         }
         ~AddonModelLoadModelWorker() {
             model->Unref();
+            if (ggufMetadata != nullptr) {
+                ggufMetadata->Unref();
+            }
         }
 
         Napi::Promise GetPromise() {
@@ -92,10 +114,42 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                model->model = llama_model_load_from_file(model->modelPath.c_str(), model->model_params);
+                if (model->modelPath != "" && ggufMetadata == nullptr) {
+                    model->model = llama_model_load_from_file(model->modelPath.c_str(), model->model_params);
+                } else {
+                    if (!model->model_params.no_alloc) {
+                        throw std::runtime_error("Loading a model from source buffers requires no_alloc=true");
+                    } else if (ggufMetadata->disposed || ggufMetadata->ggufMetadata.get() == nullptr) {
+                        throw std::runtime_error("GGUF metadata is disposed");
+                    }
+
+                        ModelEstimatorTensorAccessState tensorAccessState;
+                    model->model = llama_model_init_from_user(
+                        ggufMetadata->ggufMetadata.get(),
+                        markUnexpectedTensorDataAccess,
+                        &tensorAccessState,
+                        model->model_params
+                    );
+
+                    if (tensorAccessState.accessedTensorData) {
+                        if (model->model != nullptr) {
+                            llama_model_free(model->model);
+                            model->model = nullptr;
+                        }
+
+                        throw std::runtime_error(
+                            "Unexpected tensor data access when loading a model from source buffers with no_alloc=true"
+                        );
+                    }
+                }
+
+                if (model->model == nullptr) {
+                    throw std::runtime_error("Failed to load model");
+                }
+
                 model->vocab = llama_model_get_vocab(model->model);
 
-                model->modelLoaded = model->model != nullptr && model->model != NULL;
+                model->modelLoaded = model->model != nullptr;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -103,7 +157,7 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
-            if (model->modelLoaded) {
+            if (model->modelLoaded && !model->model_params.no_alloc) {
                 uint64_t modelSize = llama_model_size(model->model);
                 adjustNapiExternalMemoryAdd(Env(), modelSize);
                 model->loadedModelSize = modelSize;
@@ -116,6 +170,9 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
         }
         void OnError(const Napi::Error& err) {
             deferred.Reject(err.Value());
+            if (model->onLoadProgressEventCallbackSet) {
+                model->addonThreadSafeOnLoadProgressEventCallback.Release();
+            }
         }
 };
 
@@ -153,8 +210,10 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
-            adjustNapiExternalMemorySubtract(Env(), model->loadedModelSize);
-            model->loadedModelSize = 0;
+            if (!model->model_params.no_alloc) {
+                adjustNapiExternalMemorySubtract(Env(), model->loadedModelSize);
+                model->loadedModelSize = 0;
+            }
 
             deferred.Resolve(Env().Undefined());
         }
@@ -225,11 +284,11 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
         }
 };
 
-AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonModel>(info) {
+AddonModel::AddonModel(const Napi::CallbackInfo& info) :
+    Napi::ObjectWrap<AddonModel>(info) {
     data = new AddonModelData();
     model_params = llama_model_default_params();
 
-    // Get the model path
     modelPath = info[0].As<Napi::String>().Utf8Value();
 
     if (info.Length() > 1 && info[1].IsObject()) {
@@ -262,6 +321,10 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonM
 
         if (options.Has("checkTensors")) {
             model_params.check_tensors = options.Get("checkTensors").As<Napi::Boolean>().Value();
+        }
+
+        if (options.Has("noAlloc")) {
+            model_params.no_alloc = options.Get("noAlloc").As<Napi::Boolean>().Value();
         }
 
         if (options.Has("onLoadProgress")) {
@@ -351,6 +414,11 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) : Napi::ObjectWrap<AddonM
             model_params.progress_callback = llamaModelParamsProgressCallback;
         }
     }
+
+    if (model_params.no_alloc) {
+        model_params.use_mlock = false;
+        model_params.use_mmap = false;
+    }
 }
 
 AddonModel::~AddonModel() {
@@ -373,8 +441,10 @@ void AddonModel::dispose() {
         modelLoaded = false;
         llama_model_free(model);
 
-        adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
-        loadedModelSize = 0;
+        if (!model_params.no_alloc) {
+            adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
+            loadedModelSize = 0;
+        }
     }
 
     if (hasAddonExportsRef) {
@@ -389,7 +459,16 @@ Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    AddonModelLoadModelWorker* worker = new AddonModelLoadModelWorker(this->Env(), this);
+    AddonGgufMetadata* ggufMetadata = nullptr;
+    if (info.Length() > 0 && !info[0].IsUndefined()) {
+        ggufMetadata = Napi::ObjectWrap<AddonGgufMetadata>::Unwrap(info[0].As<Napi::Object>());
+        if (ggufMetadata == nullptr || ggufMetadata->ggufMetadata.get() == nullptr) {
+            Napi::TypeError::New(info.Env(), "Invalid GGUF metadata object").ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        }
+    }
+
+    AddonModelLoadModelWorker* worker = new AddonModelLoadModelWorker(this->Env(), this, ggufMetadata);
     worker->Queue();
     return worker->GetPromise();
 }
@@ -513,6 +592,48 @@ Napi::Value AddonModel::GetModelDescription(const Napi::CallbackInfo& info) {
     int actual_length = llama_model_desc(model, model_desc, sizeof(model_desc));
 
     return Napi::String::New(info.Env(), model_desc, actual_length);
+}
+
+Napi::Value AddonModel::GetMemoryBreakdown(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    if (!modelLoaded || model == nullptr) {
+        Napi::Error::New(info.Env(), "Model is not loaded").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    std::size_t cpuRam = 0;
+    std::size_t gpuVram = 0;
+
+    for (const auto& [bufferType, size] : model->memory_breakdown()) {
+        if (size == 0) {
+            continue;
+        }
+
+        if (ggml_backend_buft_is_host(bufferType)) {
+            cpuRam += size;
+        } else {
+            ggml_backend_dev_t device = ggml_backend_buft_get_device(bufferType);
+            if (device != nullptr) {
+                auto deviceType = ggml_backend_dev_type(device);
+                if (deviceType == GGML_BACKEND_DEVICE_TYPE_GPU || deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                    gpuVram += size;
+                } else {
+                    cpuRam += size;
+                }
+            } else {
+                cpuRam += size;
+            }
+        }
+    }
+
+    Napi::Object result = Napi::Object::New(info.Env());
+    result.Set("cpuRam", Napi::Number::New(info.Env(), cpuRam));
+    result.Set("gpuVram", Napi::Number::New(info.Env(), gpuVram));
+    return result;
 }
 
 Napi::Value AddonModel::TokenBos(const Napi::CallbackInfo& info) {
@@ -669,6 +790,7 @@ void AddonModel::init(Napi::Object exports) {
                 InstanceMethod("getTotalSize", &AddonModel::GetTotalSize),
                 InstanceMethod("getTotalParameters", &AddonModel::GetTotalParameters),
                 InstanceMethod("getModelDescription", &AddonModel::GetModelDescription),
+                InstanceMethod("getMemoryBreakdown", &AddonModel::GetMemoryBreakdown),
                 InstanceMethod("tokenBos", &AddonModel::TokenBos),
                 InstanceMethod("tokenEos", &AddonModel::TokenEos),
                 InstanceMethod("tokenNl", &AddonModel::TokenNl),

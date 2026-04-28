@@ -120,8 +120,8 @@ list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
 list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
 list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
 
-addVariantSuffix(llama ${NLC_VARIANT})
-addVariantSuffix(ggml ${NLC_VARIANT})
+addVariantSuffix(llama "${NLC_VARIANT}")
+addVariantSuffix(ggml "${NLC_VARIANT}")
 
 file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
 
@@ -129,7 +129,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} ${GPU_INFO_HE
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 target_link_libraries(${PROJECT_NAME} "llama")
-target_link_libraries(${PROJECT_NAME} "common")
+target_link_libraries(${PROJECT_NAME} "llama-common")
 
 if (DEFINED GPU_INFO_EXTRA_LIBS)
     target_link_libraries(${PROJECT_NAME} ${GPU_INFO_EXTRA_LIBS})

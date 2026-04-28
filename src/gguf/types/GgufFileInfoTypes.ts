@@ -16,6 +16,13 @@ export type GgufFileInfo = {
     readonly metadata: GgufMetadata,
     readonly metadataSize: number,
 
+    /**
+     * Offset in bytes from the start of the file to the end of the preserved GGUF info section.
+     * This includes the header, key-value metadata, tensor info and the alignment padding up to the tensor data section.
+     * Can be null if `readTensorInfo` is set to `false`.
+     */
+    readonly infoEndOffset?: number,
+
     /** Same value as `metadata[metadata.general.architecture]`, but with merged types for convenience */
     readonly architectureMetadata: MergeOptionalUnionTypes<Exclude<GgufMetadata[GgufArchitectureType], undefined>>,
 
@@ -60,7 +67,41 @@ export type GgufFileInfo = {
      *
      * When no splicing is done, this will be the same as `tensorInfoSize`.
      */
-    readonly totalTensorInfoSize?: number
+    readonly totalTensorInfoSize?: number,
+
+    /**
+     * An array of source data entries from which the file info was read.
+     * Each entry can be either a file path or a read-only buffer containing the raw GGUF metadata section part of the file
+     * (including the header, key-value pairs, tensor info and alignment padding up to the tensor data section).
+     * 
+     * For a single source file, this array will contain only a single entry,
+     * but for spliced metadata from multiple file parts, this array will contain an entry for each part, in the order they were spliced.
+     *
+     * When `readTensorInfo` is set to `false`, this will be an empty array.
+     */
+    readonly sourceData: GgufFileInfoSourceData[],
+
+    /**
+     * Indication of the source of the GGUF file info, such as the file path or URI it was read from.
+     */
+    readonly source?: GgufFileInfoSource
+};
+
+export type GgufFileInfoSource = {
+    type: "path",
+    path: string
+} | {
+    type: "uri",
+    uri: string
+};
+
+export type GgufFileInfoSourceData = {
+    type: "path",
+    path: string,
+    length: number
+} | {
+    type: "buffer",
+    buffer: Buffer
 };
 
 
@@ -97,5 +138,5 @@ export type GgufVersionParserResult = {
     tensorInfo?: GgufTensorInfo[],
     metadataSize: number,
     tensorInfoSize?: number,
-    tensorDataOffset?: number
+    infoEndOffset?: number
 };

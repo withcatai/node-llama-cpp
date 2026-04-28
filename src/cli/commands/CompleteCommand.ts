@@ -5,6 +5,7 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import prettyMilliseconds from "pretty-ms";
+import bytes from "bytes";
 import {getLlama} from "../../bindings/getLlama.js";
 import {
     BuildGpu, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaNuma, llamaNumaOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption,
@@ -38,6 +39,8 @@ type CompleteCommand = {
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
+    maxRam?: string,
+    maxVram?: string,
     threads?: number,
     temperature: number,
     minP: number,
@@ -129,8 +132,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
             .option("flashAttention", {
                 alias: "fa",
                 type: "boolean",
-                default: false,
-                description: "Enable flash attention"
+                description: "Force enable flash attention. Flash attention is enabled by default when supported. You can force disable flash attention via `--no-fa`"
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -157,6 +159,16 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Disable SWA (Sliding Window Attention) on supported models"
+            })
+            .option("maxRam", {
+                alias: ["ram"],
+                type: "string",
+                description: "Maximum RAM to use for all the resources allocated by `node-llama-cpp`"
+            })
+            .option("maxVram", {
+                alias: ["vram"],
+                type: "string",
+                description: "Maximum VRAM to use for all the resources allocated by `node-llama-cpp`"
             })
             .option("threads", {
                 type: "number",
@@ -322,7 +334,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
     },
     async handler({
         modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize,
-        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, threads, temperature, minP, topK,
+        flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
@@ -331,7 +343,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
         try {
             await RunCompletion({
                 modelPath, header, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
-                kvCacheKeyType, kvCacheValueType, swaFullCache,
+                kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
                 threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
@@ -348,7 +360,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
 
 async function RunCompletion({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, text, textFile, contextSize, batchSize, flashAttention,
-    kvCacheKeyType, kvCacheValueType, swaFullCache,
+    kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
@@ -356,6 +368,9 @@ async function RunCompletion({
 }: CompleteCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
+
+    const resolvedMaxRam = (typeof maxRam === "string" && maxRam !== "") ? bytes.parse(maxRam) ?? undefined : undefined;
+    const resolvedMaxVram = (typeof maxVram === "string" && maxVram !== "") ? bytes.parse(maxVram) ?? undefined : undefined;
 
     const headers = resolveHeaderFlag(headerArg);
 
@@ -377,6 +392,9 @@ async function RunCompletion({
         });
     const logBatchSize = batchSize != null;
     const useMmap = !noMmap && llama.supportsMmap;
+
+    await llama.setVramCap(resolvedMaxVram ?? null);
+    await llama.setRamCap(resolvedMaxRam ?? null);
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
@@ -552,7 +570,10 @@ async function RunCompletion({
         useDirectIo,
         minTitleLength: "Complete".length + 1,
         logBatchSize,
-        tokenMeterEnabled: meter
+        tokenMeterEnabled: meter,
+        resolvedMaxRam,
+        resolvedMaxVram,
+        swaFullCache
     });
     printInfoLine({
         title: "Complete",

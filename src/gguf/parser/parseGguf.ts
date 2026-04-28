@@ -3,8 +3,10 @@ import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {UnsupportedError} from "../../utils/UnsupportedError.js";
 import {GgufReadOffset} from "../utils/GgufReadOffset.js";
 import {GgufFileReader} from "../fileReaders/GgufFileReader.js";
-import {GgufFileInfo, GgufVersionParserOptions, GgufVersionParserResult} from "../types/GgufFileInfoTypes.js";
+import {GgufFileInfo, GgufFileInfoSourceData, GgufVersionParserOptions, GgufVersionParserResult} from "../types/GgufFileInfoTypes.js";
 import {getGgufMetadataArchitectureData} from "../utils/getGgufMetadataArchitectureData.js";
+import {GgufFsFileReader} from "../fileReaders/GgufFsFileReader.js";
+import {Promisable, transformPromisable} from "../../utils/transformPromisable.js";
 import {GgufV2Parser} from "./GgufV2Parser.js";
 import {GgufV3Parser} from "./GgufV3Parser.js";
 
@@ -33,11 +35,21 @@ export async function parseGguf({
         logWarnings
     });
     const architectureMetadata = getGgufMetadataArchitectureData(ggufInfo.metadata);
+    const sourceData: Promisable<GgufFileInfoSourceData> | undefined = ggufInfo.infoEndOffset == null
+        ? undefined
+        : (fileReader instanceof GgufFsFileReader)
+            ? {
+                type: "path",
+                path: fileReader.filePath,
+                length: ggufInfo.infoEndOffset
+            }
+            : transformPromisable(fileReader.readByteRange(0, ggufInfo.infoEndOffset), createGgufFileInfoSourceDataFromBuffer);
 
     return {
         version: magicAndVersion.version,
         tensorCount: ggufInfo.tensorCount,
         metadata: ggufInfo.metadata,
+        infoEndOffset: ggufInfo.infoEndOffset,
         architectureMetadata: architectureMetadata,
         tensorInfo: ggufInfo.tensorInfo,
         metadataSize: ggufInfo.metadataSize,
@@ -45,6 +57,11 @@ export async function parseGguf({
         totalTensorInfoSize: ggufInfo.tensorInfoSize,
         totalTensorCount: ggufInfo.tensorCount,
         totalMetadataSize: ggufInfo.metadataSize,
+        sourceData: sourceData == null
+            ? []
+            : sourceData instanceof Promise
+                ? [await sourceData]
+                : [sourceData],
         fullTensorInfo: ggufInfo.tensorInfo,
         tensorInfoSize: ggufInfo.tensorInfoSize
     };
@@ -86,4 +103,11 @@ async function parseGgufUsingASpecificVersionParser(
 
             return await (new GgufV3Parser(specificVersionParserOptions)).parse();
     }
+}
+
+function createGgufFileInfoSourceDataFromBuffer(buffer: Buffer): GgufFileInfoSourceData {
+    return {
+        type: "buffer",
+        buffer
+    };
 }

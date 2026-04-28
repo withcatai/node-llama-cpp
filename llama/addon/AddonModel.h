@@ -1,8 +1,15 @@
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "llama.h"
 #include "napi.h"
 #include "addonGlobals.h"
 #include "globals/addonProgress.h"
+
 
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
@@ -42,6 +49,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         Napi::Value GetTotalSize(const Napi::CallbackInfo& info);
         Napi::Value GetTotalParameters(const Napi::CallbackInfo& info);
         Napi::Value GetModelDescription(const Napi::CallbackInfo& info);
+        Napi::Value GetMemoryBreakdown(const Napi::CallbackInfo& info);
 
         Napi::Value TokenBos(const Napi::CallbackInfo& info);
         Napi::Value TokenEos(const Napi::CallbackInfo& info);

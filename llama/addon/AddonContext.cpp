@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include "common/common.h"
+#include "llama-context.h"
 #include "llama-vocab.h"
 #include "llama.h"
 
@@ -107,7 +108,7 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
             try {
                 context->ctx = llama_init_from_model(context->model->model, context->context_params);
 
-                context->contextLoaded = context->ctx != nullptr && context->ctx != NULL;
+                context->contextLoaded = context->ctx != nullptr;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -115,7 +116,7 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
-            if (context->contextLoaded) {
+            if (context->contextLoaded && !context->model->model_params.no_alloc) {
                 uint64_t contextMemorySize = llama_state_get_size(context->ctx);
                 adjustNapiExternalMemoryAdd(Env(), contextMemorySize);
                 context->loadedContextMemorySize = contextMemorySize;
@@ -173,8 +174,10 @@ class AddonContextUnloadContextWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
-            adjustNapiExternalMemorySubtract(Env(), context->loadedContextMemorySize);
-            context->loadedContextMemorySize = 0;
+            if (!context->model->model_params.no_alloc) {
+                adjustNapiExternalMemorySubtract(Env(), context->loadedContextMemorySize);
+                context->loadedContextMemorySize = 0;
+            }
 
             adjustNapiExternalMemorySubtract(Env(), context->batchMemorySize);
             context->batchMemorySize = 0;
@@ -403,7 +406,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.swa_full = false;
 
     if (info.Length() > 1 && info[1].IsObject()) {
-        Napi::Object options = info[1].As<Napi::Object>();
+        const auto options = info[1].As<Napi::Object>();
 
         if (options.Has("contextSize")) {
             context_params.n_ctx = options.Get("contextSize").As<Napi::Number>().Uint32Value();
@@ -427,16 +430,26 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("flashAttention")) {
-            bool flashAttention = options.Get("flashAttention").As<Napi::Boolean>().Value();
-            context_params.flash_attn_type = flashAttention ? LLAMA_FLASH_ATTN_TYPE_ENABLED : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+            const auto flashAttention = options.Get("flashAttention");
+
+            if (flashAttention.IsString() && flashAttention.As<Napi::String>().Utf8Value() == "auto") {
+                context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+            } else {
+                const bool flashAttentionEnabled = flashAttention.As<Napi::Boolean>().Value();
+                context_params.flash_attn_type = flashAttentionEnabled
+                    ? LLAMA_FLASH_ATTN_TYPE_ENABLED
+                    : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+            }
         }
 
         if (options.Has("threads")) {
-            const auto n_threads = options.Get("threads").As<Napi::Number>().Int32Value();
-            const auto resolved_n_threads = n_threads == 0 ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads) : n_threads;
+            const auto threads = options.Get("threads").As<Napi::Number>().Int32Value();
+            const auto resolvedThreads = threads == 0
+                ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads)
+                : threads;
 
-            context_params.n_threads = resolved_n_threads;
-            context_params.n_threads_batch = resolved_n_threads;
+            context_params.n_threads = resolvedThreads;
+            context_params.n_threads_batch = resolvedThreads;
         }
 
         if (options.Has("performanceTracking")) {
@@ -444,14 +457,14 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("kvCacheKeyType") && options.Get("kvCacheKeyType").IsNumber()) {
-            auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
+            const auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
             if (keyType >= 0 && keyType < GGML_TYPE_COUNT) {
                 context_params.type_k = static_cast<ggml_type>(keyType);
             }
         }
 
         if (options.Has("kvCacheValueType") && options.Get("kvCacheValueType").IsNumber()) {
-            auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
+            const auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
             if (valueType >= 0 && valueType < GGML_TYPE_COUNT) {
                 context_params.type_v = static_cast<ggml_type>(valueType);
             }
@@ -476,8 +489,10 @@ void AddonContext::dispose() {
         contextLoaded = false;
         llama_free(ctx);
 
-        adjustNapiExternalMemorySubtract(Env(), loadedContextMemorySize);
-        loadedContextMemorySize = 0;
+        if (!model->model_params.no_alloc) {
+            adjustNapiExternalMemorySubtract(Env(), loadedContextMemorySize);
+            loadedContextMemorySize = 0;
+        }
     }
 
     model->Unref();
@@ -726,6 +741,49 @@ Napi::Value AddonContext::GetStateSize(const Napi::CallbackInfo& info) {
     }
 
     return Napi::Number::From(info.Env(), llama_state_get_size(ctx));
+}
+
+Napi::Value AddonContext::GetMemoryBreakdown(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    if (!contextLoaded || ctx == nullptr) {
+        Napi::Error::New(info.Env(), "Context is not loaded").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    std::size_t cpuRam = 0;
+    std::size_t gpuVram = 0;
+
+    for (const auto& [bufferType, memoryBreakdown] : ctx->memory_breakdown()) {
+        const std::size_t size = memoryBreakdown.context + memoryBreakdown.compute;
+        if (size == 0) {
+            continue;
+        }
+
+        if (ggml_backend_buft_is_host(bufferType)) {
+            cpuRam += size;
+        } else {
+            ggml_backend_dev_t device = ggml_backend_buft_get_device(bufferType);
+            if (device != nullptr) {
+                auto deviceType = ggml_backend_dev_type(device);
+                if (deviceType == GGML_BACKEND_DEVICE_TYPE_GPU || deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                    gpuVram += size;
+                } else {
+                    cpuRam += size;
+                }
+            } else {
+                cpuRam += size;
+            }
+        }
+    }
+
+    Napi::Object result = Napi::Object::New(info.Env());
+    result.Set("cpuRam", Napi::Number::New(info.Env(), cpuRam));
+    result.Set("gpuVram", Napi::Number::New(info.Env(), gpuVram));
+    return result;
 }
 
 Napi::Value AddonContext::GetThreads(const Napi::CallbackInfo& info) {
@@ -1062,6 +1120,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                 InstanceMethod("getStateSize", &AddonContext::GetStateSize),
+                InstanceMethod("getMemoryBreakdown", &AddonContext::GetMemoryBreakdown),
                 InstanceMethod("getThreads", &AddonContext::GetThreads),
                 InstanceMethod("setThreads", &AddonContext::SetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),

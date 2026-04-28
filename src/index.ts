@@ -109,7 +109,7 @@ import {
     type GbnfJsonBasicStringSchema, type GbnfJsonFormatStringSchema, type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema,
     type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
 } from "./utils/gbnfJson/types.js";
-import {type GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
+import {type GgufFileInfo, type GgufFileInfoSource, type GgufFileInfoSourceData} from "./gguf/types/GgufFileInfoTypes.js";
 import {
     type GgufMetadata, type GgufMetadataLlmToType, GgufArchitectureType, GgufFileType, GgufMetadataTokenizerTokenType,
     GgufMetadataArchitecturePoolingType, type GgufMetadataGeneral, type GgufMetadataTokenizer, type GgufMetadataDefaultArchitectureType,
@@ -302,6 +302,8 @@ export {
     LlamaLogLevelGreaterThanOrEqual,
     readGgufFileInfo,
     type GgufFileInfo,
+    type GgufFileInfoSource,
+    type GgufFileInfoSourceData,
     type GgufMetadata,
     type GgufTensorInfo,
     type GgufMetadataLlmToType,

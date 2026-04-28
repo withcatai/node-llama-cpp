@@ -379,8 +379,11 @@ export type GgufMetadataDefaultArchitectureType = {
         readonly layer_norm_rms_epsilon?: number,
         readonly key_length?: number,
         readonly value_length?: number,
+        readonly key_length_swa?: number,
+        readonly value_length_swa?: number,
         readonly sliding_window?: number,
         readonly sliding_window_pattern?: number | number[],
+        readonly shared_kv_layers?: number,
         readonly causal?: boolean
     },
 

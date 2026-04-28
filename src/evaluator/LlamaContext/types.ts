@@ -50,18 +50,14 @@ export type LlamaContextOptions = {
 
     /**
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
-     *
-     * The support for flash attention is currently experimental and may not always work as expected.
-     * Use with caution.
+     * 
+     * When set to `"auto"`, flash attention will automatically be used when supported by the model and hardware capabilities.
      *
      * This option will be ignored if flash attention is not supported by the model.
      *
-     * Defaults to `false` (inherited from the model option `defaultContextFlashAttention`).
-     *
-     * Upon flash attention exiting the experimental status, the default value will become `true`
-     * (the inherited value from the model option `defaultContextFlashAttention` will become `true`).
+     * Defaults to `"auto"` (inherited from the model option `defaultContextFlashAttention`).
      */
-    flashAttention?: boolean,
+    flashAttention?: "auto" | boolean,
 
     /**
      * number of threads to use to evaluate tokens.

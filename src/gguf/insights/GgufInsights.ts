@@ -1,4 +1,7 @@
+import {acquireLock, withLock} from "lifecycle-utils";
+import bytes from "bytes";
 import {Llama} from "../../bindings/Llama.js";
+import {LlamaLogLevel} from "../../bindings/types.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
 import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
@@ -6,8 +9,13 @@ import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {padSafeContextSize} from "../../evaluator/LlamaContext/utils/padSafeContextSize.js";
+import {removeNullFields, removeUndefinedFields} from "../../utils/removeNullFields.js";
+import {LruCache} from "../../utils/LruCache.js";
 import {GgufInsightsConfigurationResolver} from "./GgufInsightsConfigurationResolver.js";
 import {GgufInsightsTokens} from "./GgufInsightsTokens.js";
+import type {Promisable} from "../../utils/transformPromisable.js";
+import type {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
+import type {AddonContextParams, AddonGgufMetadata, AddonModel, AddonModelParams} from "../../bindings/AddonTypes.js";
 
 export type GgufInsightsResourceRequirements = {
     cpuRam: number,
@@ -20,9 +28,15 @@ export class GgufInsights {
     /** @internal */ private _totalFileLayers: number | null = null;
     /** @internal */ private _supportsRanking?: boolean;
     /** @internal */ private _dominantTensorType?: GgmlType;
+    /** @internal */ private _addonMetadata?: AddonGgufMetadata;
+    /** @internal */ public _defaultUseMmap?: boolean;
     /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
     /** @internal */ private readonly _tokens: GgufInsightsTokens;
+    /** @internal */ private readonly _exactModelResourceRequirementsCache = new LruCache<string, GgufInsightsResourceRequirements>(40);
+    /** @internal */ private readonly _exactContextResourceRequirementsCache = new LruCache<string, GgufInsightsResourceRequirements>(40);
+    /** @internal */ private readonly _simulationSession: GgufInsightsSimulatorSession;
+    /** @internal */ private readonly _locks = {};
 
     private constructor(ggufFileInfo: GgufFileInfo, llama: Llama) {
         this._llama = llama;
@@ -31,6 +45,7 @@ export class GgufInsights {
         this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama, true, true);
         this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
         this._tokens = GgufInsightsTokens._create(this);
+        this._simulationSession = this._createSimulatorSession();
     }
 
     /**
@@ -40,16 +55,23 @@ export class GgufInsights {
      */
     public getWarnings(modelFilePath?: string) {
         const warnings: string[] = [];
-        const modelFilePathText = (modelFilePath != null && modelFilePath !== "")
-            ? ` ("${getReadablePath(modelFilePath)}")`
-            : "";
+        const resolvedModelFilePath = modelFilePath || (
+            this._ggufFileInfo.source?.type === "path"
+                ? this._ggufFileInfo.source.path
+                : undefined
+        );
+        const modelFileSourceText = (resolvedModelFilePath != null && resolvedModelFilePath !== "")
+            ? ` ("${getReadablePath(resolvedModelFilePath)}")`
+            : this._ggufFileInfo.source?.type === "uri"
+                ? ` ("${getReadablePath(this._ggufFileInfo.source.uri)}")`
+                : "";
 
         if (this._ggufFileInfo?.metadata?.tokenizer?.ggml?.model === "gpt2" &&
             this._ggufFileInfo?.metadata?.tokenizer?.ggml?.model == null
         ) {
             // equivalent to the warning in `llama.cpp` under `llm_load_vocab`: "missing pre-tokenizer type, using: 'default'"
             warnings.push(
-                `This model file${modelFilePathText} is missing a pre-tokenizer configuration. ` +
+                `This model file${modelFileSourceText} is missing a pre-tokenizer configuration. ` +
                 "This may cause incorrect tokenization and thus degrade the generation quality. " +
                 "Consider using a newer model or regenerating this GGUF model file"
             );
@@ -214,8 +236,37 @@ export class GgufInsights {
         return slidingWindow;
     }
 
+    /** @internal */
+    public _getAddonMetadata(): Promisable<AddonGgufMetadata | undefined> {
+        if (this._addonMetadata != null || this._ggufFileInfo.sourceData.length === 0)
+            return this._addonMetadata;
+
+        return withLock([this._locks, "addonMetadata"], async () => {
+            if (this._addonMetadata != null)
+                return this._addonMetadata;
+
+            const initInput: Array<Buffer | string> = [];
+            for (const data of this._ggufFileInfo.sourceData) {
+                if (data.type === "buffer")
+                    initInput.push(data.buffer);
+                else if (data.type === "path")
+                    initInput.push(data.path);
+                else
+                    void (data satisfies never);
+            }
+
+            const addonMetadata = new this._llama._bindings.AddonGgufMetadata();
+            await addonMetadata.init(initInput);
+            this._addonMetadata = addonMetadata;
+            return addonMetadata;
+        });
+    }
+
+    /**
+     * @deprecated Use `estimateModelResourceRequirementsV2` instead
+     */
     public estimateModelResourceRequirements({
-        gpuLayers, useMmap = this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
+        gpuLayers, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
     }: {
         gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean
     }): GgufInsightsResourceRequirements {
@@ -227,10 +278,100 @@ export class GgufInsights {
         };
     }
 
+    public async estimateModelResourceRequirementsV2(options: {
+        gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean,
+
+        /** @internal */
+        _simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements> {
+        const {
+            gpuLayers, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap,
+
+            _simulatorSession
+        } = options;
+
+        try {
+            const simulationResult = await this._simulateModelResourceUsage({
+                gpuLayers,
+                useMmap,
+                simulatorSession: _simulatorSession
+            });
+
+            if (simulationResult != null) {
+                if (!useMmap || gpuLayers >= this.totalLayers)
+                    return simulationResult;
+
+                // adjust for the missing mmap simulation implementation
+                const standardEstimation = this.estimateModelResourceRequirements({
+                    gpuLayers,
+                    useMmap,
+                    gpuSupportsMmap
+                });
+
+                return {
+                    gpuVram: Math.max(simulationResult.gpuVram, standardEstimation.gpuVram),
+                    cpuRam: Math.min(simulationResult.cpuRam, standardEstimation.cpuRam)
+                };
+            }
+        } catch (error: any) {
+            this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+        }
+
+        return this.estimateModelResourceRequirements({
+            gpuLayers,
+            useMmap,
+            gpuSupportsMmap
+        });
+    }
+
+    /** @internal */
+    public async _simulateModelResourceUsage({
+        gpuLayers,
+        useMmap = this._defaultUseMmap ?? this._llama.supportsMmap,
+        simulatorSession = this._simulationSession
+    }: {
+        gpuLayers: number,
+        useMmap?: boolean,
+        simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements | null> {
+        const cacheKey = [gpuLayers, Number(useMmap)].join(":");
+        const cachedValue = this._exactModelResourceRequirementsCache.get(cacheKey);
+        if (cachedValue != null)
+            return {...cachedValue};
+
+        const lock = await acquireLock([this._locks, "_simulateModelResourceUsage", cacheKey]);
+        try {
+            const cachedValue = this._exactModelResourceRequirementsCache.get(cacheKey);
+            if (cachedValue != null)
+                return {...cachedValue};
+
+            const simulatorSource = await this._resolveSimulatorSource(useMmap);
+            if (simulatorSource == null)
+                return null;
+    
+            let resourceRequirements: GgufInsightsResourceRequirements;
+            try {
+                resourceRequirements = await simulatorSession.estimateModelResources({
+                    modelSource: simulatorSource,
+                    gpuLayers,
+                    useMmap
+                });
+            } catch (error: any) {
+                throw new Error("Failed simulating model resource usage. Falling back to estimation heuristic. Error: " + (error?.message ?? String(error)));
+            }
+    
+            this._exactModelResourceRequirementsCache.set(cacheKey, resourceRequirements);
+            return {...resourceRequirements};
+        } finally {
+            lock.dispose();
+        }
+    }
+
     /**
      * Estimates the memory required to create a context of the given parameters based on the implementation details of `llama.cpp`.
      * The calculation doesn't include a precise estimation of the graph overhead memory, so it uses a rough estimate for that.
      * The estimation for the graph overhead memory will be improved in the future to be more precise, but it's good enough for now.
+     * @deprecated Use `estimateContextResourceRequirementsV2` instead
      */
     public estimateContextResourceRequirements({
         contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false,
@@ -493,10 +634,6 @@ export class GgufInsights {
                 const gemma4DenseEstimate = int32TBytes * batchSize * graphContextSize * headCount *
                     (gemma4DenseShortContextScale + Math.pow(contextRatio, gemma4DenseContextScaleExponent));
 
-                // Gemma 4 non-FA contexts allocate noticeably less temporary attention workspace than the
-                // generic heuristic predicts for the dense models. The MoE variants keep a larger
-                // tensor-driven graph reserve, so blend the dense fit with the tensor-size heuristic.
-                // `gemma4DenseShortContextScale` is a calibration floor from `inspect measure` runs for dense Gemma 4 models.
                 if (expertCount > 0) {
                     const tensorBasedEstimate = tensorBasedGraphOverhead(77.655);
                     const moeBlendWeight = Math.sqrt(contextRatio);
@@ -584,6 +721,133 @@ export class GgufInsights {
         };
     }
 
+    public async estimateContextResourceRequirementsV2(options: {
+        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+
+        /** @internal */
+        _simulatorSession?: GgufInsightsSimulatorSession,
+
+        /** @internal */
+        _useMmap?: boolean
+    }): Promise<GgufInsightsResourceRequirements> {
+        const {
+            contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
+            swaFullCache = false,
+            kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
+
+            _simulatorSession,
+            _useMmap
+        } = options;
+
+        try {
+            const simulationResult = await this._simulateContextResourceUsage({
+                contextSize,
+                modelGpuLayers,
+                batchSize,
+                sequences,
+                isEmbeddingContext,
+                flashAttention,
+                swaFullCache,
+                useMmap: _useMmap,
+                simulatorSession: _simulatorSession,
+                kvCacheKeyType,
+                kvCacheValueType
+            });
+            if (simulationResult != null)
+                return simulationResult;
+        } catch (error: any) {
+            this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+        }
+
+        return this.estimateContextResourceRequirements({
+            contextSize,
+            modelGpuLayers,
+            batchSize,
+            sequences,
+            isEmbeddingContext,
+            flashAttention: flashAttention === true,
+            swaFullCache,
+            kvCacheKeyType,
+            kvCacheValueType
+        });
+    }
+
+    /** @internal */
+    public async _simulateContextResourceUsage({
+        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
+        swaFullCache = false, useMmap = this._defaultUseMmap ?? this._llama.supportsMmap,
+        kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
+        simulatorSession = this._simulationSession
+    }: {
+        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean, useMmap?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements | null> {
+        if (sequences == null) sequences = getDefaultContextSequences();
+        if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
+
+        const cacheKey = [
+            contextSize,
+            modelGpuLayers,
+            batchSize,
+            sequences,
+            Number(isEmbeddingContext),
+            flashAttention === "auto"
+                ? "auto"
+                : String(flashAttention),
+            Number(swaFullCache),
+            Number(useMmap),
+            kvCacheKeyType,
+            kvCacheValueType
+        ].join(":");
+        const cachedValue = this._exactContextResourceRequirementsCache.get(cacheKey);
+        if (cachedValue != null)
+            return {...cachedValue};
+
+        const lock = await acquireLock([this._locks, "_simulateContextResourceUsage", cacheKey]);
+        try {
+            const cachedValue = this._exactContextResourceRequirementsCache.get(cacheKey);
+            if (cachedValue != null)
+                return {...cachedValue};
+
+            const simulatorSource = await this._resolveSimulatorSource(useMmap);
+            if (simulatorSource == null)
+                return null;
+    
+            let contextResources: GgufInsightsResourceRequirements;
+            try {
+                contextResources = await simulatorSession.estimateContextResources({
+                    modelSource: simulatorSource,
+                    gpuLayers: modelGpuLayers,
+                    contextSize,
+                    batchSize,
+                    sequences,
+                    isEmbeddingContext,
+                    flashAttention,
+                    swaFullCache,
+                    useMmap,
+                    kvCacheKeyType,
+                    kvCacheValueType
+                });
+            } catch (error: any) {
+                throw new Error("Failed simulating context resource usage. Falling back to estimation heuristic. Error: " + (error?.message ?? String(error)));
+            }
+    
+            const resourceRequirements = {
+                cpuRam: contextResources.cpuRam,
+                gpuVram: contextResources.gpuVram
+            } satisfies GgufInsightsResourceRequirements;
+    
+            this._exactContextResourceRequirementsCache.set(cacheKey, resourceRequirements);
+            return {...resourceRequirements};
+        } finally {
+            lock.dispose();
+        }
+    }
+
     /**
      * Get the split tensor resources for CPU and GPU based on the number of GPU layers
      * @internal
@@ -603,7 +867,7 @@ export class GgufInsights {
         }
 
         const fileLayers = this._getFileLayers();
-        const startGpuLayer = Math.max(0, fileLayers - gpuLayers);
+        const startGpuLayer = Math.max(0, fileLayers - gpuLayers + 1);
 
         const gpuTensors: GgufTensorInfo[] = [];
         const cpuTensors: GgufTensorInfo[] = [];
@@ -626,7 +890,7 @@ export class GgufInsights {
             // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_OUTPUT` are always
             // loaded with `model.dev_output`, which is set to the GPU only if all the layers are on the GPU
             } else if (isOutputLayer(singleTensorInfo.name)) {
-                if (gpuLayers === this.totalLayers) {
+                if (gpuLayers > 0) {
                     gpuTensors.push(singleTensorInfo);
                     continue;
                 } else {
@@ -866,6 +1130,23 @@ export class GgufInsights {
         return this._totalFileLayers;
     }
 
+    /** @internal */
+    private async _resolveSimulatorSource(useMmap: boolean = this._defaultUseMmap ?? false): Promise<string | AddonGgufMetadata | null> {
+        const addonMetadata = await this._getAddonMetadata();
+        if (addonMetadata != null)
+            return addonMetadata;
+
+        if (this._ggufFileInfo.source?.type === "path")
+            return this._ggufFileInfo.source.path;
+
+        return null;
+    }
+
+    /** @internal */
+    public _createSimulatorSession(lruCacheSize: number = 10) {
+        return new GgufInsightsSimulatorSession(this._llama, lruCacheSize);
+    }
+
     /**
      * @param ggufFileInfo
      * @param llama - If you already have a `Llama` instance, pass it to reuse it for the `GgufInsights` instance.
@@ -879,6 +1160,181 @@ export class GgufInsights {
             resolvedLlama = await getLlamaWithoutBackend();
 
         return new GgufInsights(ggufFileInfo, resolvedLlama);
+    }
+}
+
+export class GgufInsightsSimulatorSession {
+    private readonly _llama: Llama;
+    private readonly _modelPromises: LruCache<string, Promise<AddonModel>>;
+    private _disposed = false;
+
+    public constructor(llama: Llama, lruCacheSize: number = 10) {
+        this._llama = llama;
+        this._modelPromises = new LruCache(lruCacheSize);
+    }
+
+    public async estimateModelResources({
+        modelSource,
+        gpuLayers,
+        useMmap = false
+    }: {
+        modelSource: string | AddonGgufMetadata,
+        gpuLayers: number,
+        useMmap?: boolean
+    }): Promise<GgufInsightsResourceRequirements> {
+        const model = await this._getModel({source: modelSource, gpuLayers, useMmap});
+        const memoryBreakdown = model.getMemoryBreakdown();
+        if (this._llama._shouldLog(LlamaLogLevel.debug))
+            this._llama._log(LlamaLogLevel.debug, "Simulating model resource usage. " + [
+                `gpuLayers=${gpuLayers}`,
+                `useMmap=${useMmap}`,
+                `memoryBreakdownCpuRam=${bytes(memoryBreakdown.cpuRam)}`,
+                `memoryBreakdownGpuVram=${bytes(memoryBreakdown.gpuVram)}`
+            ].join(" "));
+        return memoryBreakdown;
+    }
+
+    public async estimateContextResources({
+        modelSource,
+        gpuLayers,
+        contextSize,
+        batchSize,
+        sequences,
+        isEmbeddingContext = false,
+        flashAttention = "auto",
+        swaFullCache = false,
+        useMmap = false,
+        kvCacheKeyType = GgmlType.F16,
+        kvCacheValueType = GgmlType.F16
+    }: {
+        modelSource: string | AddonGgufMetadata,
+        gpuLayers: number,
+        contextSize: number,
+        batchSize: number,
+        sequences: number,
+        isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"],
+        swaFullCache?: boolean,
+        useMmap?: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType
+    }): Promise<GgufInsightsResourceRequirements> {
+        const model = await this._getModel({source: modelSource, gpuLayers, useMmap});
+        const context = new this._llama._bindings.AddonContext(model, removeUndefinedFields({
+            contextSize,
+            batchSize,
+            sequences,
+            embeddings: isEmbeddingContext,
+            flashAttention: flashAttention === "auto"
+                ? "auto"
+                : flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
+            swaFullCache
+        } satisfies AddonContextParams));
+
+        try {
+            const contextLoaded = await context.init();
+            if (!contextLoaded)
+                throw new Error("Failed to create context");
+            
+            const memoryBreakdown = context.getMemoryBreakdown();
+            if (this._llama._shouldLog(LlamaLogLevel.debug))
+                this._llama._log(LlamaLogLevel.debug, "Simulating context resource usage. " + [
+                    `gpuLayers=${gpuLayers}`,
+                    `contextSize=${contextSize.toLocaleString("en-US", {notation: "compact"})}`,
+                    `batchSize=${batchSize}`,
+                    `sequences=${sequences}`,
+                    `isEmbeddingContext=${isEmbeddingContext}`,
+                    `flashAttention=${flashAttention}`,
+                    `swaFullCache=${swaFullCache}`,
+                    `kvCacheKeyType=${kvCacheKeyType}`,
+                    `kvCacheValueType=${kvCacheValueType}`,
+                    `useMmap=${useMmap}`,
+                    `memoryBreakdownCpuRam=${bytes(memoryBreakdown.cpuRam)}`,
+                    `memoryBreakdownGpuVram=${bytes(memoryBreakdown.gpuVram)}`
+                ].join(" "));
+            return memoryBreakdown;
+        } finally {
+            await context.dispose();
+        }
+    }
+
+    public [Symbol.asyncDispose]() {
+        return this.dispose();
+    }
+
+    public async dispose() {
+        if (this._disposed)
+            return;
+
+        this._disposed = true;
+
+        const modelPromises = [...this._modelPromises.values()].map((modelPromise) => modelPromise.catch(() => void 0));
+        this._modelPromises.clear();
+        const loadedModels = (await Promise.all(modelPromises)).filter((model) => model != null);
+
+        await Promise.all(loadedModels.map((model) => model.dispose().catch(() => void 0)));
+    }
+
+    private async _getModel({
+        source,
+        gpuLayers,
+        useMmap = this._llama.supportsMmap
+    }: {
+        source: string | AddonGgufMetadata,
+        gpuLayers: number,
+        useMmap?: boolean
+    }) {
+        if (this._disposed)
+            throw new Error("simulator session is disposed");
+
+        const cacheKey = String(gpuLayers) + ":" + String(useMmap);
+        const existingModelPromise = this._modelPromises.get(cacheKey);
+        if (existingModelPromise != null)
+            return await existingModelPromise;
+
+        if (this._llama._shouldLog(LlamaLogLevel.debug))
+            this._llama._log(LlamaLogLevel.debug, `Loading model for simulator session. gpuLayers=${gpuLayers} useMmap=${useMmap}`);
+        const modelPromise = this._loadModel({
+            source,
+            gpuLayers,
+            useMmap
+        });
+        this._modelPromises.set(cacheKey, modelPromise);
+
+        try {
+            return await modelPromise;
+        } catch (error) {
+            this._modelPromises.delete(cacheKey);
+            throw error;
+        }
+    }
+
+    private async _loadModel({
+        source, gpuLayers, useMmap = false
+    }: {
+        source: string | AddonGgufMetadata, gpuLayers: number, useMmap?: boolean
+    }) {
+        const model = new this._llama._bindings.AddonModel(
+            typeof source === "string"
+                ? source
+                : "",
+            removeNullFields({
+                gpuLayers,
+                noAlloc: true,
+                useMmap,
+                useMlock: false
+            } satisfies AddonModelParams)
+        );
+
+        const modelLoaded = typeof source === "string"
+            ? await model.init()
+            : await model.init(source);
+        if (!modelLoaded)
+            throw new Error("Failed to load model");
+
+        return model;
     }
 }
 

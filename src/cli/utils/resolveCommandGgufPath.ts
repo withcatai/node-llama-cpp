@@ -14,10 +14,10 @@ import {getReadablePath} from "./getReadablePath.js";
 import {interactivelyAskForModel} from "./interactivelyAskForModel.js";
 
 export async function resolveCommandGgufPath(ggufPath: string | undefined, llama: Llama, fetchHeaders?: Record<string, string>, {
-    targetDirectory = cliModelsDirectory, flashAttention = false, swaFullCache = false, useMmap, consoleTitle = "File",
+    targetDirectory = cliModelsDirectory, flashAttention = "auto", swaFullCache = false, useMmap, consoleTitle = "File",
     kvCacheKeyType, kvCacheValueType
 }: {
-    targetDirectory?: string, flashAttention?: boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string,
+    targetDirectory?: string, flashAttention?: "auto" | boolean, swaFullCache?: boolean, useMmap?: boolean, consoleTitle?: string,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType
 } = {}) {

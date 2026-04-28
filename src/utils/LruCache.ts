@@ -52,6 +52,10 @@ export class LruCache<Key, Value> {
         return this._cache.keys();
     }
 
+    public values() {
+        return this._cache.values();
+    }
+
     public delete(key: Key) {
         this._cache.delete(key);
     }

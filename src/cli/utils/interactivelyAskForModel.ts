@@ -60,7 +60,7 @@ export async function interactivelyAskForModel({
     modelsDirectory,
     allowLocalModels = true,
     downloadIntent = true,
-    flashAttention = false,
+    flashAttention = "auto",
     swaFullCache = false,
     useMmap,
     kvCacheKeyType,
@@ -70,7 +70,7 @@ export async function interactivelyAskForModel({
     modelsDirectory?: string,
     allowLocalModels?: boolean,
     downloadIntent?: boolean,
-    flashAttention?: boolean,
+    flashAttention?: "auto" | boolean,
     swaFullCache?: boolean,
     useMmap?: boolean,
     kvCacheKeyType?: "currentQuant" | GgmlType,
@@ -126,7 +126,7 @@ export async function interactivelyAskForModel({
                         progressUpdater.setProgress(readItems / ggufFileNames.length, renderProgress());
 
                         const compatibilityScore = await ggufInsights?.configurationResolver.scoreModelConfigurationCompatibility({
-                            flashAttention: flashAttention && ggufInsights?.flashAttentionSupported,
+                            flashAttention,
                             swaFullCache,
                             useMmap,
                             kvCacheKeyType: kvCacheKeyType === "currentQuant"
@@ -233,7 +233,7 @@ export async function interactivelyAskForModel({
 
     try {
         while (true) {
-            const minWidth = Math.min(80 + (flashAttention ? 26 : 0), process.stdout.columns - 1);
+            const minWidth = Math.min(80 + (flashAttention !== false ? 26 : 0), process.stdout.columns - 1);
             const selectedItem = await basicChooseFromListConsoleInteraction({
                 title(item, rerender) {
                     const title = chalk.bold("Select a model:") + "  ";
@@ -258,13 +258,19 @@ export async function interactivelyAskForModel({
                                 chalk.dim("(" + toBytes(vramState.used) + "/" + toBytes(vramState.total) + ")") +
                                 " "
                             ) + (
-                                !flashAttention
+                                flashAttention === false
                                     ? ""
                                     : (
                                         " " +
                                         chalk.bgGray(
                                             " " +
-                                            chalk.yellow("Flash attention:") + " " + "enabled" +
+                                            chalk.yellow("Flash attention:") + " " + (
+                                                flashAttention === "auto"
+                                                    ? "auto"
+                                                    : flashAttention === true
+                                                        ? "enabled"
+                                                        : "disabled"
+                                            ) +
                                             " "
                                         )
                                     )
@@ -424,7 +430,7 @@ async function askForModelUriOrPath(allowLocalModels: boolean): Promise<string |
 }
 
 function renderSelectionItem(
-    item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: boolean,
+    item: ModelOption, focused: boolean, rerender: () => void, abortSignal: AbortSignal, llama: Llama, flashAttention: "auto" | boolean,
     swaFullCache: boolean, useMmap: boolean | undefined,
     kvCacheKeyType?: "currentQuant" | GgmlType, kvCacheValueType?: "currentQuant" | GgmlType
 ) {
@@ -584,7 +590,7 @@ async function selectFileForModelRecommendation({
     llama: Llama,
     abortSignal: AbortSignal,
     rerenderOption(): void,
-    flashAttention: boolean,
+    flashAttention: "auto" | boolean,
     swaFullCache: boolean,
     useMmap?: boolean,
     kvCacheKeyType?: "currentQuant" | GgmlType,
