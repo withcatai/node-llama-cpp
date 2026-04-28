@@ -121,6 +121,22 @@ std::pair<ggml_backend_dev_t, std::string> getGpuDevice() {
 }
 
 Napi::Value getGpuType(const Napi::CallbackInfo& info) {
+    for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
+        ggml_backend_reg_t backend = ggml_backend_reg_get(i);
+        const auto backendName = std::string(ggml_backend_reg_name(backend));
+
+        if (backendName == "MTL" || backendName == "Metal") {
+            return Napi::String::New(info.Env(), "metal");
+        } else if (backendName == "Vulkan") {
+            return Napi::String::New(info.Env(), "vulkan");
+        }
+        
+        // else if (
+        //     backendName == "CUDA" || backendName == "ROCm" || backendName == "MUSA") {
+        //     return Napi::String::New(info.Env(), "cuda");
+        // }
+    }
+
     const auto gpuDeviceRes = getGpuDevice();
     const auto device = gpuDeviceRes.first;
     const auto deviceType = gpuDeviceRes.second;
