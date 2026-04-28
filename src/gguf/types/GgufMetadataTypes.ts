@@ -65,6 +65,7 @@ export const enum GgufArchitectureType {
     arctic = "arctic",
     deepseek = "deepseek",
     deepseek2 = "deepseek2",
+    deepseek2ocr = "deepseek2-ocr",
     chatglm = "chatglm",
     glm4 = "glm4",
     glm4moe = "glm4moe",
@@ -196,7 +197,8 @@ export enum GgufFileType {
     MOSTLY_TQ1_0 = 36,
     MOSTLY_TQ2_0 = 37,
     MOSTLY_MXFP4_MOE = 38,
-    MOSTLY_NVFP4 = 39
+    MOSTLY_NVFP4 = 39,
+    MOSTLY_Q1_0 = 40
 }
 
 
@@ -300,13 +302,13 @@ export const enum GgufMetadataTokenizerTokenType {
 
 export type GgufMetadataTokenizer = {
     readonly ggml: {
-        readonly model: "no_vocab" | "none" | "llama" | "gpt2" | "bert" | "rwkv" | "t5" | "plamo2" | string,
+        readonly model: "no_vocab" | "none" | "llama" | "gpt2" | "bert" | "rwkv" | "t5" | "plamo2" | "gemma4" | string,
         readonly pre?: "default" | "llama3" | "llama-v3" | "llama-bpe" | "deepseek-llm" | "deepseek-coder" | "falcon" | "falcon3" |
             "pixtral" | "mpt" | "starcoder" | "gpt-2" | "phi-2" | "jina-es" | "jina-de" | "jina-v1-en" | "jina-v2-es" | "jina-v2-de" |
             "jina-v2-code" | "refact" | "command-r" | "qwen2" | "stablelm2" | "olmo" | "dbrx" | "smaug-bpe" | "poro-chat" | "chatglm-bpe" |
             "viking" | "jais" | "tekken" | "smollm" | "codeshell" | "bloom" | "gpt3-finnish" | "exaone" | "exaone4" | "chameleon" |
             "minerva-7b" | "megrez" | "gpt-4o" | "superbpe" | "trillion" | "bailingmoe" | "a.x-4.0" | "mellum" | "modern-bert" |
-            "roberta-bpe" | "deepseek-r1-qwen" | "kormo" | "qwen35" | string,
+            "roberta-bpe" | "deepseek-r1-qwen" | "kormo" | "qwen35" | "gemma4" | string,
         readonly tokens: readonly string[],
         readonly token_type: GgufMetadataTokenizerTokenType[],
         readonly token_type_count?: number,
