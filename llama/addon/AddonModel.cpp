@@ -143,13 +143,12 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
                     }
                 }
 
-                if (model->model == nullptr) {
-                    throw std::runtime_error("Failed to load model");
+                if (model->model != nullptr) {
+                    model->vocab = llama_model_get_vocab(model->model);
+                    model->modelLoaded = true;
+                } else {
+                    model->modelLoaded = false;
                 }
-
-                model->vocab = llama_model_get_vocab(model->model);
-
-                model->modelLoaded = model->model != nullptr;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
