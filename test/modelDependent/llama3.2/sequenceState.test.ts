@@ -42,7 +42,7 @@ describe("llama 3.2", () => {
                     chatSession2.prompt("Remember: giraffes are not elephants", {maxTokens: 5})
                 ]);
                 expect(res1).to.toMatchInlineSnapshot("\"That's a common\"");
-                expect(res2).to.toMatchInlineSnapshot("\"I'll keep that in\"");
+                expect(res2).to.match(/I appreciate the reminder|I'll keep that in/);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");

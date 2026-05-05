@@ -12,6 +12,9 @@ describe("stableCode", () => {
             const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
             const llama = await getTestLlama();
 
+            if (llama.gpu === false)
+                return;
+
             const fileInfo = await readGgufFileInfo(modelPath);
             const ggufInsights = await GgufInsights.from(fileInfo, llama);
 

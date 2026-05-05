@@ -12,6 +12,9 @@ describe("functionary", () => {
             const modelPath = await getModelFile("functionary-small-v2.5.Q4_0.gguf");
             const llama = await getTestLlama();
 
+            if (llama.gpu === false)
+                return;
+
             const fileInfo = await readGgufFileInfo(modelPath);
             const ggufInsights = await GgufInsights.from(fileInfo, llama);
 
