@@ -101,7 +101,7 @@ export type GgufFileInfoSourceData = {
     length: number
 } | {
     type: "buffer",
-    buffer: Buffer
+    buffer: Readonly<Buffer>
 };
 
 
