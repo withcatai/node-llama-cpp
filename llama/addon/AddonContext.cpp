@@ -386,7 +386,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
 
     context_params = llama_context_default_params();
     context_params.n_ctx = 4096;
-    context_params.n_threads = std::max(cpu_get_num_math(), 1);
+    context_params.n_threads = std::max(common_cpu_get_num_math(), 1);
     context_params.n_threads_batch = context_params.n_threads;
     context_params.no_perf = true;
     context_params.swa_full = false;
@@ -788,9 +788,8 @@ Napi::Value AddonContext::SetThreads(const Napi::CallbackInfo& info) {
     }
 
     const auto threads = info[0].As<Napi::Number>().Int32Value();
-    const auto resolvedThreads = threads == 0
-        ? std::max((int32_t)std::thread::hardware_concurrency(), std::max(cpu_get_num_math(), 1))
-        : threads;
+    const auto resolvedThreads =
+        threads == 0 ? std::max((int32_t)std::thread::hardware_concurrency(), std::max(common_cpu_get_num_math(), 1)) : threads;
 
     if (llama_n_threads(ctx) != resolvedThreads) {
         llama_set_n_threads(ctx, resolvedThreads, resolvedThreads);
