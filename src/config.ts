@@ -24,6 +24,7 @@ export const projectTemplatesDirectory = path.join(__dirname, "..", "templates")
 export const localTempDirectory = path.join(__dirname, "..", ".temp");
 export const packedProjectTemplatesDirectory = path.join(projectTemplatesDirectory, "packed");
 export const llamaCppDirectory = path.join(llamaDirectory, "llama.cpp");
+export const llamaCppPatchesDirectory = path.join(llamaDirectory, "patches");
 export const llamaCppGrammarsDirectory = path.join(llamaDirectory, "llama.cpp", "grammars");
 export const tempDownloadDirectory = path.join(os.tmpdir(), "node-llama-cpp", nanoid());
 export const cliHomedirDirectory = path.join(os.homedir(), ".node-llama-cpp");

@@ -13,7 +13,7 @@ import {setBinariesGithubRelease} from "../../../../bindings/utils/binariesGithu
 import {downloadCmakeIfNeeded} from "../../../../utils/cmake.js";
 import withStatusLogs from "../../../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../../../state.js";
-import {getGitBundlePathForRelease, unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../../../utils/gitReleaseBundles.js";
+import {getGitBundlePathForRelease, isGitBundleCompatible, unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle} from "../../../../utils/gitReleaseBundles.js";
 import {cloneLlamaCppRepo} from "../../../../bindings/utils/cloneLlamaCppRepo.js";
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {resolveCustomCmakeOptions} from "../../../../bindings/utils/resolveCustomCmakeOptions.js";
@@ -26,6 +26,7 @@ import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
+import {applyLlamaCppRepoPatches, hasLlamaCppRepoPatchesToApply} from "../../../../bindings/utils/applyLlamaCppRepoPatches.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -147,14 +148,20 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
     let githubReleaseTag: string | null = (useBundle && (await getGitBundlePathForRelease(githubOwner, githubRepo, release)) != null)
         ? release
         : null;
+    let githubReleaseDate: Date | undefined = undefined;
 
-    if (githubReleaseTag == null)
+    if (githubReleaseTag == null || (
+        hasLlamaCppRepoPatchesToApply() &&
+        !(await isGitBundleCompatible(githubOwner, githubRepo, githubReleaseTag))
+    ))
         await withOra({
             loading: chalk.blue("Fetching llama.cpp info"),
             success: chalk.blue("Fetched llama.cpp info"),
             fail: chalk.blue("Failed to fetch llama.cpp info")
         }, async () => {
-            githubReleaseTag = await resolveGithubRelease(githubOwner, githubRepo, release);
+            const githubRelease = await resolveGithubRelease(githubOwner, githubRepo, release);
+            githubReleaseTag = githubRelease.tag;
+            githubReleaseDate = githubRelease.date;
         });
 
     await clearTempFolder();
@@ -169,6 +176,14 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
     });
 
     await cloneLlamaCppRepo(githubOwner, githubRepo, githubReleaseTag!, useBundle);
+
+    if (isCI && updateBinariesReleaseMetadataAndSaveGitBundle) {
+        await setBinariesGithubRelease(githubReleaseTag!);
+        await unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle();
+
+        await applyLlamaCppRepoPatches(githubReleaseDate, true);
+    } else
+        await applyLlamaCppRepoPatches(githubReleaseDate, false);
 
     if (!skipBuild) {
         for (let i = 0; i < buildGpusToTry.length; i++) {
@@ -261,11 +276,6 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
         console.log();
         console.log();
         logBinaryUsageExampleToConsole(buildOptions, gpu !== "auto", true);
-    }
-
-    if (isCI && updateBinariesReleaseMetadataAndSaveGitBundle) {
-        await setBinariesGithubRelease(githubReleaseTag!);
-        await unshallowAndSquashCurrentRepoAndSaveItAsReleaseBundle();
     }
 
     console.log();

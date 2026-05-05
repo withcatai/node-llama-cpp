@@ -644,7 +644,7 @@ export async function getLlamaForOptions({
 
                     if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
                         const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-                        llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
+                        llamaCppInfo.release = (await resolveGithubRelease(owner!, name!, llamaCppInfo.release)).tag;
                     }
                 }
 
@@ -705,7 +705,7 @@ export async function getLlamaForOptions({
 
         if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
             const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-            llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
+            llamaCppInfo.release = (await resolveGithubRelease(owner!, name!, llamaCppInfo.release)).tag;
         }
     }
 
