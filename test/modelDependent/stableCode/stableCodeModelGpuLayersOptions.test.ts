@@ -7,13 +7,11 @@ import {BuildGpu} from "../../../src/bindings/types.js";
 import {defaultLlamaVramPadding} from "../../../src/bindings/getLlama.js";
 
 describe("stableCode", () => {
-    describe("model options", () => {
-        describe("Resolve the correct number of GPU layers", async () => {
-            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
-            const llama = await getTestLlama();
+    describe("model options", async () => {
+        const llama = await getTestLlama();
 
-            if (llama.gpu === false)
-                return;
+        describe.skipIf(llama.gpu === false)("Resolve the correct number of GPU layers", async (scope) => {
+            const modelPath = await getModelFile("stable-code-3b-Q5_K_M.gguf");
 
             const fileInfo = await readGgufFileInfo(modelPath);
             const ggufInsights = await GgufInsights.from(fileInfo, llama);
