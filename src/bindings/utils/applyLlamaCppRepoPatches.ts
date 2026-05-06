@@ -51,6 +51,14 @@ const patches: RepoPatch[] = [{
 
         return false;
     }
+}, {
+    // https://github.com/ggml-org/llama.cpp/pull/22742
+    filename: "PR-22742.diff",
+    title: "model: don't crash on unsupported architecture",
+    async canSkip(repoPath) {
+        const llamaModel = await fs.readFile(path.join(repoPath, "src", "llama-model.cpp"), "utf8");
+        return !llamaModel.includes('GGML_ABORT("unimplemented model class");');
+    }
 }];
 
 export function hasLlamaCppRepoPatchesToApply() {
