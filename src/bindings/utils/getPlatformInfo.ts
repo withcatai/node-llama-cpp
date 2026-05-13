@@ -2,7 +2,7 @@ import os from "os";
 import {getPlatform} from "./getPlatform.js";
 import {getLinuxDistroInfo} from "./getLinuxDistroInfo.js";
 
-export async function getPlatformInfo(): Promise<{name: string, version: string}> {
+export async function getPlatformInfo(): Promise<{name: string, version: string, wslDistro?: boolean}> {
     const currentPlatform = getPlatform();
 
     if (currentPlatform === "mac")
@@ -15,7 +15,8 @@ export async function getPlatformInfo(): Promise<{name: string, version: string}
 
         return {
             name: linuxDistroInfo.name,
-            version: linuxDistroInfo.version
+            version: linuxDistroInfo.version,
+            ...(linuxDistroInfo.wslDistro ? { wslDistro: true } : {})
         };
     } else if (currentPlatform === "win")
         return {

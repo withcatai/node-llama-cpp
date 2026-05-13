@@ -5,17 +5,33 @@ const osReleasePaths = [
     "/usr/lib/os-release"
 ] as const;
 
+const wslKernelReleasePath = "/proc/sys/kernel/osrelease";
+
 export type LinuxDistroInfo = Awaited<ReturnType<typeof getLinuxDistroInfo>>;
 export async function getLinuxDistroInfo() {
     const osReleaseInfo = await getOsReleaseInfo();
+    const wslDistro = await checkIfWSL2();
 
     return {
         name: osReleaseInfo.get("name") ?? "",
         id: osReleaseInfo.get("id") ?? "",
         version: osReleaseInfo.get("version_id") ?? osReleaseInfo.get("version") ?? "",
         versionCodename: osReleaseInfo.get("version_codename") ?? "",
-        prettyName: osReleaseInfo.get("pretty_name") ?? ""
+        prettyName: osReleaseInfo.get("pretty_name") ?? "",
+        wslDistro
     };
+}
+
+async function checkIfWSL2(): Promise<boolean> {
+    try {
+        if (!(await fs.pathExists(wslKernelReleasePath)))
+            return false;
+        const kernelRelease = await fs.readFile(wslKernelReleasePath, "utf8");
+        return kernelRelease.toLowerCase().includes("wsl2") ||
+            kernelRelease.toLowerCase().includes("microsoft");
+    } catch {
+        return false;
+    }
 }
 
 export async function isDistroAlpineLinux(linuxDistroInfo: LinuxDistroInfo) {
