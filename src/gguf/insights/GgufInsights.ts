@@ -603,8 +603,19 @@ export class GgufInsights {
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+        // `getTypeSizeForGgmlType` returns bytes per BLOCK (matches
+        // `ggml_type_size` in llama.cpp). For block-quantized types
+        // (Q4_0, Q8_0, ...) one block holds N elements (block size > 1),
+        // so per-element bytes = block-bytes / block-elements. F16 / F32
+        // are scalar (blockSize=1) so the division is a no-op there.
+        // Without this division, quantized KV-cache estimates overshoot
+        // by ~32× and the configuration resolver rejects valid configs.
         const keyTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheKeyType) ?? this._llama._consts.ggmlTypeF16Size;
         const valueTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheValueType) ?? this._llama._consts.ggmlTypeF16Size;
+        const keyBlockSize = this._llama._bindings.getBlockSizeForGgmlType(kvCacheKeyType) ?? 1;
+        const valueBlockSize = this._llama._bindings.getBlockSizeForGgmlType(kvCacheValueType) ?? 1;
+        const keyBytesPerElement = keyTypeSize / Math.max(1, keyBlockSize);
+        const valueBytesPerElement = valueTypeSize / Math.max(1, valueBlockSize);
 
         // source: `llama_model::load_tensors` in `llama-model.cpp`
         // repeating layers are assigned to GPU from `i_gpu_start = n_layer + 1 - n_gpu_layers`
@@ -644,9 +655,9 @@ export class GgufInsights {
         }
 
         const gpuKVCacheSize = usingGpu
-            ? ((gpuKvElementsK * keyTypeSize) + (gpuKvElementsV * valueTypeSize))
+            ? ((gpuKvElementsK * keyBytesPerElement) + (gpuKvElementsV * valueBytesPerElement))
             : 0;
-        const cpuKVCacheSize = (cpuKvElementsK * keyTypeSize) + (cpuKvElementsV * valueTypeSize);
+        const cpuKVCacheSize = (cpuKvElementsK * keyBytesPerElement) + (cpuKvElementsV * valueBytesPerElement);
 
         const recurrentCellSize = Math.max(1, sequences);
         const gpuRecurrentStateSize = usingGpu
