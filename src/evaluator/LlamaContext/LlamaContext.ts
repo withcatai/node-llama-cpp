@@ -109,7 +109,7 @@ export class LlamaContext {
         threads,
         batching: {
             dispatchSchedule: batchingDispatchSchedule = "nextCycle",
-            itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
+            itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "firstInFirstOut"
         } = {},
         swaFullCache = _model.defaultContextSwaFullCache,
         performanceTracking = false,
