@@ -70,8 +70,16 @@ export function resolveGgmlTypeOption(option?: keyof typeof GgmlType | GgmlType)
 
     if (typeof option === "number" && Object.hasOwn(GgmlType, option))
         return option as GgmlType;
-    else if (typeof option === "string" && Object.hasOwn(GgmlType, option))
-        return GgmlType[option as keyof typeof GgmlType];
+    else if (typeof option === "string") {
+        // GgmlType enum keys are conventionally uppercase (e.g. "Q8_0",
+        // "F16", "BF16"). Accept lowercase / mixed-case inputs so config
+        // files and CLI flags don't silently fall through to the default.
+        // Prior behaviour treated e.g. "q8_0" as unrecognised and returned
+        // undefined — callers then fell back to F16 with no warning.
+        const upper = option.toUpperCase();
+        if (Object.hasOwn(GgmlType, upper))
+            return GgmlType[upper as keyof typeof GgmlType];
+    }
 
     return undefined;
 }
