@@ -105,6 +105,7 @@ export class LlamaContext {
         sequences,
         contextSize,
         batchSize,
+        ubatchSize,
         flashAttention = _model.defaultContextFlashAttention,
         threads,
         batching: {
@@ -162,6 +163,7 @@ export class LlamaContext {
                     ? 1 // +1 to handle edge cases with SWA KV cache
                     : 0
             ),
+            ubatchSize,
             sequences: this._totalSequences,
             flashAttention: this._flashAttention,
             threads: this._idealThreads,
