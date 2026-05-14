@@ -460,6 +460,10 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         if (options.Has("swaFullCache")) {
             context_params.swa_full = options.Get("swaFullCache").As<Napi::Boolean>().Value();
         }
+
+        if (options.Has("kvUnified")) {
+            context_params.kv_unified = options.Get("kvUnified").As<Napi::Boolean>().Value();
+        }
     }
 }
 AddonContext::~AddonContext() {

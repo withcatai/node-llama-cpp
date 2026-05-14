@@ -81,6 +81,7 @@ export class LlamaContext {
     /** @internal */ private readonly _unusedSequenceIds: number[] = [];
     /** @internal */ private readonly _batchingOptions: Required<BatchingOptions>;
     /** @internal */ public readonly _swaFullCache: boolean = false;
+    /** @internal */ private readonly _kvUnified: boolean | undefined = undefined;
     /** @internal */ private readonly _queuedDecodeSequenceIds = new Set<number>();
     /** @internal */ private readonly _queuedDecodes: InternalQueuedDecode[] = [];
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
@@ -112,6 +113,7 @@ export class LlamaContext {
             itemPrioritizationStrategy: batchingItemsPrioritizationStrategy = "maximumParallelism"
         } = {},
         swaFullCache = _model.defaultContextSwaFullCache,
+        kvUnified,
         performanceTracking = false,
         experimentalKvCacheKeyType,
         experimentalKvCacheValueType,
@@ -155,6 +157,7 @@ export class LlamaContext {
         this._kvCacheKeyType = experimentalKvCacheKeyType;
         this._kvCacheValueType = experimentalKvCacheValueType;
         this._swaFullCache = !!swaFullCache;
+        this._kvUnified = kvUnified;
         this._ctx = new this._llama._bindings.AddonContext(this._model._model, removeNullFields({
             contextSize: padSafeContextSize(this._contextSize * this._totalSequences, "up"), // each sequence needs its own <contextSize> of cells
             batchSize: this._batchSize + (
@@ -170,7 +173,8 @@ export class LlamaContext {
             performanceTracking: this._performanceTracking,
             kvCacheKeyType: this._kvCacheKeyType,
             kvCacheValueType: this._kvCacheValueType,
-            swaFullCache: this._swaFullCache
+            swaFullCache: this._swaFullCache,
+            kvUnified: this._kvUnified
         }));
         this._batchingOptions = {
             dispatchSchedule: batchingDispatchSchedule,

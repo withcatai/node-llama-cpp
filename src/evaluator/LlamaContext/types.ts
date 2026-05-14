@@ -154,6 +154,21 @@ export type LlamaContextOptions = {
     swaFullCache?: boolean,
 
     /**
+     * Use a unified KV buffer shared across all sequences when computing attention.
+     *
+     * When enabled, llama.cpp uses a single contiguous KV buffer indexed by sequence id,
+     * which can significantly improve multi-sequence prefill/decode throughput on GPU
+     * backends by reducing per-sequence buffer juggling.
+     *
+     * The llama.cpp default for `kv_unified` depends on whether the number of sequences
+     * is auto-detected; explicitly setting `kvUnified: true` matches the behavior of
+     * `llama-server` running with `--kv-unified` (which is the default in many configurations).
+     *
+     * Defaults to the llama.cpp default for the context configuration.
+     */
+    kvUnified?: boolean,
+
+    /**
      * Load the provided LoRA adapters onto the context.
      * LoRA adapters are used to modify the weights of a pretrained model to adapt to new tasks or domains
      * without the need for extensive retraining from scratch.
