@@ -1,3 +1,5 @@
+#include <cuda.h>
+#include <dlfcn.h>
 #include "addonGlobals.h"
 #include "AddonModel.h"
 #include "AddonModelLora.h"
@@ -286,7 +288,32 @@ static void addonFreeLlamaBackendFromFinalizer(Napi::Env env, int* data) {
     addonFreeLlamaBackend();
 }
 
+
+// WSL2 Fix: Force load CUDA driver
+static void wsl_cuda_preinit() {
+    void* handle = dlopen("/usr/lib/wsl/lib/libcuda.so", RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+        fprintf(stderr, "[WSL2-CUDA] Failed to preload libcuda.so: %s
+", dlerror());
+        return;
+    }
+    typedef CUresult (*cuInit_fn)(unsigned int);
+    cuInit_fn my_cuInit = (cuInit_fn)dlsym(handle, "cuInit");
+    if (my_cuInit) {
+        CUresult res = my_cuInit(0);
+        if (res == 0) {
+            fprintf(stderr, "[WSL2-CUDA] Pre-init cuInit result: 0 (SUCCESS)
+");
+        } else {
+            fprintf(stderr, "[WSL2-CUDA] Pre-init cuInit result: %d (FAILED)
+", res);
+        }
+    }
+}
+
 Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
+    // WSL2 Fix
+    wsl_cuda_preinit();
     exports.DefineProperties({
         Napi::PropertyDescriptor::Function("markLoaded", markLoaded),
         Napi::PropertyDescriptor::Function("systemInfo", systemInfo),
