@@ -124,8 +124,14 @@ export async function BuildLlamaCppCommand({
             downloadedCmake = true;
         }
 
+        // WSL2 fix: Disable VMM to prevent cuMemAddressReserve crash (Issue #580)
+        const effectiveCmakeOptions = new Map(customCmakeOptions);
+        if (gpuToTry === "cuda" && platformInfo.wsl2) {
+            effectiveCmakeOptions.set("GGML_CUDA_NO_VMM", "ON");
+        }
+
         const buildOptions: BuildOptions = {
-            customCmakeOptions,
+            customCmakeOptions: effectiveCmakeOptions,
             progressLogs: true,
             platform,
             platformInfo,
