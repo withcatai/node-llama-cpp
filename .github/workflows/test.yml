@@ -66,6 +66,7 @@ jobs:
       - name: Download resolved llama.cpp release
         env:
           CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node ./dist/cli/cli.js source download --release "${{ steps.resolveLlamaCppRelease.outputs.release }}" --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Compile docs
         run: npm run docs:build

@@ -1,3 +1,4 @@
+import process from "process";
 import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
 
 export async function resolveGithubRelease(githubOwner: string, githubRepo: string, release: string) {
@@ -131,7 +132,10 @@ class GitHubClient {
     private readonly _clientOptions: GitHubClientOptions;
 
     public constructor(clientOptions: GitHubClientOptions = {}) {
-        this._clientOptions = clientOptions;
+        this._clientOptions = {
+            ...clientOptions,
+            token: clientOptions.token ?? getGithubApiToken()
+        };
     }
 
     public async getLatestRelease({
@@ -202,4 +206,10 @@ class GitHubClient {
     private _getApiBase() {
         return this._clientOptions?.apiBase ?? defaultGitHubApiBase;
     }
+}
+
+function getGithubApiToken() {
+    return process.env.NODE_LLAMA_CPP_GITHUB_TOKEN
+        ?? process.env.GH_TOKEN
+        ?? process.env.GITHUB_TOKEN;
 }

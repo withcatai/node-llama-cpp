@@ -18,7 +18,7 @@ import {cloneLlamaCppRepo} from "../../../../bindings/utils/cloneLlamaCppRepo.js
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {resolveCustomCmakeOptions} from "../../../../bindings/utils/resolveCustomCmakeOptions.js";
 import {logBinaryUsageExampleToConsole} from "../../../../bindings/utils/logBinaryUsageExampleToConsole.js";
-import {resolveGithubRelease} from "../../../../utils/resolveGithubRelease.js";
+import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../../../../utils/resolveGithubRelease.js";
 import {BuildGpu, BuildOptions, nodeLlamaCppGpuOptions, parseNodeLlamaCppGpuOption} from "../../../../bindings/types.js";
 import {logUsedGpuTypeOption} from "../../../utils/logUsedGpuTypeOption.js";
 import {getGpuTypesToUseForOption} from "../../../../bindings/utils/getGpuTypesToUseForOption.js";
@@ -147,6 +147,9 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
     let githubReleaseTag: string | null = (useBundle && (await getGitBundlePathForRelease(githubOwner, githubRepo, release)) != null)
         ? release
         : null;
+
+    if (githubReleaseTag == null && !isGithubReleaseNeedsResolving(release))
+        githubReleaseTag = release;
 
     if (githubReleaseTag == null)
         await withOra({
@@ -281,4 +284,3 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
     console.log();
     console.log(chalk.green("Done"));
 }
-
