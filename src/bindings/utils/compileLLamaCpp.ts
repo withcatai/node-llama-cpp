@@ -229,6 +229,27 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
             }
         });
     } catch (err) {
+        async function tryCompileAgainWithoutLlvm() {
+            if (!useWindowsLlvm)
+                return false;
+
+            if (buildOptions.progressLogs)
+                console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
+
+            try {
+                await compileLlamaCpp(buildOptions, {
+                    ...compileOptions,
+                    ignoreWorkarounds: [...ignoreWorkarounds, "avoidWindowsLlvm"]
+                });
+                return true;
+            } catch (err) {
+                if (buildOptions.progressLogs)
+                    console.error(getConsoleLogPrefix(true, false), err);
+            }
+
+            return false;
+        }
+
         if (platform === "linux" && await which("make", {nothrow: true}) == null) {
             console.info("\n" +
                 getConsoleLogPrefix(true) +
@@ -340,26 +361,17 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 chalk.yellow("To resolve errors related to CUDA compilation, see the CUDA guide: ") +
                 documentationPageUrls.CUDA
             );
-        } else if (buildOptions.gpu === "vulkan")
+        } else if (buildOptions.gpu === "vulkan") {
+            if (await tryCompileAgainWithoutLlvm())
+                return;
+
             console.info("\n" +
                 getConsoleLogPrefix(true) +
                 chalk.yellow("To resolve errors related to Vulkan compilation, see the Vulkan guide: ") +
                 documentationPageUrls.Vulkan
             );
-        else if (useWindowsLlvm && !ciMode) {
-            if (buildOptions.progressLogs)
-                console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
-
-            try {
-                return await compileLlamaCpp(buildOptions, {
-                    ...compileOptions,
-                    ignoreWorkarounds: [...ignoreWorkarounds, "avoidWindowsLlvm"]
-                });
-            } catch (err) {
-                if (buildOptions.progressLogs)
-                    console.error(getConsoleLogPrefix(true, false), err);
-            }
-        }
+        } else if (await tryCompileAgainWithoutLlvm())
+            return;
 
         throw err;
     }
