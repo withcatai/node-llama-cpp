@@ -234,7 +234,8 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock = false, checkTensors, onLoadProgress, loadSignal,
+        metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number,
         useMmap: boolean

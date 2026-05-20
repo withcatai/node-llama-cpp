@@ -941,27 +941,43 @@ async function runTestWorkerLogic() {
 
     async function testWithGpuLayers({
         modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention,
-        kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false
+        kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, isFirstLoad
     }: {
         modelPath: string, useMmap?: "auto" | boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
         maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
         swaFullCache?: boolean, batchSize?: number,
-        evaluateText?: string, exitAfterMeasurement?: boolean
+        evaluateText?: string, exitAfterMeasurement?: boolean,
+        isFirstLoad: boolean
     }) {
         try {
             const preModelVramUsage = (await llama._getRawVramState()).used;
             const preModelRamUsage = getMemoryUsage(llama);
-            const model = await llama.loadModel({
-                modelPath,
-                useMmap,
-                useDirectIo,
-                gpuLayers,
-                defaultContextFlashAttention: flashAttention,
-                experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
-                experimentalDefaultContextKvCacheValueType: kvCacheValueType,
-                defaultContextSwaFullCache: swaFullCache,
-                ignoreMemorySafetyChecks: true
-            });
+            let model: LlamaModel | undefined = undefined;
+
+            for (let triesLeft = 2; triesLeft > 0; triesLeft--) {
+                try {
+                    model = await llama.loadModel({
+                        modelPath,
+                        useMmap,
+                        useDirectIo,
+                        gpuLayers,
+                        defaultContextFlashAttention: flashAttention,
+                        experimentalDefaultContextKvCacheKeyType: kvCacheKeyType,
+                        experimentalDefaultContextKvCacheValueType: kvCacheValueType,
+                        defaultContextSwaFullCache: swaFullCache
+                    });
+                } catch (err) {
+                    if (isFirstLoad || triesLeft === 1)
+                        throw err;
+
+                    // wait for the locked memory to free up before trying again
+                    await new Promise((accept) => setTimeout(accept, 6 * 1000));
+                }
+            }
+
+            if (model == null)
+                throw new Error("Failed to load model");
+
             const postModelVramUsage = (await llama._getRawVramState()).used;
             const postModelRamUsage = getMemoryUsage(llama);
 
@@ -1044,7 +1060,8 @@ async function runTestWorkerLogic() {
                     swaFullCache: message.swaFullCache,
                     batchSize: message.batchSize,
                     evaluateText: message.evaluateText,
-                    exitAfterMeasurement: message.exitAfterMeasurement
+                    exitAfterMeasurement: message.exitAfterMeasurement,
+                    isFirstLoad: gpuLayers == message.maxGpuLayers
                 });
 
                 if (measurementsDone > 0 && message.exitAfterMeasurement) {
