@@ -29,6 +29,28 @@ export type BuildOptionsJSON = Omit<BuildOptions, "customCmakeOptions"> & {
     customCmakeOptions: Record<string, string>
 };
 
+export type RamState = {
+    /**
+     * The total amount of memory in bytes
+     */
+    total: number,
+
+    /**
+     * The amount of free memory in bytes.
+     * This memory is immediately available for allocation.
+     */
+    free: number,
+
+    /**
+     * The total amount of currently useful memory for allocation in bytes,
+     * which consists of the the free memory and any other amounts that the OS is willing to free on demand
+     * (by offloading other processes to disk if needed or compressing memory, etc.)
+     * 
+     * This value will always be equal to or higher than `free`, and will be at most the total amount of memory.
+     */
+    useful: number
+};
+
 export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOptions)[number] | (typeof nodeLlamaCppGpuOffStringOptions)[number]): BuildGpu | "auto" {
     function optionIsGpuOff(opt: typeof option): opt is (typeof nodeLlamaCppGpuOffStringOptions)[number] {
         return nodeLlamaCppGpuOffStringOptions.includes(opt as (typeof nodeLlamaCppGpuOffStringOptions)[number]);

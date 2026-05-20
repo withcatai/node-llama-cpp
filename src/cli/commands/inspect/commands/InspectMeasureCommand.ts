@@ -1179,7 +1179,7 @@ function padStartAnsi(text: string, length: number, padChar: string = " ") {
 }
 
 function getMemoryUsage(llama: Llama) {
-    const totalMemoryUsage = llama._bindings.getMemoryInfo().total;
+    const totalMemoryUsage = llama._bindings.getProcessMemoryInfo().total;
     const vramUsage = llama._bindings.getGpuVramInfo();
 
     let memoryUsage = totalMemoryUsage;

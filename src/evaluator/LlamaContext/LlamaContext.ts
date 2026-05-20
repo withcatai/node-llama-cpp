@@ -975,7 +975,7 @@ export class LlamaContext {
                 : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.gpuVram);
             const contextCreationRamReservation = options.ignoreMemorySafetyChecks
                 ? null
-                : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
+                : _model._llama._ramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
 
             try {
                 if (createSignal?.aborted)

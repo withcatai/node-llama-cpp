@@ -1,22 +1,23 @@
-#include "addonGlobals.h"
-#include "AddonGgufMetadata.h"
-#include "AddonModel.h"
-#include "AddonModelLora.h"
-#include "AddonGrammar.h"
-#include "AddonGrammarEvaluationState.h"
-#include "AddonSampler.h"
-#include "AddonContext.h"
-#include "globals/addonLog.h"
-#include "globals/addonProgress.h"
-#include "globals/getGpuInfo.h"
-#include "globals/getSwapInfo.h"
-#include "globals/getMemoryInfo.h"
-
 #include <atomic>
 #include <cstdlib>
 #include <mutex>
 
-    std::mutex backendMutex;
+#include "AddonContext.h"
+#include "AddonGgufMetadata.h"
+#include "AddonGrammar.h"
+#include "AddonGrammarEvaluationState.h"
+#include "AddonModel.h"
+#include "AddonModelLora.h"
+#include "AddonSampler.h"
+#include "addonGlobals.h"
+#include "globals/addonLog.h"
+#include "globals/addonProgress.h"
+#include "globals/getGpuInfo.h"
+#include "globals/getProcessMemoryInfo.h"
+#include "globals/getSwapInfo.h"
+#include "globals/getSystemMemoryInfo.h"
+
+std::mutex backendMutex;
 bool backendInitialized = false;
 bool backendDisposed = false;
 
@@ -307,7 +308,8 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGpuType", getGpuType),
         Napi::PropertyDescriptor::Function("ensureGpuDeviceIsSupported", ensureGpuDeviceIsSupported),
         Napi::PropertyDescriptor::Function("getSwapInfo", getSwapInfo),
-        Napi::PropertyDescriptor::Function("getMemoryInfo", getMemoryInfo),
+        Napi::PropertyDescriptor::Function("getProcessMemoryInfo", getProcessMemoryInfo),
+        Napi::PropertyDescriptor::Function("getSystemMemoryInfo", getSystemMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
         Napi::PropertyDescriptor::Function("setNuma", addonSetNuma),
         Napi::PropertyDescriptor::Function("init", addonInit),

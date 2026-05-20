@@ -4,7 +4,7 @@ import chalk from "chalk";
 import {getLlamaForOptions} from "../../../../bindings/getLlama.js";
 import {detectAvailableComputeLayers} from "../../../../bindings/utils/detectAvailableComputeLayers.js";
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
-import {BuildGpu, LlamaLogLevel} from "../../../../bindings/types.js";
+import {BuildGpu, LlamaLogLevel, RamState} from "../../../../bindings/types.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getModuleVersion} from "../../../../utils/getModuleVersion.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
@@ -210,7 +210,7 @@ export const InspectGpuCommand: CommandModule<object, InspectGpuCommand> = {
         }
 
         console.info();
-        await logRamUsage(lastLlama?.cpuMathCores);
+        await logRamUsage(lastLlama, lastLlama?.cpuMathCores);
 
         if (lastLlama != null) {
             await logSwapUsage(lastLlama);
@@ -287,10 +287,15 @@ async function logGpuVramUsage(llama: Llama) {
     } catch (err) {}
 }
 
-async function logRamUsage(cpuMathCores?: number) {
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
+async function logRamUsage(llama?: Llama, cpuMathCores?: number) {
+    const ramState: RamState = llama != null
+        ? await llama.getRamState()
+        : {
+            total: os.totalmem(),
+            free: os.freemem(),
+            useful: os.freemem()
+        };
+    const usedMemory = ramState.total - ramState.free;
     const cpuDeviceNames = Array.from(
         new Set(
             os.cpus()
@@ -305,8 +310,11 @@ async function logRamUsage(cpuMathCores?: number) {
     if (cpuMathCores != null)
         console.info(`${chalk.yellow("Math cores:")} ${cpuMathCores}`);
 
-    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(totalMemory) + ")")}`);
-    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + toBytes(freeMemory) + "/" + toBytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, ramState.total)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(ramState.total) + ")")}`);
+    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(ramState.free, ramState.total)}% ${chalk.gray("(" + toBytes(ramState.free) + "/" + toBytes(ramState.total) + ")")}`);
+
+    if (llama != null)
+        console.info(`${chalk.yellow("Useful RAM:")} ${getPercentageString(ramState.useful, ramState.total)}% ${chalk.gray("(" + toBytes(ramState.useful) + "/" + toBytes(ramState.total) + ")")}`);
 }
 
 async function logSwapUsage(llama: Llama) {

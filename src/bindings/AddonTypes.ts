@@ -97,7 +97,12 @@ export type BindingModule = {
         maxSize: number,
         free: number
     },
-    getMemoryInfo(): {
+    getSystemMemoryInfo(): Promise<{
+        total: number | null,
+        useful: number | null,
+        free: number | null
+    }>,
+    getProcessMemoryInfo(): {
         total: number
     },
     init(): Promise<void>,

@@ -4,7 +4,8 @@ import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/get
 import {getLlamaGpuTypes} from "./bindings/utils/getLlamaGpuTypes.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {
-    type LlamaGpuType, type LlamaNuma, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType
+    type LlamaGpuType, type LlamaNuma, type RamState, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual,
+    LlamaVocabularyType
 } from "./bindings/types.js";
 import {resolveModelFile, type ResolveModelFileOptions} from "./utils/resolveModelFile.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
@@ -132,6 +133,7 @@ export {
     type LastBuildOptions,
     type LlamaGpuType,
     type LlamaNuma,
+    type RamState,
     type LlamaClasses,
     LlamaLogLevel,
     NoBinaryFoundError,

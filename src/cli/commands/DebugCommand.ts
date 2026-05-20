@@ -1,4 +1,3 @@
-import os from "os";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import {getLlama} from "../../bindings/getLlama.js";
@@ -37,9 +36,8 @@ async function DebugVramFunction() {
     const llama = await getLlama("lastBuild");
 
     const vramStatus = await llama.getVramState();
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
+    const ramStatus = await llama.getRamState();
+    const usedMemory = ramStatus.total - ramStatus.free;
 
     const getPercentageString = (amount: number, total: number) => {
         if (total === 0)
@@ -54,8 +52,9 @@ async function DebugVramFunction() {
     console.info(`${chalk.yellow("Used VRAM:")} ${getPercentageString(vramStatus.used, vramStatus.total)}% ${chalk.gray("(" + toBytes(vramStatus.used) + "/" + toBytes(vramStatus.total) + ")")}`);
     console.info(`${chalk.yellow("Free VRAM:")} ${getPercentageString(vramStatus.free, vramStatus.total)}% ${chalk.gray("(" + toBytes(vramStatus.free) + "/" + toBytes(vramStatus.total) + ")")}`);
     console.info();
-    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, totalMemory)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(totalMemory) + ")")}`);
-    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(freeMemory, totalMemory)}% ${chalk.gray("(" + toBytes(freeMemory) + "/" + toBytes(totalMemory) + ")")}`);
+    console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, ramStatus.total)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(ramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(ramStatus.free, ramStatus.total)}% ${chalk.gray("(" + toBytes(ramStatus.free) + "/" + toBytes(ramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Useful RAM:")} ${getPercentageString(ramStatus.useful, ramStatus.total)}% ${chalk.gray("(" + toBytes(ramStatus.useful) + "/" + toBytes(ramStatus.total) + ")")}`);
 }
 
 async function DebugCmakeOptionsFunction() {

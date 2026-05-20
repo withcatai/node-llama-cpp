@@ -1,7 +1,8 @@
 import {EventRelay} from "lifecycle-utils";
+import {Promisable} from "../../utils/transformPromisable.js";
 
 export class MemoryOrchestrator {
-    /** @internal */ private readonly _getMemoryState: () => {free: number, total: number, unifiedSize: number};
+    /** @internal */ private readonly _getMemoryState: () => Promisable<{free: number, total: number, unifiedSize: number}>;
     /** @internal */ private _reservedMemory: number = 0;
     /** @internal */ public _markedMemory: number = 0;
     /** @internal */ private _memoryCap: number | null = null;
@@ -10,7 +11,7 @@ export class MemoryOrchestrator {
     public readonly onMemoryReservationRelease = new EventRelay<void>();
     public readonly onMemoryMarkingRelease = new EventRelay<void>();
 
-    public constructor(getMemoryState: () => {free: number, total: number, unifiedSize: number}) {
+    public constructor(getMemoryState: () => Promisable<{free: number, total: number, unifiedSize: number}>) {
         this._getMemoryState = getMemoryState;
 
         this._onMarkFinalized = this._onMarkFinalized.bind(this);
@@ -52,7 +53,10 @@ export class MemoryOrchestrator {
     }
 
     public async getMemoryState() {
-        let {free, total, unifiedSize} = this._getMemoryState();
+        const state = this._getMemoryState();
+        let {free, total, unifiedSize} = state instanceof Promise
+            ? await state
+            : state;
 
         free = Math.max(0, free - this._padding);
 

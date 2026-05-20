@@ -14,9 +14,10 @@ import {getTempDir, FsPathHandle} from "../utils/getTempDir.js";
 import {BindingModule} from "./AddonTypes.js";
 import {
     BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel,
-    LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma
+    LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma,
+    RamState
 } from "./types.js";
-import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
+import {MemoryOrchestrator} from "./utils/MemoryOrchestrator.js";
 import {registerDisposeBeforeExit, unregisterDisposeBeforeExit} from "./utils/disposeBeforeExit.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
@@ -312,17 +313,24 @@ export class Llama {
      * `unifiedSize` represents the amount of VRAM that is shared between the CPU and GPU.
      * On SoC devices, this is usually the same as `total`.
      */
-    public async getVramState() {
+    public async getVramState(): Promise<{
+        total: number,
+        used: number,
+        free: number,
+        unifiedSize: number
+    }> {
         this._ensureNotDisposed();
 
-        const {total, used, unifiedSize} = this._bindings.getGpuVramInfo();
+        return getBalancedVramState(this._bindings);
+    }
 
-        return {
-            total,
-            used,
-            free: Math.max(0, total - used),
-            unifiedSize
-        };
+    /**
+     * Get the state of the system RAM
+     */
+    public async getRamState(): Promise<RamState> {
+        this._ensureNotDisposed();
+
+        return getBalancedRamState(this._bindings);
     }
 
     /**
@@ -630,22 +638,13 @@ export class Llama {
         numa?: LlamaNuma,
         tempDir?: string | string[] | false
     }) {
-        const vramOrchestrator = new MemoryOrchestrator(() => {
-            const {total, used, unifiedSize} = bindings.getGpuVramInfo();
-
+        const vramOrchestrator = new MemoryOrchestrator(getBalancedVramState.bind(undefined, bindings));
+        const ramOrchestrator = new MemoryOrchestrator(async () => {
+            const {total, useful} = await getBalancedRamState(bindings);
+            
             return {
                 total,
-                free: Math.max(0, total - used),
-                unifiedSize
-            };
-        });
-        const ramOrchestrator = new MemoryOrchestrator(() => {
-            const used = process.memoryUsage().rss;
-            const total = os.totalmem();
-
-            return {
-                total,
-                free: Math.max(0, total - used),
+                free: useful,
                 unifiedSize: total
             };
         });
@@ -820,4 +819,60 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: Buil
         return LlamaLogLevel.info;
 
     return level;
+}
+
+async function getBalancedVramState(bindings: BindingModule) {
+    const {total, used, unifiedSize} = bindings.getGpuVramInfo();
+    let currentUsed = used;
+
+    if (unifiedSize !== 0) {
+        try {
+            const systemMemoryInfo = await bindings.getSystemMemoryInfo();
+            systemMemoryInfo.total ??= os.totalmem();
+            systemMemoryInfo.free ??= os.freemem();
+            systemMemoryInfo.useful = Math.max(systemMemoryInfo.free, Math.min(systemMemoryInfo.useful ?? systemMemoryInfo.free, total));
+    
+            const lockedRam = Math.max(0, systemMemoryInfo.total - systemMemoryInfo.useful);
+            const nonUnifiedMemoryRam = systemMemoryInfo.total - unifiedSize;
+    
+            const lockedUnifiedVram = Math.max(0, lockedRam - nonUnifiedMemoryRam);
+    
+            currentUsed = Math.max(currentUsed, Math.min(lockedUnifiedVram, unifiedSize));
+        } catch (err) {
+            // do nothing
+        }
+    }
+
+    return {
+        total,
+        used: currentUsed,
+        free: Math.max(0, total - currentUsed),
+        unifiedSize
+    };
+}
+
+
+async function getBalancedRamState(bindings: BindingModule): Promise<RamState> {
+    let total: number | null = null;
+    let useful: number | null = null;
+    let free: number | null = null;
+
+    try {
+        const systemMemoryInfo = await bindings.getSystemMemoryInfo();
+        total = systemMemoryInfo.total;
+        useful = systemMemoryInfo.useful;
+        free = systemMemoryInfo.free;
+    } catch (error) {
+        // do nothing
+    }
+
+    total ??= os.totalmem();
+    free ??= os.freemem();
+    useful = Math.max(free, Math.min(useful ?? free, total));
+
+    return {
+        total,
+        useful,
+        free
+    };
 }
