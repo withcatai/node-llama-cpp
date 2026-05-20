@@ -32,7 +32,7 @@ static std::optional<uint64_t> multiplyUint64(uint64_t left, uint64_t right) {
         return uint64_t(0);
     }
 
-    if (left > (std::numeric_limits<uint64_t>::max() / right)) {
+    if (left > ((std::numeric_limits<uint64_t>::max)() / right)) {
         return std::nullopt;
     }
 
@@ -181,7 +181,7 @@ static std::optional<uint64_t> parseLinuxMeminfoValueBytes(const std::string& li
     }
 
     const long double roundedBytesValue = std::round(bytesValue);
-    if (roundedBytesValue > static_cast<long double>(std::numeric_limits<uint64_t>::max())) {
+    if (roundedBytesValue > static_cast<long double>((std::numeric_limits<uint64_t>::max)())) {
         return std::nullopt;
     }
 
@@ -211,7 +211,7 @@ static std::optional<uint64_t> parseLinuxVmstatValuePages(const std::string& lin
         sawDigit = true;
 
         const uint64_t digit = uint64_t(line[index] - '0');
-        if (pageCount > ((std::numeric_limits<uint64_t>::max() - digit) / 10)) {
+        if (pageCount > (((std::numeric_limits<uint64_t>::max)() - digit) / 10)) {
             return std::nullopt;
         }
 
@@ -396,10 +396,10 @@ static AddonSystemMemoryInfo retrieveSystemMemoryInfo() {
 #endif
 
     if (systemMemoryInfo.total.has_value() && systemMemoryInfo.wired.has_value())
-        systemMemoryInfo.wired = std::min(systemMemoryInfo.wired.value(), systemMemoryInfo.total.value());
+        systemMemoryInfo.wired = (std::min)(systemMemoryInfo.wired.value(), systemMemoryInfo.total.value());
 
     if (systemMemoryInfo.total.has_value() && systemMemoryInfo.free.has_value())
-        systemMemoryInfo.free = std::min(systemMemoryInfo.free.value(), systemMemoryInfo.total.value());
+        systemMemoryInfo.free = (std::min)(systemMemoryInfo.free.value(), systemMemoryInfo.total.value());
 
     return systemMemoryInfo;
 }
