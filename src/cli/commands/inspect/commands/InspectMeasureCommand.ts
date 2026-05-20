@@ -966,6 +966,7 @@ async function runTestWorkerLogic() {
                         experimentalDefaultContextKvCacheValueType: kvCacheValueType,
                         defaultContextSwaFullCache: swaFullCache
                     });
+                    break;
                 } catch (err) {
                     if (isFirstLoad || triesLeft === 1)
                         throw err;
