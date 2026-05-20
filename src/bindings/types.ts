@@ -42,13 +42,9 @@ export type RamState = {
     free: number,
 
     /**
-     * The total amount of currently useful memory for allocation in bytes,
-     * which consists of the the free memory and any other amounts that the OS is willing to free on demand
-     * (by offloading other processes to disk if needed or compressing memory, etc.)
-     * 
-     * This value will always be equal to or higher than `free`, and will be at most the total amount of memory.
+     * The amount of wired memory (memory that cannot be evicted or moved to disk) in bytes
      */
-    useful: number
+    wired: number
 };
 
 export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOptions)[number] | (typeof nodeLlamaCppGpuOffStringOptions)[number]): BuildGpu | "auto" {

@@ -293,7 +293,7 @@ async function logRamUsage(llama?: Llama, cpuMathCores?: number) {
         : {
             total: os.totalmem(),
             free: os.freemem(),
-            useful: os.freemem()
+            wired: 0
         };
     const usedMemory = ramState.total - ramState.free;
     const cpuDeviceNames = Array.from(
@@ -314,7 +314,7 @@ async function logRamUsage(llama?: Llama, cpuMathCores?: number) {
     console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(ramState.free, ramState.total)}% ${chalk.gray("(" + toBytes(ramState.free) + "/" + toBytes(ramState.total) + ")")}`);
 
     if (llama != null)
-        console.info(`${chalk.yellow("Useful RAM:")} ${getPercentageString(ramState.useful, ramState.total)}% ${chalk.gray("(" + toBytes(ramState.useful) + "/" + toBytes(ramState.total) + ")")}`);
+        console.info(`${chalk.yellow("Wired RAM:")} ${getPercentageString(ramState.wired, ramState.total)}% ${chalk.gray("(" + toBytes(ramState.wired) + "/" + toBytes(ramState.total) + ")")}`);
 }
 
 async function logSwapUsage(llama: Llama) {

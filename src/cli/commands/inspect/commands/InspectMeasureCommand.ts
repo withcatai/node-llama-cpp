@@ -262,7 +262,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             sourceType: "filesystem"
         });
         const ggufInsights = await GgufInsights.from(ggufMetadata, llama);
-        const totalVram = (await llama.getVramState()).total;
+        const totalVram = (await llama._getRawVramState()).total;
         const totalRam = (await llama.getRamState()).total;
 
         let lastGpuLayers = maxLayers ?? (
@@ -872,7 +872,7 @@ async function runTestWorkerLogic() {
                 currentContextSizeCheck = null;
 
             try {
-                const preContextVramUsage = (await llama.getVramState()).used;
+                const preContextVramUsage = (await llama._getRawVramState()).used;
                 const preContextRamUsage = getMemoryUsage(llama);
                 const context = await model.createContext({
                     contextSize: currentContextSizeCheck ?? (
@@ -894,7 +894,7 @@ async function runTestWorkerLogic() {
                     await sequence.evaluateWithoutGeneratingNewTokens(model.tokenize(evaluateText));
                 }
 
-                const postContextVramUsage = (await llama.getVramState()).used;
+                const postContextVramUsage = (await llama._getRawVramState()).used;
                 const postContextRamUsage = getMemoryUsage(llama);
                 measurementsDone++;
 
@@ -949,7 +949,7 @@ async function runTestWorkerLogic() {
         evaluateText?: string, exitAfterMeasurement?: boolean
     }) {
         try {
-            const preModelVramUsage = (await llama.getVramState()).used;
+            const preModelVramUsage = (await llama._getRawVramState()).used;
             const preModelRamUsage = getMemoryUsage(llama);
             const model = await llama.loadModel({
                 modelPath,
@@ -962,7 +962,7 @@ async function runTestWorkerLogic() {
                 defaultContextSwaFullCache: swaFullCache,
                 ignoreMemorySafetyChecks: true
             });
-            const postModelVramUsage = (await llama.getVramState()).used;
+            const postModelVramUsage = (await llama._getRawVramState()).used;
             const postModelRamUsage = getMemoryUsage(llama);
 
             sendInfoBack({

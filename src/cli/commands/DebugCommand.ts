@@ -54,7 +54,7 @@ async function DebugVramFunction() {
     console.info();
     console.info(`${chalk.yellow("Used RAM:")} ${getPercentageString(usedMemory, ramStatus.total)}% ${chalk.gray("(" + toBytes(usedMemory) + "/" + toBytes(ramStatus.total) + ")")}`);
     console.info(`${chalk.yellow("Free RAM:")} ${getPercentageString(ramStatus.free, ramStatus.total)}% ${chalk.gray("(" + toBytes(ramStatus.free) + "/" + toBytes(ramStatus.total) + ")")}`);
-    console.info(`${chalk.yellow("Useful RAM:")} ${getPercentageString(ramStatus.useful, ramStatus.total)}% ${chalk.gray("(" + toBytes(ramStatus.useful) + "/" + toBytes(ramStatus.total) + ")")}`);
+    console.info(`${chalk.yellow("Wired RAM:")} ${getPercentageString(ramStatus.wired, ramStatus.total)}% ${chalk.gray("(" + toBytes(ramStatus.wired) + "/" + toBytes(ramStatus.total) + ")")}`);
 }
 
 async function DebugCmakeOptionsFunction() {

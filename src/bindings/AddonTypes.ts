@@ -99,7 +99,7 @@ export type BindingModule = {
     },
     getSystemMemoryInfo(): Promise<{
         total: number | null,
-        useful: number | null,
+        wired: number | null,
         free: number | null
     }>,
     getProcessMemoryInfo(): {
