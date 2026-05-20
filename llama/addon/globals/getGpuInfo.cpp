@@ -37,7 +37,10 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
             used += deviceTotal - deviceFree;
 
 #if defined(__arm64__) || defined(__aarch64__)
-            if (std::string(ggml_backend_dev_name(device)) == "Metal") {
+            ggml_backend_reg_t backend = ggml_backend_dev_backend_reg(device);
+            const auto backendName = std::string(backend == nullptr ? "" : ggml_backend_reg_name(backend));
+
+            if (backendName == "MTL" || backendName == "Metal") {
                 unifiedVramSize += deviceTotal;
             }
 #endif

@@ -2,7 +2,6 @@ import path from "path";
 import process from "process";
 import {fileURLToPath} from "url";
 import {fork} from "node:child_process";
-import os from "os";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import stripAnsi from "strip-ansi";
@@ -264,7 +263,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
         });
         const ggufInsights = await GgufInsights.from(ggufMetadata, llama);
         const totalVram = (await llama.getVramState()).total;
-        const totalRam = os.totalmem();
+        const totalRam = (await llama.getRamState()).total;
 
         let lastGpuLayers = maxLayers ?? (
             resolvedMaxVram == null

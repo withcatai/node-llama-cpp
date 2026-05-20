@@ -830,7 +830,10 @@ async function getBalancedVramState(bindings: BindingModule) {
             const systemMemoryInfo = await bindings.getSystemMemoryInfo();
             systemMemoryInfo.total ??= os.totalmem();
             systemMemoryInfo.free ??= os.freemem();
-            systemMemoryInfo.useful = Math.max(systemMemoryInfo.free, Math.min(systemMemoryInfo.useful ?? systemMemoryInfo.free, total));
+            systemMemoryInfo.useful = Math.max(
+                systemMemoryInfo.free,
+                Math.min(systemMemoryInfo.useful ?? systemMemoryInfo.free, systemMemoryInfo.total)
+            );
     
             const lockedRam = Math.max(0, systemMemoryInfo.total - systemMemoryInfo.useful);
             const nonUnifiedMemoryRam = systemMemoryInfo.total - unifiedSize;
