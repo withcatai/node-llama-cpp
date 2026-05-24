@@ -38,13 +38,11 @@ void addonCallJsLogCallback(
     }
 
     if (!called && data != nullptr) {
-        if (data->logLevelNumber == 2) {
-            fputs(data->stringStream->str().c_str(), stderr);
-            fflush(stderr);
-        } else {
-            fputs(data->stringStream->str().c_str(), stdout);
-            fflush(stdout);
-        }
+        // llama.cpp diagnostics go to stderr regardless of level —
+        // stdout is the host process's data / JSON-RPC channel and
+        // must not be polluted with library log lines.
+        fputs(data->stringStream->str().c_str(), stderr);
+        fflush(stderr);
     }
 
     if (data != nullptr) {
@@ -83,13 +81,10 @@ void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user
     }
 
     if (text != nullptr) {
-        if (level == 2) {
-            fputs(text, stderr);
-            fflush(stderr);
-        } else {
-            fputs(text, stdout);
-            fflush(stdout);
-        }
+        // All llama.cpp log output goes to stderr — see the note in
+        // addonCallJsLogCallback; stdout is the host's data channel.
+        fputs(text, stderr);
+        fflush(stderr);
     }
 }
 
