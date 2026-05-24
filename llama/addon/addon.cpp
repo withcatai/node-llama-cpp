@@ -51,7 +51,7 @@ Napi::Value addonGetSupportsMlock(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value addonGetMathCores(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), cpu_get_num_math());
+    return Napi::Number::New(info.Env(), common_cpu_get_num_math());
 }
 
 Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
