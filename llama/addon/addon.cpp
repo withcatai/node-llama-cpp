@@ -236,7 +236,7 @@ Napi::Value addonSetNuma(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value markLoaded(const Napi::CallbackInfo& info) {
-    static std::atomic_bool loaded = false;
+    static std::atomic_bool loaded{false};
     return Napi::Boolean::New(info.Env(), loaded.exchange(true));
 }
 
