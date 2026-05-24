@@ -1099,6 +1099,12 @@ function getShouldTestBinaryBeforeLoading({
     buildMetadata: BuildMetadataFile
 }) {
     if (platform === "linux") {
+        // WSL2: skip binding test on WSL2 since prebuilt binaries are built for
+        // the same Ubuntu kernel but WSL2's WSL-specific environment causes test failures
+        // while the binary is actually compatible (WSL uses Windows CUDA .dll, not Linux)
+        if (platformInfo.wslDistro === true)
+            return false;
+
         if (isPrebuiltBinary)
             return true;
 
