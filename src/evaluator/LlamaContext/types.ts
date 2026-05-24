@@ -49,6 +49,20 @@ export type LlamaContextOptions = {
     batchSize?: number,
 
     /**
+     * The physical micro-batch size used inside the model's forward pass.
+     *
+     * Defaults to `batchSize` — the batch queue is managed JS-side and a
+     * single ubatch processes the whole batch. Set this lower than
+     * `batchSize` to chunk a large logical batch into smaller GPU
+     * submissions (matches llama.cpp's `--ubatch-size` flag, useful when
+     * the model is sensitive to per-ubatch VRAM peaks or when probing
+     * different `n_ubatch` values for throughput on a given hardware).
+     *
+     * Must be ≤ `batchSize`.
+     */
+    ubatchSize?: number,
+
+    /**
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
      *
      * The support for flash attention is currently experimental and may not always work as expected.

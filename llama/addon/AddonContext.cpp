@@ -414,6 +414,10 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
             context_params.n_ubatch = context_params.n_batch; // the batch queue is managed in the JS side, so there's no need for managing it on the C++ side
         }
 
+        if (options.Has("ubatchSize")) {
+            context_params.n_ubatch = options.Get("ubatchSize").As<Napi::Number>().Uint32Value();
+        }
+
         if (options.Has("sequences")) {
             context_params.n_seq_max = options.Get("sequences").As<Napi::Number>().Uint32Value();
         }
