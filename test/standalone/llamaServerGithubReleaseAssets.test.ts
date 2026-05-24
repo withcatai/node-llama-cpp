@@ -22,7 +22,7 @@ describe("llamaServerGithubReleaseAssets", () => {
                 {
                     platform: "mac",
                     arch: "x64",
-                    gpu: false,
+                    gpu: "metal",
                     runtimePlatform: "darwin",
                     runtimeArch: "x64"
                 },
@@ -120,7 +120,6 @@ describe("llamaServerGithubReleaseAssets", () => {
     });
 
     test.each([
-        [{platform: "mac", arch: "x64", gpu: "metal"}],
         [{platform: "win", arch: "arm64", gpu: "cuda"}]
     ] as const)("does not resolve non-primary managed server flavor %#", (buildOptions) => {
         expect(getLlamaServerGithubReleaseAssetForBuildOptions(buildOptions))

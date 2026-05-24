@@ -432,17 +432,31 @@ export async function getPrebuiltBinaryPath(buildOptions: BuildOptions, folderNa
         ? undefined
         : packagePrebuiltBinariesDirectoryPath.extBinsDir;
 
-    const packagePrebuiltBinaryDirectoryPath = path.join(prebuiltBinariesDirPath, folderName);
+    let resolvedFolderName = folderName;
+    let packagePrebuiltBinaryDirectoryPath = path.join(prebuiltBinariesDirPath, resolvedFolderName);
+    let binaryPathFromPackage = await resolvePrebuiltBinaryPath(packagePrebuiltBinaryDirectoryPath);
+
+    if (binaryPathFromPackage == null && buildOptions.platform === "mac" && buildOptions.gpu === false) {
+        const metalBuildOptions = {...buildOptions, gpu: "metal" as const};
+        const metalFolderName = (await getBuildFolderNameForBuildOptions(metalBuildOptions)).withCustomCmakeOptions;
+        const metalPackagePrebuiltBinaryDirectoryPath = path.join(prebuiltBinariesDirPath, metalFolderName);
+        const metalBinaryPathFromPackage = await resolvePrebuiltBinaryPath(metalPackagePrebuiltBinaryDirectoryPath);
+
+        if (metalBinaryPathFromPackage != null) {
+            resolvedFolderName = metalFolderName;
+            packagePrebuiltBinaryDirectoryPath = metalPackagePrebuiltBinaryDirectoryPath;
+            binaryPathFromPackage = metalBinaryPathFromPackage;
+        }
+    }
+
     const extPackagePrebuiltBinaryDirectoryPath = prebuiltBinariesExtDirPath == null
         ? undefined
-        : path.join(prebuiltBinariesExtDirPath, folderName);
-
-    const binaryPathFromPackage = await resolvePrebuiltBinaryPath(packagePrebuiltBinaryDirectoryPath);
+        : path.join(prebuiltBinariesExtDirPath, resolvedFolderName);
 
     if (binaryPathFromPackage != null)
         return {
             binaryPath: binaryPathFromPackage,
-            folderName,
+            folderName: resolvedFolderName,
             folderPath: packagePrebuiltBinaryDirectoryPath,
             extBackendsPath: extPackagePrebuiltBinaryDirectoryPath
         };
@@ -606,10 +620,10 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
 
     /* eslint-disable import/no-unresolved */
     if (buildOptions.platform === "mac") {
-        if (buildOptions.arch === "arm64" && buildOptions.gpu === "metal")
+        if (buildOptions.arch === "arm64" && (buildOptions.gpu === "metal" || buildOptions.gpu === false))
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@realtimex/node-llama-cpp-mac-arm64-metal"));
-        else if (buildOptions.arch === "x64" && buildOptions.gpu === false)
+        else if (buildOptions.arch === "x64" && (buildOptions.gpu === "metal" || buildOptions.gpu === false))
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@realtimex/node-llama-cpp-mac-x64"));
     } else if (buildOptions.platform === "linux") {

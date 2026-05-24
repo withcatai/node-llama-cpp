@@ -843,7 +843,8 @@ async function loadExistingLlamaBinary({
                     skipLlamaInit,
                     debug,
                     numa,
-                    tempDir
+                    tempDir,
+                    gpu: buildOptions.gpu
                 });
             } else if (progressLogs) {
                 console.warn(
@@ -910,7 +911,8 @@ async function loadExistingLlamaBinary({
                         skipLlamaInit,
                         debug,
                         numa,
-                        tempDir
+                        tempDir,
+                        gpu: buildOptions.gpu
                     });
                 } else if (progressLogs) {
                     const binaryDescription = describeBinary({
@@ -1016,7 +1018,8 @@ async function buildAndLoadLlamaBinary({
         skipLlamaInit,
         debug,
         numa,
-        tempDir
+        tempDir,
+        gpu: buildOptions.gpu
     });
 }
 

@@ -343,9 +343,9 @@ jobs:
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildLlamaServerRuntimeBinary("x64", "cuda");
           } else if (process.env.ARTIFACT_NAME === "mac-x64") {
-            await buildBinary("x64", ["--gpu", "false"]);
+            await buildBinary("x64", ["--gpu", "metal"]);
 
-            await buildLlamaServerRuntimeBinary("x64", false);
+            await buildLlamaServerRuntimeBinary("x64", "metal");
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
             await buildBinary("arm64", ["--gpu", "metal"]);
 

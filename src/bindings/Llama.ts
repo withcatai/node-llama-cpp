@@ -140,10 +140,10 @@ export class Llama {
         if (this._numa !== false)
             bindings.setNuma(numa);
 
-        this._gpu = bindings.getGpuType() ?? false;
-        this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
+        this._gpu = buildGpu === false ? false : (bindings.getGpuType() ?? false);
+        this._supportsGpuOffloading = this._gpu !== false && bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
-        this._gpuSupportsMmap = bindings.getGpuSupportsMmap();
+        this._gpuSupportsMmap = this._gpu !== false && bindings.getGpuSupportsMmap();
         this._supportsMlock = bindings.getSupportsMlock();
         this._mathCores = Math.floor(bindings.getMathCores());
         this._consts = bindings.getConsts();
@@ -522,7 +522,7 @@ export class Llama {
     /** @internal */
     public static async _create({
         bindings, bindingPath, extBackendsPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads,
-        skipLlamaInit = false, debug, numa, tempDir
+        skipLlamaInit = false, debug, numa, tempDir, gpu
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -537,7 +537,8 @@ export class Llama {
         skipLlamaInit?: boolean,
         debug: boolean,
         numa?: LlamaNuma,
-        tempDir?: string | string[] | false
+        tempDir?: string | string[] | false,
+        gpu?: LlamaGpuType
     }) {
         const vramOrchestrator = new MemoryOrchestrator(() => {
             const {total, used, unifiedSize} = bindings.getGpuVramInfo();
@@ -605,7 +606,7 @@ export class Llama {
             debug,
             tempDir: resolvedTempDir,
             numa,
-            buildGpu: buildMetadata.buildOptions.gpu,
+            buildGpu: gpu !== undefined ? gpu : buildMetadata.buildOptions.gpu,
             vramOrchestrator,
             maxThreads,
             vramPadding: vramOrchestrator.reserveMemory(0),

@@ -25,7 +25,7 @@ const llamaServerRuntimeGithubReleaseAssets: readonly LlamaServerRuntimeGithubRe
     {
         platform: "mac",
         arch: "x64",
-        gpu: false,
+        gpu: "metal",
         runtimePlatform: "darwin",
         runtimeArch: "x64"
     },

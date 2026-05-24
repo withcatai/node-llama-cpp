@@ -32,13 +32,13 @@ export async function getLlamaGpuTypes(include: "supported" | "allValid"): Promi
 
     const res: LlamaGpuType[] = [];
 
-    // Metal is not properly supported by llama.cpp on x64 Mac machines
-    if (platform === "mac" && arch === "arm64")
+    if (platform === "mac") {
         res.push("metal");
-    else
+    } else {
         res.push("cuda");
+        res.push("vulkan");
+    }
 
-    res.push("vulkan");
     res.push(false);
 
     return res;

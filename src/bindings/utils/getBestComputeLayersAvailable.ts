@@ -24,7 +24,7 @@ export async function detectBestComputeLayersAvailable({
     arch?: typeof process.arch,
     hasCudaWithStaticBinaryBuild?: boolean
 } = {}): Promise<BuildGpu[]> {
-    if (platform === "mac" && arch === "arm64")
+    if (platform === "mac")
         return ["metal"];
 
     const res: BuildGpu[] = [];
