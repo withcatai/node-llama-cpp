@@ -12,16 +12,6 @@ type RepoPatch = {
 };
 
 const patches: RepoPatch[] = [{
-    // https://github.com/ggml-org/llama.cpp/pull/22341
-    filename: "PR-22341.diff",
-    title: "ggml: `gguf_init_from_callback` and `gguf_init_from_buffer`",
-    async canSkip(repoPath) {
-        const ggufH = await fs.readFile(path.join(repoPath, "ggml", "include", "gguf.h"), "utf8");
-
-        return !ggufH.includes("//GGML_API struct gguf_context * gguf_init_from_buffer") &&
-            /\n\s*GGML_API struct gguf_context\s*\*\s*gguf_init_from_buffer\s*\(const\s+void\s*\*\s*data/.test(ggufH);
-    }
-}, {
     // https://github.com/ggml-org/llama.cpp/pull/22566
     filename: "PR-22566.diff",
     title: "fix: consistent memory breakdown for models loaded with `no_alloc`",
