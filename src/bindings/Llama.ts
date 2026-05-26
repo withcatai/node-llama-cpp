@@ -19,6 +19,8 @@ import {
 } from "./types.js";
 import {MemoryOrchestrator} from "./utils/MemoryOrchestrator.js";
 import {registerDisposeBeforeExit, unregisterDisposeBeforeExit} from "./utils/disposeBeforeExit.js";
+import {LlamaExperimentalOptions} from "./getLlama.js";
+import {getPlatform} from "./utils/getPlatform.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -51,6 +53,7 @@ export class Llama {
     /** @internal */ public _hadErrorLogs: boolean = false;
     /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _numa: LlamaNuma;
+    /** @internal */ private readonly _experimentalOptions?: LlamaExperimentalOptions;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
@@ -77,7 +80,7 @@ export class Llama {
 
     private constructor({
         bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, tempDir, numa, buildGpu,
-        maxThreads, vramOrchestrator, ramOrchestrator, swapOrchestrator, skipLlamaInit
+        maxThreads, vramOrchestrator, ramOrchestrator, swapOrchestrator, skipLlamaInit, experimentalOptions
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -98,7 +101,8 @@ export class Llama {
         vramOrchestrator: MemoryOrchestrator,
         ramOrchestrator: MemoryOrchestrator,
         swapOrchestrator: MemoryOrchestrator,
-        skipLlamaInit: boolean
+        skipLlamaInit: boolean,
+        experimentalOptions?: LlamaExperimentalOptions
     }) {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
@@ -110,6 +114,7 @@ export class Llama {
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
+        this._experimentalOptions = experimentalOptions;
         this._selfWeakRef = new WeakRef(this);
 
         const previouslyLoaded = bindings.markLoaded();
@@ -117,6 +122,14 @@ export class Llama {
         if (!this._debug && (!skipLlamaInit || !previouslyLoaded)) {
             this._bindings.setLogger(this._onAddonLog);
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
+        }
+
+        let disabledResidencySets = false;
+        if (getPlatform() === "mac" && buildGpu === "metal" && this._experimentalOptions?.metalSkipDisablingResidencySets !== true &&
+            process.env["GGML_METAL_NO_RESIDENCY"] == null
+        ) {
+            this._log(LlamaLogLevel.debug, "Disabling residency sets");
+            disabledResidencySets = bindings.setEnv("GGML_METAL_NO_RESIDENCY", "1");
         }
 
         bindings.loadBackends();
@@ -136,6 +149,9 @@ export class Llama {
 
         if (this._numa !== false)
             bindings.setNuma(numa);
+
+        if (disabledResidencySets)
+            bindings.setEnv("GGML_METAL_NO_RESIDENCY", undefined);
 
         this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
@@ -628,7 +644,7 @@ export class Llama {
     /** @internal */
     public static async _create({
         bindings, bindingPath, extBackendsPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads,
-        skipLlamaInit = false, debug, numa, tempDir
+        skipLlamaInit = false, debug, numa, tempDir, experimentalOptions
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -643,7 +659,8 @@ export class Llama {
         skipLlamaInit?: boolean,
         debug: boolean,
         numa?: LlamaNuma,
-        tempDir?: string | string[] | false
+        tempDir?: string | string[] | false,
+        experimentalOptions?: LlamaExperimentalOptions
     }) {
         const vramOrchestrator = new MemoryOrchestrator(getBalancedVramState.bind(undefined, bindings, true));
         const ramOrchestrator = new MemoryOrchestrator(async () => {
@@ -706,7 +723,8 @@ export class Llama {
             maxThreads,
             ramOrchestrator,
             swapOrchestrator,
-            skipLlamaInit
+            skipLlamaInit,
+            experimentalOptions
         });
 
         if (llama.gpu === false || vramPadding === 0) {

@@ -107,6 +107,7 @@ export type BindingModule = {
     },
     init(): Promise<void>,
     setNuma(numa?: LlamaNuma): void,
+    setEnv(key: string, value?: string | null, overwrite?: boolean): boolean,
     loadBackends(forceLoadLibrariesSearchPath?: string): void,
     dispose(): Promise<void>
 };

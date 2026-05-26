@@ -1,6 +1,6 @@
 import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
-import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/getLlama.js";
+import {getLlama, type LlamaOptions, type LastBuildOptions, type LlamaExperimentalOptions} from "./bindings/getLlama.js";
 import {getLlamaGpuTypes} from "./bindings/utils/getLlamaGpuTypes.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {
@@ -131,6 +131,7 @@ export {
     getLlamaGpuTypes,
     type LlamaOptions,
     type LastBuildOptions,
+    type LlamaExperimentalOptions,
     type LlamaGpuType,
     type LlamaNuma,
     type RamState,

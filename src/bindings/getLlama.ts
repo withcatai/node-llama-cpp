@@ -228,7 +228,16 @@ export type LlamaOptions = {
      * Hidden since currently unused - defaults to `false` for now
      * @internal
      */
-    tempDir?: string | string[] | false
+    tempDir?: string | string[] | false,
+
+    /**
+     * Experimental options that may be removed in the future without a major version bump, so use with caution.
+     * @deprecated Any options under this field are experimental and may be removed in the future without a major version bump,
+     * so use with caution.
+     * @experimental Any options under this field are experimental and may be removed in the future without a major version bump,
+     * so use with caution.
+     */
+    experimental?: LlamaExperimentalOptions
 };
 
 export type LastBuildOptions = {
@@ -358,7 +367,25 @@ export type LastBuildOptions = {
      * Hidden since currently unused - defaults to `false` for now
      * @internal
      */
-    tempDir?: string | string[] | false
+    tempDir?: string | string[] | false,
+
+    /**
+     * Experimental options that may be removed in the future without a major version bump, so use with caution.
+     */
+    experimental?: LlamaExperimentalOptions
+};
+
+export type LlamaExperimentalOptions = {
+    /**
+     * Skip disabling Metal residency sets on macOS when using Metal,
+     * which will keep the model data wired (force it to stay in memory) but can negatively affect system performance.
+     * 
+     * Doing this may cause issues where the system thinks it has less available memory to load a model even after disposing a previous one.
+     * 
+     * Defaults to `false`.
+     * @experimental This is an experimental option that may be removed in the future without a major version bump, so use with caution.
+     */
+    metalSkipDisablingResidencySets?: boolean
 };
 
 export const getLlamaFunctionName = "getLlama";
@@ -419,7 +446,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
             numa: lastBuildOptions?.numa,
             tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
-            dryRun
+            dryRun,
+            experimental: lastBuildOptions?.experimental
         };
 
         if (lastBuildInfo == null)
@@ -448,7 +476,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
                     numa: lastBuildOptions?.numa,
                     tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
-                    skipLlamaInit: dryRun
+                    skipLlamaInit: dryRun,
+                    experimentalOptions: lastBuildOptions?.experimental
                 });
 
                 if (dryRun)
@@ -484,7 +513,8 @@ export async function getLlamaForOptions({
     debug = defaultLlamaCppDebugMode,
     numa = false,
     tempDir = defaultTempDir,
-    dryRun = false
+    dryRun = false,
+    experimental: experimentalOptions
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
     skipLlamaInit = false,
@@ -559,7 +589,8 @@ export async function getLlamaForOptions({
                     debug,
                     numa,
                     tempDir,
-                    dryRun
+                    dryRun,
+                    experimental: experimentalOptions
                 });
             } catch (err) {
                 return await getLlamaForOptions({
@@ -578,7 +609,8 @@ export async function getLlamaForOptions({
                     debug,
                     numa,
                     tempDir,
-                    dryRun
+                    dryRun,
+                    experimental: experimentalOptions
                 });
             }
         } else
@@ -626,7 +658,8 @@ export async function getLlamaForOptions({
                 debug,
                 numa,
                 tempDir,
-                pipeBinaryTestErrorLogs
+                pipeBinaryTestErrorLogs,
+                experimentalOptions
             });
 
             if (llama != null) {
@@ -662,7 +695,8 @@ export async function getLlamaForOptions({
                         skipLlamaInit,
                         debug,
                         numa,
-                        tempDir
+                        tempDir,
+                        experimentalOptions
                     });
                 } catch (err) {
                     console.error(
@@ -740,7 +774,8 @@ export async function getLlamaForOptions({
                 skipLlamaInit,
                 debug,
                 numa,
-                tempDir
+                tempDir,
+                experimentalOptions
             });
         } catch (err) {
             console.error(
@@ -787,7 +822,8 @@ async function loadExistingLlamaBinary({
     debug,
     numa,
     tempDir,
-    pipeBinaryTestErrorLogs
+    pipeBinaryTestErrorLogs,
+    experimentalOptions
 }: {
     buildOptions: BuildOptions,
     canUsePrebuiltBinaries: boolean,
@@ -805,7 +841,8 @@ async function loadExistingLlamaBinary({
     debug: boolean,
     numa?: LlamaNuma,
     tempDir: LlamaOptions["tempDir"],
-    pipeBinaryTestErrorLogs: boolean
+    pipeBinaryTestErrorLogs: boolean,
+    experimentalOptions?: LlamaExperimentalOptions
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -843,7 +880,8 @@ async function loadExistingLlamaBinary({
                     skipLlamaInit,
                     debug,
                     numa,
-                    tempDir
+                    tempDir,
+                    experimentalOptions
                 });
             } else if (progressLogs) {
                 console.warn(
@@ -910,7 +948,8 @@ async function loadExistingLlamaBinary({
                         skipLlamaInit,
                         debug,
                         numa,
-                        tempDir
+                        tempDir,
+                        experimentalOptions
                     });
                 } else if (progressLogs) {
                     const binaryDescription = describeBinary({
@@ -967,7 +1006,8 @@ async function buildAndLoadLlamaBinary({
     skipLlamaInit,
     debug,
     numa,
-    tempDir
+    tempDir,
+    experimentalOptions
 }: {
     buildOptions: BuildOptions,
     skipDownload: boolean,
@@ -980,7 +1020,8 @@ async function buildAndLoadLlamaBinary({
     skipLlamaInit: boolean,
     debug: boolean,
     numa?: LlamaNuma,
-    tempDir: LlamaOptions["tempDir"]
+    tempDir: LlamaOptions["tempDir"],
+    experimentalOptions?: LlamaExperimentalOptions
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -1016,7 +1057,8 @@ async function buildAndLoadLlamaBinary({
         skipLlamaInit,
         debug,
         numa,
-        tempDir
+        tempDir,
+        experimentalOptions
     });
 }
 

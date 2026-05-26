@@ -16,6 +16,7 @@
 #include "globals/getProcessMemoryInfo.h"
 #include "globals/getSwapInfo.h"
 #include "globals/getSystemMemoryInfo.h"
+#include "globals/addonEnv.h"
 
 std::mutex backendMutex;
 bool backendInitialized = false;
@@ -170,9 +171,9 @@ class AddonBackendUnloadWorker : public Napi::AsyncWorker {
         Napi::Promise::Deferred deferred;
 
         void Execute() {
-            std::lock_guard<std::mutex> lock(backendMutex);
-
             try {
+                std::lock_guard<std::mutex> lock(backendMutex);
+
                 if (backendInitialized) {
                     backendInitialized = false;
                     llama_backend_free();
@@ -312,6 +313,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getSystemMemoryInfo", getSystemMemoryInfo),
         Napi::PropertyDescriptor::Function("loadBackends", addonLoadBackends),
         Napi::PropertyDescriptor::Function("setNuma", addonSetNuma),
+        Napi::PropertyDescriptor::Function("setEnv", addonSetEnv),
         Napi::PropertyDescriptor::Function("init", addonInit),
         Napi::PropertyDescriptor::Function("dispose", addonDispose),
     });
