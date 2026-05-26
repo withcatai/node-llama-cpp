@@ -583,7 +583,7 @@ export class LlamaModel {
         if (token == null)
             return false;
 
-        if (this.getTokenAttributes(token).control)
+        if (this.getTokenAttributes(token).control || this.isEogToken(token))
             return true;
 
         const normalText = this.detokenize([token], false);
