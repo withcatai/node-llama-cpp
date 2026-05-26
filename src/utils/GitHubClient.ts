@@ -20,7 +20,15 @@ type GitHubClientOptions = {
      */
     apiVersion?: GitHubApiVersion,
 
-    userAgent?: string
+    userAgent?: string,
+
+    /**
+     * When the API ratelimit is exceeded, retry with a GitHub token if one is found
+     * in the environment variables (`GITHUB_TOKEN` or `GH_TOKEN`).
+     * 
+     * Defaults to `true`.
+     */
+    retryWithToken?: boolean
 };
 
 export type GitHubRelease = {
@@ -153,10 +161,24 @@ export class GitHubClient {
             headers["User-Agent"] = this._clientOptions.userAgent;
 
 
-        const res = await fetch(url, {
+        let res = await fetch(url, {
             method: "GET",
             headers
         });
+
+        if (!res.ok && res.status === 403 && headers.Authorization == null && this._clientOptions.retryWithToken !== false &&
+            res.headers.get("X-RateLimit-Remaining") === "0"
+        ) {
+            const tokenFromEnv = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+            if (tokenFromEnv != null && tokenFromEnv !== "") {
+                headers.Authorization = "Bearer " + tokenFromEnv;
+
+                res = await fetch(url, {
+                    method: "GET",
+                    headers
+                });
+            }
+        }
 
         if (!res.ok) {
             const err = new Error(
