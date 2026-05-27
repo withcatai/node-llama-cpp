@@ -169,7 +169,11 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                     }
-                }
+                } else if (!cmakeCustomOptions.has("GGML_NATIVE") &&
+                    buildOptions.platform === platform &&
+                    buildOptions.arch === process.arch
+                )
+                    cmakeCustomOptions.set("GGML_NATIVE", "ON");
 
                 await fs.remove(outDirectory);
 
