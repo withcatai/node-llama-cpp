@@ -792,6 +792,8 @@ export class GgufInsights {
         if (sequences == null) sequences = getDefaultContextSequences();
         if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
 
+        const kvUnified = false;
+
         const cacheKey = [
             contextSize,
             modelGpuLayers,
@@ -822,11 +824,21 @@ export class GgufInsights {
     
             let contextResources: GgufInsightsResourceRequirements;
             try {
+                const paddedContextSize = padSafeContextSize(contextSize, "up");
+                const actualContextSize = kvUnified
+                    ? padSafeContextSize(sequences * contextSize, "up")
+                    : sequences * paddedContextSize;
+                const actualBatchSize = Math.max(batchSize, sequences) + (
+                    (!swaFullCache && this.swaSize != null && this.swaSize > 0)
+                        ? 1 // +1 to handle edge cases with SWA KV cache
+                        : 0
+                );
+
                 contextResources = await simulatorSession.estimateContextResources({
                     modelSource: simulatorSource,
                     gpuLayers: modelGpuLayers,
-                    contextSize,
-                    batchSize,
+                    contextSize: actualContextSize,
+                    batchSize: actualBatchSize,
                     sequences,
                     isEmbeddingContext,
                     flashAttention,
@@ -838,7 +850,7 @@ export class GgufInsights {
             } catch (error: any) {
                 throw new Error("Failed simulating context resource usage. Falling back to estimation heuristic. Error: " + (error?.message ?? String(error)));
             }
-    
+
             const resourceRequirements = {
                 cpuRam: contextResources.cpuRam,
                 gpuVram: contextResources.gpuVram
