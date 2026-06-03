@@ -56,6 +56,10 @@ export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
 export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .default(builtinLlamaCppRelease)
     .asString();
+export const defaultLlamaCppRepoSkipPatches = env.get("NODE_LLAMA_CPP_REPO_SKIP_PATCHES")
+    .default("")
+    .asString()
+    .split(";");
 export const defaultLlamaCppGpuSupport = parseNodeLlamaCppGpuOption(
     env.get("NODE_LLAMA_CPP_GPU")
         .default("auto")
