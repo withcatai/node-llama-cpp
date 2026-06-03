@@ -204,7 +204,7 @@ export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progres
     }
 
     await cloneLlamaCppRepo(githubOwner!, githubRepo!, releaseTag, true, progressLogs);
-    await applyLlamaCppRepoPatches(releaseDate);
+    await applyLlamaCppRepoPatches(releaseDate, false, progressLogs);
 }
 
 async function updateClonedLlamaCppRepoTagFile(githubOwner: string, githubRepo: string, tag: string) {

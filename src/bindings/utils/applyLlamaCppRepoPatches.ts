@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs-extra";
 import {simpleGit} from "simple-git";
 import {GitHubClient} from "../../utils/GitHubClient.js";
-import {llamaCppDirectory, llamaCppPatchesDirectory} from "../../config.js";
+import {defaultLlamaCppRepoSkipPatches, llamaCppDirectory, llamaCppPatchesDirectory} from "../../config.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 
 type RepoPatch = {
@@ -47,8 +47,8 @@ export function hasLlamaCppRepoPatchesToApply() {
     return patches.length > 0;
 }
 
-export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnError: boolean = false) {
-    if (!hasLlamaCppRepoPatchesToApply())
+export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnError: boolean = false, progressLogs: boolean = true) {
+    if (!hasLlamaCppRepoPatchesToApply() || (defaultLlamaCppRepoSkipPatches.length === 1 && defaultLlamaCppRepoSkipPatches[0] === "*"))
         return;
 
     if (!(await fs.pathExists(llamaCppPatchesDirectory)) || !(await fs.pathExists(llamaCppDirectory)))
@@ -58,30 +58,41 @@ export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnErr
     for (const patch of patches) {
         const patchPath = path.join(path.resolve(llamaCppPatchesDirectory), patch.filename);
 
+        const filenameWithoutDiff = patch.filename.toLowerCase().endsWith(".diff")
+            ? patch.filename.slice(0, -".diff".length)
+            : patch.filename;
+
+        if (defaultLlamaCppRepoSkipPatches.includes(filenameWithoutDiff) || defaultLlamaCppRepoSkipPatches.includes(patch.filename))
+            continue;
+
         try {
             if (!(await fs.pathExists(patchPath))) {
-                console.warn(`Patch file "${patch.filename}" not found, skipping patch "${patch.title}"`);
+                if (progressLogs)
+                    console.warn(`Patch file "${patch.filename}" not found, skipping patch "${patch.title}"`);
+                
                 continue;
             }
 
             if (await patch.canSkip(llamaCppDirectory, lastCommitDate))
                 continue;
         } catch (err) {
-            console.warn(
-                getConsoleLogPrefix(),
-                `Failed testing whether patch "${patch.filename}": "${patch.title}" can be skipped:`,
-                String(err)
-            );
+            if (progressLogs)
+                console.warn(
+                    getConsoleLogPrefix(),
+                    `Failed testing whether patch "${patch.filename}": "${patch.title}" can be skipped:`,
+                    String(err)
+                );
         }
 
         try {
             await git.applyPatch(patchPath, {"--ignore-whitespace": null});
         } catch (err) {
-            console.error(
-                getConsoleLogPrefix(),
-                `Failed to apply patch "${patch.filename}": "${patch.title}", building llama.cpp may fail.`,
-                String(err)
-            );
+            if (progressLogs)
+                console.error(
+                    getConsoleLogPrefix(),
+                    `Failed to apply patch "${patch.filename}": "${patch.title}", building llama.cpp may fail.`,
+                    String(err)
+                );
 
             if (throwOnError)
                 throw err;
