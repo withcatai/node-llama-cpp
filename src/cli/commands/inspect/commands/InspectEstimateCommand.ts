@@ -33,6 +33,7 @@ type InspectEstimateCommand = {
     gpu?: BuildGpu | "auto",
     gpuLayers?: number | "max",
     contextSize?: number | "train",
+    flashAttention?: boolean,
     embedding?: boolean,
     mmap?: boolean,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
@@ -111,6 +112,11 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
+            .option("flashAttention", {
+                alias: "fa",
+                type: "boolean",
+                description: "Force enable flash attention. Flash attention is enabled by default when supported. You can force disable flash attention via `--no-fa`"
+            })
             .option("embedding", {
                 alias: "e",
                 type: "boolean",
@@ -165,7 +171,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, mmap,
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, flashAttention, embedding, mmap,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
@@ -233,9 +239,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             ? ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes
             : contextSizeArg;
 
-        async function resolveCompatibilityScore(flashAttention: boolean) {
+        const compatibilityScore = await withOra({
+            loading: chalk.blue("Resolving config"),
+            success: chalk.blue("Resolved config"),
+            fail: chalk.blue("Failed to resolve config"),
+            noSuccessLiveStatus: true
+        }, async () => {
             return await ggufInsights.configurationResolver.resolveAndScoreConfig({
-                flashAttention,
+                flashAttention: flashAttention == null
+                    ? "auto"
+                    : flashAttention,
                 targetContextSize: contextSize,
                 targetGpuLayers: gpuLayers,
                 embeddingContext: embedding,
@@ -248,15 +261,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                     : resolveGgmlTypeOption(kvCacheValueType),
                 swaFullCache
             });
-        }
-
-        const [
-            compatibilityScore,
-            compatibilityScoreWithFlashAttention
-        ] = await Promise.all([
-            resolveCompatibilityScore(false),
-            resolveCompatibilityScore(true)
-        ]);
+        });
 
         const longestTitle = Math.max("GPU info".length, "Model info".length, "Resolved config".length, "With flash attention".length) + 1;
 
@@ -339,8 +344,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
 
         console.info();
-        logCompatibilityScore("Resolved config", longestTitle, compatibilityScore, ggufInsights, llama, false);
-        logCompatibilityScore("With flash attention", longestTitle, compatibilityScoreWithFlashAttention, ggufInsights, llama, true);
+        logCompatibilityScore(
+            "Resolved config",
+            longestTitle,
+            compatibilityScore,
+            ggufInsights,
+            llama,
+            flashAttention == null
+                ? "auto"
+                : flashAttention
+        );
     }
 };
 
@@ -350,7 +363,7 @@ function logCompatibilityScore(
     compatibilityScore: Awaited<ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>>,
     ggufInsights: GgufInsights,
     llama: Llama,
-    flashAttention: boolean
+    flashAttention: boolean | "auto"
 ) {
     printInfoLine({
         title,
@@ -378,9 +391,12 @@ function logCompatibilityScore(
             title: "RAM usage",
             value: () => toBytes(compatibilityScore.resolvedValues.totalRamUsage)
         }, {
-            show: flashAttention,
             title: "Flash attention",
-            value: "enabled"
+            value: flashAttention === "auto"
+                ? "auto"
+                : flashAttention
+                    ? "enabled"
+                    : "disabled"
         }, {
             show: llama.supportsMmap,
             title: "mmap",
