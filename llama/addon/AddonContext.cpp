@@ -151,37 +151,15 @@ class AddonContextUnloadContextWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                llama_free(context->ctx);
-                context->contextLoaded = false;
-
-                try {
-                    if (context->has_batch) {
-                        llama_batch_free(context->batch);
-                        context->has_batch = false;
-                        context->batch_n_tokens = 0;
-                    }
-
-                    context->dispose();
-                } catch (const std::exception& e) {
-                    SetError(e.what());
-                } catch(...) {
-                    SetError("Unknown error when calling \"llama_batch_free\"");
-                }
+                context->disposeMemory();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_free\"");
+                SetError("Unknown error while disposing context memory");
             }
         }
         void OnOK() {
-            if (!context->model->model_params.no_alloc) {
-                adjustNapiExternalMemorySubtract(Env(), context->loadedContextMemorySize);
-                context->loadedContextMemorySize = 0;
-            }
-
-            adjustNapiExternalMemorySubtract(Env(), context->batchMemorySize);
-            context->batchMemorySize = 0;
-
+            context->disposeMT();
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -462,30 +440,12 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     }
 }
 AddonContext::~AddonContext() {
-    dispose();
+    disposeMT();
 }
 
-void AddonContext::dispose() {
-    if (disposed) {
-        return;
-    }
+void AddonContext::disposeBatchMemory() {
+    std::lock_guard<std::mutex> lock(disposeMutex);
 
-    disposed = true;
-    if (contextLoaded) {
-        contextLoaded = false;
-        llama_free(ctx);
-
-        if (!model->model_params.no_alloc) {
-            adjustNapiExternalMemorySubtract(Env(), loadedContextMemorySize);
-            loadedContextMemorySize = 0;
-        }
-    }
-
-    model->Unref();
-
-    disposeBatch();
-}
-void AddonContext::disposeBatch() {
     if (!has_batch) {
         return;
     }
@@ -493,38 +453,110 @@ void AddonContext::disposeBatch() {
     llama_batch_free(batch);
     has_batch = false;
     batch_n_tokens = 0;
+}
 
-    adjustNapiExternalMemorySubtract(Env(), batchMemorySize);
-    batchMemorySize = 0;
+void AddonContext::disposeBatchMT() {
+    uint64_t currentBatchMemorySize = 0;
+
+    disposeBatchMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+        currentBatchMemorySize = batchMemorySize;
+        batchMemorySize = 0;
+    }
+
+    if (currentBatchMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentBatchMemorySize);
+    }
+}
+
+void AddonContext::disposeMemory() {
+    llama_context* currentCtx = nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (!memoryDisposed) {
+            memoryDisposed = true;
+            currentCtx = ctx;
+            ctx = nullptr;
+            contextLoaded = false;
+        }
+    }
+
+    disposeBatchMemory();
+
+    if (currentCtx != nullptr) {
+        llama_free(currentCtx);
+    }
+}
+
+void AddonContext::disposeMT() {
+    uint64_t currentLoadedContextMemorySize = 0;
+    uint64_t currentBatchMemorySize = 0;
+    bool shouldUnrefModel = false;
+
+    disposeMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (disposed) {
+            return;
+        }
+
+        disposed = true;
+        shouldUnrefModel = true;
+
+        if (!model->model_params.no_alloc) {
+            currentLoadedContextMemorySize = loadedContextMemorySize;
+            loadedContextMemorySize = 0;
+        }
+
+        currentBatchMemorySize = batchMemorySize;
+        batchMemorySize = 0;
+    }
+
+    if (currentLoadedContextMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentLoadedContextMemorySize);
+    }
+
+    if (currentBatchMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentBatchMemorySize);
+    }
+
+    if (shouldUnrefModel) {
+        model->Unref();
+    }
+}
+
+Napi::Value AddonContext::Dispose(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        return info.Env().Undefined();
+    }
+
+    if (contextLoaded || has_batch) {
+        AddonContextUnloadContextWorker* worker = new AddonContextUnloadContextWorker(this->Env(), this);
+        worker->Queue();
+        return worker->GetPromise();
+    }
+
+    disposeMT();
+
+    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+    deferred.Resolve(info.Env().Undefined());
+    return deferred.Promise();
 }
 
 Napi::Value AddonContext::Init(const Napi::CallbackInfo& info) {
     if (disposed) {
         Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
         return info.Env().Undefined();
-    }
-
-    AddonContextLoadContextWorker* worker = new AddonContextLoadContextWorker(this->Env(), this);
-    worker->Queue();
-    return worker->GetPromise();
-}
-Napi::Value AddonContext::Dispose(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        return info.Env().Undefined();
-    }
-
-    if (contextLoaded) {
-        contextLoaded = false;
-
-        AddonContextUnloadContextWorker* worker = new AddonContextUnloadContextWorker(this->Env(), this);
+    } else {
+        AddonContextLoadContextWorker* worker = new AddonContextLoadContextWorker(this->Env(), this);
         worker->Queue();
         return worker->GetPromise();
-    } else {
-        dispose();
-
-        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
-        deferred.Resolve(info.Env().Undefined());
-        return deferred.Promise();
     }
 }
 
@@ -569,7 +601,7 @@ Napi::Value AddonContext::DisposeBatch(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    disposeBatch();
+    disposeBatchMT();
 
     return info.Env().Undefined();
 }

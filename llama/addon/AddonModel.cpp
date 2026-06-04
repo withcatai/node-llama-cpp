@@ -198,22 +198,15 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                llama_model_free(model->model);
-                model->modelLoaded = false;
-
-                model->dispose();
+                model->disposeMemory();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_model_free\"");
+                SetError("Unknown error when disposing model memory");
             }
         }
         void OnOK() {
-            if (!model->model_params.no_alloc) {
-                adjustNapiExternalMemorySubtract(Env(), model->loadedModelSize);
-                model->loadedModelSize = 0;
-            }
-
+            model->disposeMT();
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -261,12 +254,18 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
                 }
 
                 modelLora->lora_adapter = loraAdapter;
-                modelLora->model->Ref();
 
-                if (modelLora->model->data != nullptr) {
-                    modelLora->model->data->loraAdapters.insert(modelLora);
-                } else {
-                    modelLora->dispose(true);
+                bool hasModelData = false;
+                {
+                    std::lock_guard<std::mutex> modelLock(modelLora->model->disposeMutex);
+                    hasModelData = !modelLora->model->disposed
+                        && !modelLora->model->memoryDisposed
+                        && modelLora->model->data != nullptr;
+                }
+
+                if (!hasModelData) {
+                    llama_adapter_lora_free(modelLora->lora_adapter);
+                    modelLora->lora_adapter = nullptr;
                     SetError("Model data is not initialized");
                 }
             } catch (const std::exception& e) {
@@ -276,6 +275,32 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
+            bool shouldReject = false;
+
+            {
+                std::lock_guard<std::mutex> modelLock(modelLora->model->disposeMutex);
+                std::lock_guard<std::mutex> loraLock(modelLora->disposeMutex);
+
+                shouldReject = modelLora->disposed
+                    || modelLora->model->disposed
+                    || modelLora->model->memoryDisposed
+                    || modelLora->model->data == nullptr;
+
+                if (!shouldReject) {
+                    modelLora->model->Ref();
+                    modelLora->hasModelRef = true;
+                    modelLora->Ref();
+                    modelLora->hasSelfRef = true;
+                    modelLora->model->data->addLora(modelLora);
+                }
+            }
+
+            if (shouldReject) {
+                modelLora->disposeMemory();
+                deferred.Reject(Napi::Error::New(Env(), "Model or LoRA was disposed before LoRA load completed").Value());
+                return;
+            }
+
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -421,34 +446,94 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
 }
 
 AddonModel::~AddonModel() {
-    dispose();
+    disposeMT();
 }
-void AddonModel::dispose() {
-    if (disposed) {
-        return;
+
+void AddonModel::disposeMemory() {
+    llama_model* currentModel = nullptr;
+    AddonModelData* currentData = nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (memoryDisposed) {
+            return;
+        }
+
+        memoryDisposed = true;
+
+        currentData = data;
+        currentModel = model;
+        model = nullptr;
+        vocab = nullptr;
+        modelLoaded = false;
     }
 
-    disposed = true;
-    
-    if (data != nullptr) {
-        auto currentData = data;
+    if (currentData != nullptr) {
+        currentData->disposeMemory();
+    }
+
+    if (currentModel != nullptr) {
+        llama_model_free(currentModel);
+    }
+}
+
+void AddonModel::disposeMT() {
+    AddonModelData* currentData = nullptr;
+    uint64_t currentLoadedModelSize = 0;
+    bool shouldUnrefAddonExports = false;
+
+    disposeMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (disposed) {
+            return;
+        }
+
+        disposed = true;
+        currentData = data;
         data = nullptr;
+
+        if (!model_params.no_alloc) {
+            currentLoadedModelSize = loadedModelSize;
+            loadedModelSize = 0;
+        }
+
+        shouldUnrefAddonExports = hasAddonExportsRef;
+        hasAddonExportsRef = false;
+    }
+
+    if (currentData != nullptr) {
+        currentData->disposeMT();
         delete currentData;
     }
 
-    if (modelLoaded) {
-        modelLoaded = false;
-        llama_model_free(model);
-
-        if (!model_params.no_alloc) {
-            adjustNapiExternalMemorySubtract(Env(), loadedModelSize);
-            loadedModelSize = 0;
-        }
+    if (currentLoadedModelSize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentLoadedModelSize);
     }
 
-    if (hasAddonExportsRef) {
+    if (shouldUnrefAddonExports) {
         addonExportsRef.Unref();
-        hasAddonExportsRef = false;
+    }
+}
+
+Napi::Value AddonModel::Dispose(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        return info.Env().Undefined();
+    }
+
+    if (modelLoaded) {
+        AddonModelUnloadModelWorker* worker = new AddonModelUnloadModelWorker(this->Env(), this);
+        worker->Queue();
+        return worker->GetPromise();
+    } else {
+        disposeMT();
+    
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+        deferred.Resolve(info.Env().Undefined());
+        return deferred.Promise();
     }
 }
 
@@ -472,6 +557,11 @@ Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
     return worker->GetPromise();
 }
 Napi::Value AddonModel::LoadLora(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
     AddonModelLora* modelLora = Napi::ObjectWrap<AddonModelLora>::Unwrap(info[0].As<Napi::Object>());
     AddonModelLoadLoraWorker* worker = new AddonModelLoadLoraWorker(this->Env(), modelLora);
     worker->Queue();
@@ -481,26 +571,6 @@ Napi::Value AddonModel::AbortActiveModelLoad(const Napi::CallbackInfo& info) {
     abortModelLoad = true;
     return info.Env().Undefined();
 }
-Napi::Value AddonModel::Dispose(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        return info.Env().Undefined();
-    }
-
-    if (modelLoaded) {
-        modelLoaded = false;
-
-        AddonModelUnloadModelWorker* worker = new AddonModelUnloadModelWorker(this->Env(), this);
-        worker->Queue();
-        return worker->GetPromise();
-    } else {
-        dispose();
-
-        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
-        deferred.Resolve(info.Env().Undefined());
-        return deferred.Promise();
-    }
-}
-
 Napi::Value AddonModel::Tokenize(const Napi::CallbackInfo& info) {
     if (disposed) {
         Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();

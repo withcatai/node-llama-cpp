@@ -20,14 +20,18 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
         uint64_t loadedContextMemorySize = 0;
         bool contextLoaded = false;
+        std::mutex disposeMutex;
 
         bool disposed = false;
+        bool memoryDisposed = false;
 
         AddonContext(const Napi::CallbackInfo& info);
         ~AddonContext();
 
-        void dispose();
-        void disposeBatch();
+        void disposeMemory();
+        void disposeMT();
+        void disposeBatchMemory();
+        void disposeBatchMT();
 
         Napi::Value Init(const Napi::CallbackInfo& info);
         Napi::Value Dispose(const Napi::CallbackInfo& info);

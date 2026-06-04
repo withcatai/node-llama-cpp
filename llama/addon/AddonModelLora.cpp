@@ -26,7 +26,7 @@ class AddonModelLoraUnloadLoraWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                addonLora->dispose();
+                addonLora->disposeMemory();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -34,6 +34,7 @@ class AddonModelLoraUnloadLoraWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
+            addonLora->disposeMT();
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -48,18 +49,55 @@ AddonModelLora::AddonModelLora(const Napi::CallbackInfo& info) : Napi::ObjectWra
 }
 
 AddonModelLora::~AddonModelLora() {
-    dispose();
+    disposeMT();
 }
 
-void AddonModelLora::dispose(bool skipErase) {
-    if (lora_adapter != nullptr) {
-        lora_adapter = nullptr;
+void AddonModelLora::disposeMemory() {
+    std::lock_guard<std::mutex> lock(disposeMutex);
 
-        if (!skipErase && model->data != nullptr) {
-            model->data->removeLora(this);
+    if (memoryDisposed) {
+        return;
+    }
+
+    memoryDisposed = true;
+
+    if (lora_adapter != nullptr) {
+        llama_adapter_lora_free(lora_adapter);
+        lora_adapter = nullptr;
+    }
+}
+
+void AddonModelLora::disposeMT(bool skipErase) {
+    bool shouldRemoveFromModel = false;
+    bool shouldUnrefModel = false;
+    bool shouldUnrefSelf = false;
+
+    disposeMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (disposed) {
+            return;
         }
 
+        disposed = true;
+        shouldRemoveFromModel = !skipErase;
+        shouldUnrefModel = hasModelRef;
+        shouldUnrefSelf = hasSelfRef;
+        hasModelRef = false;
+        hasSelfRef = false;
+    }
+
+    if (shouldRemoveFromModel && model->data != nullptr) {
+        model->data->removeLora(this);
+    }
+
+    if (shouldUnrefModel) {
         model->Unref();
+    }
+    if (shouldUnrefSelf) {
+        Unref();
     }
 }
 
@@ -77,13 +115,27 @@ void AddonModelLora::SetUsages(const Napi::CallbackInfo& info, const Napi::Value
 }
 
 Napi::Value AddonModelLora::Dispose(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+        deferred.Resolve(info.Env().Undefined());
+        return deferred.Promise();
+    }
+
+    if (lora_adapter == nullptr) {
+        disposeMT();
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+        deferred.Resolve(info.Env().Undefined());
+        return deferred.Promise();
+    }
+
     AddonModelLoraUnloadLoraWorker* worker = new AddonModelLoraUnloadLoraWorker(this->Env(), this);
     worker->Queue();
     return worker->GetPromise();
 }
 
 Napi::Value AddonModelLora::GetDisposed(const Napi::CallbackInfo& info) {
-    return Napi::Boolean::New(info.Env(), lora_adapter == nullptr);
+    return Napi::Boolean::New(info.Env(), disposed);
 }
 
 void AddonModelLora::init(Napi::Object exports) {

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         Napi::Reference<Napi::Object> addonExportsRef;
         bool hasAddonExportsRef = false;
         AddonModelData* data;
+        std::mutex disposeMutex;
 
         std::string modelPath;
         bool modelLoaded = false;
@@ -33,10 +35,12 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         bool hasLoadAbortSignal = false;
 
         bool disposed = false;
+        bool memoryDisposed = false;
 
         AddonModel(const Napi::CallbackInfo& info);
         ~AddonModel();
-        void dispose();
+        void disposeMemory();
+        void disposeMT();
 
         Napi::Value Init(const Napi::CallbackInfo& info);
         Napi::Value LoadLora(const Napi::CallbackInfo& info);
