@@ -17,25 +17,26 @@ export async function resolveModelFileAccessTokensTryHeaders(
 ) {
     const res: Record<string, string>[] = [];
 
-    if (tokens == null || !isUrl(modelUrl))
+    if (!isUrl(modelUrl))
         return res;
 
-    const {huggingFace} = tokens;
+    const {huggingFace} = tokens ?? {};
 
     if (isHuggingFaceUrl(modelUrl, endpoints)) {
-        const hfToken = resolveHfToken(huggingFace);
+        const hfToken = await resolveHfToken(huggingFace);
 
-        res.push({
-            ...(baseHeaders ?? {}),
-            "Authorization": `Bearer ${hfToken}`
-        });
+        if (hfToken != null)
+            res.push({
+                ...(baseHeaders ?? {}),
+                "Authorization": `Bearer ${hfToken}`
+            });
     }
 
     return res;
 }
 
 async function resolveHfToken(providedToken?: string) {
-    if (providedToken !== null)
+    if (providedToken !== undefined) // if `null` then don't try to resolve from env var or file
         return providedToken;
 
     if (process.env.HF_TOKEN != null)

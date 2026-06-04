@@ -217,15 +217,15 @@ async function fetchHuggingFaceModelManifest({
     ].join("");
     const headersToTry = [
         {},
-        await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens, endpoints)
+        ...await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens, endpoints)
     ];
     let rateLimitPendingRetries = 0;
-
+    
     for (let i = 0; i < headersToTry.length * (1 + rateLimitPendingRetries); i++) {
         const headers = headersToTry[i % headersToTry.length];
         if (headers == null)
             continue;
-
+        
         let response: Awaited<ReturnType<typeof fetch>> | undefined;
         try {
             response = await fetch(manifestUrl, {

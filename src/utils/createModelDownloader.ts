@@ -361,9 +361,6 @@ export class ModelDownloader {
 
     /** @internal */
     private async resolveTryHeaders() {
-        if (this._tokens == null)
-            return;
-
         pushAll(
             this._tryHeaders,
             await resolveModelFileAccessTokensTryHeaders(this._modelUrl, this._tokens, this._endpoints, this._headers)
