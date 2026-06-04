@@ -16,7 +16,8 @@ const patches: RepoPatch[] = [{
     filename: "PR-22566.diff",
     title: "fix: consistent memory breakdown for models loaded with `no_alloc`",
     async canSkip(repoPath, lastCommitDate) {
-        if (await fs.pathExists(path.join(repoPath, "tests", "test-model-load-buffer.cpp")))
+        const llamaModelLoaderCpp = await fs.readFile(path.join(repoPath, "src", "llama-model-loader.cpp"), "utf8");
+        if (!llamaModelLoaderCpp.includes("n_tensors = weights_map.size();") && llamaModelLoaderCpp.includes("n_tensors = gguf_get_n_tensors(metadata);"))
             return true;
 
         if (lastCommitDate == null)

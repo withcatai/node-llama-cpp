@@ -1,19 +1,18 @@
 diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
-index 4e65a45a50d..2de7e7bcd1f 100644
+index c645d0785ab..01b79e6a9f9 100644
 --- a/src/llama-model-loader.cpp
 +++ b/src/llama-model-loader.cpp
-@@ -697,7 +697,9 @@ llama_model_loader::llama_model_loader(
+@@ -697,7 +697,8 @@ llama_model_loader::llama_model_loader(
      }
  
      n_kv      = gguf_get_n_kv(metadata);
 -    n_tensors = weights_map.size();
-+    n_tensors = files.empty()
-+        ? gguf_get_n_tensors(metadata)
-+        : weights_map.size();
++    n_tensors = gguf_get_n_tensors(metadata);
++    GGML_ASSERT(files.empty() || weights_map.size() == static_cast<size_t>(n_tensors));
  
      fver = (enum llama_fver) gguf_get_version(metadata);
  
-@@ -1218,6 +1220,12 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1218,6 +1219,12 @@ struct ggml_tensor * llama_model_loader::create_tensor(
          const int64_t tid = gguf_find_tensor(metadata, tn.str().c_str());
          if (tid != -1) {
              type = gguf_get_tensor_type(metadata, tid);
@@ -26,7 +25,7 @@ index 4e65a45a50d..2de7e7bcd1f 100644
          }
  
          // for tensors that are not required some of the dimensions can be invalid:
-@@ -1243,6 +1251,16 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1243,6 +1250,16 @@ struct ggml_tensor * llama_model_loader::create_tensor(
          ggml_backend_buffer_type_t buft = buft_for_tensor(&t_meta);
          GGML_ASSERT(buft != nullptr);
          ggml_context * ctx = ctx_for_buft(buft);
