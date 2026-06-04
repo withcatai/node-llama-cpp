@@ -112,7 +112,7 @@ export class FsPathHandle {
         this._finalizationRegistry = new FinalizationRegistry(removePathUsageSync);
 
         addPathUsage(this.path);
-        this._finalizationRegistry.register(this, this.path);
+        this._finalizationRegistry.register(this, this.path, this);
     }
 
     public async dispose() {

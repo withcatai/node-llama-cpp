@@ -1108,7 +1108,7 @@ export class LlamaContextSequence {
         };
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
-        this._gcRegistry.register(this, sequenceId);
+        this._gcRegistry.register(this, sequenceId, this);
         this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
 
         this._disposeAggregator.add(this.onDispose.dispatchEvent);

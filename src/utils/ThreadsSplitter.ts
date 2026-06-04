@@ -140,10 +140,10 @@ export class ThreadsSplitterConsumer {
         this._threadsSplitter._addThreadDemand(this._demandedThreads);
 
         this._wantedThreadsGcRegistry = new FinalizationRegistry(this._threadsSplitter._removeWantedThreads);
-        this._wantedThreadsGcRegistry.register(this, this._wantedThreads);
+        this._wantedThreadsGcRegistry.register(this, this._wantedThreads, this);
 
         this._demandedThreadsGcRegistry = new FinalizationRegistry(this._threadsSplitter._removeThreadDemand);
-        this._demandedThreadsGcRegistry.register(this, this._demandedThreads);
+        this._demandedThreadsGcRegistry.register(this, this._demandedThreads, this);
     }
 
     public [Symbol.dispose]() {

@@ -122,7 +122,7 @@ export class MemoryMarking {
         this._size = size;
         this._orchestrator = orchestrator;
         this._finalizationRegistry = new FinalizationRegistry(orchestrator._onMarkFinalized);
-        this._finalizationRegistry.register(this, size);
+        this._finalizationRegistry.register(this, size, this);
     }
 
     public get size(): number {
