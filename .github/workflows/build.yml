@@ -237,8 +237,10 @@ jobs:
           # postinstall download to let npm ci complete on riscv64.
           ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ matrix.config.artifact == 'linux-riscv64' && '1' || '' }}
         run: |
-          npm ci
-          
+          # npm on the unofficial riscv64 node intermittently throws internal
+          # TypeErrors (e.g. "key.match is not a function"); retry a few times.
+          npm ci || npm ci || npm ci
+
           npx zx -y <<'EOF'
           
           async function getLatestNodeVersions(maxDate) {
