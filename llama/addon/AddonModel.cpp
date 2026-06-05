@@ -123,7 +123,7 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
                         throw std::runtime_error("GGUF metadata is disposed");
                     }
 
-                        ModelEstimatorTensorAccessState tensorAccessState;
+                    ModelEstimatorTensorAccessState tensorAccessState;
                     model->model = llama_model_init_from_user(
                         ggufMetadata->ggufMetadata.get(),
                         markUnexpectedTensorDataAccess,

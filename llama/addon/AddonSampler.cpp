@@ -423,6 +423,8 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
 
     if (config.Has("repeatPenaltyTokens")) {
         Napi::Uint32Array repeat_penalty_tokens_uint32_array = config.Get("repeatPenaltyTokens").As<Napi::Uint32Array>();
+        const size_t repeatPenaltyTokensLength = repeat_penalty_tokens_uint32_array.ElementLength();
+        const uint32_t* repeatPenaltyTokens = repeat_penalty_tokens_uint32_array.Data();
         auto repeatPenalty = config.Has("repeatPenalty")
             ? config.Get("repeatPenalty").As<Napi::Number>().FloatValue()
             : 1;
@@ -456,19 +458,19 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             existingSamplerMatchesConfig &= repeatPenalty_frequencyPenalty == repeatPenaltyFrequencyPenalty;
 
             if (existingSamplerMatchesConfig) {
-                if (repeat_penalty_tokens_uint32_array.ElementLength() > 0) {
-                    const auto firstToken = static_cast<llama_token>(repeat_penalty_tokens_uint32_array[0]);
+                if (repeatPenaltyTokensLength > 0) {
+                    const auto firstToken = static_cast<llama_token>(repeatPenaltyTokens[0]);
                     if (repeatPenalty_lastTokens.rat(0) != firstToken &&
                         repeatPenalty_lastTokens.size() == repeatPenalty_maxTokens &&
-                        repeat_penalty_tokens_uint32_array.ElementLength() == repeatPenalty_maxTokens
+                        repeatPenaltyTokensLength == static_cast<size_t>(repeatPenalty_maxTokens)
                     ) {
-                        const auto lastToken = static_cast<llama_token>(repeat_penalty_tokens_uint32_array[repeat_penalty_tokens_uint32_array.ElementLength() - 1]);
+                        const auto lastToken = static_cast<llama_token>(repeatPenaltyTokens[repeatPenaltyTokensLength - 1]);
                         llama_sampler_accept(repeatPenaltySampler, lastToken);
                         repeatPenalty_lastTokens.push_back(lastToken);
                     }
                 }
-                for (size_t i = 0; i < repeat_penalty_tokens_uint32_array.ElementLength() && existingSamplerMatchesConfig; i++) {
-                    auto token = static_cast<llama_token>(repeat_penalty_tokens_uint32_array[i]);
+                for (size_t i = 0; i < repeatPenaltyTokensLength && existingSamplerMatchesConfig; i++) {
+                    auto token = static_cast<llama_token>(repeatPenaltyTokens[i]);
 
                     if (i < repeatPenalty_lastTokens.size()) {
                         existingSamplerMatchesConfig &= repeatPenalty_lastTokens.rat(i) == token;
@@ -497,9 +499,9 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             );
             repeatPenalty_lastTokens = RingBuffer<llama_token>(repeatPenaltyMaxTokens);
 
-            for (size_t i = 0; i < repeat_penalty_tokens_uint32_array.ElementLength(); i++) {
-                llama_sampler_accept(repeatPenaltySampler, static_cast<llama_token>(repeat_penalty_tokens_uint32_array[i]));
-                repeatPenalty_lastTokens.push_back(static_cast<llama_token>(repeat_penalty_tokens_uint32_array[i]));
+            for (size_t i = 0; i < repeatPenaltyTokensLength; i++) {
+                llama_sampler_accept(repeatPenaltySampler, static_cast<llama_token>(repeatPenaltyTokens[i]));
+                repeatPenalty_lastTokens.push_back(static_cast<llama_token>(repeatPenaltyTokens[i]));
             }
 
             repeatPenalty_maxTokens = repeatPenaltyMaxTokens;
