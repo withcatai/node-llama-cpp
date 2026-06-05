@@ -90,7 +90,10 @@ jobs:
         if: matrix.config.artifact == 'linux-riscv64'
         run: |
           set -e
-          NODE_VER=v20.19.0
+          # node 24 (npm 11): node 20's npm 10.8.2 trips "set.delete is not a
+          # function" during npm ci on riscv64, and several devDeps require
+          # node >= 24.10. The built binary still targets node 20 N-API.
+          NODE_VER=v24.16.0
           curl -fsSL -o /tmp/node.tar.xz "https://unofficial-builds.nodejs.org/download/release/${NODE_VER}/node-${NODE_VER}-linux-riscv64.tar.xz"
           mkdir -p "$HOME/node"
           tar -xJf /tmp/node.tar.xz -C "$HOME/node" --strip-components=1
