@@ -232,6 +232,10 @@ jobs:
         timeout-minutes: 300
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
+          # electron has no riscv64 prebuilt binary; the binary build does not
+          # use it (the electron example is a separate job), so skip its
+          # postinstall download to let npm ci complete on riscv64.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ matrix.config.artifact == 'linux-riscv64' && '1' || '' }}
         run: |
           npm ci
           
