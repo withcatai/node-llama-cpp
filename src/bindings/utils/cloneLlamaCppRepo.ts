@@ -25,14 +25,14 @@ type ClonedLlamaCppRepoTagFile = {
 
 
 export async function cloneLlamaCppRepo(
-    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean = true,
+    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean | "stderr" = "stderr",
     recursive: boolean = enableRecursiveClone
 ) {
     const gitBundleForTag = !useBundles ? null : await getGitBundlePathForRelease(githubOwner, githubRepo, tag);
     const remoteGitUrl = `https://github.com/${githubOwner}/${githubRepo}.git`;
 
     async function withGitCloneProgress<T>(cloneName: string, callback: (gitWithCloneProgress: SimpleGit) => Promise<T>): Promise<T> {
-        if (!progressLogs)
+        if (progressLogs === false)
             return await callback(simpleGit({}));
 
         const repoText = `${githubOwner}/${githubRepo} (${cloneName})`;
@@ -94,7 +94,7 @@ export async function cloneLlamaCppRepo(
                 await fs.remove(llamaCppDirectory);
                 await fs.remove(llamaCppDirectoryInfoFilePath);
 
-                if (progressLogs)
+                if (progressLogs !== false)
                     console.error(getConsoleLogPrefix() + "Failed to clone git bundle, cloning from GitHub instead", err);
 
                 await printCloneErrorHelp(String(err));
@@ -176,14 +176,14 @@ export async function isLlamaCppRepoCloned(waitForLock: boolean = true) {
     return repoGitExists && releaseInfoFileExists;
 }
 
-export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progressLogs?: boolean} = {}) {
+export async function ensureLlamaCppRepoIsCloned({progressLogs = "stderr"}: {progressLogs?: boolean | "stderr"} = {}) {
     if (await isLlamaCppRepoCloned(true))
         return;
 
     const [githubOwner, githubRepo] = defaultLlamaCppGitHubRepo.split("/");
 
-    if (progressLogs)
-        console.log(getConsoleLogPrefix() + chalk.blue("Cloning llama.cpp"));
+    if (progressLogs !== false)
+        console.warn(getConsoleLogPrefix() + chalk.blue("Cloning llama.cpp"));
 
     let releaseTag = defaultLlamaCppRelease;
     let releaseDate: Date | undefined = undefined;
@@ -196,7 +196,7 @@ export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progres
             loading: chalk.blue("Fetching llama.cpp info"),
             success: chalk.blue("Fetched llama.cpp info"),
             fail: chalk.blue("Failed to fetch llama.cpp info"),
-            disableLogs: !progressLogs
+            disableLogs: progressLogs === false
         }, async () => {
             const release = await resolveGithubRelease(githubOwner!, githubRepo!, releaseTag);
             releaseTag = release.tag;

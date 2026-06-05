@@ -281,8 +281,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 )
             )) {
                 for (const {nvccPath, cudaHomePath} of await getCudaNvccPaths()) {
-                    if (buildOptions.progressLogs)
-                        console.info(
+                    if (buildOptions.progressLogs !== false)
+                        console.warn(
                             getConsoleLogPrefix(true) +
                             `Trying to compile again with "CUDACXX=${nvccPath}" and "CUDA_PATH=${cudaHomePath}" environment variables`
                         );
@@ -298,7 +298,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             ignoreWorkarounds: [...ignoreWorkarounds, "cudaArchitecture"]
                         });
                     } catch (err) {
-                        if (buildOptions.progressLogs)
+                        if (buildOptions.progressLogs !== false)
                             console.error(getConsoleLogPrefix(true, false), err);
                     }
                 }
@@ -311,13 +311,13 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
                 )
             ) {
-                if (buildOptions.progressLogs) {
+                if (buildOptions.progressLogs !== false) {
                     if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
-                        console.info(
+                        console.warn(
                             getConsoleLogPrefix(true) + "Trying to compile again with a single build thread"
                         );
                     else
-                        console.info(
+                        console.warn(
                             getConsoleLogPrefix(true) + "Trying to compile again with reduced parallel build threads"
                         );
                 }
@@ -333,7 +333,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         ]
                     });
                 } catch (err) {
-                    if (buildOptions.progressLogs)
+                    if (buildOptions.progressLogs !== false)
                         console.error(getConsoleLogPrefix(true, false), err);
                 }
             }
@@ -350,8 +350,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 documentationPageUrls.Vulkan
             );
         else if (useWindowsLlvm && !ciMode) {
-            if (buildOptions.progressLogs)
-                console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
+            if (buildOptions.progressLogs !== false)
+                console.warn(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
 
             try {
                 return await compileLlamaCpp(buildOptions, {
@@ -359,7 +359,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     ignoreWorkarounds: [...ignoreWorkarounds, "avoidWindowsLlvm"]
                 });
             } catch (err) {
-                if (buildOptions.progressLogs)
+                if (buildOptions.progressLogs !== false)
                     console.error(getConsoleLogPrefix(true, false), err);
             }
         }

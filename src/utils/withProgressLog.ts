@@ -128,7 +128,7 @@ export async function withProgressLog<T>({
                     currentProgressBarText !== lastLogProgressBarText ||
                     (progress === 1 && lastLogProgress !== 1)
                 ) {
-                    console.log(getConsoleLogPrefix() + getLoadingText());
+                    console.warn(getConsoleLogPrefix() + getLoadingText());
                     lastLogProgress = currentProgress;
                     lastLogProgressBarText = currentProgressBarText;
                 }
@@ -137,22 +137,22 @@ export async function withProgressLog<T>({
             }
         };
 
-        console.log(getConsoleLogPrefix() + getLoadingText());
+        console.warn(getConsoleLogPrefix() + getLoadingText());
 
         try {
             const res = await callback(progressUpdater);
 
-            console.log(getConsoleLogPrefix() + `${logSymbols.success} ${successText}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.success} ${successText}`);
 
             return res;
         } catch (er) {
-            console.log(getConsoleLogPrefix() + `${logSymbols.error} ${failText}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.error} ${failText}`);
 
             throw er;
         }
     }
 
-    const updateManager = UpdateManager.getInstance();
+    const updateManager = UpdateManager.getInstance(process.stderr);
     let etaUpdateTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
 
     function getProgressLine() {
@@ -280,7 +280,7 @@ export async function withProgressLog<T>({
         updateManager.unhook(true);
 
         if (moveCursorUpAfterUnhook)
-            process.stdout.moveCursor(0, -1);
+            process.stderr.moveCursor(0, -1);
     }
 }
 

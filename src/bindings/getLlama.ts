@@ -123,9 +123,12 @@ export type LlamaOptions = {
 
     /**
      * Print binary compilation progress logs.
-     * Enabled by default.
+     * 
+     * When set to "stderr", progress logs will be printed to stderr instead of stdout.
+     * 
+     * Defaults to `"stderr"`.
      */
-    progressLogs?: boolean,
+    progressLogs?: boolean | "stderr",
 
     /**
      * Don't download llama.cpp source if it's not found.
@@ -260,11 +263,13 @@ export type LastBuildOptions = {
     usePrebuiltBinaries?: boolean,
 
     /**
-     * If a local build is not found, and prebuilt binaries are not found, when building from source,
-     * print binary compilation progress logs.
-     * Enabled by default.
+     * Print binary compilation progress logs.
+     * 
+     * When set to "stderr", progress logs will be printed to stderr instead of stdout.
+     * 
+     * Defaults to `"stderr"`.
      */
-    progressLogs?: boolean,
+    progressLogs?: boolean | "stderr",
 
     /**
      * If a local build is not found, and prebuilt binaries are not found, don't download llama.cpp source if it's not found.
@@ -439,7 +444,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppLogLevel,
             logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
             usePrebuiltBinaries: lastBuildOptions?.usePrebuiltBinaries ?? true,
-            progressLogs: lastBuildOptions?.progressLogs ?? true,
+            progressLogs: lastBuildOptions?.progressLogs ?? "stderr",
             skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload,
             maxThreads: lastBuildOptions?.maxThreads,
             vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
@@ -506,7 +511,7 @@ export async function getLlamaForOptions({
     cmakeOptions = {},
     existingPrebuiltBinaryMustMatchBuildOptions = false,
     usePrebuiltBinaries = true,
-    progressLogs = true,
+    progressLogs = "stderr",
     skipDownload = defaultSkipDownload,
     maxThreads,
     vramPadding = defaultLlamaVramPadding,
@@ -534,7 +539,7 @@ export async function getLlamaForOptions({
     if (cmakeOptions == null) cmakeOptions = {};
     if (existingPrebuiltBinaryMustMatchBuildOptions == null) existingPrebuiltBinaryMustMatchBuildOptions = false;
     if (usePrebuiltBinaries == null) usePrebuiltBinaries = true;
-    if (progressLogs == null) progressLogs = true;
+    if (progressLogs == null) progressLogs = "stderr";
     if (skipDownload == null) skipDownload = defaultSkipDownload;
     if (vramPadding == null) vramPadding = defaultLlamaVramPadding;
     if (ramPadding == null) ramPadding = defaultLlamaRamPadding;
@@ -724,7 +729,7 @@ export async function getLlamaForOptions({
         }
     }
 
-    if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs)
+    if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs !== false)
         await logNoGlibcWarning();
 
     if (!canBuild || build === "autoAttempt")
@@ -831,7 +836,7 @@ async function loadExistingLlamaBinary({
     logLevel: Required<LlamaOptions>["logLevel"],
     logger: Required<LlamaOptions>["logger"],
     existingPrebuiltBinaryMustMatchBuildOptions: boolean,
-    progressLogs: boolean,
+    progressLogs: boolean | "stderr",
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     skipLlamaInit: boolean,
@@ -884,24 +889,24 @@ async function loadExistingLlamaBinary({
                     tempDir,
                     experimentalOptions
                 });
-            } else if (progressLogs) {
+            } else if (progressLogs !== false) {
                 console.warn(
                     getConsoleLogPrefix() + "The local build binary was not built in the current system and is incompatible with it"
                 );
 
                 if (canUsePrebuiltBinaries)
-                    console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+                    console.warn(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
                 else if (fallbackMessage != null)
-                    console.info(getConsoleLogPrefix() + fallbackMessage);
+                    console.warn(getConsoleLogPrefix() + fallbackMessage);
             }
         } catch (err) {
             const binaryDescription = describeBinary(buildOptions);
             console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);
 
             if (canUsePrebuiltBinaries)
-                console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+                console.warn(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
             else if (fallbackMessage != null)
-                console.info(getConsoleLogPrefix() + fallbackMessage);
+                console.warn(getConsoleLogPrefix() + fallbackMessage);
         }
     }
 
@@ -952,7 +957,7 @@ async function loadExistingLlamaBinary({
                         tempDir,
                         experimentalOptions
                     });
-                } else if (progressLogs) {
+                } else if (progressLogs !== false) {
                     const binaryDescription = describeBinary({
                         ...buildOptions,
                         customCmakeOptions: existingPrebuiltBinaryMustMatchBuildOptions
@@ -982,7 +987,7 @@ async function loadExistingLlamaBinary({
                             : ""
                     ) + ". Error:", err);
             }
-        } else if (progressLogs)
+        } else if (progressLogs !== false)
             console.warn(
                 getConsoleLogPrefix() + "A prebuilt binary was not found" + (
                     fallbackMessage != null

@@ -48,7 +48,7 @@ export function hasLlamaCppRepoPatchesToApply() {
     return patches.length > 0;
 }
 
-export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnError: boolean = false, progressLogs: boolean = true) {
+export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnError: boolean = false, progressLogs: boolean | "stderr" = "stderr") {
     if (!hasLlamaCppRepoPatchesToApply() || (defaultLlamaCppRepoSkipPatches.length === 1 && defaultLlamaCppRepoSkipPatches[0] === "*"))
         return;
 
@@ -68,7 +68,7 @@ export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnErr
 
         try {
             if (!(await fs.pathExists(patchPath))) {
-                if (progressLogs)
+                if (progressLogs !== false)
                     console.warn(`Patch file "${patch.filename}" not found, skipping patch "${patch.title}"`);
                 
                 continue;
@@ -77,7 +77,7 @@ export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnErr
             if (await patch.canSkip(llamaCppDirectory, lastCommitDate))
                 continue;
         } catch (err) {
-            if (progressLogs)
+            if (progressLogs !== false)
                 console.warn(
                     getConsoleLogPrefix(),
                     `Failed testing whether patch "${patch.filename}": "${patch.title}" can be skipped:`,
@@ -88,7 +88,7 @@ export async function applyLlamaCppRepoPatches(lastCommitDate?: Date, throwOnErr
         try {
             await git.applyPatch(patchPath, {"--ignore-whitespace": null});
         } catch (err) {
-            if (progressLogs)
+            if (progressLogs !== false)
                 console.error(
                     getConsoleLogPrefix(),
                     `Failed to apply patch "${patch.filename}": "${patch.title}", building llama.cpp may fail.`,

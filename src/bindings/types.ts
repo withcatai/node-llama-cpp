@@ -12,7 +12,7 @@ export const nodeLlamaCppGpuOffStringOptions = ["false", "off", "none", "disable
 export type BuildGpu = (typeof buildGpuOptions)[number];
 export type BuildOptions = {
     customCmakeOptions: Map<string, string>,
-    progressLogs: boolean,
+    progressLogs: boolean | "stderr",
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     arch: typeof process.arch,

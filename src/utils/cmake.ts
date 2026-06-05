@@ -68,13 +68,13 @@ export async function getCmakePath() {
     throw new Error("cmake not found");
 }
 
-export async function downloadCmakeIfNeeded(wrapWithStatusLogs: boolean = false) {
+export async function downloadCmakeIfNeeded(wrapWithStatusLogs: boolean | "stderr" = "stderr") {
     try {
         await getCmakePath();
         return;
     } catch (err) {}
 
-    if (!wrapWithStatusLogs)
+    if (wrapWithStatusLogs === false)
         await downloadCmake({progressLogs: wrapWithStatusLogs});
     else {
         try {
@@ -140,7 +140,7 @@ async function findExistingCmake() {
     return undefined;
 }
 
-async function downloadCmake({progressLogs = true}: {progressLogs?: boolean} = {}) {
+async function downloadCmake({progressLogs = "stderr"}: {progressLogs?: boolean | "stderr"} = {}) {
     await withLockfile({
         resourcePath: path.join(xpackDirectory, "cmakeInstall")
     }, async () => {
