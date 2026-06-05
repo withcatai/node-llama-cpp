@@ -3,8 +3,8 @@ import path from "path";
 import console from "console";
 import {createRequire} from "module";
 import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppLogLevel, defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport,
-    defaultLlamaCppRelease, defaultSkipDownload, llamaLocalBuildBinsDirectory, recommendedBaseDockerImage, defaultLlamaCppDebugMode
+    builtinLlamaCppGitHubRepo, defaultLlamaCppLogLevel, defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport,
+    defaultSkipDownload, llamaLocalBuildBinsDirectory, recommendedBaseDockerImage, defaultLlamaCppDebugMode
 } from "../config.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
@@ -31,6 +31,7 @@ import {testBindingBinary} from "./utils/testBindingBinary.js";
 import {BinaryPlatformInfo, getPlatformInfo} from "./utils/getPlatformInfo.js";
 import {hasBuildingFromSourceDependenciesInstalled} from "./utils/hasBuildingFromSourceDependenciesInstalled.js";
 import {resolveActualBindingBinaryPath} from "./utils/resolveActualBindingBinaryPath.js";
+import {defaultLlamaCppRelease, builtinLlamaCppRelease} from "./utils/binariesGithubRelease.js";
 
 const require = createRequire(import.meta.url);
 

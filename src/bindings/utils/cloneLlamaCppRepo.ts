@@ -4,7 +4,7 @@ import chalk from "chalk";
 import fs from "fs-extra";
 import which from "which";
 import {
-    defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, enableRecursiveClone, llamaCppDirectory, llamaCppDirectoryInfoFilePath
+    defaultLlamaCppGitHubRepo, enableRecursiveClone, llamaCppDirectory, llamaCppDirectoryInfoFilePath
 } from "../../config.js";
 import {getGitBundlePathForRelease, isGitBundleCompatible} from "../../utils/gitReleaseBundles.js";
 import {withLockfile} from "../../utils/withLockfile.js";
@@ -16,6 +16,7 @@ import withStatusLogs from "../../utils/withStatusLogs.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
 import {applyLlamaCppRepoPatches, hasLlamaCppRepoPatchesToApply} from "./applyLlamaCppRepoPatches.js";
+import {defaultLlamaCppRelease} from "./binariesGithubRelease.js";
 
 type ClonedLlamaCppRepoTagFile = {
     tag: string,

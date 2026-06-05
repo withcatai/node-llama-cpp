@@ -4,7 +4,6 @@ import * as os from "os";
 import process from "process";
 import envVar from "env-var";
 import {nanoid} from "nanoid";
-import {getBinariesGithubRelease} from "./bindings/utils/binariesGithubRelease.js";
 import {
     nodeLlamaCppGpuOptions, LlamaLogLevel, LlamaLogLevelValues, parseNodeLlamaCppGpuOption, nodeLlamaCppGpuOffStringOptions
 } from "./bindings/types.js";
@@ -41,7 +40,7 @@ export const localXpacksCacheDirectory = path.join(xpackDirectory, "cache");
 export const buildMetadataFileName = "_nlcBuildMetadata.json";
 export const xpmVersion = "^0.16.3";
 export const builtinLlamaCppGitHubRepo = "ggml-org/llama.cpp";
-export const builtinLlamaCppRelease = await getBinariesGithubRelease();
+// builtinLlamaCppRelease moved to binariesGithubRelease.ts
 
 export const isCI = env.get("CI")
     .default("false")
@@ -53,8 +52,8 @@ export const useCiLogs = isCI || isRunningInsideGoogleColab;
 export const defaultLlamaCppGitHubRepo = env.get("NODE_LLAMA_CPP_REPO")
     .default(builtinLlamaCppGitHubRepo)
     .asString();
-export const defaultLlamaCppRelease = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
-    .default(builtinLlamaCppRelease)
+// defaultLlamaCppRelease moved to binariesGithubRelease.ts
+export const llamaCppReleaseEnvVar = env.get("NODE_LLAMA_CPP_REPO_RELEASE")
     .asString();
 export const defaultLlamaCppRepoSkipPatches = env.get("NODE_LLAMA_CPP_REPO_SKIP_PATCHES")
     .default("")

@@ -1,4 +1,5 @@
-import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease} from "../../config.js";
+import {builtinLlamaCppGitHubRepo} from "../../config.js";
+import {builtinLlamaCppRelease} from "./binariesGithubRelease.js";
 import {getClonedLlamaCppRepoReleaseInfo} from "./cloneLlamaCppRepo.js";
 
 export async function getCanUsePrebuiltBinaries() {

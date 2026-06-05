@@ -4,7 +4,7 @@ import chalk from "chalk";
 import {compileLlamaCpp} from "../../../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../../../utils/withOra.js";
 import {clearTempFolder} from "../../../../utils/clearTempFolder.js";
-import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, isCI, defaultLlamaCppGpuSupport, documentationPageUrls} from "../../../../config.js";
+import {builtinLlamaCppGitHubRepo, isCI, defaultLlamaCppGpuSupport, documentationPageUrls} from "../../../../config.js";
 import {downloadCmakeIfNeeded} from "../../../../utils/cmake.js";
 import withStatusLogs from "../../../../utils/withStatusLogs.js";
 import {logBinaryUsageExampleToConsole} from "../../../../bindings/utils/logBinaryUsageExampleToConsole.js";
@@ -18,6 +18,7 @@ import {getConsoleLogPrefix} from "../../../../utils/getConsoleLogPrefix.js";
 import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
+import {builtinLlamaCppRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
 
 type BuildCommand = {
     arch?: typeof process.arch,

@@ -3,13 +3,12 @@ import {CommandModule} from "yargs";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {
-    defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath,
-    defaultLlamaCppGpuSupport, documentationPageUrls
+    defaultLlamaCppGitHubRepo, isCI, llamaCppDirectory, llamaCppDirectoryInfoFilePath, defaultLlamaCppGpuSupport, documentationPageUrls
 } from "../../../../config.js";
 import {compileLlamaCpp} from "../../../../bindings/utils/compileLLamaCpp.js";
 import withOra from "../../../../utils/withOra.js";
 import {clearTempFolder} from "../../../../utils/clearTempFolder.js";
-import {setBinariesGithubRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
+import {defaultLlamaCppRelease, setBinariesGithubRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
 import {downloadCmakeIfNeeded} from "../../../../utils/cmake.js";
 import withStatusLogs from "../../../../utils/withStatusLogs.js";
 import {getIsInDocumentationMode} from "../../../../state.js";
