@@ -19,7 +19,8 @@ export async function detectGlibc({
             "/usr/lib64",
             "/usr/lib/x86_64-linux-gnu",
             "/usr/lib/aarch64-linux-gnu",
-            "/usr/lib/armv7l-linux-gnu"
+            "/usr/lib/armv7l-linux-gnu",
+            "/usr/lib/riscv64-linux-gnu"
         ];
 
         const glibcFileNames = [
@@ -45,7 +46,11 @@ export async function detectGlibc({
             "ld-linux-armv7l.so",
             "ld-linux-armv7l.so.1",
             "ld-linux-armv7l.so.2",
-            "ld-linux-armv7l.so.3" // for when the next version comes out
+            "ld-linux-armv7l.so.3", // for when the next version comes out
+            "ld-linux-riscv64-lp64d.so",
+            "ld-linux-riscv64-lp64d.so.1",
+            "ld-linux-riscv64-lp64d.so.2",
+            "ld-linux-riscv64-lp64d.so.3" // for when the next version comes out
         ];
 
         const foundGlibC = await asyncEvery([
