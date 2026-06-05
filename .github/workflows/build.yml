@@ -75,12 +75,27 @@ jobs:
           - name: "macOS arm64"
             os: macos-26
             artifact: "mac-arm64"
+          - name: "Ubuntu riscv64"
+            os: ubuntu-24.04-riscv
+            artifact: "linux-riscv64"
 
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: matrix.config.artifact != 'linux-riscv64'
         with:
           node-version: "20"
+
+      - name: Install Node.js (riscv64 unofficial build)
+        if: matrix.config.artifact == 'linux-riscv64'
+        run: |
+          set -e
+          NODE_VER=v20.19.0
+          curl -fsSL -o /tmp/node.tar.xz "https://unofficial-builds.nodejs.org/download/release/${NODE_VER}/node-${NODE_VER}-linux-riscv64.tar.xz"
+          mkdir -p "$HOME/node"
+          tar -xJf /tmp/node.tar.xz -C "$HOME/node" --strip-components=1
+          echo "$HOME/node/bin" >> "$GITHUB_PATH"
+          "$HOME/node/bin/node" --version
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -129,6 +144,13 @@ jobs:
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
           
+          cmake --version
+
+      - name: Install dependencies on Ubuntu riscv64
+        if: matrix.config.name == 'Ubuntu riscv64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev
           cmake --version
 
       - name: Install Cuda 13.1 on Windows (1)
@@ -275,6 +297,8 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
             await buildBinary("arm64", ["--gpu", "metal"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-riscv64") {
+            await buildBinary("riscv64", ["--gpu", "false"]);
           }
           
           // move binaries to bins
