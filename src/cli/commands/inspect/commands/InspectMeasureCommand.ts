@@ -24,6 +24,7 @@ import {toBytes} from "../../../utils/toBytes.js";
 import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../../../gguf/types/GgufTensorInfoTypes.js";
+import {LlamaContext, LlamaEmbeddingContext} from "../../../../apiDocsIndex.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -34,6 +35,7 @@ type InspectMeasureCommand = {
     minContextSize: number,
     maxContextSize?: number,
     flashAttention?: boolean,
+    embedding?: boolean,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
@@ -113,6 +115,12 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 type: "boolean",
                 default: false,
                 description: "Enable flash attention for the context"
+            })
+            .option("embedding", {
+                alias: "e",
+                type: "boolean",
+                description: "Whether to create an embedding context instead of a regular context",
+                default: false
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -195,7 +203,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention,
+        modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, embedding,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
         batchSize, measures = 10, memory: measureMemoryType, mmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
         repeatEvaluateText
@@ -317,6 +325,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 maxContextSize,
                 minContextSize,
                 flashAttention,
+                embedding,
                 kvCacheKeyType: resolvedKvCacheKeyType,
                 kvCacheValueType: resolvedKvCacheValueType,
                 swaFullCache,
@@ -395,7 +404,8 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                                 modelGpuLayers: lastGpuLayers,
                                 flashAttention,
                                 swaFullCache,
-                                batchSize
+                                batchSize,
+                                isEmbeddingContext: embedding
                             });
 
                         const contextVramEstimation = contextResourceEstimation?.gpuVram;
@@ -581,13 +591,18 @@ function renderDiffPercentageWithColors(percentage: number, {
     greenBright = 2,
     green = 6,
     yellow = 10,
-    yellowBright = 14
+    yellowBright = 14,
+    nanIsZero = true
 }: {
     greenBright?: number,
     green?: number,
     yellow?: number,
-    yellowBright?: number
+    yellowBright?: number,
+    nanIsZero?: boolean
 } = {}): string {
+    if (nanIsZero && Number.isNaN(percentage))
+        percentage = 0;
+    
     const percentageText = percentage.toFixed(2).padStart(5, "0") + "%";
     const absPercentage = Math.abs(percentage);
 
@@ -609,7 +624,8 @@ const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
     modelPath, useMmap, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers,
-    flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, batchSize, evaluateText, exitAfterMeasurement = false,
+    flashAttention, embedding, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, batchSize, evaluateText,
+    exitAfterMeasurement = false,
     onInfo
 }: {
     modelPath: string,
@@ -623,6 +639,7 @@ async function measureModel({
     maxGpuLayers: number,
     minGpuLayers?: number,
     flashAttention?: boolean,
+    embedding?: boolean,
     kvCacheKeyType?: GgmlType,
     kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
@@ -738,6 +755,7 @@ async function measureModel({
                         maxGpuLayers,
                         minGpuLayers,
                         flashAttention,
+                        embedding,
                         kvCacheKeyType,
                         kvCacheValueType,
                         swaFullCache,
@@ -846,12 +864,12 @@ async function runTestWorkerLogic() {
     }
 
     async function testContextSizes({
-        model, modelVramUsage, modelRamUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention,
+        model, modelVramUsage, modelRamUsage, startContextSize, maxContextSize, minContextSize, tests, flashAttention, embedding,
         kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false
     }: {
         model: LlamaModel, modelVramUsage: number, modelRamUsage: number, startContextSize?: number, maxContextSize?: number,
-        minContextSize?: number, tests: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
-        swaFullCache?: boolean, batchSize?: number, evaluateText?: string,
+        minContextSize?: number, tests: number, flashAttention?: boolean, embedding?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache?: boolean, batchSize?: number, evaluateText?: string,
         exitAfterMeasurement?: boolean
     }) {
         let measurementsDone: number = 0;
@@ -874,25 +892,38 @@ async function runTestWorkerLogic() {
             try {
                 const preContextVramUsage = (await llama._getRawVramState()).used;
                 const preContextRamUsage = getMemoryUsage(llama);
-                const context = await model.createContext({
-                    contextSize: currentContextSizeCheck ?? (
-                        maxContextSize != null
-                            ? {max: maxContextSize}
-                            : undefined
-                    ),
-                    ignoreMemorySafetyChecks: currentContextSizeCheck != null,
-                    flashAttention,
-                    experimentalKvCacheKeyType: kvCacheKeyType,
-                    experimentalKvCacheValueType: kvCacheValueType,
-                    swaFullCache,
-                    batchSize,
-                    failedCreationRemedy: false
-                });
 
-                if (evaluateText != null && evaluateText != "") {
-                    const sequence = context.getSequence();
-                    await sequence.evaluateWithoutGeneratingNewTokens(model.tokenize(evaluateText));
-                }
+                let context: LlamaContext | LlamaEmbeddingContext | undefined = undefined;
+                if (!embedding) {
+                    context = await model.createContext({
+                        contextSize: currentContextSizeCheck ?? (
+                            maxContextSize != null
+                                ? {max: maxContextSize}
+                                : undefined
+                        ),
+                        ignoreMemorySafetyChecks: currentContextSizeCheck != null,
+                        flashAttention,
+                        experimentalKvCacheKeyType: kvCacheKeyType,
+                        experimentalKvCacheValueType: kvCacheValueType,
+                        swaFullCache,
+                        batchSize,
+                        failedCreationRemedy: false
+                    });
+    
+                    if (evaluateText != null && evaluateText != "") {
+                        const sequence = context.getSequence();
+                        await sequence.evaluateWithoutGeneratingNewTokens(model.tokenize(evaluateText));
+                    }
+                } else
+                    context = await model.createEmbeddingContext({
+                        contextSize: currentContextSizeCheck ?? (
+                            maxContextSize != null
+                                ? {max: maxContextSize}
+                                : undefined
+                        ),
+                        ignoreMemorySafetyChecks: currentContextSizeCheck != null,
+                        batchSize
+                    });
 
                 const postContextVramUsage = (await llama._getRawVramState()).used;
                 const postContextRamUsage = getMemoryUsage(llama);
@@ -903,15 +934,21 @@ async function runTestWorkerLogic() {
                     gpuLayers: model.gpuLayers,
                     modelVramUsage,
                     modelRamUsage,
-                    contextSize: context.contextSize,
+                    contextSize: context instanceof LlamaContext
+                        ? context.contextSize
+                        : context._llamaContext.contextSize,
                     useMmap: model.useMmap,
                     contextVramUsage: postContextVramUsage - preContextVramUsage,
                     contextRamUsage: postContextRamUsage - preContextRamUsage,
-                    contextStateSize: context.stateSize,
+                    contextStateSize: context instanceof LlamaContext
+                        ? context.stateSize
+                        : context._llamaContext.stateSize,
                     totalVramUsage: postContextVramUsage,
                     totalRamUsage: postContextRamUsage
                 });
-                currentContextSizeCheck = context.contextSize;
+                currentContextSizeCheck = context instanceof LlamaContext
+                    ? context.contextSize
+                    : context._llamaContext.contextSize;
 
                 await context.dispose();
             } catch (err) {
@@ -940,12 +977,12 @@ async function runTestWorkerLogic() {
     }
 
     async function testWithGpuLayers({
-        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention,
+        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, embedding,
         kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, isFirstLoad
     }: {
         modelPath: string, useMmap?: "auto" | boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
-        maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
-        swaFullCache?: boolean, batchSize?: number,
+        maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, embedding?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache?: boolean, batchSize?: number,
         evaluateText?: string, exitAfterMeasurement?: boolean,
         isFirstLoad: boolean
     }) {
@@ -1000,6 +1037,7 @@ async function runTestWorkerLogic() {
                 maxContextSize,
                 minContextSize,
                 flashAttention,
+                embedding,
                 kvCacheKeyType,
                 kvCacheValueType,
                 swaFullCache,
@@ -1056,6 +1094,7 @@ async function runTestWorkerLogic() {
                     maxContextSize: message.maxContextSize,
                     minContextSize: message.minContextSize,
                     flashAttention: message.flashAttention,
+                    embedding: message.embedding,
                     kvCacheKeyType: message.kvCacheKeyType,
                     kvCacheValueType: message.kvCacheValueType,
                     swaFullCache: message.swaFullCache,
@@ -1153,6 +1192,7 @@ type ParentToChildMessage = {
     maxGpuLayers: number,
     minGpuLayers?: number,
     flashAttention?: boolean,
+    embedding?: boolean,
     kvCacheKeyType?: GgmlType,
     kvCacheValueType?: GgmlType,
     swaFullCache?: boolean,
