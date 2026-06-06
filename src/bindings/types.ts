@@ -158,5 +158,6 @@ export function LlamaLogLevelGreaterThanOrEqual(a: LlamaLogLevel, b: LlamaLogLev
 }
 
 export const enum LlamaLocks {
-    loadToMemory = "loadToMemory"
+    loadToMemory = "loadToMemory",
+    addonInitFree = "addonInitFree"
 }
