@@ -1,7 +1,7 @@
 import {acquireLock, withLock} from "lifecycle-utils";
 import bytes from "bytes";
 import {Llama} from "../../bindings/Llama.js";
-import {LlamaLogLevel} from "../../bindings/types.js";
+import {LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
 import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
@@ -1343,11 +1343,16 @@ export class GgufInsightsSimulatorSession {
             } satisfies AddonModelParams)
         );
 
-        const modelLoaded = typeof source === "string"
-            ? await model.init()
-            : await model.init(source);
-        if (!modelLoaded)
-            throw new Error("Failed to load model");
+        const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.loadToMemory]);
+        try {
+            const modelLoaded = typeof source === "string"
+                ? await model.init()
+                : await model.init(source);
+            if (!modelLoaded)
+                throw new Error("Failed to load model");
+        } finally {
+            loadingLock.dispose();
+        }
 
         return model;
     }
