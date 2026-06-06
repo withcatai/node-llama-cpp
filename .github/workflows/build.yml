@@ -153,8 +153,14 @@ jobs:
         if: matrix.config.name == 'Ubuntu riscv64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev
+          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev gcc-14 g++-14
+          # llama.cpp's ggml-cpu uses the RVV _Float16 (zvfh) vector intrinsics,
+          # which only exist in GCC 14+. The runner defaults to GCC 13, so make
+          # gcc-14/g++-14 the default compilers (same as upstream build-riscv).
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
           cmake --version
+          gcc --version
 
       - name: Install Cuda 13.1 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
