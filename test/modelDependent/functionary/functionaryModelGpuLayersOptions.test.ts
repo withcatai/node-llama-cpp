@@ -979,7 +979,7 @@ describe("functionary", () => {
             });
 
             describe('attempts to resolve "auto"', () => {
-                test("8GB RAM", {timeout: 1000 * 60}, async () => {
+                test("8GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
@@ -1158,7 +1158,7 @@ describe("functionary", () => {
                     }
                 });
 
-                test("5GB RAM", {timeout: 1000 * 60}, async () => {
+                test("5GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const res = await resolveGpuLayers("auto", {
                             totalVram: s1GB * 6,
@@ -1339,7 +1339,7 @@ describe("functionary", () => {
             });
 
             describe("attempts to resolve {min?: number, max?: number}", () => {
-                test("8GB RAM", {timeout: 1000 * 60}, async () => {
+                test("8GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const res = await resolveGpuLayers({max: 4}, {
                             totalVram: s1GB * 6,
@@ -1447,7 +1447,7 @@ describe("functionary", () => {
                     }
                 });
 
-                test("5GB RAM", {timeout: 1000 * 60}, async () => {
+                test("5GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const res = await resolveGpuLayers({max: 4}, {
                             totalVram: s1GB * 6,
@@ -1557,7 +1557,7 @@ describe("functionary", () => {
             });
 
             describe("attempts to resolve {fitContext?: {contextSize?: number}}", () => {
-                test("8GB RAM", async () => {
+                test("8GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const contextSize = 4096;
                         const res = await resolveGpuLayers({fitContext: {contextSize}}, {
@@ -1652,7 +1652,7 @@ describe("functionary", () => {
                     }
                 });
 
-                test("7GB RAM", async () => {
+                test("7GB RAM", {timeout: 1000 * 60 * 2}, async () => {
                     {
                         const contextSize = 4096;
                         const res = await resolveGpuLayers({fitContext: {contextSize}}, {

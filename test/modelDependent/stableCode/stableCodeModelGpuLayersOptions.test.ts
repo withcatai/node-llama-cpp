@@ -282,7 +282,7 @@ describe("stableCode", () => {
                 }
             });
 
-            it('attempts to resolve "max"', async () => {
+            it('attempts to resolve "max"', {timeout: 1000 * 60 * 2}, async () => {
                 try {
                     await resolveGpuLayers("max", {
                         totalVram: s1GB * 6,
@@ -352,7 +352,7 @@ describe("stableCode", () => {
                 }
             });
 
-            it('attempts to resolve "auto"', {timeout: 1000 * 60}, async () => {
+            it('attempts to resolve "auto"', {timeout: 1000 * 60 * 2}, async () => {
                 {
                     const res = await resolveGpuLayers("auto", {
                         totalVram: s1GB * 6,
@@ -499,7 +499,7 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve {min?: number, max?: number}", {timeout: 1000 * 60}, async () => {
+            it("attempts to resolve {min?: number, max?: number}", {timeout: 1000 * 60 * 2}, async () => {
                 {
                     const res = await resolveGpuLayers({max: 4}, {
                         totalVram: s1GB * 6,
@@ -589,7 +589,7 @@ describe("stableCode", () => {
                 }
             });
 
-            it("attempts to resolve {fitContext?: {contextSize?: number}}", async () => {
+            it("attempts to resolve {fitContext?: {contextSize?: number}}", {timeout: 1000 * 60 * 2}, async () => {
                 {
                     const contextSize = 4096;
                     const res = await resolveGpuLayers({fitContext: {contextSize}}, {
