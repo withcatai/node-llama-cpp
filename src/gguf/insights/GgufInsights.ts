@@ -1249,9 +1249,14 @@ export class GgufInsightsSimulatorSession {
         } satisfies AddonContextParams));
 
         try {
-            const contextLoaded = await context.init();
-            if (!contextLoaded)
-                throw new Error("Failed to create context");
+            const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.loadToMemory]);
+            try {
+                const contextLoaded = await context.init();
+                if (!contextLoaded)
+                    throw new Error("Failed to create context");
+            } finally {
+                loadingLock.dispose();
+            }
             
             const memoryBreakdown = context.getMemoryBreakdown();
             if (this._llama._shouldLog(LlamaLogLevel.debug))
