@@ -45,7 +45,7 @@ type InspectMeasureCommand = {
     measures: number,
     memory: "vram" | "ram" | "all",
     mmap?: boolean,
-    noDirectIo: boolean,
+    useDirectIo: boolean,
     printHeaderBeforeEachLayer?: boolean,
     evaluateText?: string,
     repeatEvaluateText?: number
@@ -179,10 +179,10 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 type: "boolean",
                 description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
-            .option("noDirectIo", {
+            .option("useDirectIo", {
                 type: "boolean",
                 default: false,
-                description: "Disable Direct I/O usage when available"
+                description: "Use Direct I/O usage when available"
             })
             .option("printHeaderBeforeEachLayer", {
                 alias: "ph",
@@ -205,7 +205,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, embedding,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
-        batchSize, measures = 10, memory: measureMemoryType, mmap, noDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
+        batchSize, measures = 10, memory: measureMemoryType, mmap, useDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
         repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
@@ -237,7 +237,6 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             : typeof mmap === "boolean"
                 ? mmap
                 : "auto";
-        const useDirectIo = !noDirectIo;
         const resolvedGgufPath = await resolveCommandGgufPath(ggufPath, llama, headers, {
             flashAttention, swaFullCache, useMmap, kvCacheKeyType, kvCacheValueType
         });
