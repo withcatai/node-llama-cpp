@@ -1249,7 +1249,7 @@ export class GgufInsightsSimulatorSession {
         } satisfies AddonContextParams));
 
         try {
-            const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.loadToMemory]);
+            const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.addonInitFree]);
             try {
                 const contextLoaded = await context.init();
                 if (!contextLoaded)
@@ -1348,7 +1348,7 @@ export class GgufInsightsSimulatorSession {
             } satisfies AddonModelParams)
         );
 
-        const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.loadToMemory]);
+        const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.addonInitFree]);
         try {
             const modelLoaded = typeof source === "string"
                 ? await model.init()

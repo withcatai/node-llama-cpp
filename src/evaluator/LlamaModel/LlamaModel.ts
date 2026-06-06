@@ -1,6 +1,6 @@
 import process from "process";
 import path from "path";
-import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token, Tokenizer} from "../../types.js";
 import {AddonModel, AddonModelLora, ModelTypeDescription} from "../../bindings/AddonTypes.js";
@@ -877,7 +877,13 @@ export class LlamaModel {
         logWarnings(ggufInsights.getWarnings(modelOptions.modelPath));
 
         try {
-            const modelLoaded = await model._model.init();
+            const initLock = await acquireLock([_llama._memoryLock, LlamaLocks.addonInitFree]);
+            let modelLoaded: boolean = false;
+            try {
+                modelLoaded = await model._model.init();
+            } finally {
+                initLock.dispose();
+            }
 
             if (loadSignal?.aborted) {
                 if (modelLoaded)

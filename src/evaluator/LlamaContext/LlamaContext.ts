@@ -14,7 +14,7 @@ import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
-import {LlamaLogLevel} from "../../bindings/types.js";
+import {LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {MemoryMarking} from "../../bindings/utils/MemoryOrchestrator.js";
 import {
@@ -981,7 +981,13 @@ export class LlamaContext {
                 if (createSignal?.aborted)
                     throw createSignal.reason;
 
-                const contextLoaded = await context._ctx.init();
+                const initLock = await acquireLock([_model._llama._memoryLock, LlamaLocks.addonInitFree]);
+                let contextLoaded: boolean = false;
+                try {
+                    contextLoaded = await context._ctx.init();
+                } finally {
+                    initLock.dispose();
+                }
 
                 if (createSignal?.aborted) {
                     if (contextLoaded)
