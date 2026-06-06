@@ -298,7 +298,7 @@ export class GgufInsights {
             });
 
             if (simulationResult != null) {
-                if (!useMmap || gpuLayers >= this.totalLayers)
+                if (!useMmap || !gpuSupportsMmap)
                     return simulationResult;
 
                 // adjust for the missing mmap simulation implementation
