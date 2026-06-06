@@ -39,7 +39,7 @@ describe("gguf", async () => {
             expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 1}))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "3.93GB",
-                "gpuVram": "442.53MB",
+                "gpuVram": "442.52MB",
               }
             `);
             expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 8}))).toMatchInlineSnapshot(`
