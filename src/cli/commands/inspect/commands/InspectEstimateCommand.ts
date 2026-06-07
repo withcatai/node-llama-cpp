@@ -239,41 +239,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             ? ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes
             : contextSizeArg;
 
-        const compatibilityScore = await withOra({
-            loading: chalk.blue("Resolving config"),
-            success: chalk.blue("Resolved config"),
-            fail: chalk.blue("Failed to resolve config"),
-            noSuccessLiveStatus: true
-        }, async () => {
-            return await ggufInsights.configurationResolver.resolveAndScoreConfig({
-                flashAttention: flashAttention == null
-                    ? "auto"
-                    : flashAttention,
-                targetContextSize: contextSize,
-                targetGpuLayers: gpuLayers,
-                embeddingContext: embedding,
-                useMmap,
-                kvCacheKeyType: kvCacheKeyType === "currentQuant"
-                    ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheKeyType),
-                kvCacheValueType: kvCacheValueType === "currentQuant"
-                    ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheValueType),
-                swaFullCache
-            });
-        });
-
         const longestTitle = Math.max("GPU info".length, "Model info".length, "Resolved config".length, "With flash attention".length) + 1;
 
+        const [
+            vramState,
+            deviceNames
+        ] = await Promise.all([
+            llama.getVramState(),
+            llama.getGpuDeviceNames()
+        ]);
         if (llama.gpu !== false) {
-            const [
-                vramState,
-                deviceNames
-            ] = await Promise.all([
-                llama.getVramState(),
-                llama.getGpuDeviceNames()
-            ]);
-
             printInfoLine({
                 title: "GPU info",
                 padTitle: longestTitle,
@@ -310,6 +285,7 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 value: getReadableContextSize(ggufInsights.trainContextSize ?? 0)
             }]
         });
+
         if (resolvedMaxRam != null || resolvedMaxVram != null || mmap != null || swaFullCache)
             printInfoLine({
                 title: "Options",
@@ -344,6 +320,41 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             });
 
         console.info();
+
+        if (resolvedMaxVram != null && resolvedMaxRam != null && resolvedMaxRam < resolvedMaxVram && vramState.unifiedSize > 0) {
+            console.warn(
+                chalk.yellow(
+                    "Warning: Both RAM and VRAM limits are set, but the RAM limit is lower than the VRAM limit.\n" +
+                    "On unified memory systems, this may cause the effective VRAM limit to be the same as the RAM limit"
+                )
+            );
+            console.warn();
+        }
+
+        const compatibilityScore = await withOra({
+            loading: chalk.blue("Resolving config"),
+            success: chalk.blue("Resolved config"),
+            fail: chalk.blue("Failed to resolve config"),
+            noSuccessLiveStatus: true
+        }, async () => {
+            return await ggufInsights.configurationResolver.resolveAndScoreConfig({
+                flashAttention: flashAttention == null
+                    ? "auto"
+                    : flashAttention,
+                targetContextSize: contextSize,
+                targetGpuLayers: gpuLayers,
+                embeddingContext: embedding,
+                useMmap,
+                kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheKeyType),
+                kvCacheValueType: kvCacheValueType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheValueType),
+                swaFullCache
+            });
+        });
+
         logCompatibilityScore(
             "Resolved config",
             longestTitle,

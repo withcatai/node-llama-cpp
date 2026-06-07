@@ -440,6 +440,11 @@ export class Llama {
      * 
      * Setting a cap will only affect future model loads and context creations.
      * 
+     * On unified memory systems, capping the RAM may also effectively cap the VRAM, as they are shared.
+     * On such systems, it's recommended to either cap the VRAM or the RAM (but not both),
+     * and if you need to cap both then make sure to set the RAM cap to a value greater than the VRAM cap.
+     * > **Note:** You can detect a unified memory system by checking whether `getVramState().unifiedSize` is greater than 0.
+     * 
      * Use with caution.
      * Setting to `null` disables the cap.
      * 
