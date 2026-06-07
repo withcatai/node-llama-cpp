@@ -55,7 +55,7 @@ export class GgufInsightsConfigurationResolver {
         useMmap?: "auto" | boolean
     } = {}, {
         getVramState = (() => this._ggufInsights._llama._vramOrchestrator.getMemoryState()),
-        getRamState = (async () => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
+        getRamState = (() => this._ggufInsights._llama._ramOrchestrator.getMemoryState()),
         getSwapState = (() => this._ggufInsights._llama._swapOrchestrator.getMemoryState()),
         llamaVramPaddingSize = this._ggufInsights._llama.vramPaddingSize,
         llamaGpu = this._ggufInsights._llama.gpu,
@@ -274,8 +274,10 @@ export class GgufInsightsConfigurationResolver {
                     total: ramState.total,
                     free: Math.max(
                         0,
-                        ramState.free - estimatedModelResourceUsage.cpuRam +
-                        (-getRamUsageFromUnifiedVram(estimatedModelResourceUsage.gpuVram, vramState))
+                        ramState.free - (
+                            estimatedModelResourceUsage.cpuRam +
+                            getRamUsageFromUnifiedVram(estimatedModelResourceUsage.gpuVram, vramState)
+                        )
                     )
                 }),
                 getSwapState: async () => ({
@@ -285,7 +287,7 @@ export class GgufInsightsConfigurationResolver {
                         swapState.free - Math.max(
                             0,
                             estimatedModelResourceUsage.cpuRam +
-                            (-getRamUsageFromUnifiedVram(estimatedModelResourceUsage.gpuVram, vramState)) +
+                            getRamUsageFromUnifiedVram(estimatedModelResourceUsage.gpuVram, vramState) +
                             (-ramState.free)
                         )
                     )
