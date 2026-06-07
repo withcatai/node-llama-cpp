@@ -349,7 +349,6 @@ async function getVramRequiredForGpuLayers({
     defaultContextSwaFullCache: boolean, useMmap?: boolean,
     simulatorSession?: GgufInsightsSimulatorSession
 }) {
-    const heuristicFlashAttention = defaultContextFlashAttention === true;
     const modelVram = (await ggufInsights.estimateModelResourceRequirementsV2({
         gpuLayers,
         useMmap,
@@ -366,7 +365,7 @@ async function getVramRequiredForGpuLayers({
             modelGpuLayers: gpuLayers,
             sequences: 1,
             isEmbeddingContext: fitContext.embeddingContext ?? false,
-            flashAttention: heuristicFlashAttention,
+            flashAttention: defaultContextFlashAttention,
             kvCacheKeyType: defaultContextKvCacheKeyType,
             kvCacheValueType: defaultContextKvCacheValueType,
             swaFullCache: defaultContextSwaFullCache,
@@ -393,7 +392,7 @@ async function getVramRequiredForGpuLayers({
         ggufInsights,
         vram: currentVram - modelVram,
         isEmbeddingContext: fitContext?.embeddingContext ?? false,
-        flashAttention: heuristicFlashAttention,
+        flashAttention: defaultContextFlashAttention,
         kvCacheKeyType: defaultContextKvCacheKeyType,
         kvCacheValueType: defaultContextKvCacheValueType,
         swaFullCache: defaultContextSwaFullCache,
@@ -417,9 +416,9 @@ async function findMaxPossibleContextSizeForVram({
     gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache,
     useMmap, simulatorSession
 }: {
-    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean,
-    kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache: boolean, useMmap?: boolean,
-    simulatorSession?: GgufInsightsSimulatorSession
+    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean,
+    flashAttention: LlamaContextOptions["flashAttention"], kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache: boolean,
+    useMmap?: boolean, simulatorSession?: GgufInsightsSimulatorSession
 }) {
     const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
 

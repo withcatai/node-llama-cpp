@@ -159,5 +159,9 @@ export function LlamaLogLevelGreaterThanOrEqual(a: LlamaLogLevel, b: LlamaLogLev
 
 export const enum LlamaLocks {
     loadToMemory = "loadToMemory",
-    addonInitFree = "addonInitFree"
+    addonInit = "addonInit"
+}
+
+export function doesLlamaBackendNeedAddonInitLock(gpu: LlamaGpuType): boolean {
+    return gpu === "vulkan";
 }

@@ -1,7 +1,7 @@
 import {acquireLock, withLock} from "lifecycle-utils";
 import bytes from "bytes";
 import {Llama} from "../../bindings/Llama.js";
-import {LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
+import {doesLlamaBackendNeedAddonInitLock, LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
 import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
@@ -1249,13 +1249,15 @@ export class GgufInsightsSimulatorSession {
         } satisfies AddonContextParams));
 
         try {
-            const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.addonInitFree]);
+            const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
+                ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
+                : undefined;
             try {
                 const contextLoaded = await context.init();
                 if (!contextLoaded)
                     throw new Error("Failed to create context");
             } finally {
-                loadingLock.dispose();
+                loadingLock?.dispose();
             }
             
             const memoryBreakdown = context.getMemoryBreakdown();
@@ -1348,7 +1350,9 @@ export class GgufInsightsSimulatorSession {
             } satisfies AddonModelParams)
         );
 
-        const loadingLock = await acquireLock([this._llama._memoryLock, LlamaLocks.addonInitFree]);
+        const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
+            ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
+            : undefined;
         try {
             const modelLoaded = typeof source === "string"
                 ? await model.init()
@@ -1356,7 +1360,7 @@ export class GgufInsightsSimulatorSession {
             if (!modelLoaded)
                 throw new Error("Failed to load model");
         } finally {
-            loadingLock.dispose();
+            loadingLock?.dispose();
         }
 
         return model;

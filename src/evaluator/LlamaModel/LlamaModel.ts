@@ -877,7 +877,7 @@ export class LlamaModel {
         logWarnings(ggufInsights.getWarnings(modelOptions.modelPath));
 
         try {
-            const initLock = await acquireLock([_llama._memoryLock, LlamaLocks.addonInitFree]);
+            const initLock = await acquireLock([_llama._memoryLock, LlamaLocks.addonInit]);
             let modelLoaded: boolean = false;
             try {
                 modelLoaded = await model._model.init();

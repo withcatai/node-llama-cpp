@@ -981,7 +981,7 @@ export class LlamaContext {
                 if (createSignal?.aborted)
                     throw createSignal.reason;
 
-                const initLock = await acquireLock([_model._llama._memoryLock, LlamaLocks.addonInitFree]);
+                const initLock = await acquireLock([_model._llama._memoryLock, LlamaLocks.addonInit]);
                 let contextLoaded: boolean = false;
                 try {
                     contextLoaded = await context._ctx.init();
