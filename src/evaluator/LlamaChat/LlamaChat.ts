@@ -522,7 +522,7 @@ const defaultSegmentBudgetSize = (contextSize: number) => (
         ? contextSize * 0.5
         : contextSize * 0.75
 );
-const maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget = 12;
+const maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget = 10;
 
 
 export class LlamaChat {

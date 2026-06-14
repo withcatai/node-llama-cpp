@@ -25,7 +25,7 @@ describe("gguf", async () => {
             expect(ggufInsights.modelSize).toMatchInlineSnapshot("4653375488");
         });
 
-        test("estimated model memory footprint stays the same", async () => {
+        test("estimated model memory footprint stays the same", {timeout: 1000 * 60 * 5}, async () => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
 

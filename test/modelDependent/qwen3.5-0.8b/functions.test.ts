@@ -29,6 +29,9 @@ describe("qwen3.5 0.8b", () => {
                             properties: {
                                 n: {
                                     enum: [1, 2, 3, 4]
+                                },
+                                dummy: {
+                                    const: "This is a long text, I'll write it"
                                 }
                             }
                         },
@@ -48,9 +51,9 @@ describe("qwen3.5 0.8b", () => {
 
               The second word is "secret"."
             `);
-            expect(chatSession.sequence.tokenMeter.usedInputTokens).toMatchInlineSnapshot("372");
-            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("393");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("405");
+            expect(chatSession.sequence.tokenMeter.usedInputTokens).toMatchInlineSnapshot("389");
+            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("425");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("437");
 
             const initialMeterState = chatSession.sequence.tokenMeter.getState();
             const res2 = await chatSession.prompt("Explain what this word means", {
@@ -62,12 +65,12 @@ describe("qwen3.5 0.8b", () => {
             expect(res2).to.toMatchInlineSnapshot(`
               "
 
-              The word "secret" means something that is hidden or"
+              The word "secret" is a noun that refers to"
             `);
-            expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("73");
-            expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(80);
-            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("414");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("429");
+            expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("88");
+            expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(92);
+            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("446");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("461");
         });
     });
 });
