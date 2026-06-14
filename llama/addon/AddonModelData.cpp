@@ -37,7 +37,7 @@ void AddonModelData::disposeMemory() {
         currentLoraAdapters.reserve(loraAdapters.size());
         pendingFinalization.reserve(pendingFinalization.size() + loraAdapters.size());
 
-            for (auto* lora : loraAdapters) {
+        for (auto* lora : loraAdapters) {
             currentLoraAdapters.push_back(lora);
             pendingFinalization.push_back(lora);
         }

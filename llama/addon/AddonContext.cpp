@@ -118,7 +118,7 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
         void OnOK() {
             if (context->contextLoaded && !context->model->model_params.no_alloc) {
                 uint64_t contextMemorySize = llama_state_get_size(context->ctx);
-                adjustNapiExternalMemoryAdd(Env(), contextMemorySize);
+                adjustNapiExternalMemoryAdd(context->Env(), contextMemorySize);
                 context->loadedContextMemorySize = contextMemorySize;
             }
 

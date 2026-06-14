@@ -158,7 +158,7 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
         void OnOK() {
             if (model->modelLoaded && !model->model_params.no_alloc) {
                 uint64_t modelSize = llama_model_size(model->model);
-                adjustNapiExternalMemoryAdd(Env(), modelSize);
+                adjustNapiExternalMemoryAdd(model->Env(), modelSize);
                 model->loadedModelSize = modelSize;
             }
 
