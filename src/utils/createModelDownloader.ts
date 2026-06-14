@@ -295,6 +295,19 @@ export class ModelDownloader {
     }
 
     /**
+     * Info about all the files that will be saved to the download directory,
+     * including their filenames, full paths, total sizes and downloaded sizes.
+     */
+    public get filesInfo() {
+        return this._specificFileDownloaders.map((downloader) => ({
+            fileName: downloader.fileName!,
+            filePath: path.join(this._dirPath, downloader.fileName!),
+            totalSize: downloader.status.totalBytes,
+            downloadedSize: downloader.status.transferredBytes
+        }));
+    }
+
+    /**
      * @returns The path to the entrypoint file that should be used to load the model
      */
     public async download({

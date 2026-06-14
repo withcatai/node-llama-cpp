@@ -85,6 +85,60 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
         }
 
         await fs.remove(downloader.entrypointFilePath);
+    } else if (downloader.totalFiles > 1) {
+        const filesInfo = downloader.filesInfo;
+        const fileStats = await Promise.all(
+            filesInfo.map(async (info) => {
+                try {
+                    return {
+                        stats: await fs.stat(info.filePath),
+                        info
+                    };
+                } catch (err) {
+                    return {
+                        stats: null,
+                        info
+                    };
+                }
+            })
+        );
+
+        const totalFileSizes = fileStats.reduce((res, {stats}) => res + (stats?.size ?? 0), 0);
+        const allFilesExist = fileStats.every(({stats}) => stats != null);
+        if (allFilesExist && totalFileSizes === downloader.totalSize) {
+            console.info(`${chalk.yellow(consoleTitle + ":")} ${getReadablePath(downloader.entrypointFilePath)}`);
+
+            return downloader.entrypointFilePath;
+        } else if (allFilesExist && totalFileSizes !== downloader.totalSize) {
+            const res = await ConsoleInteraction.yesNoQuestion(
+                "There are already downloaded local files for this model that are different from the remote ones.\n" +
+                "Download them and override the existing files?"
+            );
+
+            if (!res) {
+                console.info("Loading the existing files");
+                console.info(`${chalk.yellow(consoleTitle + ":")} ${getReadablePath(downloader.entrypointFilePath)}`);
+
+                return downloader.entrypointFilePath;
+            } else
+                await Promise.all(
+                    fileStats.map(({stats, info}) => {
+                        if (stats == null)
+                            return undefined;
+
+                        return fs.remove(info.filePath);
+                    })
+                );
+        } else
+            await Promise.all(
+                fileStats.map(async ({stats, info}) => {
+                    if (stats == null)
+                        return;
+    
+                    if (stats.size !== info.totalSize)
+                        await fs.remove(info.filePath);
+                })
+            );
     }
 
     const consoleInteraction = new ConsoleInteraction();
