@@ -1,18 +1,24 @@
 diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
-index 0d1cf3cc33b..5547bd450fb 100644
+index 474cabdfc09..35fef097f5b 100644
 --- a/src/llama-model-loader.cpp
 +++ b/src/llama-model-loader.cpp
-@@ -698,7 +698,8 @@ llama_model_loader::llama_model_loader(
+@@ -698,8 +698,13 @@ llama_model_loader::llama_model_loader(
+         llm_kv = LLM_KV(llm_arch_from_string(arch_name));
      }
  
-     n_kv      = gguf_get_n_kv(metadata);
+-    n_kv      = gguf_get_n_kv(metadata);
 -    n_tensors = weights_map.size();
-+    n_tensors = gguf_get_n_tensors(metadata);
-+    GGML_ASSERT(files.empty() || weights_map.size() == static_cast<size_t>(n_tensors));
++    n_kv = gguf_get_n_kv(metadata);
++    if (files.empty()) {
++        n_tensors = gguf_get_n_tensors(metadata);
++    } else {
++        n_tensors = weights_map.size();
++        GGML_ASSERT(files.size() != 1 || static_cast<int64_t>(n_tensors) == gguf_get_n_tensors(metadata));
++    }
  
      fver = (enum llama_fver) gguf_get_version(metadata);
  
-@@ -1212,13 +1213,18 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1213,13 +1218,20 @@ struct ggml_tensor * llama_model_loader::create_tensor(
      };
  
      if (files.empty()) {
@@ -25,16 +31,18 @@ index 0d1cf3cc33b..5547bd450fb 100644
              type = gguf_get_tensor_type(metadata, tid);
 +        } else if (flags & TENSOR_SKIP_IF_VIRTUAL) {
 +            return nullptr;
-+        } else if (no_alloc) {
++        } else {
 +            if (flags & TENSOR_NOT_REQUIRED) {
 +                return nullptr;
 +            }
 +
-+            throw std::runtime_error(format("missing tensor '%s'", tn.str().c_str()));
++            if (no_alloc) {
++                throw std::runtime_error(format("missing tensor '%s'", tn.str().c_str()));
++            }
          }
  
          // for tensors that are not required some of the dimensions can be invalid:
-@@ -1236,7 +1242,13 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1237,7 +1249,13 @@ struct ggml_tensor * llama_model_loader::create_tensor(
          for (size_t dim = 0; dim < GGML_MAX_DIMS; dim++) {
              t_meta.ne[dim] = dim < ne.size() ? ne.begin()[dim] : 1;
              GGML_ASSERT(t_meta.ne[dim] >= 1);
@@ -49,7 +57,7 @@ index 0d1cf3cc33b..5547bd450fb 100644
              GGML_ASSERT(t_meta.nb[dim] >= 1);
          }
          ggml_set_name(&t_meta, tn.str().c_str());
-@@ -1244,6 +1256,16 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1245,6 +1263,16 @@ struct ggml_tensor * llama_model_loader::create_tensor(
          ggml_backend_buffer_type_t buft = buft_for_tensor(&t_meta);
          GGML_ASSERT(buft != nullptr);
          ggml_context * ctx = ctx_for_buft(buft);
