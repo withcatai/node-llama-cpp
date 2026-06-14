@@ -522,6 +522,7 @@ const defaultSegmentBudgetSize = (contextSize: number) => (
         ? contextSize * 0.5
         : contextSize * 0.75
 );
+const maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget = 12;
 
 
 export class LlamaChat {
@@ -2920,7 +2921,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         });
 
                         if (!hadInProgressTriggers && functionParamsGenerationDoneDetector.hasInProgressStops &&
-                            this.llamaChat.sequence.needsCheckpoints
+                            this.llamaChat.sequence.needsCheckpoints &&
+                            this.llamaChat.sequence.getRestoreToPrefixIndexEvaluationSize(
+                                this.llamaChat.sequence.nextTokenIndex - Math.floor(
+                                    maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget / 2
+                                )
+                            ) > Math.floor(maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget / 2)
                         )
                             await this.llamaChat.sequence._takeNamedCheckpoint(
                                 internalCheckpoints.chatGrammarEnd.name,
@@ -3383,7 +3389,10 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             this.currentQueuedTokenRelease?.createTokenIndexLock(0);
 
         if (this.grammar != null && !hadInProgressStopTrigger && this.stopGenerationDetector.hasInProgressStops &&
-            this.llamaChat.sequence.needsCheckpoints
+            this.llamaChat.sequence.needsCheckpoints &&
+            this.llamaChat.sequence.getRestoreToPrefixIndexEvaluationSize(
+                this.llamaChat.sequence.nextTokenIndex - Math.floor(maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget / 2)
+            ) > Math.floor(maxGrammarEndReevaluateCheckpointRestoreEvaluationBudget / 2)
         )
             return this.llamaChat.sequence._takeNamedCheckpoint(
                 internalCheckpoints.chatGrammarEnd.name,

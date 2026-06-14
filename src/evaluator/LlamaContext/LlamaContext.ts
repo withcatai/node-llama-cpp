@@ -1962,6 +1962,28 @@ export class LlamaContextSequence {
         return this._checkpoints.memoryUsage;
     }
 
+    /**
+     * Check how many tokens will be evaluated when trying to restore to checkpoint at a given index
+     */
+    public getRestoreToPrefixIndexEvaluationSize(tokenIndex: number) {
+        if (tokenIndex < 0)
+            return 0;
+        else if (tokenIndex >= this.nextTokenIndex)
+            return -1;
+
+        if (!this.needsCheckpoints)
+            return 0;
+
+        if (tokenIndex >= this.stateCellsStartIndex)
+            return 0;
+
+        const checkpoint = this._checkpoints.getLastCheckpoint(tokenIndex, this.contextSize);
+        if (checkpoint == null)
+            return tokenIndex;
+
+        return Math.max(0, tokenIndex - checkpoint.maxPos);
+    }
+
     /** @internal */
     private async _takeCheckpoint(name: string | undefined, maxNamedCheckpoints: number) {
         if (!this.needsCheckpoints || this._nextTokenIndex === 0 || this._checkpoints.hasCheckpoint(name, this._nextTokenIndex - 1))
