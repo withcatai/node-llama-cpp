@@ -1,3 +1,5 @@
+import {getConsoleLogPrefix} from "./getConsoleLogPrefix.js";
+
 const defaultGitHubApiBase = "https://api.github.com";
 const defaultGitHubApiVersion: GitHubApiVersion = "2022-11-28";
 
@@ -177,7 +179,8 @@ export class GitHubClient {
                     method: "GET",
                     headers
                 });
-            }
+            } else
+                console.warn(getConsoleLogPrefix(), "GitHub API rate limit exceeded. Try setting the `GITHUB_TOKEN` environment variable to increase the rate limit");
         }
 
         if (!res.ok) {
