@@ -1,7 +1,44 @@
 #include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <stdexcept>
+#include <vector>
 
 #include "AddonGgufMetadata.h"
 #include "gguf.h"
+#include "llama.h"
+
+
+static constexpr const char* kGgufSplitNoKey = "split.no";
+static constexpr const char* kGgufSplitCountKey = "split.count";
+static constexpr const char* kGgufSplitTensorsCountKey = "split.tensors.count";
+
+static std::optional<uint16_t> getOptionalGgufU16(const gguf_context* metadata, const char* key) {
+    const int64_t keyId = gguf_find_key(metadata, key);
+    if (keyId < 0) {
+        return std::nullopt;
+    }
+
+    return gguf_get_val_u16(metadata, keyId);
+}
+
+static std::string getSplitPrefixFromPath(const std::string& path, const uint16_t splitNo, const uint16_t splitCount) {
+    std::vector<char> splitPrefix(path.size() + 1, '\0');
+    if (llama_split_prefix(splitPrefix.data(), splitPrefix.size(), path.c_str(), splitNo, splitCount) <= 0) {
+        throw std::runtime_error("Invalid split GGUF path: " + path);
+    }
+
+    return std::string(splitPrefix.data());
+}
+
+static std::string getSplitPath(const std::string& splitPrefix, const uint16_t splitNo, const uint16_t splitCount) {
+    std::vector<char> splitPath(splitPrefix.size() + 32, '\0');
+    if (llama_split_path(splitPath.data(), splitPath.size(), splitPrefix.c_str(), splitNo, splitCount) <= 0) {
+        throw std::runtime_error("Failed to construct GGUF split path for split " + std::to_string(splitNo));
+    }
+
+    return std::string(splitPath.data());
+}
 
 
 AddonGgufMetadata::AddonGgufMetadata(const Napi::CallbackInfo& info)
@@ -56,8 +93,7 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
             try {
                 gguf_context_ptr& ggufMetadata = addonGgufMetadata->ggufMetadata;
 
-                bool hasCopiedMetadata = false;
-                for (const auto& itemSource : sources) {
+                auto loadMetadataSource = [](const AddonGgufMetadataSource& itemSource, ggml_context_ptr& tensorContextGuard) {
                     struct ggml_context* tensorContext = nullptr;
                     struct gguf_init_params ggufParams = {
                         /* .no_alloc = */ true,
@@ -68,21 +104,108 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
                             ? gguf_init_from_buffer(itemSource.buffer.data, itemSource.buffer.length, ggufParams)
                             : gguf_init_from_file(itemSource.path.c_str(), ggufParams)
                     );
-                    ggml_context_ptr tensorContextGuard(tensorContext);
+                    tensorContextGuard.reset(tensorContext);
 
                     if (metadata.get() == nullptr || tensorContext == nullptr) {
                         throw std::runtime_error("Failed to parse GGUF metadata buffer");
                     }
 
+                    return metadata;
+                };
+
+                std::vector<AddonGgufMetadataSource> resolvedSources = sources;
+                if (!sources.empty()) {
+                    ggml_context_ptr initialTensorContextGuard;
+                    gguf_context_ptr initialMetadata = loadMetadataSource(sources.front(), initialTensorContextGuard);
+                    const std::optional<uint16_t> splitCount = getOptionalGgufU16(initialMetadata.get(), kGgufSplitCountKey);
+
+                    if (splitCount.has_value() && splitCount.value() > 1) {
+                        if (sources.size() == 1) {
+                            if (sources.front().type != AddonGgufMetadataSourceType::path) {
+                                throw std::runtime_error(
+                                    "Loading split GGUF metadata from source buffers requires all split parts to be provided"
+                                );
+                            }
+
+                            const std::optional<uint16_t> splitNo = getOptionalGgufU16(initialMetadata.get(), kGgufSplitNoKey);
+                            if (!splitNo.has_value()) {
+                                throw std::runtime_error("Missing split.no metadata in split GGUF source");
+                            }
+
+                            const std::string splitPrefix = getSplitPrefixFromPath(
+                                sources.front().path,
+                                splitNo.value(),
+                                splitCount.value()
+                            );
+
+                            resolvedSources.clear();
+                            resolvedSources.reserve(splitCount.value());
+
+                            for (uint16_t splitIndex = 0; splitIndex < splitCount.value(); ++splitIndex) {
+                                resolvedSources.emplace_back(AddonGgufMetadataSource(
+                                    getSplitPath(splitPrefix, splitIndex, splitCount.value())
+                                ));
+                            }
+                        } else if (sources.size() != splitCount.value()) {
+                            throw std::runtime_error(
+                                "Expected " + std::to_string(splitCount.value()) +
+                                " split GGUF sources, but got " + std::to_string(sources.size())
+                            );
+                        }
+                    }
+                }
+
+                bool hasCopiedMetadata = false;
+                int32_t mergedTensorCount = 0;
+                std::optional<uint16_t> mergedSplitCount;
+                for (size_t sourceIndex = 0; sourceIndex < resolvedSources.size(); sourceIndex++) {
+                    const auto& itemSource = resolvedSources[sourceIndex];
+                    ggml_context_ptr tensorContextGuard;
+                    gguf_context_ptr metadata = loadMetadataSource(itemSource, tensorContextGuard);
+
                     if (!hasCopiedMetadata) {
                         gguf_set_kv(ggufMetadata.get(), metadata.get());
                         hasCopiedMetadata = true;
+                        mergedSplitCount = getOptionalGgufU16(metadata.get(), kGgufSplitCountKey);
                     }
 
-                    for (ggml_tensor* tensor = ggml_get_first_tensor(tensorContext); tensor != nullptr;
-                        tensor = ggml_get_next_tensor(tensorContext, tensor)) {
-                        gguf_add_tensor(ggufMetadata.get(), tensor);
+                    if (mergedSplitCount.has_value() && mergedSplitCount.value() > 1) {
+                        const std::optional<uint16_t> splitNo = getOptionalGgufU16(metadata.get(), kGgufSplitNoKey);
+                        if (!splitNo.has_value()) {
+                            throw std::runtime_error("Missing split.no metadata in split GGUF source");
+                        } else if (splitNo.value() != sourceIndex) {
+                            throw std::runtime_error(
+                                "Invalid split GGUF source order: expected split index " + std::to_string(sourceIndex) +
+                                ", but got " + std::to_string(splitNo.value())
+                            );
+                        }
+
+                        const std::optional<uint16_t> splitCount = getOptionalGgufU16(metadata.get(), kGgufSplitCountKey);
+                        if (!splitCount.has_value()) {
+                            throw std::runtime_error("Missing split.count metadata in split GGUF source");
+                        } else if (splitCount.value() != mergedSplitCount.value()) {
+                            throw std::runtime_error(
+                                "Inconsistent split.count metadata in split GGUF source: expected " +
+                                std::to_string(mergedSplitCount.value()) + ", but got " + std::to_string(splitCount.value())
+                            );
+                        }
                     }
+
+                    for (ggml_tensor* tensor = ggml_get_first_tensor(tensorContextGuard.get()); tensor != nullptr;
+                        tensor = ggml_get_next_tensor(tensorContextGuard.get(), tensor)) {
+                        gguf_add_tensor(ggufMetadata.get(), tensor);
+                        mergedTensorCount++;
+                    }
+                }
+
+                if (mergedSplitCount.has_value() && mergedSplitCount.value() > 1) {
+                    // mirror `gguf_merge` in `llama.cpp/tools/gguf-split/gguf-split.cpp`:
+                    // copy the KV metadata from the first split, append tensors from all splits,
+                    // then normalize the split bookkeeping so the merged context behaves like
+                    // a single spliced GGUF instead of shard 0 with extra tensors appended.
+                    gguf_set_val_u16(ggufMetadata.get(), kGgufSplitNoKey, 0);
+                    gguf_set_val_u16(ggufMetadata.get(), kGgufSplitCountKey, 0);
+                    gguf_set_val_i32(ggufMetadata.get(), kGgufSplitTensorsCountKey, mergedTensorCount);
                 }
             } catch (const std::exception& e) {
                 SetError(e.what());
