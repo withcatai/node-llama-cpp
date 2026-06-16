@@ -163,7 +163,33 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (!cmakeCustomOptions.has("GGML_NATIVE") || isCmakeValueOff(cmakeCustomOptions.get("GGML_NATIVE"))) {
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
 
-                        if (!cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS")) {
+                        // matches that clause of `if (GGML_CPU_ALL_VARIANTS)` in `llama.cpp` under `ggml/src/CMakeLists.txt`
+                        if (!cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS") && (
+                            (
+                                buildOptions.arch === "x64"
+                            ) ||
+                            (
+                                (buildOptions.arch === "arm64" || buildOptions.arch === "arm") && (
+                                    buildOptions.platform === "linux" ||
+                                    buildOptions.platform === "mac"
+                                )
+                            ) ||
+                            (
+                                (buildOptions.arch === "ppc64" || buildOptions.arch === "ppc") && (
+                                    buildOptions.platform === "linux"
+                                )
+                            ) ||
+                            (
+                                buildOptions.arch === "s390x" && (
+                                    buildOptions.platform === "linux"
+                                )
+                            ) ||
+                            (
+                                buildOptions.arch === "riscv64" && (
+                                    buildOptions.platform === "linux"
+                                )
+                            )
+                        )) {
                             cmakeCustomOptions.set("GGML_CPU_ALL_VARIANTS", "ON");
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
