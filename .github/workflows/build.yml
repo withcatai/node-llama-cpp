@@ -243,8 +243,10 @@ jobs:
           # where electron ships no prebuilt binary.
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: |
-          # npm on the unofficial riscv64 node intermittently throws internal
-          # TypeErrors (e.g. "key.match is not a function"); retry a few times.
+          # The unofficial riscv64 Node runtime intermittently throws internal
+          # TypeErrors during npm ci (e.g. "key.match is not a function"). These
+          # trace to upstream V8-on-riscv64 flakiness, not an npm or repo bug,
+          # and don't reproduce deterministically, so retry a few times.
           npm ci || npm ci || npm ci
 
           npx zx -y <<'EOF'
