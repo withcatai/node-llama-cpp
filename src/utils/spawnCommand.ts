@@ -66,13 +66,17 @@ export function spawnCommand(
                 reject(createError(`Command ${getCommandString()} closed with code ${code}`));
         });
 
-        if (progressLogs) {
-            child.stdout?.pipe(process.stdout);
-            child.stderr?.pipe(process.stderr);
-            process.stdin.pipe(child.stdin!);
-        } else {
-            child.stderr?.pipe(process.stderr);
-        }
+        // Echo progress to stderr (not stdout) so that when node-llama-cpp is used inside a process
+        // that reserves stdout as a data channel (e.g. a stdio MCP server speaking JSON-RPC over stdout),
+        // build/progress output doesn't corrupt that channel. The child's stdout is still captured for
+        // the resolved result via the "data" handler below, so nothing is lost.
+        // `process.stdin` is intentionally not piped into the child: build commands don't read stdin, and
+        // piping it hands the parent's stdin to the child, which drains/closes it on child exit and makes
+        // the parent stop reading its own input (breaking stdio-based transports / causing an early exit).
+        if (progressLogs)
+            child.stdout?.pipe(process.stderr);
+
+        child.stderr?.pipe(process.stderr);
 
         child.stdout?.on("data", (data) => {
             stdout.push(data.toString());
