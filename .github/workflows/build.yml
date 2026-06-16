@@ -71,6 +71,9 @@ jobs:
           - name: "Ubuntu (2)"
             os: ubuntu-22.04
             artifact: "linux-2"
+          - name: "Ubuntu (arm64)"
+            os: ubuntu-22.04-arm
+            artifact: "linux-arm64"
           - name: "macOS x64"
             os: macos-15-intel
             artifact: "mac-x64"
@@ -108,17 +111,11 @@ jobs:
         if: matrix.config.name == 'Ubuntu (1)'
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+          sudo apt-get install ninja-build libtbb-dev
           
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
-          
-          which aarch64-linux-gnu-gcc
-          which aarch64-linux-gnu-g++
-          
-          which arm-linux-gnueabihf-gcc
-          which arm-linux-gnueabihf-g++
           
           cmake --version
 
@@ -131,6 +128,37 @@ jobs:
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
+          
+          cmake --version
+      
+      - name: Install dependencies on Ubuntu (arm64)
+        if: matrix.config.name == 'Ubuntu (arm64)'
+        env:
+          LLVM_VERSION: 21
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh "${LLVM_VERSION}"
+          
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libtbb-dev "clang-${LLVM_VERSION}" "lld-${LLVM_VERSION}" "llvm-${LLVM_VERSION}" g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+
+          sudo update-alternatives --install /usr/bin/cc cc "/usr/bin/clang-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/c++ c++ "/usr/bin/clang++-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/clang-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/clang++-${LLVM_VERSION}" 100
+          
+          wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-aarch64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-aarch64.tar.gz
+          rm -f ./cmake-4.2.1-linux-aarch64.tar.gz
+          
+          cc --version
+          c++ --version
+          gcc --version
+          g++ --version
+
+          which arm-linux-gnueabihf-gcc
+          which arm-linux-gnueabihf-g++
           
           cmake --version
 
@@ -270,10 +298,11 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
-            await buildBinary("arm64", ["--gpu", "false"]);
-            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "linux-2") {
             await buildBinary("x64", ["--gpu", "cuda"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-arm64") {
+            await buildBinary("arm64", ["--gpu", "false"]);
+            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
