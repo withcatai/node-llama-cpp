@@ -82,6 +82,7 @@ export type BindingModule = {
     },
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
+    setLoggerLogLevelOverride(level: number | undefined): void,
     getGpuVramInfo(): {
         total: number,
         used: number,

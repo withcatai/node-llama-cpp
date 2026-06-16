@@ -67,6 +67,8 @@ export class Llama {
     };
     /** @internal */ private _logger: ((level: LlamaLogLevel, message: string) => void);
     /** @internal */ private _logLevel: LlamaLogLevel;
+    /** @internal */ private _logLevelOverride?: LlamaLogLevel;
+    /** @internal */ private _logLevelOverrideHandles: {level: LlamaLogLevel}[] = [];
     /** @internal */ private _pendingLog: string | null = null;
     /** @internal */ private _pendingLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _logDispatchQueuedMicrotasks: number = 0;
@@ -531,6 +533,41 @@ export class Llama {
     }
 
     /**
+     * Set log level override
+     * @internal
+     */
+    public _createLogLevelOverride(value: LlamaLogLevel) {
+        const handle = {level: value};
+        this._logLevelOverrideHandles.push(handle);
+
+        if (this._logLevelOverride != value) {
+            this._logLevelOverride = value;
+            const addonLogLevel = LlamaLogLevelToAddonLogLevel.get(value);
+
+            if (addonLogLevel != null)
+                this._bindings.setLoggerLogLevelOverride(addonLogLevel);
+        }
+
+        return () => {
+            const index = this._logLevelOverrideHandles.indexOf(handle);
+            if (index < 0)
+                return;
+
+            this._logLevelOverrideHandles.splice(index, 1);
+            const newOverride = this._logLevelOverrideHandles.at(-1)?.level;
+
+            if (this._logLevelOverride != newOverride) {
+                this._logLevelOverride = newOverride;
+                this._bindings.setLoggerLogLevelOverride(
+                    newOverride == null
+                        ? undefined
+                        : LlamaLogLevelToAddonLogLevel.get(newOverride) ?? undefined
+                );
+            }
+        };
+    }
+
+    /**
      * Log messages related to the Llama instance
      * @internal
      */
@@ -543,7 +580,7 @@ export class Llama {
      * @internal
      */
     public _shouldLog(level: LlamaLogLevel) {
-        return LlamaLogLevelGreaterThanOrEqual(level, this._logLevel);
+        return LlamaLogLevelGreaterThanOrEqual(level, this._logLevelOverride ?? this._logLevel);
     }
 
     /** @internal */
@@ -618,7 +655,7 @@ export class Llama {
 
             try {
                 const transformedLogLevel = getTransformedLogLevel(level, message, this.gpu);
-                if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevel))
+                if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevelOverride ?? this._logLevel))
                     this._logger(transformedLogLevel, message);
             } catch (err) {
                 // the native addon code calls this function, so there's no use to throw an error here

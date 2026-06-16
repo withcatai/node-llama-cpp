@@ -1252,11 +1252,13 @@ export class GgufInsightsSimulatorSession {
             const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
                 ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
                 : undefined;
+            const disposeLogLevelOverride = this._llama._createLogLevelOverride(LlamaLogLevel.error);
             try {
                 const contextLoaded = await context.init();
                 if (!contextLoaded)
                     throw new Error("Failed to create context");
             } finally {
+                disposeLogLevelOverride();
                 loadingLock?.dispose();
             }
             
@@ -1353,6 +1355,7 @@ export class GgufInsightsSimulatorSession {
         const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
             ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
             : undefined;
+        const disposeLogLevelOverride = this._llama._createLogLevelOverride(LlamaLogLevel.error);
         try {
             const modelLoaded = typeof source === "string"
                 ? await model.init()
@@ -1360,6 +1363,7 @@ export class GgufInsightsSimulatorSession {
             if (!modelLoaded)
                 throw new Error("Failed to load model");
         } finally {
+            disposeLogLevelOverride();
             loadingLock?.dispose();
         }
 

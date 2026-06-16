@@ -458,6 +458,7 @@ export class GgufInsightsConfigurationResolver {
         llamaVramPaddingSize?: number, llamaGpu?: BuildGpu, llamaSupportsGpuOffloading?: boolean, defaultContextFlashAttention?: LlamaContextOptions["flashAttention"],
         defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache?: boolean,
         useMmap?: "auto" | boolean,
+        onProgress?(step: number, totalSteps: number): void,
 
         /** @internal */
         _simulatorSession?: GgufInsightsSimulatorSession
@@ -472,6 +473,7 @@ export class GgufInsightsConfigurationResolver {
             defaultContextKvCacheValueType,
             defaultContextSwaFullCache = false,
             useMmap = "auto",
+            onProgress,
 
             _simulatorSession
         } = options;
@@ -489,7 +491,8 @@ export class GgufInsightsConfigurationResolver {
             defaultContextSwaFullCache,
             useMmap,
             simulatorSession: _simulatorSession,
-            vramCapIsSet: this._ggufInsights._llama.getVramCap() != null
+            vramCapIsSet: this._ggufInsights._llama.getVramCap() != null,
+            onProgress
         });
     }
 

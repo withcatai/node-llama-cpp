@@ -200,6 +200,11 @@ const defaultUseMmap = "auto" as const satisfies NonNullable<LlamaModelOptions["
 const defaultUseDirectIo = false;
 const defaultContextFlashAttentionOptionDefault = "auto" as const satisfies NonNullable<LlamaModelOptions["defaultContextFlashAttention"]>;
 const defaultContextSwaFullCache = false;
+const figuringGpuLayersValueLoadPercentage = {
+    percentagePerStep: 0.01,
+    percentagePerStepModelMemorySize: 0.005,
+    maxPercentage: 0.16
+} as const;
 
 export class LlamaModel {
     /** @internal */ public readonly _llama: Llama;
@@ -248,7 +253,9 @@ export class LlamaModel {
         _defaultContextSwaFullCache,
         _defaultContextKvCacheKeyType,
         _defaultContextKvCacheValueType,
-        _flashAttentionSupported
+        _flashAttentionSupported,
+        _loadPercentageShift,
+        _loadPercentageMultiplier
     }: {
         _llama: Llama,
         _fileInfo: GgufFileInfo,
@@ -258,7 +265,9 @@ export class LlamaModel {
         _defaultContextSwaFullCache: boolean,
         _defaultContextKvCacheKeyType: GgmlType,
         _defaultContextKvCacheValueType: GgmlType,
-        _flashAttentionSupported: boolean
+        _flashAttentionSupported: boolean,
+        _loadPercentageShift: number,
+        _loadPercentageMultiplier: number
     }) {
         this._llama = _llama;
         this._fileInfo = _fileInfo;
@@ -290,7 +299,7 @@ export class LlamaModel {
                 ? undefined
                 : (loadPercentage: number) => {
                     try {
-                        onLoadProgress(loadPercentage);
+                        onLoadProgress(_loadPercentageShift + (loadPercentage * _loadPercentageMultiplier));
                     } catch (err) {
                         // the native addon code calls this function, so there's no use to throw an error here
                         console.error(err);
@@ -810,7 +819,17 @@ export class LlamaModel {
         let resolvedUseMmap: boolean;
         let resourceRequirementsEstimation: GgufInsightsResourceRequirements;
         const simulatorSession = ggufInsights._createSimulatorSession();
+        let layersResolutionLoadedPercentage = 0;
         try {
+            let lastProgressSteps = 0;
+            const onProgressPercentagePerStep = figuringGpuLayersValueLoadPercentage.percentagePerStep + (
+                modelOptions.onLoadProgress == null
+                    ? 0
+                    : (
+                        Math.min(1, ggufInsights.modelSize / (await _llama._ramOrchestrator.getMemoryState()).total) *
+                        figuringGpuLayersValueLoadPercentage.percentagePerStepModelMemorySize
+                    )
+            );
             const layersResolution = await ggufInsights.configurationResolver.resolveModelGpuLayersV2(modelOptions.gpuLayers, {
                 ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
                 defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
@@ -818,6 +837,21 @@ export class LlamaModel {
                 defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
                 defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
                 useMmap,
+                onProgress: modelOptions.onLoadProgress == null
+                    ? undefined
+                    : (steps: number, totalSteps: number) => {
+                        if (steps === totalSteps && (totalSteps - lastProgressSteps) / totalSteps >= 0.2)
+                            return; // skip a too big jump in the progress bar at the end of the loading progress
+
+                        lastProgressSteps = steps;
+
+                        if (totalSteps * onProgressPercentagePerStep >= figuringGpuLayersValueLoadPercentage.maxPercentage)
+                            layersResolutionLoadedPercentage = (steps / totalSteps) * figuringGpuLayersValueLoadPercentage.maxPercentage;
+                        else
+                            layersResolutionLoadedPercentage = steps * onProgressPercentagePerStep;
+
+                        modelOptions.onLoadProgress?.(layersResolutionLoadedPercentage);
+                    },
     
                 _simulatorSession: simulatorSession
             });
@@ -842,7 +876,9 @@ export class LlamaModel {
             _defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
             _defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
             _defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
-            _defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType
+            _defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
+            _loadPercentageShift: layersResolutionLoadedPercentage,
+            _loadPercentageMultiplier: 1 - layersResolutionLoadedPercentage
         });
         const modelCreationVramReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
