@@ -149,14 +149,14 @@ jobs:
           
           cmake --version
 
+      # llama.cpp's ggml-cpu uses the RVV _Float16 (zvfh) vector intrinsics,
+      # which only exist in GCC 14+. The runner defaults to GCC 13, so make
+      # gcc-14/g++-14 the default compilers (same as upstream build-riscv).
       - name: Install dependencies on Ubuntu riscv64
         if: matrix.config.name == 'Ubuntu riscv64'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential ninja-build libtbb-dev gcc-14 g++-14
-          # llama.cpp's ggml-cpu uses the RVV _Float16 (zvfh) vector intrinsics,
-          # which only exist in GCC 14+. The runner defaults to GCC 13, so make
-          # gcc-14/g++-14 the default compilers (same as upstream build-riscv).
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
           cmake --version
@@ -238,16 +238,19 @@ jobs:
         timeout-minutes: 300
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
-          # This job only needs electron's types, never its binary, so always
-          # skip the postinstall download. It also unblocks npm ci on riscv64,
-          # where electron ships no prebuilt binary.
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: |
-          # The unofficial riscv64 Node runtime intermittently throws internal
-          # TypeErrors during npm ci (e.g. "key.match is not a function"). These
-          # trace to upstream V8-on-riscv64 flakiness, not an npm or repo bug,
-          # and don't reproduce deterministically, so retry a few times.
-          npm ci || npm ci || npm ci
+          if [ "$ARTIFACT_NAME" = "linux-riscv64" ]; then
+            # The unofficial riscv64 Node runtime intermittently throws internal
+            # TypeErrors during npm ci (e.g. "key.match is not a function"). These
+            # trace to upstream V8-on-riscv64 flakiness, not an npm or repo bug,
+            # and don't reproduce deterministically, so retry a few times. Keep
+            # the retry scoped to riscv64 so a first-try failure on any other
+            # platform still fails loudly.
+            npm ci || npm ci || npm ci
+          else
+            npm ci
+          fi
 
           npx zx -y <<'EOF'
           
