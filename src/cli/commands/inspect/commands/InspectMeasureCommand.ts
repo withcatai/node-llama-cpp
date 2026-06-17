@@ -6,6 +6,7 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import stripAnsi from "strip-ansi";
 import bytes from "bytes";
+import {acquireLock} from "lifecycle-utils";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveCommandGgufPath} from "../../../utils/resolveCommandGgufPath.js";
 import {getLlama} from "../../../../bindings/getLlama.js";
@@ -24,7 +25,8 @@ import {toBytes} from "../../../utils/toBytes.js";
 import {padSafeContextSize} from "../../../../evaluator/LlamaContext/utils/padSafeContextSize.js";
 import {getPlatform} from "../../../../bindings/utils/getPlatform.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../../../gguf/types/GgufTensorInfoTypes.js";
-import {LlamaContext, LlamaEmbeddingContext} from "../../../../apiDocsIndex.js";
+import {LlamaContext} from "../../../../evaluator/LlamaContext/LlamaContext.js";
+import {LlamaEmbeddingContext} from "../../../../evaluator/LlamaEmbeddingContext.js";
 
 type InspectMeasureCommand = {
     modelPath?: string,
@@ -337,150 +339,156 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                     : evaluateText.repeat(repeatEvaluateText ?? 1),
                 exitAfterMeasurement: exitAfterEachMeasurement,
                 async onInfo({gpuLayers, result}) {
-                    if (lastGpuLayers !== gpuLayers) {
-                        lastGpuLayers = gpuLayers;
-                        previousContextSizeCheck = undefined;
-                        measureTable.logLine({});
+                    const onInfoLock = await acquireLock([InspectMeasureCommand, "onInfo"]);
 
-                        if (printHeaderBeforeEachLayer)
-                            measureTable.logHeader({drawRowSeparator: false});
-                    }
+                    try {
+                        if (lastGpuLayers !== gpuLayers) {
+                            lastGpuLayers = gpuLayers;
+                            previousContextSizeCheck = undefined;
+                            measureTable.logLine({});
 
-                    if (result.type === "crash") {
-                        if (!hadSuccessInThisProcess) {
+                            if (printHeaderBeforeEachLayer)
+                                measureTable.logHeader({drawRowSeparator: false});
+                        }
+
+                        if (result.type === "crash") {
+                            if (!hadSuccessInThisProcess) {
+                                measureTable.logLine({
+                                    newProcess: getNewProccessValue(),
+                                    type: chalk.redBright("Crash"),
+                                    gpuLayers: String(lastGpuLayers),
+                                    contextSize: previousContextSizeCheck != null
+                                        ? String(previousContextSizeCheck)
+                                        : chalk.red(result.result),
+                                    estimatedModelVram: previousContextSizeCheck == null
+                                        ? undefined
+                                        : chalk.red(result.result)
+                                });
+                                lastGpuLayers--;
+                            }
+                        } else if (result.type === "error") {
+                            previousContextSizeCheck = result.contextSize;
+                            hadSuccessInThisProcess = true;
+
                             measureTable.logLine({
                                 newProcess: getNewProccessValue(),
-                                type: chalk.redBright("Crash"),
+                                type: chalk.red("Error"),
                                 gpuLayers: String(lastGpuLayers),
                                 contextSize: previousContextSizeCheck != null
                                     ? String(previousContextSizeCheck)
-                                    : chalk.red(result.result),
+                                    : chalk.red(result.error),
                                 estimatedModelVram: previousContextSizeCheck == null
                                     ? undefined
-                                    : chalk.red(result.result)
+                                    : chalk.red(result.error)
                             });
-                            lastGpuLayers--;
+                        } else if (result.type === "success") {
+                            previousContextSizeCheck = result.contextSize;
+                            hadSuccessInThisProcess = true;
+
+                            const modelResourceEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
+                                gpuLayers: lastGpuLayers,
+                                useMmap: result.useMmap
+                            });
+                            const modelVramEstimation = modelResourceEstimation.gpuVram;
+                            const modelVramEstimationDiffBytes = (modelVramEstimation < result.modelVramUsage ? "-" : "") +
+                                toBytes(Math.abs(result.modelVramUsage - modelVramEstimation));
+                            const modelVramEstimationDiffText = modelVramEstimationDiffBytes.padEnd(9, " ") + " " +
+                                padStartAnsi("(" + renderDiffPercentageWithColors(((modelVramEstimation / result.modelVramUsage) - 1) * 100) + ")", 9);
+
+                            const modelRamEstimation = modelResourceEstimation.cpuRam;
+                            const modelRamEstimationDiffBytes = (modelRamEstimation < result.modelRamUsage ? "-" : "") +
+                                toBytes(Math.abs(result.modelRamUsage - modelRamEstimation));
+                            const modelRamEstimationDiffText = modelRamEstimationDiffBytes.padEnd(9, " ") + " " +
+                                padStartAnsi("(" + renderDiffPercentageWithColors(((modelRamEstimation / result.modelRamUsage) - 1) * 100) + ")", 9);
+
+                            const contextResourceEstimation = previousContextSizeCheck == null
+                                ? undefined
+                                : await ggufInsights.estimateContextResourceRequirementsV2({
+                                    contextSize: previousContextSizeCheck,
+                                    modelGpuLayers: lastGpuLayers,
+                                    flashAttention,
+                                    swaFullCache,
+                                    batchSize,
+                                    isEmbeddingContext: embedding
+                                });
+
+                            const contextVramEstimation = contextResourceEstimation?.gpuVram;
+                            const contextVramEstimationDiffBytes = (result.contextVramUsage == null || contextVramEstimation == null)
+                                ? undefined
+                                : (
+                                    (contextVramEstimation < result.contextVramUsage ? "-" : "") +
+                                    toBytes(Math.abs(result.contextVramUsage - contextVramEstimation))
+                                );
+                            const contextVramEstimationDiffText = (
+                                contextVramEstimation == null || contextVramEstimationDiffBytes == null || result.contextVramUsage == null
+                            )
+                                ? undefined
+                                : (
+                                    contextVramEstimationDiffBytes.padEnd(9, " ") + " " +
+                                    padStartAnsi("(" + renderDiffPercentageWithColors(((contextVramEstimation / result.contextVramUsage) - 1) * 100) + ")", 9)
+                                );
+
+                            const contextRamEstimation = contextResourceEstimation?.cpuRam;
+                            const contextRamEstimationDiffBytes = (result.contextRamUsage == null || contextRamEstimation == null)
+                                ? undefined
+                                : (
+                                    (contextRamEstimation < result.contextRamUsage ? "-" : "") +
+                                    toBytes(Math.abs(result.contextRamUsage - contextRamEstimation))
+                                );
+                            const contextRamEstimationDiffText = (
+                                contextRamEstimation == null || contextRamEstimationDiffBytes == null || result.contextRamUsage == null
+                            )
+                                ? undefined
+                                : (
+                                    contextRamEstimationDiffBytes.padEnd(9, " ") + " " +
+                                    padStartAnsi("(" + renderDiffPercentageWithColors(((contextRamEstimation / result.contextRamUsage) - 1) * 100) + ")", 9)
+                                );
+
+                            measureTable.logLine({
+                                newProcess: getNewProccessValue(),
+                                type: previousContextSizeCheck == null
+                                    ? "Model"
+                                    : "Context",
+                                gpuLayers: String(lastGpuLayers).padEnd("Layers".length - 1, " ") + (
+                                    result.useMmap
+                                        ? chalk.gray("M")
+                                        : " "
+                                ),
+                                contextSize: previousContextSizeCheck != null
+                                    ? String(previousContextSizeCheck)
+                                    : undefined,
+
+                                estimatedModelVram: toBytes(modelVramEstimation),
+                                actualModelVram: toBytes(result.modelVramUsage),
+                                modelVramEstimationDiff: modelVramEstimationDiffText,
+
+                                estimatedModelRam: toBytes(modelRamEstimation),
+                                actualModelRam: toBytes(result.modelRamUsage),
+                                modelRamEstimationDiff: modelRamEstimationDiffText,
+
+                                estimatedContextVram: contextVramEstimation == null
+                                    ? undefined
+                                    : toBytes(contextVramEstimation),
+                                actualContextVram: result.contextVramUsage == null
+                                    ? undefined
+                                    : toBytes(result.contextVramUsage),
+                                contextVramEstimationDiff: contextVramEstimationDiffText,
+                                totalVramUsage: ((result.totalVramUsage / totalVram) * 100).toFixed(2).padStart(5, "0") + "% " +
+                                    chalk.gray("(" + toBytes(result.totalVramUsage) + "/" + toBytes(totalVram) + ")"),
+
+                                estimatedContextRam: contextRamEstimation == null
+                                    ? undefined
+                                    : toBytes(contextRamEstimation),
+                                actualContextRam: result.contextRamUsage == null
+                                    ? undefined
+                                    : toBytes(result.contextRamUsage),
+                                contextRamEstimationDiff: contextRamEstimationDiffText,
+                                totalRamUsage: ((result.totalRamUsage / totalRam) * 100).toFixed(2).padStart(5, "0") + "% " +
+                                    chalk.gray("(" + toBytes(result.totalRamUsage) + "/" + toBytes(totalRam) + ")")
+                            });
                         }
-                    } else if (result.type === "error") {
-                        previousContextSizeCheck = result.contextSize;
-                        hadSuccessInThisProcess = true;
-
-                        measureTable.logLine({
-                            newProcess: getNewProccessValue(),
-                            type: chalk.red("Error"),
-                            gpuLayers: String(lastGpuLayers),
-                            contextSize: previousContextSizeCheck != null
-                                ? String(previousContextSizeCheck)
-                                : chalk.red(result.error),
-                            estimatedModelVram: previousContextSizeCheck == null
-                                ? undefined
-                                : chalk.red(result.error)
-                        });
-                    } else if (result.type === "success") {
-                        previousContextSizeCheck = result.contextSize;
-                        hadSuccessInThisProcess = true;
-
-                        const modelResourceEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
-                            gpuLayers: lastGpuLayers,
-                            useMmap: result.useMmap
-                        });
-                        const modelVramEstimation = modelResourceEstimation.gpuVram;
-                        const modelVramEstimationDiffBytes = (modelVramEstimation < result.modelVramUsage ? "-" : "") +
-                            toBytes(Math.abs(result.modelVramUsage - modelVramEstimation));
-                        const modelVramEstimationDiffText = modelVramEstimationDiffBytes.padEnd(9, " ") + " " +
-                            padStartAnsi("(" + renderDiffPercentageWithColors(((modelVramEstimation / result.modelVramUsage) - 1) * 100) + ")", 9);
-
-                        const modelRamEstimation = modelResourceEstimation.cpuRam;
-                        const modelRamEstimationDiffBytes = (modelRamEstimation < result.modelRamUsage ? "-" : "") +
-                            toBytes(Math.abs(result.modelRamUsage - modelRamEstimation));
-                        const modelRamEstimationDiffText = modelRamEstimationDiffBytes.padEnd(9, " ") + " " +
-                            padStartAnsi("(" + renderDiffPercentageWithColors(((modelRamEstimation / result.modelRamUsage) - 1) * 100) + ")", 9);
-
-                        const contextResourceEstimation = previousContextSizeCheck == null
-                            ? undefined
-                            : await ggufInsights.estimateContextResourceRequirementsV2({
-                                contextSize: previousContextSizeCheck,
-                                modelGpuLayers: lastGpuLayers,
-                                flashAttention,
-                                swaFullCache,
-                                batchSize,
-                                isEmbeddingContext: embedding
-                            });
-
-                        const contextVramEstimation = contextResourceEstimation?.gpuVram;
-                        const contextVramEstimationDiffBytes = (result.contextVramUsage == null || contextVramEstimation == null)
-                            ? undefined
-                            : (
-                                (contextVramEstimation < result.contextVramUsage ? "-" : "") +
-                                toBytes(Math.abs(result.contextVramUsage - contextVramEstimation))
-                            );
-                        const contextVramEstimationDiffText = (
-                            contextVramEstimation == null || contextVramEstimationDiffBytes == null || result.contextVramUsage == null
-                        )
-                            ? undefined
-                            : (
-                                contextVramEstimationDiffBytes.padEnd(9, " ") + " " +
-                                padStartAnsi("(" + renderDiffPercentageWithColors(((contextVramEstimation / result.contextVramUsage) - 1) * 100) + ")", 9)
-                            );
-
-                        const contextRamEstimation = contextResourceEstimation?.cpuRam;
-                        const contextRamEstimationDiffBytes = (result.contextRamUsage == null || contextRamEstimation == null)
-                            ? undefined
-                            : (
-                                (contextRamEstimation < result.contextRamUsage ? "-" : "") +
-                                toBytes(Math.abs(result.contextRamUsage - contextRamEstimation))
-                            );
-                        const contextRamEstimationDiffText = (
-                            contextRamEstimation == null || contextRamEstimationDiffBytes == null || result.contextRamUsage == null
-                        )
-                            ? undefined
-                            : (
-                                contextRamEstimationDiffBytes.padEnd(9, " ") + " " +
-                                padStartAnsi("(" + renderDiffPercentageWithColors(((contextRamEstimation / result.contextRamUsage) - 1) * 100) + ")", 9)
-                            );
-
-                        measureTable.logLine({
-                            newProcess: getNewProccessValue(),
-                            type: previousContextSizeCheck == null
-                                ? "Model"
-                                : "Context",
-                            gpuLayers: String(lastGpuLayers).padEnd("Layers".length - 1, " ") + (
-                                result.useMmap
-                                    ? chalk.gray("M")
-                                    : " "
-                            ),
-                            contextSize: previousContextSizeCheck != null
-                                ? String(previousContextSizeCheck)
-                                : undefined,
-
-                            estimatedModelVram: toBytes(modelVramEstimation),
-                            actualModelVram: toBytes(result.modelVramUsage),
-                            modelVramEstimationDiff: modelVramEstimationDiffText,
-
-                            estimatedModelRam: toBytes(modelRamEstimation),
-                            actualModelRam: toBytes(result.modelRamUsage),
-                            modelRamEstimationDiff: modelRamEstimationDiffText,
-
-                            estimatedContextVram: contextVramEstimation == null
-                                ? undefined
-                                : toBytes(contextVramEstimation),
-                            actualContextVram: result.contextVramUsage == null
-                                ? undefined
-                                : toBytes(result.contextVramUsage),
-                            contextVramEstimationDiff: contextVramEstimationDiffText,
-                            totalVramUsage: ((result.totalVramUsage / totalVram) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.gray("(" + toBytes(result.totalVramUsage) + "/" + toBytes(totalVram) + ")"),
-
-                            estimatedContextRam: contextRamEstimation == null
-                                ? undefined
-                                : toBytes(contextRamEstimation),
-                            actualContextRam: result.contextRamUsage == null
-                                ? undefined
-                                : toBytes(result.contextRamUsage),
-                            contextRamEstimationDiff: contextRamEstimationDiffText,
-                            totalRamUsage: ((result.totalRamUsage / totalRam) * 100).toFixed(2).padStart(5, "0") + "% " +
-                                chalk.gray("(" + toBytes(result.totalRamUsage) + "/" + toBytes(totalRam) + ")")
-                        });
+                    } finally {
+                        onInfoLock.dispose();
                     }
                 }
             });
