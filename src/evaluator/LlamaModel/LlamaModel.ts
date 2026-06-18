@@ -837,6 +837,7 @@ export class LlamaModel {
                 defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
                 defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
                 useMmap,
+                signal: loadSignal,
                 onProgress: modelOptions.onLoadProgress == null
                     ? undefined
                     : (steps: number, totalSteps: number) => {

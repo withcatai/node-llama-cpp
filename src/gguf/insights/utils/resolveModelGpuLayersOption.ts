@@ -20,13 +20,15 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
     llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: LlamaContextOptions["flashAttention"],
     defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache: boolean,
     useMmap?: "auto" | boolean, simulatorSession?: GgufInsightsSimulatorSession, vramCapIsSet?: boolean,
-    onProgress?(step: number, totalSteps: number): void
+    onProgress?(step: number, totalSteps: number): void, enablePredictiveLayerScoring?: boolean, startProbeLayersCount?: number,
+    signal?: AbortSignal
 }): Promise<{gpuLayers: number, useMmap: boolean}> {
     const {
         ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
         llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention,
         defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache, useMmap = "auto",
-        simulatorSession: _simulatorSession, vramCapIsSet = false, onProgress
+        simulatorSession: _simulatorSession, vramCapIsSet = false, onProgress, enablePredictiveLayerScoring = false,
+        startProbeLayersCount, signal
     } = options;
 
     const progressTracker = onProgress != null
@@ -158,7 +160,10 @@ export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["
                 simulatorSession,
                 progressTask: skipProgress
                     ? undefined
-                    : progressTracker?.createTask()
+                    : progressTracker?.createTask(),
+                predictiveScoring: enablePredictiveLayerScoring,
+                startProbeLayersCount,
+                signal
             });
             const getGpuLayersForMmapOptionsWithResourceRequirements = async (useMmap: boolean, skipProgress: boolean = false) => {
                 const resolvedLayers = await getGpuLayersForMmapOptions(useMmap, skipProgress);
@@ -258,7 +263,10 @@ async function getBestGpuLayersForFreeVram({
     defaultContextSwaFullCache,
     useMmap,
     simulatorSession,
-    progressTask
+    progressTask,
+    startProbeLayersCount,
+    predictiveScoring = false,
+    signal
 }: {
     ggufInsights: GgufInsights,
     freeVram: number,
@@ -271,7 +279,10 @@ async function getBestGpuLayersForFreeVram({
     defaultContextSwaFullCache: boolean,
     useMmap?: boolean,
     simulatorSession?: GgufInsightsSimulatorSession,
-    progressTask?: ProgressTrackerTask
+    progressTask?: ProgressTrackerTask,
+    startProbeLayersCount?: number,
+    predictiveScoring?: boolean,
+    signal?: AbortSignal
 }) {
     const minLayers = Math.floor(Math.max(0, minGpuLayers ?? 0));
     const maxLayers = Math.floor(Math.min(ggufInsights.totalLayers, maxGpuLayers ?? ggufInsights.totalLayers));
@@ -282,6 +293,12 @@ async function getBestGpuLayersForFreeVram({
     try {
         return (await findFirstNonNullBestOptionAsync({
             prefill: Math.max(1, Math.min(100, Math.ceil((maxLayers - minLayers) / 3))),
+            initialSkip: (startProbeLayersCount != null && startProbeLayersCount >= 0 && startProbeLayersCount <= maxLayers)
+                ? (maxLayers - Math.floor(startProbeLayersCount))
+                : undefined,
+            predictiveScoring: predictiveScoring
+                ? 3
+                : 0,
             *generator() {
                 for (let layers = maxLayers; layers >= minLayers; layers--) {
                     yield {
@@ -290,6 +307,9 @@ async function getBestGpuLayersForFreeVram({
                 }
             },
             async score(option) {
+                if (signal?.aborted)
+                    throw signal.reason;
+
                 const layersRequirements = await getVramRequiredForGpuLayers({
                     gpuLayers: option.gpuLayers,
                     ggufInsights,

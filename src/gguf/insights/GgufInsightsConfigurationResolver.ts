@@ -1,9 +1,10 @@
-import {BuildGpu} from "../../bindings/types.js";
+import {BuildGpu, doesLlamaBackendNeedAddonInitLock} from "../../bindings/types.js";
 import {LlamaModelOptions} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
 import {getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {InsufficientMemoryError} from "../../utils/InsufficientMemoryError.js";
 import {GgmlType} from "../types/GgufTensorInfoTypes.js";
+import {withAbortSignal} from "../../utils/withAbortSignal.js";
 import {resolveModelGpuLayersOption} from "./utils/resolveModelGpuLayersOption.js";
 import {resolveContextContextSizeOption} from "./utils/resolveContextContextSizeOption.js";
 import {scoreLevels} from "./utils/scoreLevels.js";
@@ -460,6 +461,9 @@ export class GgufInsightsConfigurationResolver {
         useMmap?: "auto" | boolean,
         onProgress?(step: number, totalSteps: number): void,
 
+        /** Signal to abort the resolving operation */
+        signal?: AbortSignal,
+
         /** @internal */
         _simulatorSession?: GgufInsightsSimulatorSession
     } = {}) {
@@ -474,11 +478,12 @@ export class GgufInsightsConfigurationResolver {
             defaultContextSwaFullCache = false,
             useMmap = "auto",
             onProgress,
+            signal,
 
             _simulatorSession
         } = options;
 
-        return resolveModelGpuLayersOption(gpuLayers, {
+        return withAbortSignal(signal, resolveModelGpuLayersOption(gpuLayers, {
             ggufInsights: this._ggufInsights,
             ignoreMemorySafetyChecks,
             getVramState,
@@ -492,8 +497,10 @@ export class GgufInsightsConfigurationResolver {
             useMmap,
             simulatorSession: _simulatorSession,
             vramCapIsSet: this._ggufInsights._llama.getVramCap() != null,
-            onProgress
-        });
+            onProgress,
+            signal,
+            enablePredictiveLayerScoring: !doesLlamaBackendNeedAddonInitLock(this._ggufInsights._llama.gpu)
+        }));
     }
 
     /**
