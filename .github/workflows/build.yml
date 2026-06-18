@@ -257,19 +257,10 @@ jobs:
             # The unofficial riscv64 Node runtime intermittently throws internal
             # TypeErrors during npm ci (e.g. "key.match is not a function"). These
             # trace to upstream V8-on-riscv64 flakiness, not an npm or repo bug,
-            # and don't reproduce deterministically, so retry a few times. Keep
+            # and don't reproduce deterministically, so retry with backoff. Keep
             # the retry scoped to riscv64 so a first-try failure on any other
             # platform still fails loudly.
-            n=0
-            until npm ci; do
-              n=$((n + 1))
-              if [ "$n" -ge 3 ]; then
-                echo "npm ci failed after $n attempts"
-                exit 1
-              fi
-              echo "npm ci attempt $n failed, retrying in 5s"
-              sleep 5
-            done
+            npx -y retry-cli -n 5 -- npm ci
           else
             npm ci
           fi
