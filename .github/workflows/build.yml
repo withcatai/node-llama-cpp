@@ -162,7 +162,7 @@ jobs:
         if: matrix.config.name == 'Ubuntu riscv64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev gcc-14 g++-14
+          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev gcc-14 g++-14 retry
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
           cmake --version
