@@ -255,12 +255,8 @@ jobs:
         run: |
           if [ "$ARTIFACT_NAME" = "linux-riscv64" ]; then
             # The unofficial riscv64 Node runtime intermittently throws internal
-            # TypeErrors during npm ci (e.g. "key.match is not a function"). These
-            # trace to upstream V8-on-riscv64 flakiness, not an npm or repo bug,
-            # and don't reproduce deterministically, so retry with backoff. Keep
-            # the retry scoped to riscv64 so a first-try failure on any other
-            # platform still fails loudly.
-            npx -y retry-cli -n 5 -- npm ci
+            # TypeErrors during npm ci (e.g. "key.match is not a function")
+            retry --times=3 npm ci
           else
             npm ci
           fi
