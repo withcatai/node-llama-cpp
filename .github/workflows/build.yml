@@ -90,13 +90,6 @@ jobs:
         if: matrix.config.artifact == 'linux-riscv64'
         run: |
           set -e
-          # node 24 (npm 11) is required: node 20's npm 10.8.2 trips "set.delete
-          # is not a function" during npm ci on riscv64, and several devDeps need
-          # node >= 24.10. The built binary still targets node 20 N-API.
-          # ubuntu-24.04-riscv ships node 24, so prefer the preinstalled one and
-          # only fall back to the unofficial build when it is missing or too old.
-          # (actions/setup-node can't help here: actions/node-versions has no
-          # riscv64 entries in its versions manifest.)
           need=24.10.0
           if command -v node >/dev/null 2>&1; then
             cur="$(node -p 'process.versions.node')"
