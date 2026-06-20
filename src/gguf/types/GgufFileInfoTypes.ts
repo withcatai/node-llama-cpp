@@ -98,6 +98,11 @@ export type GgufFileInfoSource = {
 export type GgufFileInfoSourceData = {
     type: "path",
     path: string,
+
+    /**
+     * The length of the GGUF metadata section in bytes, including the header, key-value pairs,
+     * tensor info and alignment padding up to the tensor data section.
+     */
     length: number
 } | {
     type: "buffer",
