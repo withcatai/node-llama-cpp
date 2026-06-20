@@ -65,6 +65,7 @@ import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
 import {Gemma4ChatWrapper} from "./chatWrappers/Gemma4ChatWrapper.js";
 import {HarmonyChatWrapper} from "./chatWrappers/HarmonyChatWrapper.js";
+import {SeedChatWrapper} from "./chatWrappers/SeedChatWrapper.js";
 import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
 import {
     JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
@@ -93,6 +94,7 @@ import {
     createModelDownloader, ModelDownloader, type ModelDownloaderOptions, combineModelDownloaders, CombinedModelDownloader,
     type CombinedModelDownloaderOptions
 } from "./utils/createModelDownloader.js";
+import {type ModelDownloadEndpoints} from "./utils/modelDownloadEndpoints.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
@@ -108,7 +110,7 @@ import {
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
     type GbnfJsonBasicStringSchema, type GbnfJsonFormatStringSchema, type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema,
-    type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
+    type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType, type GbnfJsonRefSchema, type GbnfJsonDefList
 } from "./utils/gbnfJson/types.js";
 import {type GgufFileInfo, type GgufFileInfoSource, type GgufFileInfoSourceData} from "./gguf/types/GgufFileInfoTypes.js";
 import {
@@ -237,6 +239,7 @@ export {
     GemmaChatWrapper,
     Gemma4ChatWrapper,
     HarmonyChatWrapper,
+    SeedChatWrapper,
     TemplateChatWrapper,
     type TemplateChatWrapperOptions,
     JinjaTemplateChatWrapper,
@@ -300,6 +303,8 @@ export {
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,
     type GbnfJsonArraySchema,
+    type GbnfJsonRefSchema,
+    type GbnfJsonDefList,
     LlamaVocabularyType,
     LlamaLogLevelGreaterThan,
     LlamaLogLevelGreaterThanOrEqual,
@@ -334,6 +339,7 @@ export {
     createModelDownloader,
     ModelDownloader,
     type ModelDownloaderOptions,
+    type ModelDownloadEndpoints,
     type ModelFileAccessTokens,
     combineModelDownloaders,
     CombinedModelDownloader,
