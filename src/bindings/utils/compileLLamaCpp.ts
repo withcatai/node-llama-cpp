@@ -648,6 +648,9 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
         else if (buildOptions.arch === "arm")
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-armv7l"));
+        else if (buildOptions.arch === "riscv64")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-riscv64"));
     } else if (buildOptions.platform === "win") {
         if (buildOptions.arch === "x64") {
             if (buildOptions.gpu === "cuda")

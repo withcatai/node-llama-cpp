@@ -80,13 +80,37 @@ jobs:
           - name: "macOS arm64"
             os: macos-26
             artifact: "mac-arm64"
+          - name: "Ubuntu riscv64"
+            os: ubuntu-24.04-riscv
+            artifact: "linux-riscv64"
 
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
+        if: matrix.config.artifact != 'linux-riscv64'
         with:
           node-version: "22"
           package-manager-cache: false
+
+      - name: Install Node.js (riscv64 unofficial build)
+        if: matrix.config.artifact == 'linux-riscv64'
+        run: |
+          set -e
+          need=24.10.0
+          if command -v node >/dev/null 2>&1; then
+            cur="$(node -p 'process.versions.node')"
+            if [ "$(printf '%s\n%s\n' "$need" "$cur" | sort -V | head -1)" = "$need" ]; then
+              echo "Using preinstalled Node.js v$cur at $(command -v node)"
+              exit 0
+            fi
+            echo "Preinstalled Node.js v$cur is older than $need; installing unofficial build"
+          fi
+          NODE_VER=v24.16.0
+          curl -fsSL -o /tmp/node.tar.xz "https://unofficial-builds.nodejs.org/download/release/${NODE_VER}/node-${NODE_VER}-linux-riscv64.tar.xz"
+          mkdir -p "$HOME/node"
+          tar -xJf /tmp/node.tar.xz -C "$HOME/node" --strip-components=1
+          echo "$HOME/node/bin" >> "$GITHUB_PATH"
+          "$HOME/node/bin/node" --version
 
       - name: Download build artifact
         uses: actions/download-artifact@v8
@@ -161,6 +185,19 @@ jobs:
           which arm-linux-gnueabihf-g++
           
           cmake --version
+
+      # llama.cpp's ggml-cpu uses the RVV _Float16 (zvfh) vector intrinsics,
+      # which only exist in GCC 14+. The runner defaults to GCC 13, so make
+      # gcc-14/g++-14 the default compilers (same as upstream build-riscv).
+      - name: Install dependencies on Ubuntu riscv64
+        if: matrix.config.name == 'Ubuntu riscv64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential ninja-build libtbb-dev gcc-14 g++-14 retry
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          cmake --version
+          gcc --version
 
       - name: Install Cuda 13.1 on Windows (1)
         if: matrix.config.name == 'Windows (1)'
@@ -238,9 +275,16 @@ jobs:
         timeout-minutes: 300
         env:
           ARTIFACT_NAME: ${{ matrix.config.artifact }}
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: |
-          npm ci
-          
+          if [ "$ARTIFACT_NAME" = "linux-riscv64" ]; then
+            # The unofficial riscv64 Node runtime intermittently throws internal
+            # TypeErrors during npm ci (e.g. "key.match is not a function")
+            retry --times=3 npm ci
+          else
+            npm ci
+          fi
+
           npx zx -y <<'EOF'
           
           async function getLatestNodeVersions(maxDate) {
@@ -307,6 +351,8 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
             await buildBinary("arm64", ["--gpu", "metal"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-riscv64") {
+            await buildBinary("riscv64", ["--gpu", "false"]);
           }
           
           // move binaries to bins
