@@ -163,7 +163,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (!cmakeCustomOptions.has("GGML_NATIVE") || isCmakeValueOff(cmakeCustomOptions.get("GGML_NATIVE"))) {
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
 
-                        if (buildOptions.arch === "x64" && !cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS")) {
+                        if ((buildOptions.arch === "x64" || buildOptions.arch === "riscv64") &&
+                            !cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS")
+                        ) {
                             cmakeCustomOptions.set("GGML_CPU_ALL_VARIANTS", "ON");
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
@@ -618,6 +620,9 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
         else if (buildOptions.arch === "arm")
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-armv7l"));
+        else if (buildOptions.arch === "riscv64")
+            // @ts-ignore
+            return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-riscv64"));
     } else if (buildOptions.platform === "win") {
         if (buildOptions.arch === "x64") {
             if (buildOptions.gpu === "cuda")

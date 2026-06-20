@@ -58,6 +58,7 @@ await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith
 
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-arm64"), "@node-llama-cpp/linux-arm64");
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-armv7l"), "@node-llama-cpp/linux-armv7l");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-riscv64"), "@node-llama-cpp/linux-riscv64");
 
 await moveBinariesFallbackDirToStandaloneExtModule((folderName) => folderName.startsWith("win-x64-cuda"), "@node-llama-cpp/win-x64-cuda-ext");
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("win-x64-cuda"), "@node-llama-cpp/win-x64-cuda");
