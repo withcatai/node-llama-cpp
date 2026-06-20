@@ -830,6 +830,8 @@ export class LlamaModel {
                         figuringGpuLayersValueLoadPercentage.percentagePerStepModelMemorySize
                     )
             );
+            
+            const layersResolutionStartTime = Date.now();
             const layersResolution = await ggufInsights.configurationResolver.resolveModelGpuLayersV2(modelOptions.gpuLayers, {
                 ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
                 defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
@@ -856,6 +858,15 @@ export class LlamaModel {
     
                 _simulatorSession: simulatorSession
             });
+            const layersResolutionEndTime = Date.now();
+            if (_llama._shouldLog(LlamaLogLevel.debug))
+                _llama._log(LlamaLogLevel.debug, "Resolved model gpu layers. " + [
+                    `duration=${(layersResolutionEndTime - layersResolutionStartTime) / 1000}s`,
+                    `layers=${layersResolution.gpuLayers}`,
+                    `useMmap=${useMmap}`,
+                    `modelPath=${modelOptions.modelPath}`
+                ].join(" "));
+
             gpuLayers = layersResolution.gpuLayers;
             resolvedUseMmap = layersResolution.useMmap;
             resourceRequirementsEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
