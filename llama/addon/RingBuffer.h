@@ -1,4 +1,8 @@
-// copied from llama-impl.h
+#pragma once
+#include <stdexcept>
+#include <vector>
+
+// copied from llama-sampler.cpp
 template<typename T>
 struct RingBuffer {
     RingBuffer(size_t cap) : capacity(cap), data(cap) {}
