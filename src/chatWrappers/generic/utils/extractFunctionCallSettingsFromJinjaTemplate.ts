@@ -243,8 +243,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         chatHistory: chatHistory1Call,
         functions: functions1,
         additionalParams,
-        stringifyFunctionParams: true,
-        stringifyFunctionResults: true,
+        stringifyFunctionParams: stringifyParams,
+        stringifyFunctionResults: stringifyResult,
         combineModelMessageAndToolCalls
     }).includes(modelMessage1);
 
@@ -406,21 +406,27 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         return {settings: null, stringifyParams, stringifyResult, combineModelMessageAndToolCalls};
 
     const callPrefixLength = findCommonEndLength(modelMessage1ToFunc1Name.text, func1ParamsToFunc2Name.text);
-    const callPrefixText = func1ParamsToFunc2Name.text.slice(-callPrefixLength);
-    const parallelismCallPrefix = modelMessage1ToFunc1Name.text.slice(0, -callPrefixLength);
+    const callPrefixText = func1ParamsToFunc2Name.text.slice(func1ParamsToFunc2Name.text.length - callPrefixLength);
+    const parallelismCallPrefix = modelMessage1ToFunc1Name.text.slice(0, modelMessage1ToFunc1Name.text.length - callPrefixLength);
 
     const callSuffixLength = findCommonStartLength(func1ParamsToFunc2Name.text, func2ParamsToFunc1Result.text);
     const callSuffixText = func1ParamsToFunc2Name.text.slice(0, callSuffixLength);
 
-    const parallelismBetweenCallsText = func1ParamsToFunc2Name.text.slice(callSuffixLength, -callPrefixLength);
+    const parallelismBetweenCallsText = func1ParamsToFunc2Name.text.slice(
+        callSuffixLength,
+        func1ParamsToFunc2Name.text.length - callPrefixLength
+    );
     const callParamsPrefixText = func1NameToFunc1Params.text;
 
     const resultPrefixLength = findCommonEndLength(func2ParamsToFunc1Result.text, func1ResultToFunc2Result.text);
-    const resultPrefixText = func2ParamsToFunc1Result.text.slice(-resultPrefixLength);
+    const resultPrefixText = func2ParamsToFunc1Result.text.slice(func2ParamsToFunc1Result.text.length - resultPrefixLength);
 
     const resultSuffixLength = findCommonStartLength(func1ResultToFunc2Result.text, func2ResultToModelMessage2.text);
     const resultSuffixText = func1ResultToFunc2Result.text.slice(0, resultSuffixLength);
-    const parallelismResultBetweenResultsText = func1ResultToFunc2Result.text.slice(resultSuffixLength, -resultPrefixLength);
+    const parallelismResultBetweenResultsText = func1ResultToFunc2Result.text.slice(
+        resultSuffixLength,
+        func1ResultToFunc2Result.text.length - resultPrefixLength
+    );
     const parallelismResultSuffixText = func2ResultToModelMessage2.text.slice(resultSuffixLength);
 
     const resolveParallelismBetweenSectionsParts = (betweenSectionsText: string) => {
@@ -447,7 +453,9 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     const {
         parallelismCallSuffixText,
         parallelismResultPrefix
-    } = resolveParallelismBetweenSectionsParts(func2ParamsToFunc1Result.text.slice(callSuffixLength, -resultPrefixLength));
+    } = resolveParallelismBetweenSectionsParts(
+        func2ParamsToFunc1Result.text.slice(callSuffixLength, func2ParamsToFunc1Result.text.length - resultPrefixLength)
+    );
 
     let revivedCallPrefix = reviveSeparatorText(callPrefixText, idToStaticContent, contentIds);
     const revivedParallelismCallSectionPrefix = removeCommonRevivedPrefix(
@@ -649,7 +657,11 @@ export function detectNeedToWrapFunctionArgumentsWithMap({
         });
         if (rendered.includes(paramsValue))
             return undefined;
+    } catch (err) {
+        // do nothing
+    }
 
+    try {
         const renderedWithParamsMap = renderTemplate({
             chatHistory: testChatHistoryWithParamsMap,
             functions: functionsWithParamMap,
