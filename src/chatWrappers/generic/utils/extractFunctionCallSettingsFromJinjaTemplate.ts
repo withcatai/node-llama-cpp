@@ -7,7 +7,7 @@ import {getFirstValidResult} from "./getFirstValidResult.js";
 export type ExtractFunctionCallSettingsRenderTemplate = (options: {
     chatHistory: ChatHistoryItem[], functions: ChatModelFunctions, additionalParams: Record<string, unknown>,
     stringifyFunctionParams: boolean, stringifyFunctionResults: boolean, combineModelMessageAndToolCalls: boolean,
-    squashModelTextResponses?: boolean
+    squashModelTextResponses?: boolean, setFunctionNameInResponse?: string | true
 }) => string;
 
 export function extractFunctionCallSettingsFromJinjaTemplate({
@@ -55,6 +55,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     const modelMessage2 = addContentId(idsGenerator.generateId());
     const func1StringifyParam = addContentId(idsGenerator.generateId());
     const func1StringifyResult = addContentId(idsGenerator.generateId());
+
+    const funcResponseNameId = idsGenerator.generateId();
 
     const functions1: ChatModelFunctions = {
         [func1name]: {
@@ -199,7 +201,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             additionalParams,
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
-            combineModelMessageAndToolCalls
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: funcResponseNameId
         });
         stringifyParams = (
             !paramsObjectTest.includes(`"${func1StringifyParam}":`) &&
@@ -229,7 +232,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             additionalParams,
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
-            combineModelMessageAndToolCalls
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: funcResponseNameId
         });
         stringifyResult = (
             !resultObjectTest.includes(`"${func1StringifyResult}":`) &&
@@ -245,7 +249,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         additionalParams,
         stringifyFunctionParams: stringifyParams,
         stringifyFunctionResults: stringifyResult,
-        combineModelMessageAndToolCalls
+        combineModelMessageAndToolCalls,
+        setFunctionNameInResponse: funcResponseNameId
     }).includes(modelMessage1);
 
     let textBetween2TextualModelResponses: LlamaText = LlamaText();
@@ -264,7 +269,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                 stringifyFunctionParams: false,
                 stringifyFunctionResults: false,
                 combineModelMessageAndToolCalls,
-                squashModelTextResponses: false
+                squashModelTextResponses: false,
+                setFunctionNameInResponse: funcResponseNameId
             });
             const textDiff = getTextBetweenIds(
                 betweenModelTextualResponsesTest, modelMessage1, modelMessage2
@@ -282,7 +288,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         additionalParams,
         stringifyFunctionParams: stringifyParams,
         stringifyFunctionResults: stringifyResult,
-        combineModelMessageAndToolCalls
+        combineModelMessageAndToolCalls,
+        setFunctionNameInResponse: funcResponseNameId
     });
     const renderedOnlyCall = getFirstValidResult([
         () => renderTemplate({
@@ -291,7 +298,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             additionalParams,
             stringifyFunctionParams: stringifyParams,
             stringifyFunctionResults: stringifyResult,
-            combineModelMessageAndToolCalls
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: funcResponseNameId
         }),
         () => undefined
     ]);
@@ -302,7 +310,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             additionalParams,
             stringifyFunctionParams: stringifyParams,
             stringifyFunctionResults: stringifyResult,
-            combineModelMessageAndToolCalls
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: funcResponseNameId
         }),
         () => {
             usedNewChunkFor2Calls = true;
@@ -312,7 +321,8 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                 additionalParams,
                 stringifyFunctionParams: stringifyParams,
                 stringifyFunctionResults: stringifyResult,
-                combineModelMessageAndToolCalls
+                combineModelMessageAndToolCalls,
+                setFunctionNameInResponse: funcResponseNameId
             });
         }
     ]);
@@ -408,9 +418,13 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     const callPrefixLength = findCommonEndLength(modelMessage1ToFunc1Name.text, func1ParamsToFunc2Name.text);
     const callPrefixText = func1ParamsToFunc2Name.text.slice(func1ParamsToFunc2Name.text.length - callPrefixLength);
     const parallelismCallPrefix = modelMessage1ToFunc1Name.text.slice(0, modelMessage1ToFunc1Name.text.length - callPrefixLength);
-
-    const callSuffixLength = findCommonStartLength(func1ParamsToFunc2Name.text, func2ParamsToFunc1Result.text);
-    const callSuffixText = func1ParamsToFunc2Name.text.slice(0, callSuffixLength);
+    
+    const callSuffixAndParallelismBetweenCallsText = func1ParamsToFunc2Name.text.slice(
+        0,
+        func1ParamsToFunc2Name.text.length - callPrefixLength
+    );
+    const callSuffixLength = findCommonStartLength(callSuffixAndParallelismBetweenCallsText, func2ParamsToFunc1Result.text);
+    const callSuffixText = callSuffixAndParallelismBetweenCallsText.slice(0, callSuffixLength);
 
     const parallelismBetweenCallsText = func1ParamsToFunc2Name.text.slice(
         callSuffixLength,
@@ -517,23 +531,31 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                 emptyCallParamsPlaceholder: {}
             },
             result: {
-                prefix: reviveSeparatorText(
-                    resultPrefixText,
-                    new Map([
-                        ...idToStaticContent.entries(),
-                        [func1name, LlamaText("{{functionName}}")],
-                        [func1params, LlamaText("{{functionParams}}")]
-                    ]),
-                    contentIds
+                prefix: replaceInRevivedTextWithRegularText(
+                    reviveSeparatorText(
+                        resultPrefixText,
+                        new Map([
+                            ...idToStaticContent.entries(),
+                            [func1name, LlamaText("{{functionName}}")],
+                            [func1params, LlamaText("{{functionParams}}")]
+                        ]),
+                        contentIds
+                    ),
+                    funcResponseNameId,
+                    "{{functionName}}"
                 ),
-                suffix: reviveSeparatorText(
-                    resultSuffixText,
-                    new Map([
-                        ...idToStaticContent.entries(),
-                        [func1name, LlamaText("{{functionName}}")],
-                        [func1params, LlamaText("{{functionParams}}")]
-                    ]),
-                    contentIds
+                suffix: replaceInRevivedTextWithRegularText(
+                    reviveSeparatorText(
+                        resultSuffixText,
+                        new Map([
+                            ...idToStaticContent.entries(),
+                            [func1name, LlamaText("{{functionName}}")],
+                            [func1params, LlamaText("{{functionParams}}")]
+                        ]),
+                        contentIds
+                    ),
+                    funcResponseNameId,
+                    "{{functionName}}"
                 )
             },
             parallelism: {
@@ -653,7 +675,8 @@ export function detectNeedToWrapFunctionArgumentsWithMap({
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls: false,
-            squashModelTextResponses: true
+            squashModelTextResponses: true,
+            setFunctionNameInResponse: true
         });
         if (rendered.includes(paramsValue))
             return undefined;
@@ -669,7 +692,8 @@ export function detectNeedToWrapFunctionArgumentsWithMap({
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls: false,
-            squashModelTextResponses: true
+            squashModelTextResponses: true,
+            setFunctionNameInResponse: true
         });
         if (renderedWithParamsMap.includes(paramsValue))
             return paramsMapKey;
@@ -865,4 +889,18 @@ function findFirstTextMatch<const T extends string>(
     }
 
     return {index: -1, text: undefined};
+}
+
+function replaceInRevivedTextWithRegularText(target: LlamaText, oldText: string, newText: string) {
+    return LlamaText(
+        target.values.map((value) => {
+            if (typeof value === "string")
+                return value.replaceAll(oldText, newText);
+
+            if (value instanceof SpecialTokensText)
+                return LlamaText.joinValues(newText, value.value.split(oldText).map((part) => new SpecialTokensText(part)));
+
+            return value;
+        })
+    );
 }

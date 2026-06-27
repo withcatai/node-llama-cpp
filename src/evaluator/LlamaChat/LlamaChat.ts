@@ -3537,6 +3537,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     ),
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
+
+                functionCalls: lastHistoryItemType !== "model"
+                    ? undefined
+                    : this.resFunctionCalls.map((functionCall) => {
+                        return {
+                            functionName: functionCall.functionName,
+                            params: functionCall.params,
+                            raw: functionCall.raw.toJSON()
+                        } satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>;
+                    }) satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>[] as any, // prevent infinite TS type instantiation
+
                 metadata: {
                     stopReason: "maxTokens"
                 }
@@ -3633,6 +3644,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     ),
                     contextShiftMetadata: this.lastHistoryCompressionMetadata
                 },
+
+                functionCalls: lastHistoryItemType !== "model"
+                    ? undefined
+                    : this.resFunctionCalls.map((functionCall) => {
+                        return {
+                            functionName: functionCall.functionName,
+                            params: functionCall.params,
+                            raw: functionCall.raw.toJSON()
+                        } satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>;
+                    }) satisfies LlamaChatResponseFunctionCall<NonNullable<Functions>>[] as any, // prevent infinite TS type instantiation
+
                 metadata: {
                     stopReason: this.shouldAbortBecauseOfNonText
                         ? "eogToken"

@@ -314,7 +314,10 @@ export class GgufInsights {
                 };
             }
         } catch (error: any) {
-            this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+            if (_simulatorSession?.disposed)
+                this._llama._log(LlamaLogLevel.debug, error?.message ?? String(error));
+            else
+                this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
         }
 
         return this.estimateModelResourceRequirements({
@@ -756,7 +759,10 @@ export class GgufInsights {
             if (simulationResult != null)
                 return simulationResult;
         } catch (error: any) {
-            this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+            if (_simulatorSession?.disposed)
+                this._llama._log(LlamaLogLevel.debug, error?.message ?? String(error));
+            else
+                this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
         }
 
         return this.estimateContextResourceRequirements({
@@ -1299,6 +1305,10 @@ export class GgufInsightsSimulatorSession {
         const loadedModels = (await Promise.all(modelPromises)).filter((model) => model != null);
 
         await Promise.all(loadedModels.map((model) => model.dispose().catch(() => void 0)));
+    }
+
+    public get disposed() {
+        return this._disposed;
     }
 
     private async _getModel({
