@@ -243,7 +243,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                         convertSystemMessagesToUserMessagesFormat:
                             JinjaTemplateChatWrapperOptionsConvertMessageFormat["format"] | undefined,
                         wipeFunctionCallIds: boolean | "align",
-                        setFunctionNameInResponse?: string | true
+                        setFunctionNameInResponse?: string | boolean
                     ) => {
                         let inputChatHistory = chatHistory;
                         if (this._wrapFunctionParamsInsideMapKey != null)
@@ -354,8 +354,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                             ),
                         wipeFunctionCallIds: [true, "align", false],
                         setFunctionNameInResponse: setFunctionNameInResponse == null
-                            ? [undefined]
-                            : [undefined, setFunctionNameInResponse]
+                            ? [false]
+                            : [false, setFunctionNameInResponse]
                     }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse}) => {
                         return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse);
                     });

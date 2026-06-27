@@ -159,7 +159,7 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
     stringifyFunctionParams = true,
     stringifyFunctionResults = true,
     squashModelTextResponses = true,
-    setFunctionNameInResponse = false
+    setFunctionNameInResponse = true
 }: {
     chatHistory: readonly ChatHistoryItem[],
     chatWrapperSettings: ChatWrapperSettings,

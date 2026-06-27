@@ -363,9 +363,9 @@ export class FunctionaryChatWrapper extends ChatWrapper {
                                 LlamaText([
                                     new SpecialTokensText("<|start_header_id|>assistant<|end_header_id|>\n\n"),
                                     response,
-                                    (isLastItem && isLastResponse)
-                                        ? LlamaText([])
-                                        : new SpecialTokensText("<|eot_id|>")
+                                    (!isLastItem && isLastResponse)
+                                        ? new SpecialTokensText("<|eot_id|>")
+                                        : LlamaText([])
                                 ])
                             );
                         } else if (isChatModelResponseFunctionCall(response)) {
