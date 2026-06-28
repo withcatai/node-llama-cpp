@@ -39,7 +39,8 @@ describe("JinjaTemplateChatWrapper", () => {
                     "betweenResults": LlamaText([]),
                     "sectionPrefix": LlamaText([]),
                     "sectionSuffix": LlamaText([
-                      new SpecialTokensText("assistant
+                      new SpecialTokensText("<|im_end|>
+              <|im_start|>assistant
               "),
                     ]),
                   },
@@ -50,10 +51,7 @@ describe("JinjaTemplateChatWrapper", () => {
               <|im_start|>tool
               "),
                   ]),
-                  "suffix": LlamaText([
-                    new SpecialTokensText("<|im_end|>
-              <|im_start|>"),
-                  ]),
+                  "suffix": LlamaText([]),
                 },
               }
             `);
@@ -137,7 +135,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     "betweenResults": LlamaText([]),
                     "sectionPrefix": LlamaText([]),
                     "sectionSuffix": LlamaText([
-                      new SpecialTokensText("|assistant|></think>"),
+                      new SpecialTokensText("><|assistant|></think>"),
                     ]),
                   },
                 },
@@ -146,7 +144,7 @@ describe("JinjaTemplateChatWrapper", () => {
                     new SpecialTokensText("><tool_response>"),
                   ]),
                   "suffix": LlamaText([
-                    new SpecialTokensText("</tool_response><"),
+                    new SpecialTokensText("</tool_response"),
                   ]),
                 },
               }
@@ -185,14 +183,14 @@ describe("JinjaTemplateChatWrapper", () => {
                       "sectionPrefix": LlamaText([]),
                       "sectionPrefixAlternateMatches": undefined,
                       "sectionSuffix": LlamaText([
-                        new SpecialTokensText("<|observation|>"),
+                        new SpecialTokensText("<|observation|"),
                       ]),
                     },
                     "result": {
                       "betweenResults": LlamaText([]),
                       "sectionPrefix": LlamaText([]),
                       "sectionSuffix": LlamaText([
-                        new SpecialTokensText("<|assistant|>
+                        new SpecialTokensText("><|assistant|>
               <think></think>
               "),
                       ]),
@@ -200,13 +198,13 @@ describe("JinjaTemplateChatWrapper", () => {
                   },
                   "result": {
                     "prefix": LlamaText([
-                      new SpecialTokensText("
+                      new SpecialTokensText(">
               <tool_response>
               "),
                     ]),
                     "suffix": LlamaText([
                       new SpecialTokensText("
-              </tool_response>"),
+              </tool_response"),
                     ]),
                   },
                 },
