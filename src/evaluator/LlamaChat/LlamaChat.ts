@@ -2997,6 +2997,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 continue;
             } else if (this.functionEvaluationMode === "sectionSuffixOrBetweenCalls") {
                 const sectionSuffixDetector = new StopGenerationDetector();
+                const resultStartDetector = new StopGenerationDetector();
                 let isFirstToken = true;
 
                 this.functionsGrammar = undefined;
@@ -3005,15 +3006,24 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.currentFunctionCallCurrentPartTokens.length = 0;
 
                 StopGenerationDetector.resolveStopTriggers([
-                    ...(
-                        this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix != null
-                            ? [this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix]
-                            : []
-                    ),
+                    this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix ?? "",
                     LlamaText(new SpecialToken("EOS")),
                     LlamaText(new SpecialToken("EOT"))
                 ], this.llamaChat.model.tokenizer)
                     .map((stopTrigger) => sectionSuffixDetector.addStopTrigger(stopTrigger));
+
+                StopGenerationDetector.resolveStopTriggers([
+                    LlamaText([
+                        this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix ?? "",
+                        this.chatWrapper.settings.functions.parallelism?.result?.sectionPrefix ?? ""
+                    ]),
+                    LlamaText([
+                        this.chatWrapper.settings.functions.parallelism?.call?.sectionSuffix ?? "",
+                        this.chatWrapper.settings.functions.parallelism?.result?.sectionPrefix ?? "",
+                        this.chatWrapper.settings.functions?.result?.prefix ?? ""
+                    ])
+                ], this.llamaChat.model.tokenizer)
+                    .map((stopTrigger) => resultStartDetector.addStopTrigger(stopTrigger));
 
                 let tookInitialCheckpoint = false;
                 for await (const tokens of this.evaluateWithContextShift(loadContextWindow)) {
@@ -3028,6 +3038,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     pushAll(this.currentFunctionCallCurrentPartTokens, tokens);
 
                     sectionSuffixDetector.recordGeneration({
+                        text: this.currentText,
+                        tokens: this.currentTokens,
+                        startNewChecks: isFirstToken,
+                        triggerMustStartWithGeneration: true
+                    });
+                    resultStartDetector.recordGeneration({
                         text: this.currentText,
                         tokens: this.currentTokens,
                         startNewChecks: isFirstToken,
@@ -3048,7 +3064,14 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 if (stopRes != null)
                     return stopRes;
 
-                if (sectionSuffixDetector.hasTriggeredStops) {
+                if (sectionSuffixDetector.hasTriggeredStops ||
+                    (
+                        this.currentFunctionCallCurrentPartTokens.length === 1 &&
+                        this.llamaChat.model.isEogToken(this.currentFunctionCallCurrentPartTokens[0])
+                    ) ||
+                    resultStartDetector.hasTriggeredStops ||
+                    resultStartDetector.hasInProgressStops
+                ) {
                     this.functionEvaluationMode = false;
                     return this.returnFunctionCallResults();
                 }

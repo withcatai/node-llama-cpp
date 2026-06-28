@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 import {JinjaTemplateChatWrapper} from "../../../../../src/index.js";
-import {functionGemma270mJinjaTemplate, lfm2_5JinjaTemplate} from "../../utils/jinjaTemplates.js";
+import {functionGemma270mJinjaTemplate, glm4_7flashJinjaTemplate, lfm2_5JinjaTemplate} from "../../utils/jinjaTemplates.js";
 
 
 describe("JinjaTemplateChatWrapper", () => {
@@ -93,12 +93,60 @@ describe("JinjaTemplateChatWrapper", () => {
                 },
                 "result": {
                   "prefix": LlamaText([
-                    new SpecialTokensText("><start_function_response>response:"),
+                    new SpecialTokensText("<start_function_response>response:"),
                     "{{functionName}}",
                     new SpecialTokensText("{value:<escape>"),
                   ]),
                   "suffix": LlamaText([
                     new SpecialTokensText("<escape>}<end_function_response>"),
+                  ]),
+                },
+              }
+            `);
+        });
+
+        test("glm4_7flashJinjaTemplate", () => {
+            const chatWrapper = new JinjaTemplateChatWrapper({
+                template: glm4_7flashJinjaTemplate
+            });
+            expect(chatWrapper.settings.functions).toMatchInlineSnapshot(`
+              {
+                "call": {
+                  "emptyCallParamsPlaceholder": {},
+                  "optionalPrefixSpace": true,
+                  "paramsPrefix": LlamaText([
+                    new SpecialTokensText("<arg_key>params</arg_key><arg_value>"),
+                  ]),
+                  "prefix": LlamaText([
+                    new SpecialTokensText("<tool_call>"),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("</arg_value></tool_call>"),
+                  ]),
+                },
+                "parallelism": {
+                  "call": {
+                    "betweenCalls": LlamaText([]),
+                    "sectionPrefix": LlamaText([]),
+                    "sectionPrefixAlternateMatches": undefined,
+                    "sectionSuffix": LlamaText([
+                      new SpecialTokensText("<|observation|"),
+                    ]),
+                  },
+                  "result": {
+                    "betweenResults": LlamaText([]),
+                    "sectionPrefix": LlamaText([]),
+                    "sectionSuffix": LlamaText([
+                      new SpecialTokensText("|assistant|></think>"),
+                    ]),
+                  },
+                },
+                "result": {
+                  "prefix": LlamaText([
+                    new SpecialTokensText("><tool_response>"),
+                  ]),
+                  "suffix": LlamaText([
+                    new SpecialTokensText("</tool_response><"),
                   ]),
                 },
               }

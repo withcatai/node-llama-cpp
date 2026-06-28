@@ -432,7 +432,10 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     );
     const callParamsPrefixText = func1NameToFunc1Params.text;
 
-    const resultPrefixLength = findCommonEndLength(func2ParamsToFunc1Result.text, func1ResultToFunc2Result.text);
+    const resultPrefixLength = findCommonEndLength(
+        func2ParamsToFunc1Result.text.slice(callSuffixText.length),
+        func1ResultToFunc2Result.text
+    );
     const resultPrefixText = func2ParamsToFunc1Result.text.slice(func2ParamsToFunc1Result.text.length - resultPrefixLength);
 
     const resultSuffixLength = findCommonStartLength(func1ResultToFunc2Result.text, func2ResultToModelMessage2.text);
