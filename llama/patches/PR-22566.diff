@@ -1,5 +1,5 @@
 diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
-index 474cabdfc09..35fef097f5b 100644
+index 474cabdfc095..76692620408d 100644
 --- a/src/llama-model-loader.cpp
 +++ b/src/llama-model-loader.cpp
 @@ -698,8 +698,13 @@ llama_model_loader::llama_model_loader(
@@ -42,7 +42,7 @@ index 474cabdfc09..35fef097f5b 100644
          }
  
          // for tensors that are not required some of the dimensions can be invalid:
-@@ -1237,7 +1249,13 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+@@ -1237,14 +1249,32 @@ struct ggml_tensor * llama_model_loader::create_tensor(
          for (size_t dim = 0; dim < GGML_MAX_DIMS; dim++) {
              t_meta.ne[dim] = dim < ne.size() ? ne.begin()[dim] : 1;
              GGML_ASSERT(t_meta.ne[dim] >= 1);
@@ -57,9 +57,12 @@ index 474cabdfc09..35fef097f5b 100644
              GGML_ASSERT(t_meta.nb[dim] >= 1);
          }
          ggml_set_name(&t_meta, tn.str().c_str());
-@@ -1245,6 +1263,16 @@ struct ggml_tensor * llama_model_loader::create_tensor(
+ 
          ggml_backend_buffer_type_t buft = buft_for_tensor(&t_meta);
-         GGML_ASSERT(buft != nullptr);
+-        GGML_ASSERT(buft != nullptr);
++        if (buft == nullptr) {
++            return nullptr; // return type is ggml_tensor *
++        }
          ggml_context * ctx = ctx_for_buft(buft);
 +
 +        if (flags & TENSOR_DUPLICATED) {
