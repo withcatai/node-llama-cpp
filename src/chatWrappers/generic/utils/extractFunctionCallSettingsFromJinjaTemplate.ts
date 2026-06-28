@@ -373,23 +373,31 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                     emptyCallParamsPlaceholder: {}
                 },
                 result: {
-                    prefix: reviveSeparatorText(
-                        resultPrefix.text,
-                        new Map([
-                            ...idToStaticContent.entries(),
-                            [func1name, LlamaText("{{functionName}}")],
-                            [func1params, LlamaText("{{functionParams}}")]
-                        ]),
-                        contentIds
+                    prefix: replaceInRevivedTextWithRegularText(
+                        reviveSeparatorText(
+                            resultPrefix.text,
+                            new Map([
+                                ...idToStaticContent.entries(),
+                                [func1name, LlamaText("{{functionName}}")],
+                                [func1params, LlamaText("{{functionParams}}")]
+                            ]),
+                            contentIds
+                        ),
+                        funcResponseNameId,
+                        "{{functionName}}"
                     ),
-                    suffix: reviveSeparatorText(
-                        resultSuffix.text,
-                        new Map([
-                            ...idToStaticContent.entries(),
-                            [func1name, LlamaText("{{functionName}}")],
-                            [func1params, LlamaText("{{functionParams}}")]
-                        ]),
-                        contentIds
+                    suffix: replaceInRevivedTextWithRegularText(
+                        reviveSeparatorText(
+                            resultSuffix.text,
+                            new Map([
+                                ...idToStaticContent.entries(),
+                                [func1name, LlamaText("{{functionName}}")],
+                                [func1params, LlamaText("{{functionParams}}")]
+                            ]),
+                            contentIds
+                        ),
+                        funcResponseNameId,
+                        "{{functionName}}"
                     )
                 }
             }
@@ -432,14 +440,15 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     );
     const callParamsPrefixText = func1NameToFunc1Params.text;
 
+    const resultSuffixLength = findCommonStartLength(func1ResultToFunc2Result.text, func2ResultToModelMessage2.text);
+    const resultSuffixText = func1ResultToFunc2Result.text.slice(0, resultSuffixLength);
+
     const resultPrefixLength = findCommonEndLength(
         func2ParamsToFunc1Result.text.slice(callSuffixText.length),
-        func1ResultToFunc2Result.text
+        func1ResultToFunc2Result.text.slice(resultSuffixText.length)
     );
     const resultPrefixText = func2ParamsToFunc1Result.text.slice(func2ParamsToFunc1Result.text.length - resultPrefixLength);
 
-    const resultSuffixLength = findCommonStartLength(func1ResultToFunc2Result.text, func2ResultToModelMessage2.text);
-    const resultSuffixText = func1ResultToFunc2Result.text.slice(0, resultSuffixLength);
     const parallelismResultBetweenResultsText = func1ResultToFunc2Result.text.slice(
         resultSuffixLength,
         func1ResultToFunc2Result.text.length - resultPrefixLength
