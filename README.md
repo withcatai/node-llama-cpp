@@ -15,7 +15,7 @@
 
 </div>
 
-✨ [`gpt-oss` is here!](https://node-llama-cpp.withcat.ai/blog/v3.12-gpt-oss) ✨
+✨ [Gemma 4 is here!](https://node-llama-cpp.withcat.ai/blog/v3.19-gemma-4) ✨
 
 ## Features
 * Run LLMs locally on your machine

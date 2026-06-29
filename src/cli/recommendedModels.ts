@@ -1,6 +1,147 @@
 import {ModelRecommendation} from "./utils/resolveModelRecommendationFileOptions.js";
 
 export const recommendedModels: ModelRecommendation[] = [{
+    name: "Gemma 4 31B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Gemma 4 model family was created by Google DeepMind and is optimized for reasoning, coding, agentic workflows, and native function calling.\n" +
+        "This is a dense model with 30.7 billion parameters, and is the largest and most capable Gemma 4 model.\n" +
+        "It supports up to 256K tokens of context and is positioned by Google for consumer GPUs and workstation-class deployments.\n" +
+        "Compared to the smaller Gemma 4 models, it offers the strongest text and coding performance, but requires significantly more VRAM to run well.",
+
+    fileOptions: [
+        "hf:giladgd/gemma-4-31B-it-GGUF:Q8_0",
+        "hf:giladgd/gemma-4-31B-it-GGUF:Q6_K",
+        "hf:giladgd/gemma-4-31B-it-GGUF:Q5_K_M",
+        "hf:giladgd/gemma-4-31B-it-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Gemma 4 26B A4B MoE",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Gemma 4 model family was created by Google DeepMind and is optimized for reasoning, coding, agentic workflows, and native function calling.\n" +
+        "This model utilizes a Mixture of Experts architecture, with 25.2 billion total parameters but only 3.8 billion active parameters during inference.\n" +
+        "Google positions it as a fast alternative to the dense 31B model, with much lower active compute while still supporting up to 256K tokens of context.\n" +
+        "This is a good choice when you want high-end Gemma 4 quality with much better inference speed than a dense model of similar total size.",
+
+    fileOptions: [
+        "hf:giladgd/gemma-4-26B-A4B-it-GGUF:Q8_0",
+        "hf:giladgd/gemma-4-26B-A4B-it-GGUF:Q6_K",
+        "hf:giladgd/gemma-4-26B-A4B-it-GGUF:Q5_K_M",
+        "hf:giladgd/gemma-4-26B-A4B-it-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Gemma 4 12B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Gemma 4 model family was created by Google DeepMind and is optimized for reasoning, coding, agentic workflows, and native function calling.\n" +
+        "This is a dense model with 11.95 billion parameters.\n" +
+        "It supports up to 256K tokens of context and is positioned by Google as a developer-friendly local model that can run on dedicated GPU laptops with 16GB VRAM or unified memory.\n" +
+        "This is a strong choice when you want a substantial quality step up from the 8B class without the much heavier hardware requirements of the largest Gemma 4 models.",
+
+    fileOptions: [
+        "hf:giladgd/gemma-4-12B-it-GGUF:Q8_0",
+        "hf:giladgd/gemma-4-12B-it-GGUF:Q6_K",
+        "hf:giladgd/gemma-4-12B-it-GGUF:Q5_K_M",
+        "hf:giladgd/gemma-4-12B-it-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Gemma 4 8B E4B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Gemma 4 model family was created by Google DeepMind and is optimized for reasoning, coding, agentic workflows, and native function calling.\n" +
+        "This model has 8 billion total parameters, with 4.5 billion effective parameters, and is designed to be efficient for local deployment.\n" +
+        "It supports up to 128K tokens of context.\n" +
+        "Google positions this model for laptops and higher-end edge devices, making it a practical balance between capability and local hardware requirements.",
+
+    fileOptions: [
+        "hf:giladgd/gemma-4-E4B-it-GGUF:Q8_0",
+        "hf:giladgd/gemma-4-E4B-it-GGUF:Q6_K",
+        "hf:giladgd/gemma-4-E4B-it-GGUF:Q5_K_M",
+        "hf:giladgd/gemma-4-E4B-it-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Gemma 4 5B E2B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "The Gemma 4 model family was created by Google DeepMind and is optimized for reasoning, coding, agentic workflows, and native function calling.\n" +
+        "This model has 5.1 billion total parameters, with 2.3 billion effective parameters, and is designed for efficient use on resource-constrained hardware.\n" +
+        "It supports up to 128K tokens of context.\n" +
+        "Google positions this model as the smallest and fastest Gemma 4 model for on-device deployment on laptops, mobile devices, and edge hardware.",
+
+    fileOptions: [
+        "hf:giladgd/gemma-4-E2B-it-GGUF:Q8_0",
+        "hf:giladgd/gemma-4-E2B-it-GGUF:Q6_K",
+        "hf:giladgd/gemma-4-E2B-it-GGUF:Q5_K_M",
+        "hf:giladgd/gemma-4-E2B-it-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3.6 35B A3B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen 3.6 model was created by Alibaba and is optimized for agentic coding, assistant-like chat use cases, and native function calling, with support for reasoning.\n" +
+        "This version of the model utilizes a Mixture of Experts architecture, with 35 billion total parameters but only 3 billion active parameters, thus making it much faster than a dense model of similar total size.\n" +
+        "The Qwen team positions it as one of their most versatile open-weight local models, with especially strong performance on coding and repository-level tasks.\n" +
+        "This model can support a context size of up to 262K tokens (if you have enough VRAM to accommodate it).",
+
+    fileOptions: [
+        "hf:unsloth/Qwen3.6-35B-A3B-GGUF:Q8_0",
+        "hf:unsloth/Qwen3.6-35B-A3B-GGUF:Q6_K",
+        "hf:unsloth/Qwen3.6-35B-A3B-GGUF:Q5_K_M",
+        "hf:unsloth/Qwen3.6-35B-A3B-GGUF:MXFP4_MOE",
+        "hf:unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3.6 27B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen 3.6 model was created by Alibaba and is optimized for agentic coding, assistant-like chat use cases, and native function calling, with support for reasoning.\n" +
+        "This is a dense 27 billion parameters version of the model, making it simpler to deploy than the MoE variant while still offering flagship-level coding performance.\n" +
+        "The Qwen team specifically positions this model as a practical local coding model that surpasses their previous open-weight flagship on major coding benchmarks.\n" +
+        "This model can support a context size of up to 262K tokens (if you have enough VRAM to accommodate it).",
+
+    fileOptions: [
+        "hf:unsloth/Qwen3.6-27B-GGUF:Q8_0",
+        "hf:unsloth/Qwen3.6-27B-GGUF:Q6_K",
+        "hf:unsloth/Qwen3.6-27B-GGUF:Q5_K_M",
+        "hf:unsloth/Qwen3.6-27B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3.5 9B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen 3.5 model was created by Alibaba and is optimized for assistant-like chat use cases, with native support for function calling and reasoning.\n" +
+        "It is part of Qwen's newer multimodal-native model family and supports up to 201 languages and dialects.\n" +
+        "This is the 9 billion parameters version of the model, and it offers a particularly strong balance between quality, long-context capability, and practical local deployment.\n" +
+        "This model can support a context size of up to 262K tokens (if you have enough VRAM to accommodate it).",
+
+    fileOptions: [
+        "hf:unsloth/Qwen3.5-9B-GGUF:Q8_0",
+        "hf:unsloth/Qwen3.5-9B-GGUF:Q6_K",
+        "hf:unsloth/Qwen3.5-9B-GGUF:Q5_K_M",
+        "hf:unsloth/Qwen3.5-9B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3.5 4B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen 3.5 model was created by Alibaba and is optimized for assistant-like chat use cases, with native support for function calling and reasoning.\n" +
+        "It is part of Qwen's newer multimodal-native model family and supports up to 201 languages and dialects.\n" +
+        "This is the 4 billion parameters version of the model, and is a good lower-VRAM option when you still want a modern reasoning-capable Qwen model.\n" +
+        "It is significantly lighter than the 9B version while still being strong enough for many everyday chat, coding, and agent-style tasks.",
+
+    fileOptions: [
+        "hf:unsloth/Qwen3.5-4B-GGUF:Q8_0",
+        "hf:unsloth/Qwen3.5-4B-GGUF:Q6_K",
+        "hf:unsloth/Qwen3.5-4B-GGUF:Q5_K_M",
+        "hf:unsloth/Qwen3.5-4B-GGUF:Q4_K_M"
+    ]
+}, {
+    name: "Qwen 3.5 0.8B",
+    abilities: ["chat", "complete", "functionCalling", "reasoning"],
+    description: "Qwen 3.5 model was created by Alibaba and is optimized for assistant-like chat use cases, with support for function calling and reasoning.\n" +
+        "It is part of Qwen's newer multimodal-native model family and supports up to 201 languages and dialects.\n" +
+        "This is the 0.8 billion parameters version of the model, and the official model card positions it mainly for prototyping, research, task-specific fine-tuning, and very resource-constrained hardware.\n" +
+        "It is best suited for simple tasks where speed and low memory usage matter more than raw capability.",
+
+    fileOptions: [
+        "hf:unsloth/Qwen3.5-0.8B-GGUF:Q8_0",
+        "hf:unsloth/Qwen3.5-0.8B-GGUF:Q6_K",
+        "hf:unsloth/Qwen3.5-0.8B-GGUF:Q5_K_M",
+        "hf:unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M"
+    ]
+}, {
     name: "gpt-oss 20B",
     abilities: ["chat", "complete", "functionCalling", "reasoning"],
     description: "gpt-oss models were created by OpenAI and are using chain of though (CoT) to reason across a wide variety of topics, and utilize a Mixture of Experts architecture.\n" +

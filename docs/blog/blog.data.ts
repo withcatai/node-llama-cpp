@@ -14,6 +14,19 @@ const loader = {
             entries: await Promise.all(
                 blogPosts
                     .filter((post) => post.url !== "/blog/")
+                    .sort((a, b) => {
+                        const dateA = new Date(a.frontmatter.date as string).getTime();
+                        const dateB = new Date(b.frontmatter.date as string).getTime();
+
+                        if (isNaN(dateA) || isNaN(dateB)) {
+                            const titleA = String(a.frontmatter.title ?? "");
+                            const titleB = String(b.frontmatter.title ?? "");
+
+                            return titleA.localeCompare(titleB, "en-US");
+                        }
+
+                        return dateB - dateA;
+                    })
                     .map(async (post) => {
                         return {
                             title: post.frontmatter.title as string | undefined,
