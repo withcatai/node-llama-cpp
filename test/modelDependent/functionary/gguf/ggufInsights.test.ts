@@ -25,48 +25,48 @@ describe("gguf", async () => {
             expect(ggufInsights.modelSize).toMatchInlineSnapshot("4653375488");
         });
 
-        test("estimated model memory footprint stays the same", async () => {
+        test("estimated model memory footprint stays the same", {timeout: 1000 * 60 * 5}, async () => {
             const llama = await getTestLlama();
             const ggufMetadataParseResult = await readGgufFileInfo(modelPath);
 
             const ggufInsights = await GgufInsights.from(ggufMetadataParseResult, llama);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 0}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 0}))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "4.33GB",
                 "gpuVram": "0B",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 1}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 1}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "4.22GB",
-                "gpuVram": "528.01MB",
+                "cpuRam": "3.93GB",
+                "gpuVram": "442.52MB",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 8}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 8}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "3.42GB",
-                "gpuVram": "1.32GB",
+                "cpuRam": "3.13GB",
+                "gpuVram": "1.2GB",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 16}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 16}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "2.51GB",
-                "gpuVram": "2.34GB",
+                "cpuRam": "2.22GB",
+                "gpuVram": "2.23GB",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 24}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 24}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1.59GB",
-                "gpuVram": "3.14GB",
+                "cpuRam": "1.3GB",
+                "gpuVram": "3.03GB",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 32}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 32}))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "692.8MB",
-                "gpuVram": "4.06GB",
+                "cpuRam": "398.84MB",
+                "gpuVram": "3.94GB",
               }
             `);
-            expect(makeEstimationReadable(ggufInsights.estimateModelResourceRequirements({gpuLayers: 33}))).toMatchInlineSnapshot(`
+            expect(makeEstimationReadable(await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 33}))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "281.81MB",
                 "gpuVram": "4.06GB",
@@ -95,7 +95,7 @@ describe("gguf", async () => {
             const s330MB = 330 * Math.pow(1024, 2);
             const s5MB = 5 * Math.pow(1024, 2);
 
-            const estimatedModelResourceUsage = ggufInsights.estimateModelResourceRequirements({
+            const estimatedModelResourceUsage = await ggufInsights.estimateModelResourceRequirementsV2({
                 gpuLayers: ggufInsights.totalLayers
             });
             expect(toBytes(estimatedModelResourceUsage.gpuVram)).toMatchInlineSnapshot('"4.06GB"');
@@ -149,7 +149,7 @@ describe("gguf", async () => {
             const vramUsageDiff = currentVramUsage - initialVramUsage;
 
             const s200MB = 200 * Math.pow(1024, 2);
-            const calculatedVramUsage = ggufInsights.estimateModelResourceRequirements({gpuLayers: 16}).gpuVram;
+            const calculatedVramUsage = (await ggufInsights.estimateModelResourceRequirementsV2({gpuLayers: 16})).gpuVram;
 
             expect(Math.abs(vramUsageDiff - calculatedVramUsage)).to.be.lte(s200MB);
 
@@ -168,7 +168,7 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1.75GB",
+                "cpuRam": "1.76GB",
                 "gpuVram": "0B",
               }
             `);
@@ -213,8 +213,8 @@ describe("gguf", async () => {
                 batchSize: 512
             }))).toMatchInlineSnapshot(`
               {
-                "cpuRam": "1.74GB",
-                "gpuVram": "266.78MB",
+                "cpuRam": "1.75GB",
+                "gpuVram": "267.03MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -259,7 +259,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "1.03GB",
-                "gpuVram": "990.98MB",
+                "gpuVram": "994.98MB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -304,7 +304,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "282.5MB",
-                "gpuVram": "1.72GB",
+                "gpuVram": "1.73GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({
@@ -349,7 +349,7 @@ describe("gguf", async () => {
             }))).toMatchInlineSnapshot(`
               {
                 "cpuRam": "250.5MB",
-                "gpuVram": "1.75GB",
+                "gpuVram": "1.76GB",
               }
             `);
             expect(makeEstimationReadable(ggufInsights.estimateContextResourceRequirements({

@@ -237,12 +237,13 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             try {
                 const renderTemplate: ExtractFunctionCallSettingsRenderTemplate = ({
                     chatHistory, functions, additionalParams, stringifyFunctionParams, stringifyFunctionResults,
-                    combineModelMessageAndToolCalls, squashModelTextResponses = true
+                    combineModelMessageAndToolCalls, squashModelTextResponses = true, setFunctionNameInResponse
                 }) => {
                     const render = (
                         convertSystemMessagesToUserMessagesFormat:
                             JinjaTemplateChatWrapperOptionsConvertMessageFormat["format"] | undefined,
-                        wipeFunctionCallIds: boolean | "align"
+                        wipeFunctionCallIds: boolean | "align",
+                        setFunctionNameInResponse?: string | boolean
                     ) => {
                         let inputChatHistory = chatHistory;
                         if (this._wrapFunctionParamsInsideMapKey != null)
@@ -277,7 +278,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                             stringifyFunctionParams,
                             stringifyFunctionResults,
                             combineModelMessageAndToolCalls,
-                            squashModelTextResponses
+                            squashModelTextResponses,
+                            setFunctionNameInResponse
                         });
 
                         const messages = fromIntermediateToCompleteOpenAiMessages(intermediateMessages)
@@ -350,9 +352,12 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                             getConvertUnsupportedSystemMessagesToUserMessagesTryOptions(
                                 this.convertUnsupportedSystemMessagesToUserMessages
                             ),
-                        wipeFunctionCallIds: [true, "align", false]
-                    }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds}) => {
-                        return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds);
+                        wipeFunctionCallIds: [true, "align", false],
+                        setFunctionNameInResponse: setFunctionNameInResponse == null
+                            ? [false]
+                            : [false, setFunctionNameInResponse]
+                    }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse}) => {
+                        return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse);
                     });
                 };
                 const idsGenerator = new UniqueIdGenerator(

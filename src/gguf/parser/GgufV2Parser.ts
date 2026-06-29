@@ -62,7 +62,7 @@ export class GgufV2Parser {
             tensorInfo: tensorReadResult?.tensorInfo,
             metadataSize: headerReadResult.headerSize + initialOffset,
             tensorInfoSize: tensorReadResult?.tensorInfoSize,
-            tensorDataOffset: tensorReadResult?.tensorDataOffset
+            infoEndOffset: tensorReadResult?.infoEndOffset
         };
     }
 
@@ -201,7 +201,7 @@ export class GgufV2Parser {
                 return {
                     tensorInfo,
                     tensorInfoSize: readOffset.offset - initialOffset,
-                    tensorDataOffset: fileTensorDataOffset
+                    infoEndOffset: fileTensorDataOffset
                 };
             }
         });

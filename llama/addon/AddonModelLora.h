@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include "llama.h"
 #include "napi.h"
 #include "addonGlobals.h"
@@ -9,11 +10,17 @@ class AddonModelLora : public Napi::ObjectWrap<AddonModelLora> {
         llama_adapter_lora * lora_adapter;
         std::string loraFilePath;
         uint32_t usages = 0;
+        std::mutex disposeMutex;
+        bool disposed = false;
+        bool memoryDisposed = false;
+        bool hasSelfRef = false;
+        bool hasModelRef = false;
 
         AddonModelLora(const Napi::CallbackInfo& info);
         ~AddonModelLora();
 
-        void dispose(bool skipErase = false);
+        void disposeMemory();
+        void disposeMT(bool skipErase = false);
 
         Napi::Value GetFilePath(const Napi::CallbackInfo& info);
 

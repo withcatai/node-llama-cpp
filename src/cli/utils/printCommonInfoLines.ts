@@ -15,17 +15,23 @@ export async function printCommonInfoLines({
     logBatchSize = false,
     tokenMeterEnabled = false,
     printBos = false,
-    printEos = false
+    printEos = false,
+    resolvedMaxRam,
+    resolvedMaxVram,
+    swaFullCache
 }: {
     context: LlamaContext,
     draftContext?: LlamaContext,
     minTitleLength?: number,
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
     useDirectIo?: boolean,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
     printBos?: boolean,
-    printEos?: boolean
+    printEos?: boolean,
+    resolvedMaxRam?: number,
+    resolvedMaxVram?: number,
+    swaFullCache?: boolean
 }) {
     const platform = getPlatform();
     const llama = context._llama;
@@ -62,6 +68,28 @@ export async function printCommonInfoLines({
             }]
         });
     }
+    if (resolvedMaxRam != null || resolvedMaxVram != null || swaFullCache === true)
+        printInfoLine({
+            title: "Options",
+            padTitle: padTitle,
+            info: [{
+                show: resolvedMaxRam != null,
+                title: "Max RAM",
+                value: toBytes(resolvedMaxRam ?? 0)
+            }, {
+                show: resolvedMaxVram != null,
+                title: "Max VRAM",
+                value: toBytes(resolvedMaxVram ?? 0)
+            }, {
+                show: swaFullCache === true,
+                title: "SWA",
+                value: model.fileInsights.swaSize == null
+                    ? "unsupported"
+                    : swaFullCache === true
+                        ? "disabled"
+                        : "enabled"
+            }]
+        });
     printInfoLine({
         title: "Model",
         padTitle: padTitle,
@@ -81,9 +109,13 @@ export async function printCommonInfoLines({
             title: "mmap",
             value: !model._llama.supportsMmap
                 ? "unsupported"
-                : (useMmap || useMmap == null)
+                : useMmap === true
                     ? "enabled"
-                    : "disabled"
+                    : (useMmap === "auto" || useMmap == null)
+                        ? model.useMmap
+                            ? "auto (enabled)"
+                            : "auto (disabled)"
+                        : "disabled"
         }, {
             title: "Direct I/O",
             show: platform !== "mac", // Direct IO is not supported on macOS
@@ -119,9 +151,12 @@ export async function printCommonInfoLines({
             title: "Batch size",
             value: context.batchSize.toLocaleString("en-US")
         }, {
-            show: context.flashAttention,
             title: "Flash attention",
-            value: "enabled"
+            value: context.flashAttention === "auto"
+                ? "auto"
+                : context.flashAttention === true
+                    ? "enabled"
+                    : "disabled"
         }, {
             show: tokenMeterEnabled,
             title: "Token meter",
@@ -178,9 +213,12 @@ export async function printCommonInfoLines({
                 title: "Batch size",
                 value: draftContext.batchSize.toLocaleString("en-US")
             }, {
-                show: draftContext.flashAttention,
                 title: "Flash attention",
-                value: "enabled"
+                value: draftContext.flashAttention === "auto"
+                    ? "auto"
+                    : draftContext.flashAttention === true
+                        ? "enabled"
+                        : "disabled"
             }, {
                 show: tokenMeterEnabled,
                 title: "Token meter",

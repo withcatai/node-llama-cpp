@@ -108,22 +108,26 @@ async function unshallowAndSquashCurrentRepoWithSubmodulesAndSaveItAsReleaseBund
 }
 
 export async function getGitBundlePathForRelease(githubOwner: string, githubRepo: string, release: string) {
-    const [builtinGithubOwner, builtinGithubRepo] = builtinLlamaCppGitHubRepo.split("/");
-    if (githubOwner !== builtinGithubOwner || githubRepo !== builtinGithubRepo)
-        return null;
-
-    const currentBundleRelease = await getBinariesGithubRelease();
-
-    if (isGithubReleaseNeedsResolving(currentBundleRelease))
-        return null;
-
-    if (currentBundleRelease !== release)
+    if (!(await isGitBundleCompatible(githubOwner, githubRepo, release)))
         return null;
 
     if (!(await fs.pathExists(currentReleaseGitBundlePath)))
         return null;
 
     return currentReleaseGitBundlePath;
+}
+
+export async function isGitBundleCompatible(githubOwner: string, githubRepo: string, release: string) {
+    const [builtinGithubOwner, builtinGithubRepo] = builtinLlamaCppGitHubRepo.split("/");
+    if (githubOwner !== builtinGithubOwner || githubRepo !== builtinGithubRepo)
+        return false;
+
+    const currentBundleRelease = await getBinariesGithubRelease();
+
+    if (isGithubReleaseNeedsResolving(currentBundleRelease))
+        return false;
+
+    return currentBundleRelease === release;
 }
 
 async function getCurrentTagOrBranch() {

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include "common/common.h"
+#include "llama-context.h"
 #include "llama-vocab.h"
 #include "llama.h"
 
@@ -107,7 +108,7 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
             try {
                 context->ctx = llama_init_from_model(context->model->model, context->context_params);
 
-                context->contextLoaded = context->ctx != nullptr && context->ctx != NULL;
+                context->contextLoaded = context->ctx != nullptr;
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -115,9 +116,9 @@ class AddonContextLoadContextWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
-            if (context->contextLoaded) {
+            if (context->contextLoaded && !context->model->model_params.no_alloc) {
                 uint64_t contextMemorySize = llama_state_get_size(context->ctx);
-                adjustNapiExternalMemoryAdd(Env(), contextMemorySize);
+                adjustNapiExternalMemoryAdd(context->Env(), contextMemorySize);
                 context->loadedContextMemorySize = contextMemorySize;
             }
 
@@ -150,35 +151,15 @@ class AddonContextUnloadContextWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                llama_free(context->ctx);
-                context->contextLoaded = false;
-
-                try {
-                    if (context->has_batch) {
-                        llama_batch_free(context->batch);
-                        context->has_batch = false;
-                        context->batch_n_tokens = 0;
-                    }
-
-                    context->dispose();
-                } catch (const std::exception& e) {
-                    SetError(e.what());
-                } catch(...) {
-                    SetError("Unknown error when calling \"llama_batch_free\"");
-                }
+                context->disposeMemory();
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
-                SetError("Unknown error when calling \"llama_free\"");
+                SetError("Unknown error while disposing context memory");
             }
         }
         void OnOK() {
-            adjustNapiExternalMemorySubtract(Env(), context->loadedContextMemorySize);
-            context->loadedContextMemorySize = 0;
-
-            adjustNapiExternalMemorySubtract(Env(), context->batchMemorySize);
-            context->batchMemorySize = 0;
-
+            context->disposeMT();
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -251,22 +232,8 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             sampler->rebuildChainIfNeeded();
 
-            const auto * logits = llama_get_logits_ith(ctx->ctx, batchLogitIndex);
-            const int n_vocab = llama_vocab_n_tokens(ctx->model->vocab);
-
-            auto & candidates = sampler->tokenCandidates;
-            for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                candidates[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
-            }
-
-            llama_token_data_array cur_p = {
-                /* .data       = */ candidates.data(),
-                /* .size       = */ candidates.size(),
-                /* .selected   = */ -1,
-                /* .sorted     = */ false,
-            };
-
-            llama_sampler_apply(sampler->chain, &cur_p);
+            llama_token_data_array cur_p;
+            sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence);
 
             if (!(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;
@@ -403,7 +370,7 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.swa_full = false;
 
     if (info.Length() > 1 && info[1].IsObject()) {
-        Napi::Object options = info[1].As<Napi::Object>();
+        const auto options = info[1].As<Napi::Object>();
 
         if (options.Has("contextSize")) {
             context_params.n_ctx = options.Get("contextSize").As<Napi::Number>().Uint32Value();
@@ -427,16 +394,26 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("flashAttention")) {
-            bool flashAttention = options.Get("flashAttention").As<Napi::Boolean>().Value();
-            context_params.flash_attn_type = flashAttention ? LLAMA_FLASH_ATTN_TYPE_ENABLED : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+            const auto flashAttention = options.Get("flashAttention");
+
+            if (flashAttention.IsString() && flashAttention.As<Napi::String>().Utf8Value() == "auto") {
+                context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+            } else {
+                const bool flashAttentionEnabled = flashAttention.As<Napi::Boolean>().Value();
+                context_params.flash_attn_type = flashAttentionEnabled
+                    ? LLAMA_FLASH_ATTN_TYPE_ENABLED
+                    : LLAMA_FLASH_ATTN_TYPE_DISABLED;
+            }
         }
 
         if (options.Has("threads")) {
-            const auto n_threads = options.Get("threads").As<Napi::Number>().Int32Value();
-            const auto resolved_n_threads = n_threads == 0 ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads) : n_threads;
+            const auto threads = options.Get("threads").As<Napi::Number>().Int32Value();
+            const auto resolvedThreads = threads == 0
+                ? std::max((int32_t)std::thread::hardware_concurrency(), context_params.n_threads)
+                : threads;
 
-            context_params.n_threads = resolved_n_threads;
-            context_params.n_threads_batch = resolved_n_threads;
+            context_params.n_threads = resolvedThreads;
+            context_params.n_threads_batch = resolvedThreads;
         }
 
         if (options.Has("performanceTracking")) {
@@ -444,14 +421,14 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
         }
 
         if (options.Has("kvCacheKeyType") && options.Get("kvCacheKeyType").IsNumber()) {
-            auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
+            const auto keyType = options.Get("kvCacheKeyType").As<Napi::Number>().Int32Value();
             if (keyType >= 0 && keyType < GGML_TYPE_COUNT) {
                 context_params.type_k = static_cast<ggml_type>(keyType);
             }
         }
 
         if (options.Has("kvCacheValueType") && options.Get("kvCacheValueType").IsNumber()) {
-            auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
+            const auto valueType = options.Get("kvCacheValueType").As<Napi::Number>().Int32Value();
             if (valueType >= 0 && valueType < GGML_TYPE_COUNT) {
                 context_params.type_v = static_cast<ggml_type>(valueType);
             }
@@ -463,28 +440,12 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     }
 }
 AddonContext::~AddonContext() {
-    dispose();
+    disposeMT();
 }
 
-void AddonContext::dispose() {
-    if (disposed) {
-        return;
-    }
+void AddonContext::disposeBatchMemory() {
+    std::lock_guard<std::mutex> lock(disposeMutex);
 
-    disposed = true;
-    if (contextLoaded) {
-        contextLoaded = false;
-        llama_free(ctx);
-
-        adjustNapiExternalMemorySubtract(Env(), loadedContextMemorySize);
-        loadedContextMemorySize = 0;
-    }
-
-    model->Unref();
-
-    disposeBatch();
-}
-void AddonContext::disposeBatch() {
     if (!has_batch) {
         return;
     }
@@ -492,38 +453,110 @@ void AddonContext::disposeBatch() {
     llama_batch_free(batch);
     has_batch = false;
     batch_n_tokens = 0;
+}
 
-    adjustNapiExternalMemorySubtract(Env(), batchMemorySize);
-    batchMemorySize = 0;
+void AddonContext::disposeBatchMT() {
+    uint64_t currentBatchMemorySize = 0;
+
+    disposeBatchMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+        currentBatchMemorySize = batchMemorySize;
+        batchMemorySize = 0;
+    }
+
+    if (currentBatchMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentBatchMemorySize);
+    }
+}
+
+void AddonContext::disposeMemory() {
+    llama_context* currentCtx = nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (!memoryDisposed) {
+            memoryDisposed = true;
+            currentCtx = ctx;
+            ctx = nullptr;
+            contextLoaded = false;
+        }
+    }
+
+    disposeBatchMemory();
+
+    if (currentCtx != nullptr) {
+        llama_free(currentCtx);
+    }
+}
+
+void AddonContext::disposeMT() {
+    uint64_t currentLoadedContextMemorySize = 0;
+    uint64_t currentBatchMemorySize = 0;
+    bool shouldUnrefModel = false;
+
+    disposeMemory();
+
+    {
+        std::lock_guard<std::mutex> lock(disposeMutex);
+
+        if (disposed) {
+            return;
+        }
+
+        disposed = true;
+        shouldUnrefModel = true;
+
+        if (!model->model_params.no_alloc) {
+            currentLoadedContextMemorySize = loadedContextMemorySize;
+            loadedContextMemorySize = 0;
+        }
+
+        currentBatchMemorySize = batchMemorySize;
+        batchMemorySize = 0;
+    }
+
+    if (currentLoadedContextMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentLoadedContextMemorySize);
+    }
+
+    if (currentBatchMemorySize > 0) {
+        adjustNapiExternalMemorySubtract(Env(), currentBatchMemorySize);
+    }
+
+    if (shouldUnrefModel) {
+        model->Unref();
+    }
+}
+
+Napi::Value AddonContext::Dispose(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        return info.Env().Undefined();
+    }
+
+    if (contextLoaded || has_batch) {
+        AddonContextUnloadContextWorker* worker = new AddonContextUnloadContextWorker(this->Env(), this);
+        worker->Queue();
+        return worker->GetPromise();
+    }
+
+    disposeMT();
+
+    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
+    deferred.Resolve(info.Env().Undefined());
+    return deferred.Promise();
 }
 
 Napi::Value AddonContext::Init(const Napi::CallbackInfo& info) {
     if (disposed) {
         Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
         return info.Env().Undefined();
-    }
-
-    AddonContextLoadContextWorker* worker = new AddonContextLoadContextWorker(this->Env(), this);
-    worker->Queue();
-    return worker->GetPromise();
-}
-Napi::Value AddonContext::Dispose(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        return info.Env().Undefined();
-    }
-
-    if (contextLoaded) {
-        contextLoaded = false;
-
-        AddonContextUnloadContextWorker* worker = new AddonContextUnloadContextWorker(this->Env(), this);
+    } else {
+        AddonContextLoadContextWorker* worker = new AddonContextLoadContextWorker(this->Env(), this);
         worker->Queue();
         return worker->GetPromise();
-    } else {
-        dispose();
-
-        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
-        deferred.Resolve(info.Env().Undefined());
-        return deferred.Promise();
     }
 }
 
@@ -568,7 +601,7 @@ Napi::Value AddonContext::DisposeBatch(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    disposeBatch();
+    disposeBatchMT();
 
     return info.Env().Undefined();
 }
@@ -726,6 +759,49 @@ Napi::Value AddonContext::GetStateSize(const Napi::CallbackInfo& info) {
     }
 
     return Napi::Number::From(info.Env(), llama_state_get_size(ctx));
+}
+
+Napi::Value AddonContext::GetMemoryBreakdown(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    if (!contextLoaded || ctx == nullptr) {
+        Napi::Error::New(info.Env(), "Context is not loaded").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    std::size_t cpuRam = 0;
+    std::size_t gpuVram = 0;
+
+    for (const auto& [bufferType, memoryBreakdown] : ctx->memory_breakdown()) {
+        const std::size_t size = memoryBreakdown.context + memoryBreakdown.compute;
+        if (size == 0) {
+            continue;
+        }
+
+        if (ggml_backend_buft_is_host(bufferType)) {
+            cpuRam += size;
+        } else {
+            ggml_backend_dev_t device = ggml_backend_buft_get_device(bufferType);
+            if (device != nullptr) {
+                auto deviceType = ggml_backend_dev_type(device);
+                if (deviceType == GGML_BACKEND_DEVICE_TYPE_GPU || deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                    gpuVram += size;
+                } else {
+                    cpuRam += size;
+                }
+            } else {
+                cpuRam += size;
+            }
+        }
+    }
+
+    Napi::Object result = Napi::Object::New(info.Env());
+    result.Set("cpuRam", Napi::Number::New(info.Env(), cpuRam));
+    result.Set("gpuVram", Napi::Number::New(info.Env(), gpuVram));
+    return result;
 }
 
 Napi::Value AddonContext::GetThreads(const Napi::CallbackInfo& info) {
@@ -1062,6 +1138,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
                 InstanceMethod("getStateSize", &AddonContext::GetStateSize),
+                InstanceMethod("getMemoryBreakdown", &AddonContext::GetMemoryBreakdown),
                 InstanceMethod("getThreads", &AddonContext::GetThreads),
                 InstanceMethod("setThreads", &AddonContext::SetThreads),
                 InstanceMethod("printTimings", &AddonContext::PrintTimings),

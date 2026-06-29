@@ -120,8 +120,8 @@ list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
 list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
 list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
 
-addVariantSuffix(llama ${NLC_VARIANT})
-addVariantSuffix(ggml ${NLC_VARIANT})
+addVariantSuffix(llama "${NLC_VARIANT}")
+addVariantSuffix(ggml "${NLC_VARIANT}")
 
 file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
 

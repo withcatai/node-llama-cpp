@@ -4,9 +4,9 @@ import chalk from "chalk";
 import fs from "fs-extra";
 import which from "which";
 import {
-    defaultLlamaCppGitHubRepo, defaultLlamaCppRelease, enableRecursiveClone, llamaCppDirectory, llamaCppDirectoryInfoFilePath
+    defaultLlamaCppGitHubRepo, enableRecursiveClone, llamaCppDirectory, llamaCppDirectoryInfoFilePath
 } from "../../config.js";
-import {getGitBundlePathForRelease} from "../../utils/gitReleaseBundles.js";
+import {getGitBundlePathForRelease, isGitBundleCompatible} from "../../utils/gitReleaseBundles.js";
 import {withLockfile} from "../../utils/withLockfile.js";
 import {waitForLockfileRelease} from "../../utils/waitForLockfileRelease.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
@@ -15,6 +15,8 @@ import {isGithubReleaseNeedsResolving, resolveGithubRelease} from "../../utils/r
 import withStatusLogs from "../../utils/withStatusLogs.js";
 import {withProgressLog} from "../../utils/withProgressLog.js";
 import {logDistroInstallInstruction} from "./logDistroInstallInstruction.js";
+import {applyLlamaCppRepoPatches, hasLlamaCppRepoPatchesToApply} from "./applyLlamaCppRepoPatches.js";
+import {defaultLlamaCppRelease} from "./binariesGithubRelease.js";
 
 type ClonedLlamaCppRepoTagFile = {
     tag: string,
@@ -23,14 +25,14 @@ type ClonedLlamaCppRepoTagFile = {
 
 
 export async function cloneLlamaCppRepo(
-    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean = true,
+    githubOwner: string, githubRepo: string, tag: string, useBundles: boolean = true, progressLogs: boolean | "stderr" = "stderr",
     recursive: boolean = enableRecursiveClone
 ) {
     const gitBundleForTag = !useBundles ? null : await getGitBundlePathForRelease(githubOwner, githubRepo, tag);
     const remoteGitUrl = `https://github.com/${githubOwner}/${githubRepo}.git`;
 
     async function withGitCloneProgress<T>(cloneName: string, callback: (gitWithCloneProgress: SimpleGit) => Promise<T>): Promise<T> {
-        if (!progressLogs)
+        if (progressLogs === false)
             return await callback(simpleGit({}));
 
         const repoText = `${githubOwner}/${githubRepo} (${cloneName})`;
@@ -92,7 +94,7 @@ export async function cloneLlamaCppRepo(
                 await fs.remove(llamaCppDirectory);
                 await fs.remove(llamaCppDirectoryInfoFilePath);
 
-                if (progressLogs)
+                if (progressLogs !== false)
                     console.error(getConsoleLogPrefix() + "Failed to clone git bundle, cloning from GitHub instead", err);
 
                 await printCloneErrorHelp(String(err));
@@ -174,29 +176,36 @@ export async function isLlamaCppRepoCloned(waitForLock: boolean = true) {
     return repoGitExists && releaseInfoFileExists;
 }
 
-export async function ensureLlamaCppRepoIsCloned({progressLogs = true}: {progressLogs?: boolean} = {}) {
+export async function ensureLlamaCppRepoIsCloned({progressLogs = "stderr"}: {progressLogs?: boolean | "stderr"} = {}) {
     if (await isLlamaCppRepoCloned(true))
         return;
 
     const [githubOwner, githubRepo] = defaultLlamaCppGitHubRepo.split("/");
 
-    if (progressLogs)
-        console.log(getConsoleLogPrefix() + chalk.blue("Cloning llama.cpp"));
+    if (progressLogs !== false)
+        console.warn(getConsoleLogPrefix() + chalk.blue("Cloning llama.cpp"));
 
     let releaseTag = defaultLlamaCppRelease;
+    let releaseDate: Date | undefined = undefined;
 
-    if (isGithubReleaseNeedsResolving(releaseTag)) {
+    if (isGithubReleaseNeedsResolving(releaseTag) || (
+        hasLlamaCppRepoPatchesToApply() &&
+        !(await isGitBundleCompatible(githubOwner!, githubRepo!, releaseTag))
+    )) {
         await withStatusLogs({
             loading: chalk.blue("Fetching llama.cpp info"),
             success: chalk.blue("Fetched llama.cpp info"),
             fail: chalk.blue("Failed to fetch llama.cpp info"),
-            disableLogs: !progressLogs
+            disableLogs: progressLogs === false
         }, async () => {
-            releaseTag = await resolveGithubRelease(githubOwner!, githubRepo!, releaseTag);
+            const release = await resolveGithubRelease(githubOwner!, githubRepo!, releaseTag);
+            releaseTag = release.tag;
+            releaseDate = release.date;
         });
     }
 
     await cloneLlamaCppRepo(githubOwner!, githubRepo!, releaseTag, true, progressLogs);
+    await applyLlamaCppRepoPatches(releaseDate, false, progressLogs);
 }
 
 async function updateClonedLlamaCppRepoTagFile(githubOwner: string, githubRepo: string, tag: string) {

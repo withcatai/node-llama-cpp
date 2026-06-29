@@ -2,6 +2,7 @@ import process from "process";
 import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
+import bytes from "bytes";
 import {readGgufFileInfo} from "../../../../gguf/readGgufFileInfo.js";
 import {resolveHeaderFlag} from "../../../utils/resolveHeaderFlag.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
@@ -32,11 +33,14 @@ type InspectEstimateCommand = {
     gpu?: BuildGpu | "auto",
     gpuLayers?: number | "max",
     contextSize?: number | "train",
+    flashAttention?: boolean,
     embedding?: boolean,
-    noMmap?: boolean,
+    mmap?: boolean,
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
-    swaFullCache?: boolean
+    swaFullCache?: boolean,
+    maxRam?: string,
+    maxVram?: string
 };
 
 export const InspectEstimateCommand: CommandModule<object, InspectEstimateCommand> = {
@@ -108,6 +112,11 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 defaultDescription: "Automatically determined based on the available VRAM",
                 group: "Optional:"
             })
+            .option("flashAttention", {
+                alias: "fa",
+                type: "boolean",
+                description: "Force enable flash attention. Flash attention is enabled by default when supported. You can force disable flash attention via `--no-fa`"
+            })
             .option("embedding", {
                 alias: "e",
                 type: "boolean",
@@ -115,10 +124,9 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 default: false,
                 group: "Optional:"
             })
-            .option("noMmap", {
+            .option("mmap", {
                 type: "boolean",
-                default: false,
-                description: "Disable mmap (memory-mapped file) usage"
+                description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -128,7 +136,8 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                     ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
                 ] as const,
                 default: "F16" as const,
-                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+                description: "Experimental. The type of the key for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors",
+                group: "Optional:"
             })
             .option("kvCacheValueType", {
                 alias: "kvcvt",
@@ -138,23 +147,40 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                     ...Object.keys(GgmlType).filter((key) => !/^\d+$/i.test(key)) as (keyof typeof GgmlType)[]
                 ] as const,
                 default: "F16" as const,
-                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors"
+                description: "Experimental. The type of the value for the context KV cache tensors. Use `currentQuant` to use the same type as the current quantization of the model weights tensors",
+                group: "Optional:"
             })
             .option("swaFullCache", {
                 alias: "noSwa",
                 type: "boolean",
                 default: false,
-                description: "Disable SWA (Sliding Window Attention) on supported models"
+                description: "Disable SWA (Sliding Window Attention) on supported models",
+                group: "Optional:"
+            })
+            .option("maxRam", {
+                alias: ["ram"],
+                type: "string",
+                description: "Maximum RAM to use for the model and the context. If the estimated RAM usage exceeds this value, the compatibility score will be reduced. This is useful for estimating compatibility with devices that have limited RAM. You can set this to a value like `16GB` or `512MB`.",
+                group: "Optional:"
+            })
+            .option("maxVram", {
+                alias: ["vram"],
+                type: "string",
+                description: "Experimental. Maximum VRAM to use for the model and the context. If the estimated VRAM usage exceeds this value, the compatibility score will be reduced. This is useful for estimating compatibility with devices that have limited VRAM. You can set this to a value like `8GB` or `256MB`.",
+                group: "Optional:"
             });
     },
     async handler({
-        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, embedding, noMmap,
-        kvCacheKeyType, kvCacheValueType, swaFullCache
+        modelPath: ggufPath, header: headerArg, gpu, gpuLayers, contextSize: contextSizeArg, flashAttention, embedding, mmap,
+        kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram
     }: InspectEstimateCommand) {
         if (gpuLayers === -1) gpuLayers = undefined;
         if (gpuLayers === -2) gpuLayers = "max";
         if (contextSizeArg === -1) contextSizeArg = undefined;
         if (contextSizeArg === -2) contextSizeArg = "train";
+
+        const resolvedMaxRam = (typeof maxRam === "string" && maxRam !== "") ? (bytes.parse(maxRam) ?? undefined) : undefined;
+        const resolvedMaxVram = (typeof maxVram === "string" && maxVram !== "") ? (bytes.parse(maxVram) ?? undefined) : undefined;
 
         const headers = resolveHeaderFlag(headerArg);
 
@@ -182,7 +208,14 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 logLevel: LlamaLogLevel.error
             });
 
-        const useMmap = !noMmap && llama.supportsMmap;
+        await llama.setVramCap(resolvedMaxVram ?? null);
+        await llama.setRamCap(resolvedMaxRam ?? null);
+
+        const useMmap = !llama.supportsMmap
+            ? false
+            : typeof mmap === "boolean"
+                ? mmap
+                : "auto";
         printModelDestination(resolvedModelDestination);
 
         if (embedding)
@@ -206,42 +239,16 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             ? ggufInsights.trainContextSize ?? defaultTrainContextSizeForEstimationPurposes
             : contextSizeArg;
 
-        async function resolveCompatibilityScore(flashAttention: boolean) {
-            return await ggufInsights.configurationResolver.resolveAndScoreConfig({
-                flashAttention,
-                targetContextSize: contextSize,
-                targetGpuLayers: gpuLayers,
-                embeddingContext: embedding,
-                useMmap,
-                kvCacheKeyType: kvCacheKeyType === "currentQuant"
-                    ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheKeyType),
-                kvCacheValueType: kvCacheValueType === "currentQuant"
-                    ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheValueType),
-                swaFullCache
-            });
-        }
-
-        const [
-            compatibilityScore,
-            compatibilityScoreWithFlashAttention
-        ] = await Promise.all([
-            resolveCompatibilityScore(false),
-            resolveCompatibilityScore(true)
-        ]);
-
         const longestTitle = Math.max("GPU info".length, "Model info".length, "Resolved config".length, "With flash attention".length) + 1;
 
+        const [
+            vramState,
+            deviceNames
+        ] = await Promise.all([
+            llama.getVramState(),
+            llama.getGpuDeviceNames()
+        ]);
         if (llama.gpu !== false) {
-            const [
-                vramState,
-                deviceNames
-            ] = await Promise.all([
-                llama.getVramState(),
-                llama.getGpuDeviceNames()
-            ]);
-
             printInfoLine({
                 title: "GPU info",
                 padTitle: longestTitle,
@@ -279,9 +286,85 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
             }]
         });
 
+        if (resolvedMaxRam != null || resolvedMaxVram != null || mmap != null || swaFullCache)
+            printInfoLine({
+                title: "Options",
+                padTitle: longestTitle,
+                info: [{
+                    show: resolvedMaxRam != null,
+                    title: "Max RAM",
+                    value: toBytes(resolvedMaxRam ?? 0)
+                }, {
+                    show: resolvedMaxVram != null,
+                    title: "Max VRAM",
+                    value: toBytes(resolvedMaxVram ?? 0)
+                }, {
+                    show: mmap != null,
+                    title: "mmap",
+                    value: !llama.supportsMmap
+                        ? "unsupported"
+                        : useMmap === "auto"
+                            ? "auto"
+                            : useMmap === true
+                                ? "enabled"
+                                : "disabled"
+                }, {
+                    show: swaFullCache,
+                    title: "SWA",
+                    value: ggufInsights.swaSize == null
+                        ? "unsupported"
+                        : swaFullCache
+                            ? "disabled"
+                            : "enabled"
+                }]
+            });
+
         console.info();
-        logCompatibilityScore("Resolved config", longestTitle, compatibilityScore, ggufInsights, llama, false);
-        logCompatibilityScore("With flash attention", longestTitle, compatibilityScoreWithFlashAttention, ggufInsights, llama, true);
+
+        if (resolvedMaxVram != null && resolvedMaxRam != null && resolvedMaxRam < resolvedMaxVram && vramState.unifiedSize > 0) {
+            console.warn(
+                chalk.yellow(
+                    "Warning: Both RAM and VRAM limits are set, but the RAM limit is lower than the VRAM limit.\n" +
+                    "On unified memory systems, this may cause the effective VRAM limit to be the same as the RAM limit"
+                )
+            );
+            console.warn();
+        }
+
+        const compatibilityScore = await withOra({
+            loading: chalk.blue("Resolving config"),
+            success: chalk.blue("Resolved config"),
+            fail: chalk.blue("Failed to resolve config"),
+            noSuccessLiveStatus: true
+        }, async () => {
+            return await ggufInsights.configurationResolver.resolveAndScoreConfig({
+                flashAttention: flashAttention == null
+                    ? "auto"
+                    : flashAttention,
+                targetContextSize: contextSize,
+                targetGpuLayers: gpuLayers,
+                embeddingContext: embedding,
+                useMmap,
+                kvCacheKeyType: kvCacheKeyType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheKeyType),
+                kvCacheValueType: kvCacheValueType === "currentQuant"
+                    ? ggufInsights.dominantTensorType
+                    : resolveGgmlTypeOption(kvCacheValueType),
+                swaFullCache
+            });
+        });
+
+        logCompatibilityScore(
+            "Resolved config",
+            longestTitle,
+            compatibilityScore,
+            ggufInsights,
+            llama,
+            flashAttention == null
+                ? "auto"
+                : flashAttention
+        );
     }
 };
 
@@ -291,7 +374,7 @@ function logCompatibilityScore(
     compatibilityScore: Awaited<ReturnType<typeof GgufInsightsConfigurationResolver.prototype.scoreModelConfigurationCompatibility>>,
     ggufInsights: GgufInsights,
     llama: Llama,
-    flashAttention: boolean
+    flashAttention: boolean | "auto"
 ) {
     printInfoLine({
         title,
@@ -319,9 +402,18 @@ function logCompatibilityScore(
             title: "RAM usage",
             value: () => toBytes(compatibilityScore.resolvedValues.totalRamUsage)
         }, {
-            show: flashAttention,
             title: "Flash attention",
-            value: "enabled"
+            value: flashAttention === "auto"
+                ? "auto"
+                : flashAttention
+                    ? "enabled"
+                    : "disabled"
+        }, {
+            show: llama.supportsMmap,
+            title: "mmap",
+            value: compatibilityScore.resolvedValues.useMmap
+                ? "enabled"
+                : "disabled"
         }]
     });
 }

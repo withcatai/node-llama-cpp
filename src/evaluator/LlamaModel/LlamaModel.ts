@@ -1,6 +1,6 @@
 import process from "process";
 import path from "path";
-import {AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token, Tokenizer} from "../../types.js";
 import {AddonModel, AddonModelLora, ModelTypeDescription} from "../../bindings/AddonTypes.js";
@@ -8,7 +8,7 @@ import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.j
 import {LlamaLocks, LlamaLogLevel, LlamaVocabularyType, LlamaVocabularyTypeValues} from "../../bindings/types.js";
 import {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
 import {readGgufFileInfo} from "../../gguf/readGgufFileInfo.js";
-import {GgufInsights} from "../../gguf/insights/GgufInsights.js";
+import {GgufInsights, GgufInsightsResourceRequirements} from "../../gguf/insights/GgufInsights.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Writable} from "../../utils/utilTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
@@ -20,6 +20,7 @@ import {OverridesObject} from "../../utils/OverridesObject.js";
 import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {LlamaRankingContext, LlamaRankingContextOptions} from "../LlamaRankingContext.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
+import {MemoryMarking} from "../../bindings/utils/MemoryOrchestrator.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
@@ -72,10 +73,12 @@ export type LlamaModelOptions = {
      *
      * When using mmap, you might notice a delay the first time you actually use the model,
      * which is caused by the OS itself loading the model into memory.
+     * 
+     * When this option is set to `"auto"`, mmap may be disabled in scenarios where doing so allows more layers to be offloaded to the GPU.
      *
-     * Defaults to `true` if the current system supports it.
+     * Defaults to `"auto"` if the current system supports it.
      */
-    useMmap?: boolean,
+    useMmap?: "auto" | boolean,
 
     /**
      * Direct I/O is a method of reading and writing data to and from the storage device directly to the application memory,
@@ -113,20 +116,15 @@ export type LlamaModelOptions = {
      *
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
      *
-     * The support for flash attention is currently experimental and may not always work as expected.
-     * Use with caution.
-     *
      * This option will be ignored if flash attention is not supported by the model.
      *
      * Enabling this affects the calculations of default values for the model and contexts created with it
      * as flash attention reduces the amount of memory required,
      * which allows for more layers to be offloaded to the GPU and for context sizes to be bigger.
      *
-     * Defaults to `false`.
-     *
-     * Upon flash attention exiting the experimental status, the default value will become `true`.
+     * Defaults to `"auto"`.
      */
-    defaultContextFlashAttention?: boolean,
+    defaultContextFlashAttention?: "auto" | boolean,
 
     /**
      * The default type of the key for the KV cache tensors used for contexts created with this model.
@@ -198,10 +196,15 @@ export type LlamaModelOptions = {
     metadataOverrides?: OverridesObject<GgufMetadata, number | bigint | boolean | string>
 };
 
-const defaultUseMmap = true;
+const defaultUseMmap = "auto" as const satisfies NonNullable<LlamaModelOptions["useMmap"]>;
 const defaultUseDirectIo = false;
-const defaultContextFlashAttentionEnabled = false;
+const defaultContextFlashAttentionOptionDefault = "auto" as const satisfies NonNullable<LlamaModelOptions["defaultContextFlashAttention"]>;
 const defaultContextSwaFullCache = false;
+const figuringGpuLayersValueLoadPercentage = {
+    percentagePerStep: 0.01,
+    percentagePerStepModelMemorySize: 0.005,
+    maxPercentage: 0.16
+} as const;
 
 export class LlamaModel {
     /** @internal */ public readonly _llama: Llama;
@@ -212,18 +215,21 @@ export class LlamaModel {
     /** @internal */ private readonly _fileInfo: GgufFileInfo;
     /** @internal */ private readonly _fileInsights: GgufInsights;
     /** @internal */ private readonly _gpuLayers: number;
+    /** @internal */ public readonly _useMmap: boolean;
     /** @internal */ private readonly _vocabOnly: boolean;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _llamaPreventDisposalHandle: DisposalPreventionHandle;
-    /** @internal */ private readonly _defaultContextFlashAttentionOptionEnabled: boolean;
-    /** @internal */ private readonly _defaultContextFlashAttention: boolean;
+    /** @internal */ private readonly _defaultContextFlashAttentionOptionEnabled: "auto" | boolean;
+    /** @internal */ private readonly _defaultContextFlashAttention: "auto" | boolean;
     /** @internal */ private readonly _defaultContextSwaFullCache: boolean;
     /** @internal */ private readonly _defaultContextKvCacheKeyType: GgmlType;
     /** @internal */ private readonly _defaultContextKvCacheValueType: GgmlType;
     /** @internal */ private readonly _flashAttentionSupported: boolean;
     /** @internal */ private readonly _loraAdapters = new Map<string, AddonModelLora>();
+    /** @internal */ public _vramConsumptionMarking?: MemoryMarking;
+    /** @internal */ public _ramConsumptionMarking?: MemoryMarking;
     /** @internal */ private _typeDescription?: ModelTypeDescription;
     /** @internal */ private _trainContextSize?: number;
     /** @internal */ private _embeddingVectorSize?: number;
@@ -233,9 +239,11 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock, checkTensors, onLoadProgress, loadSignal, metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock = false, checkTensors, onLoadProgress, loadSignal,
+        metadataOverrides
     }: LlamaModelOptions & {
-        gpuLayers: number
+        gpuLayers: number,
+        useMmap: boolean
     }, {
         _llama,
         _fileInfo,
@@ -245,23 +253,28 @@ export class LlamaModel {
         _defaultContextSwaFullCache,
         _defaultContextKvCacheKeyType,
         _defaultContextKvCacheValueType,
-        _flashAttentionSupported
+        _flashAttentionSupported,
+        _loadPercentageShift,
+        _loadPercentageMultiplier
     }: {
         _llama: Llama,
         _fileInfo: GgufFileInfo,
         _fileInsights: GgufInsights,
-        _defaultContextFlashAttentionOptionEnabled: boolean,
-        _defaultContextFlashAttention: boolean,
+        _defaultContextFlashAttentionOptionEnabled: "auto" | boolean,
+        _defaultContextFlashAttention: "auto" | boolean,
         _defaultContextSwaFullCache: boolean,
         _defaultContextKvCacheKeyType: GgmlType,
         _defaultContextKvCacheValueType: GgmlType,
-        _flashAttentionSupported: boolean
+        _flashAttentionSupported: boolean,
+        _loadPercentageShift: number,
+        _loadPercentageMultiplier: number
     }) {
         this._llama = _llama;
         this._fileInfo = _fileInfo;
         this._modelPath = path.resolve(process.cwd(), modelPath);
         this._fileInsights = _fileInsights;
         this._gpuLayers = gpuLayers;
+        this._useMmap = useMmap ?? false;
         this._vocabOnly = vocabOnly ?? false;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
@@ -286,7 +299,7 @@ export class LlamaModel {
                 ? undefined
                 : (loadPercentage: number) => {
                     try {
-                        onLoadProgress(loadPercentage);
+                        onLoadProgress(_loadPercentageShift + (loadPercentage * _loadPercentageMultiplier));
                     } catch (err) {
                         // the native addon code calls this function, so there's no use to throw an error here
                         console.error(err);
@@ -313,6 +326,8 @@ export class LlamaModel {
         this._disposeAggregator.add(async () => {
             await this._backendModelDisposeGuard.acquireDisposeLock();
             await this._model.dispose();
+            this._vramConsumptionMarking?.dispose();
+            this._ramConsumptionMarking?.dispose();
             this._llamaPreventDisposalHandle.dispose();
         });
 
@@ -373,6 +388,16 @@ export class LlamaModel {
      */
     public get gpuLayers(): number {
         return this._gpuLayers;
+    }
+
+    /**
+     * Whether the model is loaded using mmap (memory-mapped file) or not.
+     * 
+     * When Direct I/O (setting the `useDirectIo` option to `true`) is used it'll override mmap and this value may be out of sync
+     * with the actual usage of mmap for the loading of this model instance.
+     */
+    public get useMmap(): boolean {
+        return this._useMmap;
     }
 
     /**
@@ -567,7 +592,7 @@ export class LlamaModel {
         if (token == null)
             return false;
 
-        if (this.getTokenAttributes(token).control)
+        if (this.getTokenAttributes(token).control || this.isEogToken(token))
             return true;
 
         const normalText = this.detokenize([token], false);
@@ -658,7 +683,7 @@ export class LlamaModel {
         }
 
         try {
-            if (this._defaultContextFlashAttentionOptionEnabled && !this._flashAttentionSupported) {
+            if (this._defaultContextFlashAttentionOptionEnabled === true && !this._flashAttentionSupported) {
                 if (this.fileInfo.metadata?.general?.architecture === GgufArchitectureType.grok)
                     warnings.push("Flash attention is incompatible with Grok and thus was turned off");
                 else if (this.fileInfo.metadata?.general?.architecture === GgufArchitectureType.gemma2)
@@ -762,7 +787,11 @@ export class LlamaModel {
             experimentalDefaultContextKvCacheKeyType,
             experimentalDefaultContextKvCacheValueType
         } = modelOptions;
-        const useMmap = _llama.supportsMmap && (modelOptions.useMmap ?? defaultUseMmap);
+        const useMmap = !_llama.supportsMmap
+            ? false
+            : typeof modelOptions.useMmap === "boolean"
+                ? modelOptions.useMmap
+                : defaultUseMmap;
         const useDirectIo = modelOptions.useDirectIo ?? defaultUseDirectIo;
 
         const fileInfo = await readGgufFileInfo(modelOptions.modelPath, {
@@ -771,9 +800,12 @@ export class LlamaModel {
         });
         applyGgufMetadataOverrides(fileInfo, modelOptions.metadataOverrides);
         const ggufInsights = await GgufInsights.from(fileInfo, _llama);
+        ggufInsights._defaultUseMmap = useMmap === "auto"
+            ? true
+            : useMmap;
         const flashAttentionSupported = ggufInsights.flashAttentionSupported;
         const resolvedDefaultContextFlashAttention = flashAttentionSupported
-            ? (defaultContextFlashAttention ?? defaultContextFlashAttentionEnabled)
+            ? defaultContextFlashAttention ?? defaultContextFlashAttentionOptionDefault
             : false;
         const resolvedDefaultContextSwaFullCache = modelOptions.defaultContextSwaFullCache ?? defaultContextSwaFullCache;
         const resolvedDefaultContextKvCacheKeyType = experimentalDefaultContextKvCacheKeyType === "currentQuant"
@@ -782,29 +814,83 @@ export class LlamaModel {
         const resolvedDefaultContextKvCacheValueType = experimentalDefaultContextKvCacheValueType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
             : resolveGgmlTypeOption(experimentalDefaultContextKvCacheValueType) ?? GgmlType.F16;
-        const gpuLayers = await ggufInsights.configurationResolver.resolveModelGpuLayers(modelOptions.gpuLayers, {
-            ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
-            defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
-            defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
-            defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
-            defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
-            useMmap
-        });
-        const resourceRequirementsEstimation = ggufInsights.estimateModelResourceRequirements({
-            gpuLayers: gpuLayers,
-            useMmap
-        });
+        
+        let gpuLayers: number;
+        let resolvedUseMmap: boolean;
+        let resourceRequirementsEstimation: GgufInsightsResourceRequirements;
+        const simulatorSession = ggufInsights._createSimulatorSession();
+        let layersResolutionLoadedPercentage = 0;
+        try {
+            let lastProgressSteps = 0;
+            const onProgressPercentagePerStep = figuringGpuLayersValueLoadPercentage.percentagePerStep + (
+                modelOptions.onLoadProgress == null
+                    ? 0
+                    : (
+                        Math.min(1, ggufInsights.modelSize / (await _llama._ramOrchestrator.getMemoryState()).total) *
+                        figuringGpuLayersValueLoadPercentage.percentagePerStepModelMemorySize
+                    )
+            );
+            
+            const layersResolutionStartTime = Date.now();
+            const layersResolution = await ggufInsights.configurationResolver.resolveModelGpuLayersV2(modelOptions.gpuLayers, {
+                ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
+                defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
+                defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
+                defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
+                defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
+                useMmap,
+                signal: loadSignal,
+                onProgress: modelOptions.onLoadProgress == null
+                    ? undefined
+                    : (steps: number, totalSteps: number) => {
+                        if (steps === totalSteps && (totalSteps - lastProgressSteps) / totalSteps >= 0.2)
+                            return; // skip a too big jump in the progress bar at the end of the loading progress
 
-        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap, useDirectIo}, {
+                        lastProgressSteps = steps;
+
+                        if (totalSteps * onProgressPercentagePerStep >= figuringGpuLayersValueLoadPercentage.maxPercentage)
+                            layersResolutionLoadedPercentage = (steps / totalSteps) * figuringGpuLayersValueLoadPercentage.maxPercentage;
+                        else
+                            layersResolutionLoadedPercentage = steps * onProgressPercentagePerStep;
+
+                        modelOptions.onLoadProgress?.(layersResolutionLoadedPercentage);
+                    },
+    
+                _simulatorSession: simulatorSession
+            });
+            const layersResolutionEndTime = Date.now();
+            if (_llama._shouldLog(LlamaLogLevel.debug))
+                _llama._log(LlamaLogLevel.debug, "Resolved model gpu layers. " + [
+                    `duration=${(layersResolutionEndTime - layersResolutionStartTime) / 1000}s`,
+                    `layers=${layersResolution.gpuLayers}`,
+                    `useMmap=${useMmap}`,
+                    `modelPath=${modelOptions.modelPath}`
+                ].join(" "));
+
+            gpuLayers = layersResolution.gpuLayers;
+            resolvedUseMmap = layersResolution.useMmap;
+            resourceRequirementsEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
+                gpuLayers,
+                useMmap: resolvedUseMmap,
+                
+                _simulatorSession: simulatorSession
+            });
+        } finally {
+            simulatorSession.dispose();
+        }
+
+        const model = new LlamaModel({...modelOptions, gpuLayers, useMmap: resolvedUseMmap, useDirectIo}, {
             _fileInfo: fileInfo,
             _fileInsights: ggufInsights,
             _llama,
-            _defaultContextFlashAttentionOptionEnabled: defaultContextFlashAttention ?? false,
+            _defaultContextFlashAttentionOptionEnabled: defaultContextFlashAttention ?? defaultContextFlashAttentionOptionDefault,
             _flashAttentionSupported: flashAttentionSupported,
             _defaultContextFlashAttention: resolvedDefaultContextFlashAttention,
             _defaultContextSwaFullCache: resolvedDefaultContextSwaFullCache,
             _defaultContextKvCacheKeyType: resolvedDefaultContextKvCacheKeyType,
-            _defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType
+            _defaultContextKvCacheValueType: resolvedDefaultContextKvCacheValueType,
+            _loadPercentageShift: layersResolutionLoadedPercentage,
+            _loadPercentageMultiplier: 1 - layersResolutionLoadedPercentage
         });
         const modelCreationVramReservation = modelOptions.ignoreMemorySafetyChecks
             ? null
@@ -839,7 +925,13 @@ export class LlamaModel {
         logWarnings(ggufInsights.getWarnings(modelOptions.modelPath));
 
         try {
-            const modelLoaded = await model._model.init();
+            const initLock = await acquireLock([_llama._memoryLock, LlamaLocks.addonInit]);
+            let modelLoaded: boolean = false;
+            try {
+                modelLoaded = await model._model.init();
+            } finally {
+                initLock.dispose();
+            }
 
             if (loadSignal?.aborted) {
                 if (modelLoaded)
@@ -852,6 +944,12 @@ export class LlamaModel {
             loadSignal?.removeEventListener("abort", onAbort);
 
             logWarnings(model.getWarnings());
+
+            const memoryBreakdown = model._model.getMemoryBreakdown();
+            model._vramConsumptionMarking = _llama._vramOrchestrator.markAllocation(memoryBreakdown.gpuVram);
+            model._ramConsumptionMarking = _llama._ramOrchestrator.markAllocation(memoryBreakdown.cpuRam);
+            modelCreationVramReservation?.dispose?.();
+            modelCreationRamReservation?.dispose?.();
 
             return model;
         } finally {

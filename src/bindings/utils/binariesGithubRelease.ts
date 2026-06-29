@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import {binariesGithubReleasePath} from "../../config.js";
+import {binariesGithubReleasePath, llamaCppReleaseEnvVar} from "../../config.js";
 
 type BinariesGithubReleaseFile = {
     release: "latest" | string
@@ -20,3 +20,6 @@ export async function setBinariesGithubRelease(release: BinariesGithubReleaseFil
         spaces: 4
     });
 }
+
+export const builtinLlamaCppRelease = await getBinariesGithubRelease();
+export const defaultLlamaCppRelease = llamaCppReleaseEnvVar || builtinLlamaCppRelease;

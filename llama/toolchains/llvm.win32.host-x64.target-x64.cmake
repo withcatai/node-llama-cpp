@@ -13,8 +13,3 @@ llvmUseGnuModeCompilers("x64")
 
 include("${CMAKE_CURRENT_LIST_DIR}/../cmake/win32.ensureNinjaPath.cmake")
 ensureNinjaPath()
-
-set(arch_c_flags "-march=native")
-
-set(CMAKE_C_FLAGS_INIT "${arch_c_flags}")
-set(CMAKE_CXX_FLAGS_INIT "${arch_c_flags}")

@@ -14,10 +14,13 @@ import {getTempDir, FsPathHandle} from "../utils/getTempDir.js";
 import {BindingModule} from "./AddonTypes.js";
 import {
     BuildGpu, BuildMetadataFile, LlamaGpuType, LlamaLocks, LlamaLogLevel,
-    LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma
+    LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaNuma,
+    RamState
 } from "./types.js";
-import {MemoryOrchestrator, MemoryReservation} from "./utils/MemoryOrchestrator.js";
+import {MemoryOrchestrator} from "./utils/MemoryOrchestrator.js";
 import {registerDisposeBeforeExit, unregisterDisposeBeforeExit} from "./utils/disposeBeforeExit.js";
+import {LlamaExperimentalOptions} from "./getLlama.js";
+import {getPlatform} from "./utils/getPlatform.js";
 
 export const LlamaLogLevelToAddonLogLevel: ReadonlyMap<LlamaLogLevel, number> = new Map([
     [LlamaLogLevel.disabled, 0],
@@ -41,9 +44,7 @@ export class Llama {
     /** @internal */ public readonly _memoryLock = {};
     /** @internal */ public readonly _consts: ReturnType<BindingModule["getConsts"]>;
     /** @internal */ public readonly _vramOrchestrator: MemoryOrchestrator;
-    /** @internal */ public _vramPadding: MemoryReservation;
     /** @internal */ public readonly _ramOrchestrator: MemoryOrchestrator;
-    /** @internal */ public readonly _ramPadding: MemoryReservation;
     /** @internal */ public readonly _swapOrchestrator: MemoryOrchestrator;
     /** @internal */ public readonly _debug: boolean;
     /** @internal */ public readonly _threadsSplitter: ThreadsSplitter;
@@ -52,6 +53,7 @@ export class Llama {
     /** @internal */ public _hadErrorLogs: boolean = false;
     /** @internal */ private readonly _gpu: LlamaGpuType;
     /** @internal */ private readonly _numa: LlamaNuma;
+    /** @internal */ private readonly _experimentalOptions?: LlamaExperimentalOptions;
     /** @internal */ private readonly _buildType: "localBuild" | "prebuilt";
     /** @internal */ private readonly _cmakeOptions: Readonly<Record<string, string>>;
     /** @internal */ private readonly _supportsGpuOffloading: boolean;
@@ -65,6 +67,8 @@ export class Llama {
     };
     /** @internal */ private _logger: ((level: LlamaLogLevel, message: string) => void);
     /** @internal */ private _logLevel: LlamaLogLevel;
+    /** @internal */ private _logLevelOverride?: LlamaLogLevel;
+    /** @internal */ private _logLevelOverrideHandles: {level: LlamaLogLevel}[] = [];
     /** @internal */ private _pendingLog: string | null = null;
     /** @internal */ private _pendingLogLevel: LlamaLogLevel | null = null;
     /** @internal */ private _logDispatchQueuedMicrotasks: number = 0;
@@ -78,7 +82,7 @@ export class Llama {
 
     private constructor({
         bindings, bindingPath, extBackendsPath, logLevel, logger, buildType, cmakeOptions, llamaCppRelease, debug, tempDir, numa, buildGpu,
-        maxThreads, vramOrchestrator, vramPadding, ramOrchestrator, ramPadding, swapOrchestrator, skipLlamaInit
+        maxThreads, vramOrchestrator, ramOrchestrator, swapOrchestrator, skipLlamaInit, experimentalOptions
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -97,11 +101,10 @@ export class Llama {
         buildGpu: BuildGpu,
         maxThreads?: number,
         vramOrchestrator: MemoryOrchestrator,
-        vramPadding: MemoryReservation,
         ramOrchestrator: MemoryOrchestrator,
-        ramPadding: MemoryReservation,
         swapOrchestrator: MemoryOrchestrator,
-        skipLlamaInit: boolean
+        skipLlamaInit: boolean,
+        experimentalOptions?: LlamaExperimentalOptions
     }) {
         this._dispatchPendingLogMicrotask = this._dispatchPendingLogMicrotask.bind(this);
         this._onAddonLog = this._onAddonLog.bind(this);
@@ -113,6 +116,7 @@ export class Llama {
         this._logLevel = this._debug
             ? LlamaLogLevel.debug
             : (logLevel ?? LlamaLogLevel.debug);
+        this._experimentalOptions = experimentalOptions;
         this._selfWeakRef = new WeakRef(this);
 
         const previouslyLoaded = bindings.markLoaded();
@@ -120,6 +124,14 @@ export class Llama {
         if (!this._debug && (!skipLlamaInit || !previouslyLoaded)) {
             this._bindings.setLogger(this._onAddonLog);
             this._bindings.setLoggerLogLevel(LlamaLogLevelToAddonLogLevel.get(this._logLevel) ?? defaultLogLevel);
+        }
+
+        let disabledResidencySets = false;
+        if (getPlatform() === "mac" && buildGpu === "metal" && this._experimentalOptions?.metalSkipDisablingResidencySets !== true &&
+            process.env["GGML_METAL_NO_RESIDENCY"] == null
+        ) {
+            this._log(LlamaLogLevel.debug, "Disabling residency sets");
+            disabledResidencySets = bindings.setEnv("GGML_METAL_NO_RESIDENCY", "1");
         }
 
         bindings.loadBackends();
@@ -140,6 +152,9 @@ export class Llama {
         if (this._numa !== false)
             bindings.setNuma(numa);
 
+        if (disabledResidencySets)
+            bindings.setEnv("GGML_METAL_NO_RESIDENCY", undefined);
+
         this._gpu = bindings.getGpuType() ?? false;
         this._supportsGpuOffloading = bindings.getSupportsGpuOffloading();
         this._supportsMmap = bindings.getSupportsMmap();
@@ -148,9 +163,7 @@ export class Llama {
         this._mathCores = Math.floor(bindings.getMathCores());
         this._consts = bindings.getConsts();
         this._vramOrchestrator = vramOrchestrator;
-        this._vramPadding = vramPadding;
         this._ramOrchestrator = ramOrchestrator;
-        this._ramPadding = ramPadding;
         this._swapOrchestrator = swapOrchestrator;
         this._threadsSplitter = new ThreadsSplitter(
             maxThreads ?? (
@@ -299,7 +312,17 @@ export class Llama {
      * See `vramPadding` on `getLlama` for more information.
      */
     public get vramPaddingSize() {
-        return this._vramPadding.size;
+        return this._vramOrchestrator.padding;
+    }
+
+    /**
+     * RAM padding used for memory size calculations, as these calculations are not always accurate.
+     * This is set by default to ensure stability, but can be configured when you call `getLlama`.
+     *
+     * See `ramPadding` on `getLlama` for more information.
+     */
+    public get ramPaddingSize() {
+        return this._ramOrchestrator.padding;
     }
 
     /**
@@ -308,17 +331,24 @@ export class Llama {
      * `unifiedSize` represents the amount of VRAM that is shared between the CPU and GPU.
      * On SoC devices, this is usually the same as `total`.
      */
-    public async getVramState() {
+    public async getVramState(): Promise<{
+        total: number,
+        used: number,
+        free: number,
+        unifiedSize: number
+    }> {
         this._ensureNotDisposed();
 
-        const {total, used, unifiedSize} = this._bindings.getGpuVramInfo();
+        return getBalancedVramState(this._bindings, true);
+    }
 
-        return {
-            total,
-            used,
-            free: Math.max(0, total - used),
-            unifiedSize
-        };
+    /**
+     * Get the state of the system RAM
+     */
+    public async getRamState(): Promise<RamState> {
+        this._ensureNotDisposed();
+
+        return getBalancedRamState(this._bindings);
     }
 
     /**
@@ -357,6 +387,90 @@ export class Llama {
             allocated: total,
             used: total - free
         };
+    }
+
+    /**
+     * Get the total memory usage of this Llama instance
+     */
+    public async getLlamaMemoryUsage() {
+        return {
+            gpuVram: this._vramOrchestrator.markedMemory,
+            cpuRam: this._ramOrchestrator.markedMemory
+        };
+    }
+
+    /**
+     * Cap the amount of VRAM that this Llama instance is allowed to use in bytes.
+     * This is useful for constraining the resource usage of models and contexts created with the Llama instance.
+     * 
+     * Capping to a value that's too low may cause model loads and context creations to either fail or not fully offload to VRAM,
+     * causing inference to be significantly slower.
+     * 
+     * Setting a cap will only affect future model loads and context creations.
+     * 
+     * Use with caution.
+     * Setting to `null` disables the cap.
+     * 
+     * Defaults to `null`.
+     */
+    public async setVramCap(bytes: number | null) {
+        this._ensureNotDisposed();
+        if (bytes != null && bytes < 0)
+            throw new RangeError("VRAM cap must be a non-negative number or null");
+        else if (bytes != null)
+            bytes = Math.floor(bytes);
+
+        this._vramOrchestrator.memoryCap = bytes;
+    }
+
+    /**
+     * Get the current VRAM cap in bytes. See {@link setVramCap `setVramCap`} for more information.
+     * 
+     * Defaults to `null`, which means no cap is set.
+     */
+    public getVramCap() {
+        return this._vramOrchestrator.memoryCap;
+    }
+
+    /**
+     * Cap the amount of RAM that this Llama instance is allowed to use in bytes.
+     * This is useful for constraining the resource usage of models and contexts created with the Llama instance.
+     * 
+     * Capping to a value that's too low may cause model loads and context creations to fail.
+     * Capping to any value will exclude swap from the resource calculations,
+     * so extremely large models may not load at all even if you have enough swap available.
+     * 
+     * Setting a cap will only affect future model loads and context creations.
+     * 
+     * On unified memory systems, capping the RAM may also effectively cap the VRAM, as they are shared.
+     * On such systems, it's recommended to either cap the VRAM or the RAM (but not both),
+     * and if you need to cap both then make sure to set the RAM cap to a value greater than the VRAM cap.
+     * > **Note:** You can detect a unified memory system by checking whether `getVramState().unifiedSize` is greater than 0.
+     * 
+     * Use with caution.
+     * Setting to `null` disables the cap.
+     * 
+     * Defaults to `null`.
+     */
+    public async setRamCap(bytes: number | null) {
+        this._ensureNotDisposed();
+
+        if (bytes != null && bytes < 0)
+            throw new RangeError("RAM cap must be a non-negative number or null");
+        else if (bytes != null)
+            bytes = Math.floor(bytes);
+        
+        this._ramOrchestrator.memoryCap = bytes;
+        this._swapOrchestrator.memoryCap = bytes == null ? null : 0; // if RAM is capped, we can't count on swap for calculation
+    }
+
+    /**
+     * Get the current RAM cap in bytes. See {@link setRamCap `setRamCap`} for more information.
+     * 
+     * Defaults to `null`, which means no cap is set.
+     */
+    public getRamCap() {
+        return this._ramOrchestrator.memoryCap;
     }
 
     public async getGpuDeviceNames() {
@@ -407,8 +521,50 @@ export class Llama {
     }
 
     /** @internal */
+    public async _getRawVramState() {
+        this._ensureNotDisposed();
+
+        return getBalancedVramState(this._bindings, false);
+    }
+
+    /** @internal */
     public async _init() {
         await this._bindings.init();
+    }
+
+    /**
+     * Set log level override
+     * @internal
+     */
+    public _createLogLevelOverride(value: LlamaLogLevel) {
+        const handle = {level: value};
+        this._logLevelOverrideHandles.push(handle);
+
+        if (this._logLevelOverride != value) {
+            this._logLevelOverride = value;
+            const addonLogLevel = LlamaLogLevelToAddonLogLevel.get(value);
+
+            if (addonLogLevel != null)
+                this._bindings.setLoggerLogLevelOverride(addonLogLevel);
+        }
+
+        return () => {
+            const index = this._logLevelOverrideHandles.indexOf(handle);
+            if (index < 0)
+                return;
+
+            this._logLevelOverrideHandles.splice(index, 1);
+            const newOverride = this._logLevelOverrideHandles.at(-1)?.level;
+
+            if (this._logLevelOverride != newOverride) {
+                this._logLevelOverride = newOverride;
+                this._bindings.setLoggerLogLevelOverride(
+                    newOverride == null
+                        ? undefined
+                        : LlamaLogLevelToAddonLogLevel.get(newOverride) ?? undefined
+                );
+            }
+        };
     }
 
     /**
@@ -417,6 +573,14 @@ export class Llama {
      */
     public _log(level: LlamaLogLevel, message: string) {
         this._onAddonLog(LlamaLogLevelToAddonLogLevel.get(level) ?? defaultLogLevel, message + "\n");
+    }
+
+    /**
+     * Check whether a message with the given log level would be logged by the Llama instance
+     * @internal
+     */
+    public _shouldLog(level: LlamaLogLevel) {
+        return LlamaLogLevelGreaterThanOrEqual(level, this._logLevelOverride ?? this._logLevel);
     }
 
     /** @internal */
@@ -491,7 +655,7 @@ export class Llama {
 
             try {
                 const transformedLogLevel = getTransformedLogLevel(level, message, this.gpu);
-                if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevel))
+                if (LlamaLogLevelGreaterThanOrEqual(transformedLogLevel, this._logLevelOverride ?? this._logLevel))
                     this._logger(transformedLogLevel, message);
             } catch (err) {
                 // the native addon code calls this function, so there's no use to throw an error here
@@ -522,7 +686,7 @@ export class Llama {
     /** @internal */
     public static async _create({
         bindings, bindingPath, extBackendsPath, buildType, buildMetadata, logLevel, logger, vramPadding, ramPadding, maxThreads,
-        skipLlamaInit = false, debug, numa, tempDir
+        skipLlamaInit = false, debug, numa, tempDir, experimentalOptions
     }: {
         bindings: BindingModule,
         bindingPath: string,
@@ -537,24 +701,16 @@ export class Llama {
         skipLlamaInit?: boolean,
         debug: boolean,
         numa?: LlamaNuma,
-        tempDir?: string | string[] | false
+        tempDir?: string | string[] | false,
+        experimentalOptions?: LlamaExperimentalOptions
     }) {
-        const vramOrchestrator = new MemoryOrchestrator(() => {
-            const {total, used, unifiedSize} = bindings.getGpuVramInfo();
-
+        const vramOrchestrator = new MemoryOrchestrator(getBalancedVramState.bind(undefined, bindings, true));
+        const ramOrchestrator = new MemoryOrchestrator(async () => {
+            const {total, wired} = await getBalancedRamState(bindings);
+            
             return {
                 total,
-                free: Math.max(0, total - used),
-                unifiedSize
-            };
-        });
-        const ramOrchestrator = new MemoryOrchestrator(() => {
-            const used = process.memoryUsage().rss;
-            const total = os.totalmem();
-
-            return {
-                total,
-                free: Math.max(0, total - used),
+                free: total - wired,
                 unifiedSize: total
             };
         });
@@ -576,11 +732,10 @@ export class Llama {
             };
         });
 
-        let resolvedRamPadding: MemoryReservation;
         if (ramPadding instanceof Function)
-            resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding((await ramOrchestrator.getMemoryState()).total));
+            ramOrchestrator.padding = ramPadding((await ramOrchestrator.getMemoryState()).total);
         else
-            resolvedRamPadding = ramOrchestrator.reserveMemory(ramPadding);
+            ramOrchestrator.padding = ramPadding;
 
         const resolvedTempDir = tempDir === false
             ? undefined
@@ -608,23 +763,18 @@ export class Llama {
             buildGpu: buildMetadata.buildOptions.gpu,
             vramOrchestrator,
             maxThreads,
-            vramPadding: vramOrchestrator.reserveMemory(0),
             ramOrchestrator,
-            ramPadding: resolvedRamPadding,
             swapOrchestrator,
-            skipLlamaInit
+            skipLlamaInit,
+            experimentalOptions
         });
 
         if (llama.gpu === false || vramPadding === 0) {
-            // do nothing since `llama._vramPadding` is already set to 0
+            // do nothing since `llama._vramOrchestrator.padding` is already set to 0
         } else if (vramPadding instanceof Function) {
-            const currentVramPadding = llama._vramPadding;
-            llama._vramPadding = vramOrchestrator.reserveMemory(vramPadding((await vramOrchestrator.getMemoryState()).total));
-            currentVramPadding.dispose();
+            vramOrchestrator.padding = vramPadding((await vramOrchestrator.getMemoryState()).total);
         } else {
-            const currentVramPadding = llama._vramPadding;
-            llama._vramPadding = vramOrchestrator.reserveMemory(vramPadding);
-            currentVramPadding.dispose();
+            vramOrchestrator.padding = vramPadding;
         }
 
         if (!skipLlamaInit)
@@ -726,10 +876,66 @@ function getTransformedLogLevel(level: LlamaLogLevel, message: string, gpu: Buil
         return LlamaLogLevel.info;
     else if (level === LlamaLogLevel.warn && message.startsWith("llama_model_loader: direct I/O is not available, using mmap"))
         return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("str: cannot properly format tensor name "))
+        return LlamaLogLevel.info;
+    else if (level === LlamaLogLevel.warn && message.startsWith("llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to"))
+        return LlamaLogLevel.info;
     else if (gpu === false && level === LlamaLogLevel.warn && message.startsWith("llama_adapter_lora_init_impl: lora for '") && message.endsWith("' cannot use buft 'CPU_REPACK', fallback to CPU"))
         return LlamaLogLevel.info;
     else if (gpu === "metal" && level === LlamaLogLevel.warn && message.startsWith("ggml_metal_device_init: tensor API disabled for"))
         return LlamaLogLevel.info;
 
     return level;
+}
+
+async function getBalancedVramState(bindings: BindingModule, balanceUnifiedMemory: boolean = true) {
+    const {total, used, unifiedSize} = bindings.getGpuVramInfo();
+    let currentUsed = used;
+
+    if (unifiedSize !== 0 && balanceUnifiedMemory) {
+        try {
+            const systemMemoryInfo = await bindings.getSystemMemoryInfo();
+            systemMemoryInfo.total ??= os.totalmem();
+
+            const nonUnifiedMemoryRam = systemMemoryInfo.total - unifiedSize;
+            const lockedUnifiedVram = Math.max(0, Math.min(systemMemoryInfo.wired ?? 0, systemMemoryInfo.total) - nonUnifiedMemoryRam);
+    
+            currentUsed = Math.max(currentUsed, Math.min(lockedUnifiedVram, unifiedSize));
+        } catch (err) {
+            // do nothing
+        }
+    }
+
+    return {
+        total,
+        used: currentUsed,
+        free: Math.max(0, total - currentUsed),
+        unifiedSize
+    };
+}
+
+
+async function getBalancedRamState(bindings: BindingModule): Promise<RamState> {
+    let total: number | null = null;
+    let free: number | null = null;
+    let wired: number | null = null;
+
+    try {
+        const systemMemoryInfo = await bindings.getSystemMemoryInfo();
+        total = systemMemoryInfo.total;
+        free = systemMemoryInfo.free;
+        wired = systemMemoryInfo.wired;
+    } catch (error) {
+        // do nothing
+    }
+
+    total ??= os.totalmem();
+    free ??= os.freemem();
+    wired = Math.min(wired ?? 0, total);
+
+    return {
+        total,
+        free,
+        wired
+    };
 }

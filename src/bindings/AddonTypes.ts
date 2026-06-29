@@ -1,40 +1,48 @@
 import {Token} from "../types.js";
 import {LlamaNuma} from "./types.js";
 
+export type AddonModelParams = {
+    gpuLayers?: number,
+    vocabOnly?: boolean,
+    noAlloc?: boolean,
+    useMmap?: boolean,
+    useDirectIo?: boolean,
+    useMlock?: boolean,
+    checkTensors?: boolean,
+    overridesList?: Array<[key: string, value: number | bigint | boolean | string, type: 0 | 1 | undefined]>
+};
+
+export type AddonContextParams = {
+    contextSize?: number,
+    batchSize?: number,
+    sequences?: number,
+    flashAttention?: boolean | "auto",
+    logitsAll?: boolean,
+    embeddings?: boolean,
+    ranking?: boolean,
+    threads?: number,
+    performanceTracking?: boolean,
+    kvCacheKeyType?: number,
+    kvCacheValueType?: number,
+    swaFullCache?: boolean
+};
 
 export type BindingModule = {
+    AddonGgufMetadata: {
+        new (): AddonGgufMetadata
+    },
     AddonModel: {
-        new (modelPath: string, params: {
+        new (modelPath: string, params: AddonModelParams & {
             addonExports?: BindingModule,
-            gpuLayers?: number,
-            vocabOnly?: boolean,
-            useMmap?: boolean,
-            useDirectIo?: boolean,
-            useMlock?: boolean,
-            checkTensors?: boolean,
             onLoadProgress?(loadPercentage: number): void,
-            hasLoadAbortSignal?: boolean,
-            overridesList?: Array<[key: string, value: number | bigint | boolean | string, type: 0 | 1 | undefined]>
+            hasLoadAbortSignal?: boolean
         }): AddonModel
     },
     AddonModelLora: {
         new (model: AddonModel, filePath: string): AddonModelLora
     },
     AddonContext: {
-        new (model: AddonModel, params: {
-            contextSize?: number,
-            batchSize?: number,
-            sequences?: number,
-            flashAttention?: boolean,
-            logitsAll?: boolean,
-            embeddings?: boolean,
-            ranking?: boolean,
-            threads?: number,
-            performanceTracking?: boolean,
-            kvCacheKeyType?: number,
-            kvCacheValueType?: number,
-            swaFullCache?: boolean
-        }): AddonContext
+        new (model: AddonModel, params: AddonContextParams): AddonContext
     },
     AddonContextSequenceCheckpoint: {
         new (): AddonContextSequenceCheckpoint
@@ -74,6 +82,7 @@ export type BindingModule = {
     },
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
+    setLoggerLogLevelOverride(level: number | undefined): void,
     getGpuVramInfo(): {
         total: number,
         used: number,
@@ -89,17 +98,28 @@ export type BindingModule = {
         maxSize: number,
         free: number
     },
-    getMemoryInfo(): {
+    getSystemMemoryInfo(): Promise<{
+        total: number | null,
+        wired: number | null,
+        free: number | null
+    }>,
+    getProcessMemoryInfo(): {
         total: number
     },
     init(): Promise<void>,
     setNuma(numa?: LlamaNuma): void,
+    setEnv(key: string, value?: string | null, overwrite?: boolean): boolean,
     loadBackends(forceLoadLibrariesSearchPath?: string): void,
     dispose(): Promise<void>
 };
 
+export type AddonGgufMetadata = {
+    init(source: Array<Buffer | string>): Promise<void>,
+    dispose(): Promise<void>
+};
+
 export type AddonModel = {
-    init(): Promise<boolean>,
+    init(source?: AddonGgufMetadata): Promise<boolean>,
     loadLora(lora: AddonModelLora): Promise<void>,
     abortActiveModelLoad(): void,
     dispose(): Promise<void>,
@@ -110,6 +130,10 @@ export type AddonModel = {
     getTotalSize(): number,
     getTotalParameters(): number,
     getModelDescription(): ModelTypeDescription,
+    getMemoryBreakdown(): {
+        cpuRam: number,
+        gpuVram: number
+    },
     tokenBos(): Token,
     tokenEos(): Token,
     tokenNl(): Token,
@@ -158,6 +182,10 @@ export type AddonContext = {
     getSequenceKvCacheMaxPosition(sequenceId: number): number,
     getEmbedding(inputTokensLength: number, maxVectorSize?: number): Float64Array,
     getStateSize(): number,
+    getMemoryBreakdown(): {
+        cpuRam: number,
+        gpuVram: number
+    },
     getThreads(): number,
     setThreads(threads: number): void,
     printTimings(): void,

@@ -163,15 +163,43 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (!cmakeCustomOptions.has("GGML_NATIVE") || isCmakeValueOff(cmakeCustomOptions.get("GGML_NATIVE"))) {
                         cmakeCustomOptions.set("GGML_NATIVE", "OFF");
 
-                        if ((buildOptions.arch === "x64" || buildOptions.arch === "riscv64") &&
-                            !cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS")
-                        ) {
+                        // matches that clause of `if (GGML_CPU_ALL_VARIANTS)` in `llama.cpp` under `ggml/src/CMakeLists.txt`
+                        if (!cmakeCustomOptions.has("GGML_CPU_ALL_VARIANTS") && (
+                            (
+                                buildOptions.arch === "x64"
+                            ) ||
+                            (
+                                (buildOptions.arch === "arm64" || buildOptions.arch === "arm") && (
+                                    buildOptions.platform === "linux" ||
+                                    buildOptions.platform === "mac"
+                                )
+                            ) ||
+                            (
+                                (buildOptions.arch === "ppc64" || buildOptions.arch === "ppc") && (
+                                    buildOptions.platform === "linux"
+                                )
+                            ) ||
+                            (
+                                buildOptions.arch === "s390x" && (
+                                    buildOptions.platform === "linux"
+                                )
+                            ) ||
+                            (
+                                buildOptions.arch === "riscv64" && (
+                                    buildOptions.platform === "linux"
+                                )
+                            )
+                        )) {
                             cmakeCustomOptions.set("GGML_CPU_ALL_VARIANTS", "ON");
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                         } else if (!cmakeCustomOptions.has("GGML_BACKEND_DL"))
                             cmakeCustomOptions.set("GGML_BACKEND_DL", "ON");
                     }
-                }
+                } else if (!cmakeCustomOptions.has("GGML_NATIVE") &&
+                    buildOptions.platform === platform &&
+                    buildOptions.arch === process.arch
+                )
+                    cmakeCustomOptions.set("GGML_NATIVE", "ON");
 
                 await fs.remove(outDirectory);
 
@@ -279,8 +307,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 )
             )) {
                 for (const {nvccPath, cudaHomePath} of await getCudaNvccPaths()) {
-                    if (buildOptions.progressLogs)
-                        console.info(
+                    if (buildOptions.progressLogs !== false)
+                        console.warn(
                             getConsoleLogPrefix(true) +
                             `Trying to compile again with "CUDACXX=${nvccPath}" and "CUDA_PATH=${cudaHomePath}" environment variables`
                         );
@@ -296,7 +324,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                             ignoreWorkarounds: [...ignoreWorkarounds, "cudaArchitecture"]
                         });
                     } catch (err) {
-                        if (buildOptions.progressLogs)
+                        if (buildOptions.progressLogs !== false)
                             console.error(getConsoleLogPrefix(true, false), err);
                     }
                 }
@@ -309,13 +337,13 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     err.combinedStd.toLowerCase().includes("compiler is out of heap space".toLowerCase())
                 )
             ) {
-                if (buildOptions.progressLogs) {
+                if (buildOptions.progressLogs !== false) {
                     if (ignoreWorkarounds.includes("reduceParallelBuildThreads"))
-                        console.info(
+                        console.warn(
                             getConsoleLogPrefix(true) + "Trying to compile again with a single build thread"
                         );
                     else
-                        console.info(
+                        console.warn(
                             getConsoleLogPrefix(true) + "Trying to compile again with reduced parallel build threads"
                         );
                 }
@@ -331,7 +359,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                         ]
                     });
                 } catch (err) {
-                    if (buildOptions.progressLogs)
+                    if (buildOptions.progressLogs !== false)
                         console.error(getConsoleLogPrefix(true, false), err);
                 }
             }
@@ -348,8 +376,8 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 documentationPageUrls.Vulkan
             );
         else if (useWindowsLlvm && !ciMode) {
-            if (buildOptions.progressLogs)
-                console.info(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
+            if (buildOptions.progressLogs !== false)
+                console.warn(getConsoleLogPrefix(true) + "Trying to compile again without LLVM");
 
             try {
                 return await compileLlamaCpp(buildOptions, {
@@ -357,7 +385,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     ignoreWorkarounds: [...ignoreWorkarounds, "avoidWindowsLlvm"]
                 });
             } catch (err) {
-                if (buildOptions.progressLogs)
+                if (buildOptions.progressLogs !== false)
                     console.error(getConsoleLogPrefix(true, false), err);
             }
         }

@@ -1,104 +1,257 @@
 import {LlamaModelOptions} from "../../../evaluator/LlamaModel/LlamaModel.js";
 import {BuildGpu} from "../../../bindings/types.js";
 import {InsufficientMemoryError} from "../../../utils/InsufficientMemoryError.js";
-import {findBestOption} from "../../../utils/findBestOption.js";
+import {findFirstNonNullBestOptionAsync} from "../../../utils/findBestOption.js";
 import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 import {minAllowedContextSizeInCalculations} from "../../../config.js";
+import {ProgressTracker, ProgressTrackerTask} from "../../../utils/ProgressTracker.js";
 import {scoreLevels} from "./scoreLevels.js";
+import type {LlamaContextOptions} from "../../../evaluator/LlamaContext/types.js";
 import type {GgmlType} from "../../types/GgufTensorInfoTypes.js";
-import type {GgufInsights} from "../GgufInsights.js";
+import type {GgufInsights, GgufInsightsSimulatorSession} from "../GgufInsights.js";
 
 const fitContextExtraMemoryPaddingPercentage = 0.5;
+const vramWastePercentageToPreferDisablingMmap = 0.2;
+const contextSizeMissPercentageToPreferDisablingMmap = 0.2;
 
-export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], {
-    ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
-    llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention,
-    defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache, useMmap
-}: {
+export async function resolveModelGpuLayersOption(gpuLayers: LlamaModelOptions["gpuLayers"], options: {
     ggufInsights: GgufInsights, ignoreMemorySafetyChecks?: boolean,
     getVramState(): Promise<{total: number, free: number}>, llamaVramPaddingSize: number, llamaGpu: BuildGpu,
-    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: boolean,
+    llamaSupportsGpuOffloading: boolean, defaultContextFlashAttention: LlamaContextOptions["flashAttention"],
     defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType, defaultContextSwaFullCache: boolean,
-    useMmap?: boolean
-}): Promise<number> {
-    if (gpuLayers == null)
-        gpuLayers = "auto";
+    useMmap?: "auto" | boolean, simulatorSession?: GgufInsightsSimulatorSession, vramCapIsSet?: boolean,
+    onProgress?(step: number, totalSteps: number): void, enablePredictiveLayerScoring?: boolean, startProbeLayersCount?: number,
+    signal?: AbortSignal
+}): Promise<{gpuLayers: number, useMmap: boolean}> {
+    const {
+        ggufInsights, ignoreMemorySafetyChecks = false, getVramState, llamaVramPaddingSize,
+        llamaGpu, llamaSupportsGpuOffloading, defaultContextFlashAttention,
+        defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache, useMmap = "auto",
+        simulatorSession: _simulatorSession, vramCapIsSet = false, onProgress, enablePredictiveLayerScoring = false,
+        startProbeLayersCount, signal
+    } = options;
 
-    if (!llamaSupportsGpuOffloading)
-        return 0;
+    const progressTracker = onProgress != null
+        ? new ProgressTracker(onProgress)
+        : undefined;
 
-    if (gpuLayers === "max" || typeof gpuLayers === "number") {
-        const resolvedGpuLayers = typeof gpuLayers === "number"
-            ? Math.max(0, Math.min(ggufInsights.totalLayers, gpuLayers))
-            : ggufInsights.totalLayers;
+    const simulatorSession = _simulatorSession ?? ggufInsights._createSimulatorSession();
 
-        if (ignoreMemorySafetyChecks)
-            return resolvedGpuLayers;
+    try {
+        if (gpuLayers == null)
+            gpuLayers = "auto";
+    
+        if (!llamaSupportsGpuOffloading)
+            return {gpuLayers: 0, useMmap: useMmap === "auto" ? ggufInsights._getUseMmap() : useMmap};
+    
+        if (gpuLayers === "max" || typeof gpuLayers === "number") {
+            const resolvedGpuLayers = typeof gpuLayers === "number"
+                ? Math.max(0, Math.min(ggufInsights.totalLayers, gpuLayers))
+                : ggufInsights.totalLayers;
+            const vramState = await getVramState();
 
-        const vramState = await getVramState();
-        const maxLayersRequirements = getVramRequiredForGpuLayers({
-            gpuLayers: resolvedGpuLayers,
-            ggufInsights,
-            currentVram: vramState.free,
-            defaultContextFlashAttention,
-            defaultContextKvCacheKeyType,
-            defaultContextKvCacheValueType,
-            defaultContextSwaFullCache,
-            useMmap
-        });
+            const getVramNeeds = async (useMmap: boolean, progressTask?: ProgressTrackerTask) => {
+                try {
+                    return await getVramRequiredForGpuLayers({
+                        gpuLayers: resolvedGpuLayers,
+                        ggufInsights,
+                        currentVram: vramState.free,
+                        defaultContextFlashAttention,
+                        defaultContextKvCacheKeyType,
+                        defaultContextKvCacheValueType,
+                        defaultContextSwaFullCache,
+                        useMmap,
+                        simulatorSession
+                    });
+                } finally {
+                    progressTask?.update(1);
+                }
+            };
+            const getPreferredResolvedLayers = async () => {
+                if (useMmap !== "auto")
+                    return await getVramNeeds(useMmap, progressTracker?.createTask(1));
 
-        if (maxLayersRequirements == null)
-            throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings");
+                const [
+                    withMmap,
+                    withoutMmap
+                ] = await Promise.all([
+                    getVramNeeds(true, progressTracker?.createTask(1)),
+                    getVramNeeds(false)
+                ]);
 
-        return resolvedGpuLayers;
-    } else if (gpuLayers === "auto" || typeof gpuLayers === "object") {
-        if (llamaGpu === false)
-            return 0;
+                if (withoutMmap != null && withMmap == null)
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    typeof gpuLayers === "number" &&
+                    withoutMmap.totalVram <= withMmap.totalVram * (1 - vramWastePercentageToPreferDisablingMmap)
+                )
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    withoutMmap.gpuLayers > withMmap.gpuLayers
+                )
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    withoutMmap.contextSize >= withMmap.contextSize * (1 + contextSizeMissPercentageToPreferDisablingMmap)
+                )
+                    return withoutMmap;
 
-        const vramState = await getVramState();
-        if (vramState.total === 0)
-            return 0;
+                return withMmap ?? withoutMmap;
+            };
+    
+            if (ignoreMemorySafetyChecks)
+                return {
+                    gpuLayers: resolvedGpuLayers,
+                    useMmap: useMmap === "auto"
+                        ? gpuLayers === "max"
+                            ? true
+                            : (await getPreferredResolvedLayers())?.useMmap ?? false
+                        : useMmap
+                };
+    
+            const maxLayersRequirements = (useMmap !== "auto" || gpuLayers === "max")
+                ? await getVramNeeds(
+                    useMmap === "auto"
+                        ? ggufInsights._getUseMmap()
+                        : useMmap,
+                    progressTracker?.createTask(1)
+                )
+                : await getPreferredResolvedLayers();
+    
+            if (maxLayersRequirements == null)
+                throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings" + getCapErrorMessage(vramCapIsSet));
+    
+            return {
+                gpuLayers: resolvedGpuLayers,
+                useMmap: maxLayersRequirements.useMmap
+            };
+        } else if (gpuLayers === "auto" || typeof gpuLayers === "object") {
+            if (llamaGpu === false)
+                return {gpuLayers: 0, useMmap: useMmap === "auto" ? ggufInsights._getUseMmap() : useMmap};
+    
+            const vramState = await getVramState();
+            if (vramState.total === 0)
+                return {gpuLayers: 0, useMmap: useMmap === "auto" ? ggufInsights._getUseMmap() : useMmap};
+    
+            let freeVram = vramState.free;
+            if (typeof gpuLayers === "object" && gpuLayers.fitContext?.contextSize != null) {
+                freeVram -= llamaVramPaddingSize * fitContextExtraMemoryPaddingPercentage;
+    
+                if (freeVram < 0)
+                    freeVram = 0;
+            }
 
-        let freeVram = vramState.free;
-        if (typeof gpuLayers === "object" && gpuLayers.fitContext?.contextSize != null) {
-            freeVram -= llamaVramPaddingSize * fitContextExtraMemoryPaddingPercentage;
+            const getGpuLayersForMmapOptions = (useMmap: boolean, skipProgress: boolean = false) => getBestGpuLayersForFreeVram({
+                ggufInsights,
+                freeVram,
+                fitContext: typeof gpuLayers === "object"
+                    ? gpuLayers.fitContext
+                    : undefined,
+                minGpuLayers: typeof gpuLayers === "object"
+                    ? gpuLayers.min
+                    : undefined,
+                maxGpuLayers: typeof gpuLayers === "object"
+                    ? gpuLayers.max
+                    : undefined,
+                defaultContextFlashAttention,
+                defaultContextKvCacheKeyType,
+                defaultContextKvCacheValueType,
+                defaultContextSwaFullCache,
+                useMmap,
+                simulatorSession,
+                progressTask: skipProgress
+                    ? undefined
+                    : progressTracker?.createTask(),
+                predictiveScoring: enablePredictiveLayerScoring,
+                startProbeLayersCount,
+                signal
+            });
+            const getGpuLayersForMmapOptionsWithResourceRequirements = async (useMmap: boolean, skipProgress: boolean = false) => {
+                const resolvedLayers = await getGpuLayersForMmapOptions(useMmap, skipProgress);
+                if (resolvedLayers == null)
+                    return null;
 
-            if (freeVram < 0)
-                freeVram = 0;
+                return getVramRequiredForGpuLayers({
+                    gpuLayers: resolvedLayers,
+                    ggufInsights,
+                    currentVram: freeVram,
+                    fitContext: typeof gpuLayers === "object"
+                        ? gpuLayers.fitContext
+                        : undefined,
+                    defaultContextFlashAttention,
+                    defaultContextSwaFullCache,
+                    defaultContextKvCacheKeyType,
+                    defaultContextKvCacheValueType,
+                    useMmap,
+                    simulatorSession
+                });
+            };
+            const getPreferredResolvedLayers = async () => {
+                if (useMmap !== "auto")
+                    return {
+                        gpuLayers: await getGpuLayersForMmapOptions(useMmap),
+                        useMmap
+                    };
+
+                const [
+                    withMmap,
+                    withoutMmap
+                ] = await Promise.all([
+                    getGpuLayersForMmapOptionsWithResourceRequirements(true),
+                    getGpuLayersForMmapOptionsWithResourceRequirements(false, true)
+                ]);
+
+                if (withoutMmap != null && withMmap == null)
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    typeof gpuLayers === "number" &&
+                    withoutMmap.totalVram <= withMmap.totalVram * (1 - vramWastePercentageToPreferDisablingMmap)
+                )
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    withoutMmap.gpuLayers > withMmap.gpuLayers
+                )
+                    return withoutMmap;
+                else if (withoutMmap != null && withMmap != null &&
+                    withoutMmap.contextSize >= withMmap.contextSize * (1 + contextSizeMissPercentageToPreferDisablingMmap)
+                )
+                    return withoutMmap;
+
+                return withMmap ?? withoutMmap;
+            };
+    
+            const bestGpuLayersOption = await getPreferredResolvedLayers();
+    
+            const hasGpuLayersRequirements = typeof gpuLayers === "object" &&
+                (gpuLayers.min != null || gpuLayers.max != null || gpuLayers.fitContext?.contextSize != null);
+    
+            if (!ignoreMemorySafetyChecks && bestGpuLayersOption == null && hasGpuLayersRequirements)
+                throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings" + getCapErrorMessage(vramCapIsSet));
+    
+            return {
+                gpuLayers: bestGpuLayersOption?.gpuLayers ?? 0,
+                useMmap: bestGpuLayersOption?.useMmap ?? (
+                    useMmap === "auto"
+                        ? ggufInsights._getUseMmap()
+                        : useMmap
+                )
+            };
         }
-
-        const bestGpuLayersOption = getBestGpuLayersForFreeVram({
-            ggufInsights,
-            freeVram,
-            fitContext: typeof gpuLayers === "object"
-                ? gpuLayers.fitContext
-                : undefined,
-            minGpuLayers: typeof gpuLayers === "object"
-                ? gpuLayers.min
-                : undefined,
-            maxGpuLayers: typeof gpuLayers === "object"
-                ? gpuLayers.max
-                : undefined,
-            defaultContextFlashAttention,
-            defaultContextKvCacheKeyType,
-            defaultContextKvCacheValueType,
-            defaultContextSwaFullCache,
-            useMmap
-        });
-
-        const hasGpuLayersRequirements = typeof gpuLayers === "object" &&
-            (gpuLayers.min != null || gpuLayers.max != null || gpuLayers.fitContext?.contextSize != null);
-
-        if (!ignoreMemorySafetyChecks && bestGpuLayersOption == null && hasGpuLayersRequirements)
-            throw new InsufficientMemoryError("Not enough VRAM to fit the model with the specified settings");
-
-        return bestGpuLayersOption ?? 0;
+    
+        throw new Error(`Invalid gpuLayers value: ${gpuLayers}`);
+    } finally {
+        if (_simulatorSession == null)
+            await simulatorSession.dispose();
     }
-
-    throw new Error(`Invalid gpuLayers value: ${gpuLayers}`);
 }
 
-function getBestGpuLayersForFreeVram({
+function getCapErrorMessage(vramCapIsSet: boolean) {
+    if (vramCapIsSet)
+        return " (VRAM cap is set, consider increasing or removing the cap to fit more layers)";
+
+    return "";
+}
+
+async function getBestGpuLayersForFreeVram({
     ggufInsights,
     freeVram,
     fitContext,
@@ -108,52 +261,82 @@ function getBestGpuLayersForFreeVram({
     defaultContextKvCacheKeyType,
     defaultContextKvCacheValueType,
     defaultContextSwaFullCache,
-    useMmap
+    useMmap,
+    simulatorSession,
+    progressTask,
+    startProbeLayersCount,
+    predictiveScoring = false,
+    signal
 }: {
     ggufInsights: GgufInsights,
     freeVram: number,
     fitContext?: {contextSize?: number, embeddingContext?: boolean},
     minGpuLayers?: number,
     maxGpuLayers?: number,
-    defaultContextFlashAttention: boolean,
+    defaultContextFlashAttention: LlamaContextOptions["flashAttention"],
     defaultContextKvCacheKeyType?: GgmlType,
     defaultContextKvCacheValueType?: GgmlType,
     defaultContextSwaFullCache: boolean,
-    useMmap?: boolean
+    useMmap?: boolean,
+    simulatorSession?: GgufInsightsSimulatorSession,
+    progressTask?: ProgressTrackerTask,
+    startProbeLayersCount?: number,
+    predictiveScoring?: boolean,
+    signal?: AbortSignal
 }) {
-    return findBestOption({
-        *generator() {
-            const minLayers = Math.floor(Math.max(0, minGpuLayers ?? 0));
-            const maxLayers = Math.floor(Math.min(ggufInsights.totalLayers, maxGpuLayers ?? ggufInsights.totalLayers));
+    const minLayers = Math.floor(Math.max(0, minGpuLayers ?? 0));
+    const maxLayers = Math.floor(Math.min(ggufInsights.totalLayers, maxGpuLayers ?? ggufInsights.totalLayers));
 
-            for (let layers = maxLayers; layers >= minLayers; layers--) {
-                yield {
-                    gpuLayers: layers
-                };
+    progressTask?.update(0, Math.ceil(Math.sqrt(maxLayers - minLayers)));
+    let scoredLayers = 0;
+
+    try {
+        return (await findFirstNonNullBestOptionAsync({
+            prefill: Math.max(1, Math.min(100, Math.ceil((maxLayers - minLayers) / 3))),
+            initialSkip: (startProbeLayersCount != null && startProbeLayersCount >= 0 && startProbeLayersCount <= maxLayers)
+                ? (maxLayers - Math.floor(startProbeLayersCount))
+                : undefined,
+            predictiveScoring: predictiveScoring
+                ? 3
+                : 0,
+            *generator() {
+                for (let layers = maxLayers; layers >= minLayers; layers--) {
+                    yield {
+                        gpuLayers: layers
+                    };
+                }
+            },
+            async score(option) {
+                if (signal?.aborted)
+                    throw signal.reason;
+
+                const layersRequirements = await getVramRequiredForGpuLayers({
+                    gpuLayers: option.gpuLayers,
+                    ggufInsights,
+                    currentVram: freeVram,
+                    fitContext,
+                    defaultContextFlashAttention,
+                    defaultContextSwaFullCache,
+                    defaultContextKvCacheKeyType,
+                    defaultContextKvCacheValueType,
+                    useMmap,
+                    simulatorSession
+                });
+                scoredLayers++;
+                progressTask?.update(scoredLayers);
+
+                if (layersRequirements == null)
+                    return null;
+
+                return scoreGpuLayersAndContextCombination({gpuLayers: option.gpuLayers, contextSize: layersRequirements.contextSize}, {
+                    totalGpuLayers: ggufInsights.totalLayers,
+                    trainContextSize: getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize})
+                });
             }
-        },
-        score(option) {
-            const layersRequirements = getVramRequiredForGpuLayers({
-                gpuLayers: option.gpuLayers,
-                ggufInsights,
-                currentVram: freeVram,
-                fitContext,
-                defaultContextFlashAttention,
-                defaultContextSwaFullCache,
-                defaultContextKvCacheKeyType,
-                defaultContextKvCacheValueType,
-                useMmap
-            });
-
-            if (layersRequirements == null)
-                return null;
-
-            return scoreGpuLayersAndContextCombination({gpuLayers: option.gpuLayers, contextSize: layersRequirements.contextSize}, {
-                totalGpuLayers: ggufInsights.totalLayers,
-                trainContextSize: getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize})
-            });
-        }
-    })?.gpuLayers ?? null;
+        }))?.gpuLayers ?? null;
+    } finally {
+        progressTask?.update(progressTask.status.estimated);
+    }
 }
 
 function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayers: number, contextSize: number}, {
@@ -180,10 +363,13 @@ function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayer
 
         return scoreLevels(contextSize, [{
             start: 0,
-            points: 2
+            points: 8
+        }, {
+            start: 512,
+            points: 8
         }, {
             start: 1024,
-            points: 4
+            points: 8
         }, {
             start: 2048,
             points: gpuLayersPercentage < 0.1 ? 1 : 8
@@ -200,24 +386,27 @@ function scoreGpuLayersAndContextCombination({gpuLayers, contextSize}: {gpuLayer
     return scoreGpuLayers() + scoreContextSize();
 }
 
-function getVramRequiredForGpuLayers({
-    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = false,
-    defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache = false, useMmap
+async function getVramRequiredForGpuLayers({
+    gpuLayers, ggufInsights, currentVram, fitContext, defaultContextFlashAttention = "auto",
+    defaultContextKvCacheKeyType, defaultContextKvCacheValueType, defaultContextSwaFullCache = false, useMmap = ggufInsights._getUseMmap(),
+    simulatorSession
 }: {
     gpuLayers: number, ggufInsights: GgufInsights, currentVram: number, fitContext?: {contextSize?: number, embeddingContext?: boolean},
-    defaultContextFlashAttention: boolean, defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType,
-    defaultContextSwaFullCache: boolean, useMmap?: boolean
+    defaultContextFlashAttention: LlamaContextOptions["flashAttention"], defaultContextKvCacheKeyType?: GgmlType, defaultContextKvCacheValueType?: GgmlType,
+    defaultContextSwaFullCache: boolean, useMmap?: boolean,
+    simulatorSession?: GgufInsightsSimulatorSession
 }) {
-    const modelVram = ggufInsights.estimateModelResourceRequirements({
+    const modelVram = (await ggufInsights.estimateModelResourceRequirementsV2({
         gpuLayers,
-        useMmap
-    }).gpuVram;
+        useMmap,
+        _simulatorSession: simulatorSession
+    })).gpuVram;
 
     if (modelVram > currentVram)
         return null;
 
     if (fitContext != null && fitContext.contextSize != null) {
-        const contextVram = ggufInsights.estimateContextResourceRequirements({
+        const contextVram = (await ggufInsights.estimateContextResourceRequirementsV2({
             contextSize: fitContext.contextSize,
             batchSize: getDefaultContextBatchSize({contextSize: fitContext.contextSize, sequences: 1}),
             modelGpuLayers: gpuLayers,
@@ -226,21 +415,26 @@ function getVramRequiredForGpuLayers({
             flashAttention: defaultContextFlashAttention,
             kvCacheKeyType: defaultContextKvCacheKeyType,
             kvCacheValueType: defaultContextKvCacheValueType,
-            swaFullCache: defaultContextSwaFullCache
-        }).gpuVram;
+            swaFullCache: defaultContextSwaFullCache,
+            
+            _simulatorSession: simulatorSession,
+            useMmap
+        })).gpuVram;
 
         const totalVram = modelVram + contextVram;
         if (totalVram > currentVram)
             return null;
 
         return {
+            gpuLayers,
             contextSize: fitContext.contextSize,
             contextVram,
-            totalVram
+            totalVram,
+            useMmap
         };
     }
 
-    const maxContext = findMaxPossibleContextSizeForVram({
+    const maxContext = await findMaxPossibleContextSizeForVram({
         gpuLayers,
         ggufInsights,
         vram: currentVram - modelVram,
@@ -248,24 +442,30 @@ function getVramRequiredForGpuLayers({
         flashAttention: defaultContextFlashAttention,
         kvCacheKeyType: defaultContextKvCacheKeyType,
         kvCacheValueType: defaultContextKvCacheValueType,
-        swaFullCache: defaultContextSwaFullCache
+        swaFullCache: defaultContextSwaFullCache,
+        useMmap,
+        simulatorSession
     });
 
     if (maxContext == null || modelVram + maxContext.vram > currentVram)
         return null;
 
     return {
+        gpuLayers,
         contextSize: maxContext.contextSize,
         contextVram: maxContext.vram,
-        totalVram: modelVram + maxContext.vram
+        totalVram: modelVram + maxContext.vram,
+        useMmap
     };
 }
 
-function findMaxPossibleContextSizeForVram({
-    gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache
+async function findMaxPossibleContextSizeForVram({
+    gpuLayers, ggufInsights, vram, isEmbeddingContext, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache,
+    useMmap, simulatorSession
 }: {
-    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean, flashAttention: boolean,
-    kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache: boolean
+    gpuLayers: number, ggufInsights: GgufInsights, vram: number, isEmbeddingContext: boolean,
+    flashAttention: LlamaContextOptions["flashAttention"], kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache: boolean,
+    useMmap?: boolean, simulatorSession?: GgufInsightsSimulatorSession
 }) {
     const maxContextSize = getDefaultModelContextSize({trainContextSize: ggufInsights.trainContextSize});
 
@@ -273,8 +473,8 @@ function findMaxPossibleContextSizeForVram({
         maxValue: maxContextSize,
         minValue: minAllowedContextSizeInCalculations,
         minStep: 1,
-        test(contextSize) {
-            const contextVram = ggufInsights.estimateContextResourceRequirements({
+        async test(contextSize) {
+            const contextVram = (await ggufInsights.estimateContextResourceRequirementsV2({
                 contextSize,
                 batchSize: getDefaultContextBatchSize({contextSize, sequences: 1}),
                 modelGpuLayers: gpuLayers,
@@ -283,8 +483,11 @@ function findMaxPossibleContextSizeForVram({
                 flashAttention,
                 kvCacheKeyType,
                 kvCacheValueType,
-                swaFullCache
-            }).gpuVram;
+                swaFullCache,
+
+                _simulatorSession: simulatorSession,
+                useMmap: useMmap
+            })).gpuVram;
 
             if (contextVram <= vram)
                 return {
@@ -297,7 +500,7 @@ function findMaxPossibleContextSizeForVram({
     });
 }
 
-function findMaxValidValue<T>({
+async function findMaxValidValue<T>({
     maxValue,
     minValue,
     minStep = 1,
@@ -306,29 +509,26 @@ function findMaxValidValue<T>({
     maxValue: number,
     minValue: number,
     minStep?: number,
-    test(value: number): T | null
-}): T | null {
+    test(value: number): Promise<T | null>
+}): Promise<T | null> {
     let step = -Math.max(minStep, Math.floor((maxValue - minValue) / 4));
     let bestValue: null | {value: number, result: T} = null;
 
     for (let value = maxValue; value >= minValue;) {
         const result: T | null = (bestValue != null && value === bestValue.value)
             ? bestValue.result
-            : test(value);
+            : await test(value);
 
-        if (result != null) {
-            if (bestValue == null || value >= bestValue.value) {
-                bestValue = {value: value, result: result};
+        if (result != null && (bestValue == null || value >= bestValue.value)) {
+            bestValue = {value: value, result: result};
 
-                if (step === -minStep)
-                    break;
-                else if (step < 0)
-                    step = Math.max(minStep, Math.floor(-step / 2));
-            }
+            if (step === -minStep || value === maxValue)
+                break;
+            else if (step < 0)
+                step = Math.max(minStep, Math.floor(-step / 2));
         } else if (bestValue != null && value < bestValue.value) {
             value = bestValue.value;
             step = Math.max(minStep, Math.floor(Math.abs(step) / 2));
-            continue;
         } else if (step > 0)
             step = -Math.max(minStep, Math.floor(step / 2));
 
@@ -337,7 +537,9 @@ function findMaxValidValue<T>({
 
         value += step;
         if (value < minValue) {
-            value = minValue;
+            value = bestValue != null
+                ? Math.max(bestValue.value, minValue)
+                : minValue;
             step = Math.max(minStep, Math.floor(Math.abs(step) / 2));
         } else if (value > maxValue) {
             value = maxValue;

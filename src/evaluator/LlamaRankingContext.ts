@@ -4,6 +4,7 @@ import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {resolveBeginningTokenToPrepend, resolveEndTokenToAppend} from "../utils/tokenizerUtils.js";
 import {isRankingTemplateValid, parseRankingTemplate} from "../gguf/insights/GgufInsights.js";
+import {GgufArchitectureType} from "../gguf/types/GgufMetadataTypes.js";
 import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
 
@@ -247,11 +248,21 @@ export class LlamaRankingContext {
             if (embedding.length === 0)
                 return 0;
 
-            const logit = embedding[0]!;
-            const probability = logitToSigmoid(logit);
+            const evalValue = embedding[0]!;
+            const probability = this._currentArchRankingAlreadyNormalized
+                ? evalValue
+                : logitToSigmoid(evalValue);
 
             return probability;
         });
+    }
+
+    /** @internal */
+    private get _currentArchRankingAlreadyNormalized() {
+        const architecture = this.model.fileInfo.metadata?.general?.architecture;
+
+        // source: `llm_graph_context::build_pooling` in `llama-graph.cpp`, the arches where `cur = ggml_soft_max(ctx0, cur)` is called
+        return architecture === GgufArchitectureType.qwen3 || architecture === GgufArchitectureType.qwen3vl;
     }
 
     /** @internal */

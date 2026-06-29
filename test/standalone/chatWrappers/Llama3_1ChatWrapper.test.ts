@@ -4,7 +4,7 @@ import {defaultChatSystemPrompt} from "../../../src/config.js";
 
 
 describe("Llama3_1ChatWrapper", () => {
-    const todayDate = new Date("2024-07-26T00:00:00Z");
+    const todayDate = new Date("2024-07-26T00:00:00");
     const conversationHistory: ChatHistoryItem[] = [
         ...(new Llama3_1ChatWrapper({todayDate})).generateInitialChatHistory({systemPrompt: defaultChatSystemPrompt}), {
             type: "user",

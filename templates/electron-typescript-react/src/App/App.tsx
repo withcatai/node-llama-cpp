@@ -181,10 +181,18 @@ export function App() {
                                 <div className="separator" />
                                 <a
                                     target="_blank"
-                                    href="https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf"
+                                    href="https://huggingface.co/giladgd/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it.Q4_K_M.gguf"
                                 >
                                     <DownloadIconSVG className="downloadIcon" />
-                                    <div className="text">Get Gemma 2 2B</div>
+                                    <div className="text">Gemma 4 8B E4B</div>
+                                </a>
+                                <div className="separator" />
+                                <a
+                                    target="_blank"
+                                    href="https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf"
+                                >
+                                    <DownloadIconSVG className="downloadIcon" />
+                                    <div className="text">Qwen 3.5 4B</div>
                                 </a>
                             </div>
 

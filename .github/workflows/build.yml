@@ -13,10 +13,11 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
       - name: Install modules
         run: npm ci
       - name: Build
@@ -24,21 +25,22 @@ jobs:
       - name: Download latest llama.cpp release
         env:
           CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node ./dist/cli/cli.js source download --release latest --skipBuild --noBundle --noUsageExample --updateBinariesReleaseMetadataAndSaveGitBundle
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "build"
           path: "dist"
       - name: Upload packed templates artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "build-templates"
           path: "templates/packed"
       - name: Upload llama.cpp artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "llama.cpp"
@@ -69,6 +71,9 @@ jobs:
           - name: "Ubuntu (2)"
             os: ubuntu-22.04
             artifact: "linux-2"
+          - name: "Ubuntu (arm64)"
+            os: ubuntu-22.04-arm
+            artifact: "linux-arm64"
           - name: "macOS x64"
             os: macos-15-intel
             artifact: "mac-x64"
@@ -80,11 +85,12 @@ jobs:
             artifact: "linux-riscv64"
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         if: matrix.config.artifact != 'linux-riscv64'
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
 
       - name: Install Node.js (riscv64 unofficial build)
         if: matrix.config.artifact == 'linux-riscv64'
@@ -107,13 +113,13 @@ jobs:
           "$HOME/node/bin/node" --version
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: llama.cpp
           path: llama
@@ -129,17 +135,11 @@ jobs:
         if: matrix.config.name == 'Ubuntu (1)'
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build libtbb-dev g++-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+          sudo apt-get install ninja-build libtbb-dev
           
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
-          
-          which aarch64-linux-gnu-gcc
-          which aarch64-linux-gnu-g++
-          
-          which arm-linux-gnueabihf-gcc
-          which arm-linux-gnueabihf-g++
           
           cmake --version
 
@@ -152,6 +152,37 @@ jobs:
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
+          
+          cmake --version
+      
+      - name: Install dependencies on Ubuntu (arm64)
+        if: matrix.config.name == 'Ubuntu (arm64)'
+        env:
+          LLVM_VERSION: 21
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh "${LLVM_VERSION}"
+          
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libtbb-dev "clang-${LLVM_VERSION}" "lld-${LLVM_VERSION}" "llvm-${LLVM_VERSION}" g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
+
+          sudo update-alternatives --install /usr/bin/cc cc "/usr/bin/clang-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/c++ c++ "/usr/bin/clang++-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/clang-${LLVM_VERSION}" 100
+          sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/clang++-${LLVM_VERSION}" 100
+          
+          wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-aarch64.tar.gz
+          sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-aarch64.tar.gz
+          rm -f ./cmake-4.2.1-linux-aarch64.tar.gz
+          
+          cc --version
+          c++ --version
+          gcc --version
+          g++ --version
+
+          which arm-linux-gnueabihf-gcc
+          which arm-linux-gnueabihf-g++
           
           cmake --version
 
@@ -311,10 +342,11 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
-            await buildBinary("arm64", ["--gpu", "false"]);
-            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "linux-2") {
             await buildBinary("x64", ["--gpu", "cuda"]);
+          } else if (process.env.ARTIFACT_NAME === "linux-arm64") {
+            await buildBinary("arm64", ["--gpu", "false"]);
+            await buildBinary("armv7l", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
@@ -360,7 +392,7 @@ jobs:
 
 #      - name: Cache UPX
 #        id: cache-upx
-#        uses: actions/cache@v4
+#        uses: actions/cache@v5
 #        with:
 #          path: "upxInstallations/**"
 #          key: cache-upx-${{ runner.os }}-${{ github.workflow }}
@@ -407,7 +439,7 @@ jobs:
 #          chmod -x ./bins/linux-x64-cuda/llama-addon.node
 
       - name: Publish artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "bins-${{ matrix.config.artifact }}"
@@ -429,19 +461,20 @@ jobs:
     outputs:
       next-version: ${{ steps.save-next-version.outputs.next-version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
+          package-manager-cache: false
       - name: Install modules
         run: npm ci
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build
           path: dist
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: llama.cpp
           path: llama
@@ -464,7 +497,7 @@ jobs:
             echo "Next release version: \`$(cat ./resolvedNextVersion.txt)\`" >> $GITHUB_STEP_SUMMARY
           fi
       - name: Upload resolved release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "resolved-next-release"
@@ -476,19 +509,20 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: llama.cpp
           path: llama
@@ -515,19 +549,20 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build
           path: dist
 
       - name: Download llama.cpp artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: llama.cpp
           path: llama
@@ -553,7 +588,7 @@ jobs:
 
       - name: Cache models
         id: cache-restore-test-models
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: "test/.models/**.gguf"
           key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
@@ -570,7 +605,7 @@ jobs:
       - name: Save cached models
         id: cache-save-test-models
         if: steps.download-all-test-models.outcome == 'success' && always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: "test/.models/**.gguf"
           key: cache-test-models-${{ runner.os }}-${{ github.workflow }}
@@ -596,17 +631,18 @@ jobs:
     outputs:
       package-version: ${{ steps.set-package-version.outputs.package-version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
+          package-manager-cache: false
       - name: Update npm
         run: npm install -g npm@latest
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Move artifacts
@@ -730,12 +766,13 @@ jobs:
             os: macos-15-intel
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
 
       - name: Install dependencies on Ubuntu
         if: matrix.config.name == 'Ubuntu'
@@ -767,7 +804,7 @@ jobs:
           ls ./release
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "electron-app-example-${{ matrix.config.name }}"
@@ -821,17 +858,18 @@ jobs:
     # Can be replaced with YAML anchors when this will be supported by GitHub Actions:
     # https://github.com/actions/runner/issues/1182#issuecomment-2317953582
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Move artifacts
@@ -863,12 +901,12 @@ jobs:
           
           npm run docs:build
       - name: Upload docs to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
           artifact_name: pages-docs
       - name: Update feed
@@ -901,17 +939,18 @@ jobs:
     # Can be replaced with YAML anchors when this will be supported by GitHub Actions:
     # https://github.com/actions/runner/issues/1182#issuecomment-2317953582
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Move artifacts
@@ -943,12 +982,12 @@ jobs:
 
           npm run docs:build
       - name: Upload docs to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
           artifact_name: pages-docs
       - name: Update feed
@@ -967,15 +1006,16 @@ jobs:
 #      pull-requests: write
 #      discussions: write
 #    steps:
-#      - uses: actions/checkout@v4
-#      - uses: actions/setup-node@v4
+#      - uses: actions/checkout@v6
+#      - uses: actions/setup-node@v6
 #        with:
-#          node-version: "20"
+#          node-version: "22"
+#          package-manager-cache: false
 #      - name: Install modules
 #        run: npm ci
 #
 #      - name: Pull artifact from broken release
-#        uses: actions/download-artifact@v4
+#        uses: actions/download-artifact@v8
 #        with:
 #          name: resolved-next-release
 #          github-token: ${{ secrets.GITHUB_TOKEN }}

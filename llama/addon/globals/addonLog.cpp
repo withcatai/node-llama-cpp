@@ -1,11 +1,14 @@
-#include <sstream>
-
 #include "addonLog.h"
+
+#include <atomic>
+#include <optional>
+#include <sstream>
 
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
-int addonLoggerLogLevel = 5;
-int addonLastLoggerLogLevel = 6;
+std::atomic<int> addonLoggerLogLevel(5);
+std::atomic<std::optional<int>> addonLoggerLogLevelOverride(std::nullopt);
+std::atomic<int> addonLastLoggerLogLevel(6);
 
 static int addonGetGgmlLogLevelNumber(ggml_log_level level) {
     switch (level) {
@@ -14,7 +17,7 @@ static int addonGetGgmlLogLevelNumber(ggml_log_level level) {
         case GGML_LOG_LEVEL_INFO: return 4;
         case GGML_LOG_LEVEL_NONE: return 5;
         case GGML_LOG_LEVEL_DEBUG: return 6;
-        case GGML_LOG_LEVEL_CONT: return addonLastLoggerLogLevel;
+        case GGML_LOG_LEVEL_CONT: return addonLastLoggerLogLevel.load(std::memory_order_relaxed);
     }
 
     return 1;
@@ -55,9 +58,15 @@ void addonCallJsLogCallback(
 
 void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user_data) {
     int logLevelNumber = addonGetGgmlLogLevelNumber(level);
-    addonLastLoggerLogLevel = logLevelNumber;
 
-    if (logLevelNumber > addonLoggerLogLevel) {
+    if (level != GGML_LOG_LEVEL_CONT) {
+        addonLastLoggerLogLevel.store(logLevelNumber, std::memory_order_relaxed);
+    }
+
+    auto overrideLogLevel = addonLoggerLogLevelOverride.load(std::memory_order_relaxed);
+    if (overrideLogLevel.has_value() && logLevelNumber > overrideLogLevel.value()) {
+        return;
+    } else if (logLevelNumber > addonLoggerLogLevel.load(std::memory_order_relaxed)) {
         return;
     }
 
@@ -128,12 +137,24 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
 
 Napi::Value setLoggerLogLevel(const Napi::CallbackInfo& info) {
     if (info.Length() < 1 || !info[0].IsNumber()) {
-        addonLoggerLogLevel = 5;
+        addonLoggerLogLevel.store(5, std::memory_order_relaxed);
 
         return info.Env().Undefined();
     }
 
-    addonLoggerLogLevel = info[0].As<Napi::Number>().Int32Value();
+    addonLoggerLogLevel.store(info[0].As<Napi::Number>().Int32Value(), std::memory_order_relaxed);
+
+    return info.Env().Undefined();
+}
+
+Napi::Value setLoggerLogLevelOverride(const Napi::CallbackInfo& info) {
+    if (info.Length() < 1 || !info[0].IsNumber() || info[0].IsUndefined()) {
+        addonLoggerLogLevelOverride.store(std::nullopt, std::memory_order_relaxed);
+
+        return info.Env().Undefined();
+    }
+
+    addonLoggerLogLevelOverride.store(info[0].As<Napi::Number>().Int32Value(), std::memory_order_relaxed);
 
     return info.Env().Undefined();
 }

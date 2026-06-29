@@ -85,6 +85,11 @@ export async function readGgufFileInfo(pathOrUri: string, {
     endpoints?: ModelDownloadEndpoints
 } = {}) {
     const useNetworkReader = sourceType === "network" || (sourceType == null && (isUrl(pathOrUri) || isModelUri(pathOrUri)));
+    function createSource(pathOrUri: string) {
+        return useNetworkReader
+            ? {type: "uri" as const, uri: pathOrUri}
+            : {type: "path" as const, path: pathOrUri};
+    }
 
     async function createFileReader(pathOrUri: string) {
         if (useNetworkReader) {
@@ -125,6 +130,8 @@ export async function readGgufFileInfo(pathOrUri: string, {
                 (tensor as Writable<GgufTensorInfo>).filePart = splitPartNumber;
         }
 
+        (res as Writable<GgufFileInfo>).source = createSource(pathOrUri);
+
         return res;
     }
 
@@ -147,6 +154,7 @@ export async function readGgufFileInfo(pathOrUri: string, {
         version: first.version,
         tensorCount: first.tensorCount,
         metadata: first.metadata,
+        infoEndOffset: first.infoEndOffset,
         architectureMetadata: first.architectureMetadata,
         tensorInfo: first.tensorInfo,
         metadataSize: first.metadataSize,
@@ -159,6 +167,8 @@ export async function readGgufFileInfo(pathOrUri: string, {
         fullTensorInfo: first.fullTensorInfo == null
             ? undefined
             : [first, ...rest].flatMap((part) => (part.fullTensorInfo ?? [])),
-        tensorInfoSize: first.tensorInfoSize
+        tensorInfoSize: first.tensorInfoSize,
+        source: createSource(pathOrUri),
+        sourceData: [first, ...rest].flatMap((part) => part.sourceData)
     } satisfies GgufFileInfo;
 }

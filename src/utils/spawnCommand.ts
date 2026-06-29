@@ -1,7 +1,7 @@
 import spawn from "cross-spawn";
 
 export function spawnCommand(
-    command: string, args: string[], cwd: string, env = process.env, progressLogs: boolean = true
+    command: string, args: string[], cwd: string, env = process.env, progressLogs: boolean | "stderr" = "stderr"
 ) {
     function getCommandString() {
         let res = command;
@@ -66,8 +66,12 @@ export function spawnCommand(
                 reject(createError(`Command ${getCommandString()} closed with code ${code}`));
         });
 
-        if (progressLogs) {
+        if (progressLogs === true) {
             child.stdout?.pipe(process.stdout);
+            child.stderr?.pipe(process.stderr);
+            process.stdin.pipe(child.stdin!);
+        } else if (progressLogs === "stderr") {
+            child.stdout?.pipe(process.stderr);
             child.stderr?.pipe(process.stderr);
             process.stdin.pipe(child.stdin!);
         } else {

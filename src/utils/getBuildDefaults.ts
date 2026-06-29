@@ -1,4 +1,5 @@
-import {defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport, defaultLlamaCppRelease} from "../config.js";
+import {defaultLlamaCppRelease} from "../bindings/utils/binariesGithubRelease.js";
+import {defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport} from "../config.js";
 
 export async function getBuildDefaults() {
     return {

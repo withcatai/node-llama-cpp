@@ -1,10 +1,11 @@
 import {DisposedError} from "lifecycle-utils";
 import {Llama} from "./bindings/Llama.js";
-import {getLlama, type LlamaOptions, type LastBuildOptions} from "./bindings/getLlama.js";
+import {getLlama, type LlamaOptions, type LastBuildOptions, type LlamaExperimentalOptions} from "./bindings/getLlama.js";
 import {getLlamaGpuTypes} from "./bindings/utils/getLlamaGpuTypes.js";
 import {NoBinaryFoundError} from "./bindings/utils/NoBinaryFoundError.js";
 import {
-    type LlamaGpuType, type LlamaNuma, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual, LlamaVocabularyType
+    type LlamaGpuType, type LlamaNuma, type RamState, LlamaLogLevel, LlamaLogLevelGreaterThan, LlamaLogLevelGreaterThanOrEqual,
+    LlamaVocabularyType
 } from "./bindings/types.js";
 import {resolveModelFile, type ResolveModelFileOptions} from "./utils/resolveModelFile.js";
 import {LlamaModel, LlamaModelInfillTokens, type LlamaModelOptions, LlamaModelTokens} from "./evaluator/LlamaModel/LlamaModel.js";
@@ -62,7 +63,9 @@ import {FalconChatWrapper} from "./chatWrappers/FalconChatWrapper.js";
 import {AlpacaChatWrapper} from "./chatWrappers/AlpacaChatWrapper.js";
 import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
+import {Gemma4ChatWrapper} from "./chatWrappers/Gemma4ChatWrapper.js";
 import {HarmonyChatWrapper} from "./chatWrappers/HarmonyChatWrapper.js";
+import {SeedChatWrapper} from "./chatWrappers/SeedChatWrapper.js";
 import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
 import {
     JinjaTemplateChatWrapper, type JinjaTemplateChatWrapperOptions, type JinjaTemplateChatWrapperOptionsConvertMessageFormat
@@ -91,6 +94,7 @@ import {
     createModelDownloader, ModelDownloader, type ModelDownloaderOptions, combineModelDownloaders, CombinedModelDownloader,
     type CombinedModelDownloaderOptions
 } from "./utils/createModelDownloader.js";
+import {type ModelDownloadEndpoints} from "./utils/modelDownloadEndpoints.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 
@@ -106,9 +110,9 @@ import {
 import {
     type GbnfJsonArraySchema, type GbnfJsonBasicSchema, type GbnfJsonConstSchema, type GbnfJsonEnumSchema, type GbnfJsonStringSchema,
     type GbnfJsonBasicStringSchema, type GbnfJsonFormatStringSchema, type GbnfJsonObjectSchema, type GbnfJsonOneOfSchema,
-    type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType
+    type GbnfJsonSchema, type GbnfJsonSchemaImmutableType, type GbnfJsonSchemaToType, type GbnfJsonRefSchema, type GbnfJsonDefList
 } from "./utils/gbnfJson/types.js";
-import {type GgufFileInfo} from "./gguf/types/GgufFileInfoTypes.js";
+import {type GgufFileInfo, type GgufFileInfoSource, type GgufFileInfoSourceData} from "./gguf/types/GgufFileInfoTypes.js";
 import {
     type GgufMetadata, type GgufMetadataLlmToType, GgufArchitectureType, GgufFileType, GgufMetadataTokenizerTokenType,
     GgufMetadataArchitecturePoolingType, type GgufMetadataGeneral, type GgufMetadataTokenizer, type GgufMetadataDefaultArchitectureType,
@@ -129,8 +133,10 @@ export {
     getLlamaGpuTypes,
     type LlamaOptions,
     type LastBuildOptions,
+    type LlamaExperimentalOptions,
     type LlamaGpuType,
     type LlamaNuma,
+    type RamState,
     type LlamaClasses,
     LlamaLogLevel,
     NoBinaryFoundError,
@@ -231,7 +237,9 @@ export {
     AlpacaChatWrapper,
     FunctionaryChatWrapper,
     GemmaChatWrapper,
+    Gemma4ChatWrapper,
     HarmonyChatWrapper,
+    SeedChatWrapper,
     TemplateChatWrapper,
     type TemplateChatWrapperOptions,
     JinjaTemplateChatWrapper,
@@ -295,11 +303,15 @@ export {
     type GbnfJsonOneOfSchema,
     type GbnfJsonObjectSchema,
     type GbnfJsonArraySchema,
+    type GbnfJsonRefSchema,
+    type GbnfJsonDefList,
     LlamaVocabularyType,
     LlamaLogLevelGreaterThan,
     LlamaLogLevelGreaterThanOrEqual,
     readGgufFileInfo,
     type GgufFileInfo,
+    type GgufFileInfoSource,
+    type GgufFileInfoSourceData,
     type GgufMetadata,
     type GgufTensorInfo,
     type GgufMetadataLlmToType,
@@ -327,6 +339,7 @@ export {
     createModelDownloader,
     ModelDownloader,
     type ModelDownloaderOptions,
+    type ModelDownloadEndpoints,
     type ModelFileAccessTokens,
     combineModelDownloaders,
     CombinedModelDownloader,

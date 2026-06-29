@@ -305,6 +305,12 @@ if (process.env.TEST_BINDING_CP === "true" && (process.parentPort != null || pro
                 binding.getGpuVramInfo();
                 binding.getGpuDeviceInfo();
 
+                try {
+                    await binding.getSystemMemoryInfo();
+                } catch (err) {
+                    // do nothing
+                }
+
                 const gpuType = binding.getGpuType();
                 void (gpuType as BuildGpu satisfies typeof gpuType);
                 if (gpuType !== message.gpu)

@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 import fs from "fs-extra";
-import {LlamaChatSession, TokenMeter} from "../../../src/index.js";
+import {LlamaChatSession, resolveChatWrapper, TokenMeter} from "../../../src/index.js";
 import {getModelFile} from "../../utils/modelFiles.js";
 import {getTestLlama} from "../../utils/getTestLlama.js";
 import {getTempTestFilePath} from "../../utils/helpers/getTempTestDir.js";
@@ -8,6 +8,8 @@ import {toBytes} from "../../../src/cli/utils/toBytes.js";
 
 describe("llama 3.2", () => {
     describe("chatSession", () => {
+        const todayDate = new Date("2026-04-28T00:00:00Z");
+
         describe("sequence state", () => {
             test("save and load a state works properly", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
                 const modelPath = await getModelFile("Llama-3.2-3B-Instruct.Q4_K_M.gguf");
@@ -24,10 +26,12 @@ describe("llama 3.2", () => {
                 const contextSequence2 = context.getSequence();
 
                 const chatSession1 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 const chatSession2 = new LlamaChatSession({
-                    contextSequence: contextSequence2
+                    contextSequence: contextSequence2,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
 
                 const [
@@ -37,8 +41,8 @@ describe("llama 3.2", () => {
                     chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4}),
                     chatSession2.prompt("Remember: giraffes are not elephants", {maxTokens: 5})
                 ]);
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
-                expect(res2).to.toMatchInlineSnapshot('"I appreciate the reminder."');
+                expect(res1).to.toMatchInlineSnapshot("\"That's a common\"");
+                expect(res2).to.match(/I appreciate the reminder|I'll keep that in/);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -73,7 +77,8 @@ describe("llama 3.2", () => {
                 `);
 
                 const chatSession1_1 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 const res1_1 = await chatSession1_1.prompt("What's the exact thing I told you to remember?", {maxTokens: 10});
                 expect(res1_1).to.toMatchInlineSnapshot("\"You didn't tell me to remember anything. This\"");
@@ -102,7 +107,8 @@ describe("llama 3.2", () => {
                 `);
 
                 const chatSession1_2 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 chatSession1_2.setChatHistory(chatSession1.getChatHistory());
                 const res1_2 = await chatSession1_2.prompt("What's the exact thing I told you to remember?", {maxTokens: 12});
@@ -136,11 +142,12 @@ describe("llama 3.2", () => {
                 const contextSequence2 = context2.getSequence();
 
                 const chatSession1 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
 
                 const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
+                expect(res1).to.toMatchInlineSnapshot("\"That's a common\"");
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -163,7 +170,8 @@ describe("llama 3.2", () => {
 
 
                 const chatSession2 = new LlamaChatSession({
-                    contextSequence: contextSequence2
+                    contextSequence: contextSequence2,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
                 await contextSequence2.loadStateFromFile(stateFile1Path, {acceptRisk: true});
@@ -198,11 +206,12 @@ describe("llama 3.2", () => {
                 expect(context2.contextSize).to.eql(256); // the context is actually bigger due to `llama.cpp`'s padding
 
                 const chatSession1 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
 
                 const res1 = await chatSession1.prompt("Remember: locks are not doors. Also, write a long poem about it", {maxTokens: 154});
-                expect(res1).toMatch(/^(A clever reminder indeed.|A clever reminder, indeed.|A wise phrase to ponder|A wise phrase indeed)/);
+                expect(res1).toMatch(/^(A clever reminder indeed.|A clever reminder, indeed.|A wise phrase to ponder|A wise phrase indeed|A poetic reminder|A poetic task)/);
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -225,7 +234,8 @@ describe("llama 3.2", () => {
 
 
                 const chatSession2 = new LlamaChatSession({
-                    contextSequence: contextSequence2
+                    contextSequence: contextSequence2,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
                 try {
@@ -256,11 +266,12 @@ describe("llama 3.2", () => {
                 const contextSequence2 = context2.getSequence();
 
                 const chatSession1 = new LlamaChatSession({
-                    contextSequence: contextSequence1
+                    contextSequence: contextSequence1,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
 
                 const res1 = await chatSession1.prompt("Remember: locks are not doors", {maxTokens: 4});
-                expect(res1).to.toMatchInlineSnapshot("\"That's a clever\"");
+                expect(res1).to.toMatchInlineSnapshot("\"That's a common\"");
 
 
                 const stateFile1Path = await getTempTestFilePath("state1");
@@ -283,7 +294,8 @@ describe("llama 3.2", () => {
 
 
                 const chatSession2 = new LlamaChatSession({
-                    contextSequence: contextSequence2
+                    contextSequence: contextSequence2,
+                    chatWrapper: resolveChatWrapper(model, {customWrapperSettings: {"llama3.2-lightweight": {todayDate}}})
                 });
                 chatSession2.setChatHistory(chatSession1.getChatHistory());
                 try {

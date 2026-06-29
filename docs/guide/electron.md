@@ -65,10 +65,11 @@ jobs:
             os: macos-13
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          package-manager-cache: false
 
       - name: Install dependencies on Ubuntu
         if: matrix.config.name == 'Ubuntu'
@@ -87,7 +88,7 @@ jobs:
         run: npm run build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
           name: "electron-app-${{ matrix.config.name }}"

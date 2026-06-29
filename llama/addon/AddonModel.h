@@ -1,8 +1,16 @@
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "llama.h"
 #include "napi.h"
 #include "addonGlobals.h"
 #include "globals/addonProgress.h"
+
 
 class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
@@ -14,6 +22,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         Napi::Reference<Napi::Object> addonExportsRef;
         bool hasAddonExportsRef = false;
         AddonModelData* data;
+        std::mutex disposeMutex;
 
         std::string modelPath;
         bool modelLoaded = false;
@@ -26,10 +35,12 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         bool hasLoadAbortSignal = false;
 
         bool disposed = false;
+        bool memoryDisposed = false;
 
         AddonModel(const Napi::CallbackInfo& info);
         ~AddonModel();
-        void dispose();
+        void disposeMemory();
+        void disposeMT();
 
         Napi::Value Init(const Napi::CallbackInfo& info);
         Napi::Value LoadLora(const Napi::CallbackInfo& info);
@@ -42,6 +53,7 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
         Napi::Value GetTotalSize(const Napi::CallbackInfo& info);
         Napi::Value GetTotalParameters(const Napi::CallbackInfo& info);
         Napi::Value GetModelDescription(const Napi::CallbackInfo& info);
+        Napi::Value GetMemoryBreakdown(const Napi::CallbackInfo& info);
 
         Napi::Value TokenBos(const Napi::CallbackInfo& info);
         Napi::Value TokenEos(const Napi::CallbackInfo& info);

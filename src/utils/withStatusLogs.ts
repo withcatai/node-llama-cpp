@@ -16,22 +16,22 @@ export default async function withStatusLogs<T>(
     if (typeof messageAndOptions !== "string" && messageAndOptions.disableLogs)
         return await callback();
 
-    console.log(getConsoleLogPrefix() + `${chalk.cyan(clockChar)} ${typeof messageAndOptions === "string" ? messageAndOptions : messageAndOptions.loading}`);
+    console.warn(getConsoleLogPrefix() + `${chalk.cyan(clockChar)} ${typeof messageAndOptions === "string" ? messageAndOptions : messageAndOptions.loading}`);
 
     try {
         const res = await callback();
 
         if (typeof messageAndOptions !== "string")
-            console.log(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions.success}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions.success}`);
         else
-            console.log(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.success} ${messageAndOptions}`);
 
         return res;
     } catch (er) {
         if (typeof messageAndOptions !== "string")
-            console.log(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions.fail}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions.fail}`);
         else
-            console.log(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions}`);
+            console.warn(getConsoleLogPrefix() + `${logSymbols.error} ${messageAndOptions}`);
 
         throw er;
     }

@@ -35,6 +35,9 @@
     "react-dom": "^19.2.4",
     "semver": "^7.7.1"
   },
+  "allowScripts": {
+    "node-llama-cpp": true
+  },
   "devDependencies": {
     "@eslint/compat": "^2.0.2",
     "@stylistic/eslint-plugin": "^5.8.0",

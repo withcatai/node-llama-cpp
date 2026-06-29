@@ -1,4 +1,4 @@
-#include "getMemoryInfo.h"
+#include "getProcessMemoryInfo.h"
 #include "addonLog.h"
 
 #ifdef __APPLE__
@@ -16,7 +16,7 @@
 #endif
 
 
-Napi::Value getMemoryInfo(const Napi::CallbackInfo& info) {
+Napi::Value getProcessMemoryInfo(const Napi::CallbackInfo& info) {
     uint64_t totalMemoryUsage = 0;
 
 #ifdef __APPLE__

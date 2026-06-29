@@ -12,7 +12,7 @@ export const nodeLlamaCppGpuOffStringOptions = ["false", "off", "none", "disable
 export type BuildGpu = (typeof buildGpuOptions)[number];
 export type BuildOptions = {
     customCmakeOptions: Map<string, string>,
-    progressLogs: boolean,
+    progressLogs: boolean | "stderr",
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     arch: typeof process.arch,
@@ -27,6 +27,24 @@ export type LlamaNuma = false | "distribute" | "isolate" | "numactl" | "mirror";
 
 export type BuildOptionsJSON = Omit<BuildOptions, "customCmakeOptions"> & {
     customCmakeOptions: Record<string, string>
+};
+
+export type RamState = {
+    /**
+     * The total amount of memory in bytes
+     */
+    total: number,
+
+    /**
+     * The amount of free memory in bytes.
+     * This memory is immediately available for allocation.
+     */
+    free: number,
+
+    /**
+     * The amount of wired memory (memory that cannot be evicted or moved to disk) in bytes
+     */
+    wired: number
 };
 
 export function parseNodeLlamaCppGpuOption(option: (typeof nodeLlamaCppGpuOptions)[number] | (typeof nodeLlamaCppGpuOffStringOptions)[number]): BuildGpu | "auto" {
@@ -140,5 +158,10 @@ export function LlamaLogLevelGreaterThanOrEqual(a: LlamaLogLevel, b: LlamaLogLev
 }
 
 export const enum LlamaLocks {
-    loadToMemory = "loadToMemory"
+    loadToMemory = "loadToMemory",
+    addonInit = "addonInit"
+}
+
+export function doesLlamaBackendNeedAddonInitLock(gpu: LlamaGpuType): boolean {
+    return gpu === "vulkan";
 }

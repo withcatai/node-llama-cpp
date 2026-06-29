@@ -1,10 +1,12 @@
 import {describe, expect, test} from "vitest";
 import {
     AlpacaChatWrapper, ChatMLChatWrapper, DeepSeekChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper,
-    GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper, resolveChatWrapper, HarmonyChatWrapper
+    Gemma4ChatWrapper, GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper,
+    resolveChatWrapper, HarmonyChatWrapper
 } from "../../../../src/index.js";
 import {
-    harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5
+    harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5,
+    gemma4JinjaTemplate1, gemma4JinjaTemplate2
 } from "./jinjaTemplates.js";
 
 
@@ -781,6 +783,32 @@ describe("resolveChatWrapper", () => {
             fallbackToOtherWrappersOnJinjaError: false
         });
         expect(chatWrapper).to.be.instanceof(GemmaChatWrapper);
+    });
+
+    test("should resolve to specialized Gemma4ChatWrapper", () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: gemma4JinjaTemplate1
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+
+        expect(chatWrapper).to.be.instanceof(Gemma4ChatWrapper);
+    });
+
+    test("should resolve to specialized Gemma4ChatWrapper 2", () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: gemma4JinjaTemplate2
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+
+        expect(chatWrapper).to.be.instanceof(Gemma4ChatWrapper);
     });
 
     test("should resolve to specialized GeneralChatWrapper", () => {

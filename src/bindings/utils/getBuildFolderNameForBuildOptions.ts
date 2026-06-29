@@ -1,6 +1,7 @@
 import {hashString} from "../../utils/hashString.js";
 import {BuildOptions} from "../types.js";
-import {builtinLlamaCppGitHubRepo, builtinLlamaCppRelease} from "../../config.js";
+import {builtinLlamaCppGitHubRepo} from "../../config.js";
+import {builtinLlamaCppRelease} from "./binariesGithubRelease.js";
 
 export async function getBuildFolderNameForBuildOptions(buildOptions: BuildOptions) {
     const nameParts: string[] = [buildOptions.platform, buildOptions.arch];

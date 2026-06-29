@@ -3,8 +3,8 @@ import path from "path";
 import console from "console";
 import {createRequire} from "module";
 import {
-    builtinLlamaCppGitHubRepo, builtinLlamaCppRelease, defaultLlamaCppLogLevel, defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport,
-    defaultLlamaCppRelease, defaultSkipDownload, llamaLocalBuildBinsDirectory, recommendedBaseDockerImage, defaultLlamaCppDebugMode
+    builtinLlamaCppGitHubRepo, defaultLlamaCppLogLevel, defaultLlamaCppGitHubRepo, defaultLlamaCppGpuSupport,
+    defaultSkipDownload, llamaLocalBuildBinsDirectory, recommendedBaseDockerImage, defaultLlamaCppDebugMode
 } from "../config.js";
 import {getConsoleLogPrefix} from "../utils/getConsoleLogPrefix.js";
 import {waitForLockfileRelease} from "../utils/waitForLockfileRelease.js";
@@ -31,6 +31,7 @@ import {testBindingBinary} from "./utils/testBindingBinary.js";
 import {BinaryPlatformInfo, getPlatformInfo} from "./utils/getPlatformInfo.js";
 import {hasBuildingFromSourceDependenciesInstalled} from "./utils/hasBuildingFromSourceDependenciesInstalled.js";
 import {resolveActualBindingBinaryPath} from "./utils/resolveActualBindingBinaryPath.js";
+import {defaultLlamaCppRelease, builtinLlamaCppRelease} from "./utils/binariesGithubRelease.js";
 
 const require = createRequire(import.meta.url);
 
@@ -122,9 +123,12 @@ export type LlamaOptions = {
 
     /**
      * Print binary compilation progress logs.
-     * Enabled by default.
+     * 
+     * When set to "stderr", progress logs will be printed to stderr instead of stdout.
+     * 
+     * Defaults to `"stderr"`.
      */
-    progressLogs?: boolean,
+    progressLogs?: boolean | "stderr",
 
     /**
      * Don't download llama.cpp source if it's not found.
@@ -228,7 +232,16 @@ export type LlamaOptions = {
      * Hidden since currently unused - defaults to `false` for now
      * @internal
      */
-    tempDir?: string | string[] | false
+    tempDir?: string | string[] | false,
+
+    /**
+     * Experimental options that may be removed in the future without a major version bump, so use with caution.
+     * @deprecated Any options under this field are experimental and may be removed in the future without a major version bump,
+     * so use with caution.
+     * @experimental Any options under this field are experimental and may be removed in the future without a major version bump,
+     * so use with caution.
+     */
+    experimental?: LlamaExperimentalOptions
 };
 
 export type LastBuildOptions = {
@@ -250,11 +263,13 @@ export type LastBuildOptions = {
     usePrebuiltBinaries?: boolean,
 
     /**
-     * If a local build is not found, and prebuilt binaries are not found, when building from source,
-     * print binary compilation progress logs.
-     * Enabled by default.
+     * Print binary compilation progress logs.
+     * 
+     * When set to "stderr", progress logs will be printed to stderr instead of stdout.
+     * 
+     * Defaults to `"stderr"`.
      */
-    progressLogs?: boolean,
+    progressLogs?: boolean | "stderr",
 
     /**
      * If a local build is not found, and prebuilt binaries are not found, don't download llama.cpp source if it's not found.
@@ -358,12 +373,30 @@ export type LastBuildOptions = {
      * Hidden since currently unused - defaults to `false` for now
      * @internal
      */
-    tempDir?: string | string[] | false
+    tempDir?: string | string[] | false,
+
+    /**
+     * Experimental options that may be removed in the future without a major version bump, so use with caution.
+     */
+    experimental?: LlamaExperimentalOptions
+};
+
+export type LlamaExperimentalOptions = {
+    /**
+     * Skip disabling Metal residency sets on macOS when using Metal,
+     * which will keep the model data wired (force it to stay in memory) but can negatively affect system performance.
+     * 
+     * Doing this may cause issues where the system thinks it has less available memory to load a model even after disposing a previous one.
+     * 
+     * Defaults to `false`.
+     * @experimental This is an experimental option that may be removed in the future without a major version bump, so use with caution.
+     */
+    metalSkipDisablingResidencySets?: boolean
 };
 
 export const getLlamaFunctionName = "getLlama";
 
-export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.08, 1.2 * Math.pow(1024, 3)));
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.08, 1.6 * Math.pow(1024, 3)));
 export const defaultLlamaRamPadding = (totalRam: number) => {
     const platform = getPlatform();
 
@@ -411,7 +444,7 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             logLevel: lastBuildOptions?.logLevel ?? defaultLlamaCppLogLevel,
             logger: lastBuildOptions?.logger ?? Llama.defaultConsoleLogger,
             usePrebuiltBinaries: lastBuildOptions?.usePrebuiltBinaries ?? true,
-            progressLogs: lastBuildOptions?.progressLogs ?? true,
+            progressLogs: lastBuildOptions?.progressLogs ?? "stderr",
             skipDownload: lastBuildOptions?.skipDownload ?? defaultSkipDownload,
             maxThreads: lastBuildOptions?.maxThreads,
             vramPadding: lastBuildOptions?.vramPadding ?? defaultLlamaVramPadding,
@@ -419,7 +452,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
             debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
             numa: lastBuildOptions?.numa,
             tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
-            dryRun
+            dryRun,
+            experimental: lastBuildOptions?.experimental
         };
 
         if (lastBuildInfo == null)
@@ -448,7 +482,8 @@ export async function getLlama(options?: LlamaOptions | "lastBuild", lastBuildOp
                     debug: lastBuildOptions?.debug ?? defaultLlamaCppDebugMode,
                     numa: lastBuildOptions?.numa,
                     tempDir: lastBuildOptions?.tempDir ?? defaultTempDir,
-                    skipLlamaInit: dryRun
+                    skipLlamaInit: dryRun,
+                    experimentalOptions: lastBuildOptions?.experimental
                 });
 
                 if (dryRun)
@@ -476,7 +511,7 @@ export async function getLlamaForOptions({
     cmakeOptions = {},
     existingPrebuiltBinaryMustMatchBuildOptions = false,
     usePrebuiltBinaries = true,
-    progressLogs = true,
+    progressLogs = "stderr",
     skipDownload = defaultSkipDownload,
     maxThreads,
     vramPadding = defaultLlamaVramPadding,
@@ -484,7 +519,8 @@ export async function getLlamaForOptions({
     debug = defaultLlamaCppDebugMode,
     numa = false,
     tempDir = defaultTempDir,
-    dryRun = false
+    dryRun = false,
+    experimental: experimentalOptions
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
     skipLlamaInit = false,
@@ -503,7 +539,7 @@ export async function getLlamaForOptions({
     if (cmakeOptions == null) cmakeOptions = {};
     if (existingPrebuiltBinaryMustMatchBuildOptions == null) existingPrebuiltBinaryMustMatchBuildOptions = false;
     if (usePrebuiltBinaries == null) usePrebuiltBinaries = true;
-    if (progressLogs == null) progressLogs = true;
+    if (progressLogs == null) progressLogs = "stderr";
     if (skipDownload == null) skipDownload = defaultSkipDownload;
     if (vramPadding == null) vramPadding = defaultLlamaVramPadding;
     if (ramPadding == null) ramPadding = defaultLlamaRamPadding;
@@ -559,7 +595,8 @@ export async function getLlamaForOptions({
                     debug,
                     numa,
                     tempDir,
-                    dryRun
+                    dryRun,
+                    experimental: experimentalOptions
                 });
             } catch (err) {
                 return await getLlamaForOptions({
@@ -578,7 +615,8 @@ export async function getLlamaForOptions({
                     debug,
                     numa,
                     tempDir,
-                    dryRun
+                    dryRun,
+                    experimental: experimentalOptions
                 });
             }
         } else
@@ -626,7 +664,8 @@ export async function getLlamaForOptions({
                 debug,
                 numa,
                 tempDir,
-                pipeBinaryTestErrorLogs
+                pipeBinaryTestErrorLogs,
+                experimentalOptions
             });
 
             if (llama != null) {
@@ -644,7 +683,7 @@ export async function getLlamaForOptions({
 
                     if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
                         const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-                        llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
+                        llamaCppInfo.release = (await resolveGithubRelease(owner!, name!, llamaCppInfo.release)).tag;
                     }
                 }
 
@@ -662,7 +701,8 @@ export async function getLlamaForOptions({
                         skipLlamaInit,
                         debug,
                         numa,
-                        tempDir
+                        tempDir,
+                        experimentalOptions
                     });
                 } catch (err) {
                     console.error(
@@ -689,7 +729,7 @@ export async function getLlamaForOptions({
         }
     }
 
-    if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs)
+    if (shouldLogNoGlibcWarningIfNoBuildIsAvailable && progressLogs !== false)
         await logNoGlibcWarning();
 
     if (!canBuild || build === "autoAttempt")
@@ -705,7 +745,7 @@ export async function getLlamaForOptions({
 
         if (isGithubReleaseNeedsResolving(llamaCppInfo.release)) {
             const [owner, name] = defaultLlamaCppGitHubRepo.split("/");
-            llamaCppInfo.release = await resolveGithubRelease(owner!, name!, llamaCppInfo.release);
+            llamaCppInfo.release = (await resolveGithubRelease(owner!, name!, llamaCppInfo.release)).tag;
         }
     }
 
@@ -740,7 +780,8 @@ export async function getLlamaForOptions({
                 skipLlamaInit,
                 debug,
                 numa,
-                tempDir
+                tempDir,
+                experimentalOptions
             });
         } catch (err) {
             console.error(
@@ -787,14 +828,15 @@ async function loadExistingLlamaBinary({
     debug,
     numa,
     tempDir,
-    pipeBinaryTestErrorLogs
+    pipeBinaryTestErrorLogs,
+    experimentalOptions
 }: {
     buildOptions: BuildOptions,
     canUsePrebuiltBinaries: boolean,
     logLevel: Required<LlamaOptions>["logLevel"],
     logger: Required<LlamaOptions>["logger"],
     existingPrebuiltBinaryMustMatchBuildOptions: boolean,
-    progressLogs: boolean,
+    progressLogs: boolean | "stderr",
     platform: BinaryPlatform,
     platformInfo: BinaryPlatformInfo,
     skipLlamaInit: boolean,
@@ -805,7 +847,8 @@ async function loadExistingLlamaBinary({
     debug: boolean,
     numa?: LlamaNuma,
     tempDir: LlamaOptions["tempDir"],
-    pipeBinaryTestErrorLogs: boolean
+    pipeBinaryTestErrorLogs: boolean,
+    experimentalOptions?: LlamaExperimentalOptions
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -843,26 +886,27 @@ async function loadExistingLlamaBinary({
                     skipLlamaInit,
                     debug,
                     numa,
-                    tempDir
+                    tempDir,
+                    experimentalOptions
                 });
-            } else if (progressLogs) {
+            } else if (progressLogs !== false) {
                 console.warn(
                     getConsoleLogPrefix() + "The local build binary was not built in the current system and is incompatible with it"
                 );
 
                 if (canUsePrebuiltBinaries)
-                    console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+                    console.warn(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
                 else if (fallbackMessage != null)
-                    console.info(getConsoleLogPrefix() + fallbackMessage);
+                    console.warn(getConsoleLogPrefix() + fallbackMessage);
             }
         } catch (err) {
             const binaryDescription = describeBinary(buildOptions);
             console.error(getConsoleLogPrefix() + `Failed to load a local build ${binaryDescription}. Error:`, err);
 
             if (canUsePrebuiltBinaries)
-                console.info(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
+                console.warn(getConsoleLogPrefix() + "Falling back to prebuilt binaries");
             else if (fallbackMessage != null)
-                console.info(getConsoleLogPrefix() + fallbackMessage);
+                console.warn(getConsoleLogPrefix() + fallbackMessage);
         }
     }
 
@@ -910,9 +954,10 @@ async function loadExistingLlamaBinary({
                         skipLlamaInit,
                         debug,
                         numa,
-                        tempDir
+                        tempDir,
+                        experimentalOptions
                     });
-                } else if (progressLogs) {
+                } else if (progressLogs !== false) {
                     const binaryDescription = describeBinary({
                         ...buildOptions,
                         customCmakeOptions: existingPrebuiltBinaryMustMatchBuildOptions
@@ -942,7 +987,7 @@ async function loadExistingLlamaBinary({
                             : ""
                     ) + ". Error:", err);
             }
-        } else if (progressLogs)
+        } else if (progressLogs !== false)
             console.warn(
                 getConsoleLogPrefix() + "A prebuilt binary was not found" + (
                     fallbackMessage != null
@@ -967,7 +1012,8 @@ async function buildAndLoadLlamaBinary({
     skipLlamaInit,
     debug,
     numa,
-    tempDir
+    tempDir,
+    experimentalOptions
 }: {
     buildOptions: BuildOptions,
     skipDownload: boolean,
@@ -980,7 +1026,8 @@ async function buildAndLoadLlamaBinary({
     skipLlamaInit: boolean,
     debug: boolean,
     numa?: LlamaNuma,
-    tempDir: LlamaOptions["tempDir"]
+    tempDir: LlamaOptions["tempDir"],
+    experimentalOptions?: LlamaExperimentalOptions
 }) {
     const buildFolderName = await getBuildFolderNameForBuildOptions(buildOptions);
 
@@ -1016,7 +1063,8 @@ async function buildAndLoadLlamaBinary({
         skipLlamaInit,
         debug,
         numa,
-        tempDir
+        tempDir,
+        experimentalOptions
     });
 }
 

@@ -158,7 +158,8 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
     combineModelMessageAndToolCalls = true,
     stringifyFunctionParams = true,
     stringifyFunctionResults = true,
-    squashModelTextResponses = true
+    squashModelTextResponses = true,
+    setFunctionNameInResponse = true
 }: {
     chatHistory: readonly ChatHistoryItem[],
     chatWrapperSettings: ChatWrapperSettings,
@@ -168,7 +169,8 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
     combineModelMessageAndToolCalls?: boolean,
     stringifyFunctionParams?: boolean,
     stringifyFunctionResults?: boolean,
-    squashModelTextResponses?: boolean
+    squashModelTextResponses?: boolean,
+    setFunctionNameInResponse?: boolean | string
 }): IntermediateOpenAiConversionFromChatHistory {
     const messages: IntermediateOpenAiMessage[] = [];
 
@@ -282,7 +284,14 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                             ? response.result === undefined
                                 ? ""
                                 : jsonDumps(response.result)
-                            : response.result
+                            : response.result,
+                        ...(
+                            setFunctionNameInResponse == false ? {} : {
+                                name: typeof setFunctionNameInResponse === "string"
+                                    ? setFunctionNameInResponse
+                                    : response.name
+                            }
+                        )
                     });
                 }
             }
@@ -604,6 +613,7 @@ export type OpenAiChatAssistantMessage = {
 export type OpenAiChatToolMessage = {
     role: "tool",
     content: string | {type: "text", text: string}[],
+    name?: string,
     "tool_call_id": string
 };
 

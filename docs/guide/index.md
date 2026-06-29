@@ -26,6 +26,11 @@ npm install node-llama-cpp
 >
 > If binaries are not available for your platform, it'll fallback to download a release of `llama.cpp` and build it from source with `cmake`.
 > To disable this behavior, set the environment variable `NODE_LLAMA_CPP_SKIP_DOWNLOAD` to `true`.
+> 
+> To ensure resolving the binaries happens during `npm install` (instead of on the first time of calling [`getLlama`](../api/functions/getLlama.md)), allow scripts from `node-llama-cpp` in your `package.json`:
+> ```shell
+> npm pkg set --json "allowScripts[node-llama-cpp]=true"
+> ```
 
 ## ESM Usage {#esm-usage}
 `node-llama-cpp` is an [ES module](https://nodejs.org/api/esm.html#modules-ecmascript-modules), so can only use `import` to load it and cannot use `require`.

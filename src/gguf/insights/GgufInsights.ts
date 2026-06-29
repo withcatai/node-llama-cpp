@@ -1,4 +1,7 @@
+import {acquireLock, withLock} from "lifecycle-utils";
+import bytes from "bytes";
 import {Llama} from "../../bindings/Llama.js";
+import {doesLlamaBackendNeedAddonInitLock, LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
 import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
@@ -6,8 +9,13 @@ import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {padSafeContextSize} from "../../evaluator/LlamaContext/utils/padSafeContextSize.js";
+import {removeNullFields, removeUndefinedFields} from "../../utils/removeNullFields.js";
+import {LruCache} from "../../utils/LruCache.js";
 import {GgufInsightsConfigurationResolver} from "./GgufInsightsConfigurationResolver.js";
 import {GgufInsightsTokens} from "./GgufInsightsTokens.js";
+import type {Promisable} from "../../utils/transformPromisable.js";
+import type {LlamaContextOptions} from "../../evaluator/LlamaContext/types.js";
+import type {AddonContextParams, AddonGgufMetadata, AddonModel, AddonModelParams} from "../../bindings/AddonTypes.js";
 
 export type GgufInsightsResourceRequirements = {
     cpuRam: number,
@@ -20,9 +28,15 @@ export class GgufInsights {
     /** @internal */ private _totalFileLayers: number | null = null;
     /** @internal */ private _supportsRanking?: boolean;
     /** @internal */ private _dominantTensorType?: GgmlType;
+    /** @internal */ private _addonMetadata?: AddonGgufMetadata;
+    /** @internal */ public _defaultUseMmap?: boolean;
     /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
     /** @internal */ private readonly _tokens: GgufInsightsTokens;
+    /** @internal */ private readonly _exactModelResourceRequirementsCache = new LruCache<string, GgufInsightsResourceRequirements>(40);
+    /** @internal */ private readonly _exactContextResourceRequirementsCache = new LruCache<string, GgufInsightsResourceRequirements>(40);
+    /** @internal */ private readonly _simulationSession: GgufInsightsSimulatorSession;
+    /** @internal */ private readonly _locks = {};
 
     private constructor(ggufFileInfo: GgufFileInfo, llama: Llama) {
         this._llama = llama;
@@ -31,6 +45,7 @@ export class GgufInsights {
         this._modelSize = calculateTensorsSize(ggufFileInfo.fullTensorInfo ?? [], llama, true, true);
         this._configurationResolver = GgufInsightsConfigurationResolver._create(this);
         this._tokens = GgufInsightsTokens._create(this);
+        this._simulationSession = this._createSimulatorSession();
     }
 
     /**
@@ -40,16 +55,23 @@ export class GgufInsights {
      */
     public getWarnings(modelFilePath?: string) {
         const warnings: string[] = [];
-        const modelFilePathText = (modelFilePath != null && modelFilePath !== "")
-            ? ` ("${getReadablePath(modelFilePath)}")`
-            : "";
+        const resolvedModelFilePath = modelFilePath || (
+            this._ggufFileInfo.source?.type === "path"
+                ? this._ggufFileInfo.source.path
+                : undefined
+        );
+        const modelFileSourceText = (resolvedModelFilePath != null && resolvedModelFilePath !== "")
+            ? ` ("${getReadablePath(resolvedModelFilePath)}")`
+            : this._ggufFileInfo.source?.type === "uri"
+                ? ` ("${getReadablePath(this._ggufFileInfo.source.uri)}")`
+                : "";
 
         if (this._ggufFileInfo?.metadata?.tokenizer?.ggml?.model === "gpt2" &&
             this._ggufFileInfo?.metadata?.tokenizer?.ggml?.model == null
         ) {
             // equivalent to the warning in `llama.cpp` under `llm_load_vocab`: "missing pre-tokenizer type, using: 'default'"
             warnings.push(
-                `This model file${modelFilePathText} is missing a pre-tokenizer configuration. ` +
+                `This model file${modelFileSourceText} is missing a pre-tokenizer configuration. ` +
                 "This may cause incorrect tokenization and thus degrade the generation quality. " +
                 "Consider using a newer model or regenerating this GGUF model file"
             );
@@ -214,8 +236,37 @@ export class GgufInsights {
         return slidingWindow;
     }
 
+    /** @internal */
+    public _getAddonMetadata(): Promisable<AddonGgufMetadata | undefined> {
+        if (this._addonMetadata != null || this._ggufFileInfo.sourceData.length === 0)
+            return this._addonMetadata;
+
+        return withLock([this._locks, "addonMetadata"], async () => {
+            if (this._addonMetadata != null)
+                return this._addonMetadata;
+
+            const initInput: Array<Buffer | string> = [];
+            for (const data of this._ggufFileInfo.sourceData) {
+                if (data.type === "buffer")
+                    initInput.push(data.buffer);
+                else if (data.type === "path")
+                    initInput.push(data.path);
+                else
+                    void (data satisfies never);
+            }
+
+            const addonMetadata = new this._llama._bindings.AddonGgufMetadata();
+            await addonMetadata.init(initInput);
+            this._addonMetadata = addonMetadata;
+            return addonMetadata;
+        });
+    }
+
+    /**
+     * @deprecated Use `estimateModelResourceRequirementsV2` instead
+     */
     public estimateModelResourceRequirements({
-        gpuLayers, useMmap = this._llama.supportsMmap, gpuSupportsMmap = this._llama.gpuSupportsMmap
+        gpuLayers, useMmap = this._getUseMmap(), gpuSupportsMmap = this._llama.gpuSupportsMmap
     }: {
         gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean
     }): GgufInsightsResourceRequirements {
@@ -227,10 +278,103 @@ export class GgufInsights {
         };
     }
 
+    public async estimateModelResourceRequirementsV2(options: {
+        gpuLayers: number, useMmap?: boolean, gpuSupportsMmap?: boolean,
+
+        /** @internal */
+        _simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements> {
+        const {
+            gpuLayers, useMmap = this._getUseMmap(), gpuSupportsMmap = this._llama.gpuSupportsMmap,
+
+            _simulatorSession
+        } = options;
+
+        try {
+            const simulationResult = await this._simulateModelResourceUsage({
+                gpuLayers,
+                useMmap,
+                simulatorSession: _simulatorSession
+            });
+
+            if (simulationResult != null) {
+                if (!useMmap || !gpuSupportsMmap)
+                    return simulationResult;
+
+                // adjust for the missing mmap simulation implementation
+                const standardEstimation = this.estimateModelResourceRequirements({
+                    gpuLayers,
+                    useMmap,
+                    gpuSupportsMmap
+                });
+
+                return {
+                    gpuVram: Math.max(simulationResult.gpuVram, standardEstimation.gpuVram),
+                    cpuRam: Math.min(simulationResult.cpuRam, standardEstimation.cpuRam)
+                };
+            }
+        } catch (error: any) {
+            if (_simulatorSession?.disposed)
+                this._llama._log(LlamaLogLevel.debug, error?.message ?? String(error));
+            else
+                this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+        }
+
+        return this.estimateModelResourceRequirements({
+            gpuLayers,
+            useMmap,
+            gpuSupportsMmap
+        });
+    }
+
+    /** @internal */
+    public async _simulateModelResourceUsage({
+        gpuLayers,
+        useMmap = this._getUseMmap(),
+        simulatorSession = this._simulationSession
+    }: {
+        gpuLayers: number,
+        useMmap?: boolean,
+        simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements | null> {
+        const cacheKey = [gpuLayers, Number(useMmap)].join(":");
+        const cachedValue = this._exactModelResourceRequirementsCache.get(cacheKey);
+        if (cachedValue != null)
+            return {...cachedValue};
+
+        const lock = await acquireLock([this._locks, "_simulateModelResourceUsage", cacheKey]);
+        try {
+            const cachedValue = this._exactModelResourceRequirementsCache.get(cacheKey);
+            if (cachedValue != null)
+                return {...cachedValue};
+
+            const simulatorSource = await this._resolveSimulatorSource();
+            if (simulatorSource == null)
+                return null;
+    
+            let resourceRequirements: GgufInsightsResourceRequirements;
+            try {
+                resourceRequirements = await simulatorSession.estimateModelResources({
+                    modelSource: simulatorSource,
+                    gpuLayers,
+                    useMmap
+                });
+            } catch (error: any) {
+                throw new Error("Failed simulating model resource usage. Falling back to estimation heuristic. Error: " + (error?.message ?? String(error)));
+            }
+    
+            this._exactModelResourceRequirementsCache.set(cacheKey, resourceRequirements);
+            return {...resourceRequirements};
+        } finally {
+            lock.dispose();
+        }
+    }
+
     /**
      * Estimates the memory required to create a context of the given parameters based on the implementation details of `llama.cpp`.
      * The calculation doesn't include a precise estimation of the graph overhead memory, so it uses a rough estimate for that.
      * The estimation for the graph overhead memory will be improved in the future to be more precise, but it's good enough for now.
+     * @deprecated Use `estimateContextResourceRequirementsV2` instead
      */
     public estimateContextResourceRequirements({
         contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, includeGraphOverhead = true, flashAttention = false,
@@ -248,29 +392,48 @@ export class GgufInsights {
         const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
         const slidingWindow = this.swaSize ?? 0;
         const kvUnified = false;
-        const usingSWA = !swaFullCache && slidingWindow > 0 && slidingWindow < contextSize &&
+        const totalFileLayers = this._getTotalFileLayers();
+        const hasSwaAttention = slidingWindow > 0;
+        const usingReducedSWA = hasSwaAttention && !swaFullCache && slidingWindow < contextSize &&
             (this.trainContextSize == null || slidingWindow < this.trainContextSize);
-        const swaPattern = getSwaPatternForArchitecture(
-            this._ggufFileInfo.metadata?.general?.architecture,
-            this._ggufFileInfo.architectureMetadata?.attention?.sliding_window_pattern
-        );
-        const nonSwaPercent = swaPattern <= 1
-            ? 1
-            : (1 / (swaPattern + (flashAttention ? -0.5 : -1)));
+        let graphRelevantTensorCount = 0;
+        let graphRelevantTensorElements = 0;
+        let totalTensorElements = 0;
 
-        // source: `llama_kv_cache_unified::get_padding` in `llama-kv-cache.cpp`
-        const kvCachePadding = 1;
+        for (const singleTensorInfo of tensorInfo) {
+            let tensorElements = 0;
+            for (const dim of singleTensorInfo.dimensions)
+                tensorElements += Number(dim);
+
+            totalTensorElements += tensorElements;
+
+            if (!isGraphRelevantTensor(singleTensorInfo.name))
+                continue;
+
+            graphRelevantTensorCount++;
+            graphRelevantTensorElements += tensorElements;
+        }
+
+        const effectiveGraphTensorCount = graphRelevantTensorCount > 0
+            ? graphRelevantTensorCount
+            : tensorInfo.length;
+        const effectiveGraphTensorElements = graphRelevantTensorCount > 0
+            ? graphRelevantTensorElements
+            : totalTensorElements;
+
+        const paddedContextSize = padSafeContextSize(contextSize, "up");
         const actualContextSize = kvUnified
             ? padSafeContextSize(sequences * contextSize, "up")
-            : sequences * padSafeContextSize(contextSize, "up");
-        const kvSize = usingSWA
-            ? (
-                (1 - nonSwaPercent) * Math.min(actualContextSize, ggmlPad(sequences * slidingWindow + batchSize, kvCachePadding)) +
-                nonSwaPercent * actualContextSize
-            )
-            : actualContextSize;
-
-        const totalFileLayers = this._getTotalFileLayers();
+            : sequences * paddedContextSize;
+        const fullAttentionKvSize = actualContextSize;
+        const swaBatchSize = hasSwaAttention && !swaFullCache
+            ? batchSize + 1
+            : batchSize;
+        const swaKvSize = !hasSwaAttention
+            ? actualContextSize
+            : !usingReducedSWA
+                ? actualContextSize
+                : Math.min(actualContextSize, ggmlPad((sequences * slidingWindow) + swaBatchSize, 256));
         const totalLayersIncludingOutput = totalFileLayers + 1;
         const finalModelGpuLayers = Math.max(
             0,
@@ -284,13 +447,17 @@ export class GgufInsights {
             gpuKVCacheSize,
             cpuKVCacheSize,
             gpuRecurrentStateSize,
-            cpuRecurrentStateSize
+            cpuRecurrentStateSize,
+            maxAttentionLayerKvSize,
+            maxAttentionLayerHeadCountKv
         } = this._estimateContextCacheMemorySplitInBytes({
-            kvSize,
+            fullAttentionKvSize,
+            swaKvSize,
             sequences,
             totalFileLayers,
             finalModelGpuLayers,
             usingGpu,
+            flashAttention,
             kvCacheKeyType,
             kvCacheValueType
         });
@@ -324,37 +491,82 @@ export class GgufInsights {
 
         const estimateGraphOverheadMemory = (): number => {
             const s1MB = Math.pow(1024, 2);
-            const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
             const expertCount = llmData?.expert_count ?? 0;
             const headCount = llmData?.attention?.head_count ?? 0;
             const embeddingLength = llmData?.embedding_length ?? 0;
+            const activeGraphTokens = roundUpToMultiple(
+                Math.max(1, Math.min(paddedContextSize, batchSize)),
+                Math.max(1, sequences)
+            );
+            const graphContextSize = resolveGraphContextSizeForOverheadEstimation({
+                fullAttentionKvSize,
+                trainContextSize: this.trainContextSize,
+                flashAttention,
+                headCount,
+                batchSize,
+                paddedContextSize,
+                sequences
+            });
 
             let defaultCalculationAdjustment = 0;
+            const totalElements = effectiveGraphTensorCount === 0
+                ? this.totalLayers * (
+                    (
+                        (llmData.embedding_length ?? 0) +
+                        (llmData.feed_forward_length ?? 0)
+                    ) / 2
+                )
+                : effectiveGraphTensorElements;
+            const tensorBasedGraphOverhead = (tensorElementMultiplier: number) => (
+                (totalElements * tensorElementMultiplier * (graphContextSize / 4096)) + defaultCalculationAdjustment
+            );
+            const batchLocalTensorBasedGraphOverhead = (tensorElementMultiplier: number) => (
+                (totalElements * tensorElementMultiplier * (activeGraphTokens / 4096)) + defaultCalculationAdjustment
+            );
 
             if (batchSize == null)
                 return 0;
+
+            const genericNonFlashAttentionWorkspaceEstimate = !flashAttention
+                ? estimateNonFlashAttentionWorkspace({
+                    trainContextSize: this.trainContextSize,
+                    fullAttentionKvSize,
+                    swaKvSize,
+                    hasSwaAttention,
+                    maxAttentionLayerKvSize,
+                    maxAttentionLayerHeadCountKv,
+                    activeGraphTokens,
+                    headCount
+                })
+                : 0;
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.llama) {
                 if (expertCount > 0) {
                     const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
-                    return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
+                    return Math.max(
+                        int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (graphContextSize * headCount)),
+                        genericNonFlashAttentionWorkspaceEstimate
+                    );
                 }
 
-                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (embeddingLength + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen2) {
                 if (modelGpuLayers === this.totalLayers) {
                     defaultCalculationAdjustment -= (s1MB * 340) * (
                         this.trainContextSize == null
                             ? 1
-                            : kvSize / this.trainContextSize
+                            : graphContextSize / this.trainContextSize
                     );
                 } else {
                     defaultCalculationAdjustment -= (s1MB * 250) + (
                         (s1MB * 50) * (
                             this.trainContextSize == null
                                 ? 1
-                                : kvSize / this.trainContextSize
+                                : graphContextSize / this.trainContextSize
                         )
                     );
                 }
@@ -367,7 +579,7 @@ export class GgufInsights {
                         (s1MB * 270) * (
                             this.trainContextSize == null
                                 ? 1
-                                : kvSize / this.trainContextSize
+                                : graphContextSize / this.trainContextSize
                         )
                     );
                 } else {
@@ -375,14 +587,25 @@ export class GgufInsights {
                         (s1MB * 150) * (
                             this.trainContextSize == null
                                 ? 1
-                                : Math.max(0, (1 - (kvSize / this.trainContextSize)))
+                                : Math.max(0, (1 - (graphContextSize / this.trainContextSize)))
                         )
                     );
                 }
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.gemma3) {
+                const trainContextSize = Math.max(1, this.trainContextSize ?? graphContextSize);
+                const contextRatio = Math.min(1, Math.max(0, graphContextSize / trainContextSize));
+
+                return Math.max(
+                    int32TBytes * batchSize * graphContextSize * headCount * (0.08 + Math.pow(contextRatio, 2)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.stablelm) {
                 const headCount = this._ggufFileInfo.architectureMetadata.attention?.head_count ?? 0;
 
-                return (int32TBytes * batchSize * kvSize * headCount) - (50 * s1MB);
+                return Math.max(
+                    (int32TBytes * batchSize * graphContextSize * headCount) - (50 * s1MB),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
 
                 // if (modelGpuLayers === this.totalLayers) {
                 //     defaultCalculationAdjustment += -(s1MB * 20) + (
@@ -402,34 +625,54 @@ export class GgufInsights {
                 //     );
                 // }
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.qwen3) {
-                return int32TBytes * batchSize * (embeddingLength + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (embeddingLength + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
+            } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.gemma4) {
+                const trainContextSize = Math.max(1, this.trainContextSize ?? graphContextSize);
+                const contextRatio = Math.min(1, Math.max(0, graphContextSize / trainContextSize));
+                const gemma4DenseShortContextScale = 0.4;
+                const gemma4DenseContextScaleExponent = 3;
+                const gemma4DenseEstimate = int32TBytes * batchSize * graphContextSize * headCount *
+                    (gemma4DenseShortContextScale + Math.pow(contextRatio, gemma4DenseContextScaleExponent));
+
+                if (expertCount > 0) {
+                    const tensorBasedEstimate = tensorBasedGraphOverhead(77.655);
+                    const moeBlendWeight = Math.sqrt(contextRatio);
+
+                    return Math.max(
+                        gemma4DenseEstimate,
+                        (gemma4DenseEstimate + ((tensorBasedEstimate - gemma4DenseEstimate) * moeBlendWeight)) * 1.01,
+                        genericNonFlashAttentionWorkspaceEstimate
+                    );
+                }
+
+                return Math.max(gemma4DenseEstimate, genericNonFlashAttentionWorkspaceEstimate);
             } else if (expertCount > 0) {
                 const expertsUsedCount = this._ggufFileInfo.architectureMetadata.expert_used_count ?? 2;
 
-                return int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (kvSize * headCount));
+                return Math.max(
+                    int32TBytes * batchSize * (((expertsUsedCount + 1) * embeddingLength) + (graphContextSize * headCount)),
+                    genericNonFlashAttentionWorkspaceEstimate
+                );
             }
-
-            const totalElements = tensorInfo.length === 0
-                ? this.totalLayers * (
-                    (
-                        (llmData.embedding_length ?? 0) +
-                        (llmData.feed_forward_length ?? 0)
-                    ) / 2
-                )
-                : tensorInfo.reduce((res, tensor) => {
-                    return res + tensor.dimensions.reduce((res: number, dim) => res + Number(dim), 0);
-                }, 0);
 
             if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.phi3) {
                 // magic numbers for estimation. will be improved in the future
-                return (totalElements * 123 * (kvSize / 4096)) + defaultCalculationAdjustment;
+                return Math.max(tensorBasedGraphOverhead(123), genericNonFlashAttentionWorkspaceEstimate);
             } else if (this._ggufFileInfo.metadata.general?.architecture === GgufArchitectureType.cohere2) {
                 // magic numbers for estimation. will be improved in the future
-                return (totalElements * 148 * (kvSize / 4096)) + defaultCalculationAdjustment;
+                return Math.max(tensorBasedGraphOverhead(148), genericNonFlashAttentionWorkspaceEstimate);
             }
 
             // magic numbers for estimation. will be improved in the future
-            return (totalElements * 77.655 * (kvSize / 4096)) + defaultCalculationAdjustment;
+            return Math.max(
+                !flashAttention
+                    ? batchLocalTensorBasedGraphOverhead(77.655)
+                    : tensorBasedGraphOverhead(77.655),
+                genericNonFlashAttentionWorkspaceEstimate
+            );
         };
 
         // source: `llama_context::graph_max_nodes` in `llama-context.cpp`
@@ -449,10 +692,10 @@ export class GgufInsights {
             this._ggufFileInfo.metadata?.general?.architecture,
             Math.min(actualContextSize, batchSize)
         );
-        const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * tensorInfo.length);
+        const maxNodes = Math.max(maxNodesMultiplier.min, maxNodesMultiplier.multiplier * effectiveGraphTensorCount);
         const cpuNodes = totalFileLayers === 0
             ? 0
-            : maxNodesMultiplier.multiplier * (tensorInfo.length * (finalCpuLayers / totalFileLayers));
+            : maxNodesMultiplier.multiplier * (effectiveGraphTensorCount * (finalCpuLayers / totalFileLayers));
         const gpuNodes = maxNodes - cpuNodes;
 
         const gpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * gpuNodes) +
@@ -460,7 +703,7 @@ export class GgufInsights {
         const cpuComputeBufferSize = (this._llama._consts.ggmlTensorOverhead * cpuNodes) +
             this._llama._bindings.getGgmlGraphOverheadCustom(cpuNodes, false);
 
-        const graphOverheadMemory = (flashAttention || !includeGraphOverhead)
+        const graphOverheadMemory = !includeGraphOverhead
             ? 0
             : estimateGraphOverheadMemory();
         const graphOverheadGpuSize = (usingGpu && totalFileLayers > 0)
@@ -479,6 +722,151 @@ export class GgufInsights {
                 ? gpuVram
                 : 0
         };
+    }
+
+    public async estimateContextResourceRequirementsV2(options: {
+        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        useMmap?: boolean,
+
+        /** @internal */
+        _simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements> {
+        const {
+            contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
+            swaFullCache = false,
+            kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
+            useMmap,
+
+            _simulatorSession
+        } = options;
+
+        try {
+            const simulationResult = await this._simulateContextResourceUsage({
+                contextSize,
+                modelGpuLayers,
+                batchSize,
+                sequences,
+                isEmbeddingContext,
+                flashAttention,
+                swaFullCache,
+                useMmap,
+                simulatorSession: _simulatorSession,
+                kvCacheKeyType,
+                kvCacheValueType
+            });
+            if (simulationResult != null)
+                return simulationResult;
+        } catch (error: any) {
+            if (_simulatorSession?.disposed)
+                this._llama._log(LlamaLogLevel.debug, error?.message ?? String(error));
+            else
+                this._llama._log(LlamaLogLevel.warn, error?.message ?? String(error));
+        }
+
+        return this.estimateContextResourceRequirements({
+            contextSize,
+            modelGpuLayers,
+            batchSize,
+            sequences,
+            isEmbeddingContext,
+            flashAttention: flashAttention === true,
+            swaFullCache,
+            kvCacheKeyType,
+            kvCacheValueType
+        });
+    }
+
+    /** @internal */
+    public _getUseMmap(useMmapOption?: boolean) {
+        return useMmapOption ?? this._defaultUseMmap ?? this._llama.supportsMmap;
+    }
+
+    /** @internal */
+    public async _simulateContextResourceUsage({
+        contextSize, modelGpuLayers, batchSize, sequences, isEmbeddingContext = false, flashAttention = "auto",
+        swaFullCache = false, useMmap = this._getUseMmap(),
+        kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
+        simulatorSession = this._simulationSession
+    }: {
+        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean, useMmap?: boolean,
+        kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
+        simulatorSession?: GgufInsightsSimulatorSession
+    }): Promise<GgufInsightsResourceRequirements | null> {
+        if (sequences == null) sequences = getDefaultContextSequences();
+        if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
+
+        const kvUnified = false;
+
+        const cacheKey = [
+            contextSize,
+            modelGpuLayers,
+            batchSize,
+            sequences,
+            Number(isEmbeddingContext),
+            flashAttention === "auto"
+                ? "auto"
+                : String(flashAttention),
+            Number(swaFullCache),
+            Number(useMmap),
+            kvCacheKeyType,
+            kvCacheValueType
+        ].join(":");
+        const cachedValue = this._exactContextResourceRequirementsCache.get(cacheKey);
+        if (cachedValue != null)
+            return {...cachedValue};
+
+        const lock = await acquireLock([this._locks, "_simulateContextResourceUsage", cacheKey]);
+        try {
+            const cachedValue = this._exactContextResourceRequirementsCache.get(cacheKey);
+            if (cachedValue != null)
+                return {...cachedValue};
+
+            const simulatorSource = await this._resolveSimulatorSource();
+            if (simulatorSource == null)
+                return null;
+    
+            let contextResources: GgufInsightsResourceRequirements;
+            try {
+                const paddedContextSize = padSafeContextSize(contextSize, "up");
+                const actualContextSize = kvUnified
+                    ? padSafeContextSize(sequences * contextSize, "up")
+                    : sequences * paddedContextSize;
+                const actualBatchSize = Math.max(batchSize, sequences) + (
+                    (!swaFullCache && this.swaSize != null && this.swaSize > 0)
+                        ? 1 // +1 to handle edge cases with SWA KV cache
+                        : 0
+                );
+
+                contextResources = await simulatorSession.estimateContextResources({
+                    modelSource: simulatorSource,
+                    gpuLayers: modelGpuLayers,
+                    contextSize: actualContextSize,
+                    batchSize: actualBatchSize,
+                    sequences,
+                    isEmbeddingContext,
+                    flashAttention,
+                    swaFullCache,
+                    useMmap,
+                    kvCacheKeyType,
+                    kvCacheValueType
+                });
+            } catch (error: any) {
+                throw new Error("Failed simulating context resource usage. Falling back to estimation heuristic. Error: " + (error?.message ?? String(error)));
+            }
+
+            const resourceRequirements = {
+                cpuRam: contextResources.cpuRam,
+                gpuVram: contextResources.gpuVram
+            } satisfies GgufInsightsResourceRequirements;
+    
+            this._exactContextResourceRequirementsCache.set(cacheKey, resourceRequirements);
+            return {...resourceRequirements};
+        } finally {
+            lock.dispose();
+        }
     }
 
     /**
@@ -500,7 +888,7 @@ export class GgufInsights {
         }
 
         const fileLayers = this._getFileLayers();
-        const startGpuLayer = Math.max(0, fileLayers - gpuLayers);
+        const startGpuLayer = Math.max(0, fileLayers - gpuLayers + 1);
 
         const gpuTensors: GgufTensorInfo[] = [];
         const cpuTensors: GgufTensorInfo[] = [];
@@ -523,7 +911,7 @@ export class GgufInsights {
             // in the implementation of `llm_load_tensors`, layers with `LLM_TENSOR_LAYER_OUTPUT` are always
             // loaded with `model.dev_output`, which is set to the GPU only if all the layers are on the GPU
             } else if (isOutputLayer(singleTensorInfo.name)) {
-                if (gpuLayers === this.totalLayers) {
+                if (gpuLayers > 0) {
                     gpuTensors.push(singleTensorInfo);
                     continue;
                 } else {
@@ -580,19 +968,23 @@ export class GgufInsights {
     }
 
     private _estimateContextCacheMemorySplitInBytes({
-        kvSize,
+        fullAttentionKvSize,
+        swaKvSize,
         sequences,
         totalFileLayers,
         finalModelGpuLayers,
         usingGpu,
+        flashAttention,
         kvCacheKeyType = GgmlType.F16,
         kvCacheValueType = GgmlType.F16
     }: {
-        kvSize: number,
+        fullAttentionKvSize: number,
+        swaKvSize: number,
         sequences: number,
         totalFileLayers: number,
         finalModelGpuLayers: number,
         usingGpu: boolean,
+        flashAttention: boolean,
         kvCacheKeyType?: GgmlType,
         kvCacheValueType?: GgmlType
     }) {
@@ -603,8 +995,24 @@ export class GgufInsights {
         const nEmbdHeadK = this._ggufFileInfo.architectureMetadata.attention?.key_length ?? ((nHead == 0) ? 0 : (nEmbd / nHead));
         const nHeadKv: number | number[] = this._ggufFileInfo.architectureMetadata.attention?.head_count_kv ?? nHead;
         const nEmbdHeadV = this._ggufFileInfo.architectureMetadata.attention?.value_length ?? ((nHead == 0) ? 0 : nEmbd / nHead);
+        const nEmbdHeadKSwa = this._ggufFileInfo.architectureMetadata.attention?.key_length_swa;
+        const nEmbdHeadVSwa = this._ggufFileInfo.architectureMetadata.attention?.value_length_swa;
+        const sharedKvLayers = this._ggufFileInfo.architectureMetadata.attention?.shared_kv_layers;
+        const slidingWindowPattern = this._ggufFileInfo.architectureMetadata.attention?.sliding_window_pattern;
         const keyTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheKeyType) ?? this._llama._consts.ggmlTypeF16Size;
         const valueTypeSize = this._llama._bindings.getTypeSizeForGgmlType(kvCacheValueType) ?? this._llama._consts.ggmlTypeF16Size;
+        const nHeadKvValues = nHeadKv as unknown;
+        let maxLayerValueEmbedding = 0;
+
+        if (!flashAttention && nHeadKvValues instanceof Array) {
+            for (let i = 0; i < totalFileLayers; i++) {
+                const layerHeadCountKv = resolveLayerHeadCountKv(nHeadKvValues, i, nHead);
+                const isSwaLayer = isSwaLayerAtIndex(architecture, slidingWindowPattern, i);
+                const layerValueEmbedding = resolveLayerHeadDimension(nEmbdHeadV, nEmbdHeadVSwa, isSwaLayer) * layerHeadCountKv;
+
+                maxLayerValueEmbedding = Math.max(maxLayerValueEmbedding, layerValueEmbedding);
+            }
+        }
 
         // source: `llama_model::load_tensors` in `llama-model.cpp`
         // repeating layers are assigned to GPU from `i_gpu_start = n_layer + 1 - n_gpu_layers`
@@ -618,6 +1026,8 @@ export class GgufInsights {
         let cpuKvElementsV = 0;
         let gpuRecurrentLayers = 0;
         let cpuRecurrentLayers = 0;
+        let maxAttentionLayerKvSize = 0;
+        let maxAttentionLayerHeadCountKv = 0;
 
         for (let i = 0; i < totalFileLayers; i++) {
             const isGpuLayer = i >= gpuRepeatingLayerStart;
@@ -629,9 +1039,22 @@ export class GgufInsights {
                 else
                     cpuRecurrentLayers++;
             } else {
+                if (!doesLayerOwnKvCache(totalFileLayers, i, sharedKvLayers))
+                    continue;
+
                 const nHeadKvLayer = resolveLayerHeadCountKv(nHeadKv, i, nHead);
-                const layerElementsK = nEmbdHeadK * nHeadKvLayer * kvSize;
-                const layerElementsV = nEmbdHeadV * nHeadKvLayer * kvSize;
+                const isSwaLayer = isSwaLayerAtIndex(architecture, slidingWindowPattern, i);
+                const layerKvSize = isSwaLayer
+                    ? swaKvSize
+                    : fullAttentionKvSize;
+                maxAttentionLayerKvSize = Math.max(maxAttentionLayerKvSize, layerKvSize);
+                maxAttentionLayerHeadCountKv = Math.max(maxAttentionLayerHeadCountKv, nHeadKvLayer);
+                const layerElementsK = resolveLayerHeadDimension(nEmbdHeadK, nEmbdHeadKSwa, isSwaLayer) * nHeadKvLayer * layerKvSize;
+                const layerElementsV = layerKvSize * (
+                    maxLayerValueEmbedding > 0
+                        ? maxLayerValueEmbedding
+                        : (resolveLayerHeadDimension(nEmbdHeadV, nEmbdHeadVSwa, isSwaLayer) * nHeadKvLayer)
+                );
 
                 if (isGpuLayer) {
                     gpuKvElementsK += layerElementsK;
@@ -658,7 +1081,9 @@ export class GgufInsights {
             gpuKVCacheSize,
             cpuKVCacheSize,
             gpuRecurrentStateSize,
-            cpuRecurrentStateSize
+            cpuRecurrentStateSize,
+            maxAttentionLayerKvSize,
+            maxAttentionLayerHeadCountKv
         };
     }
 
@@ -726,6 +1151,23 @@ export class GgufInsights {
         return this._totalFileLayers;
     }
 
+    /** @internal */
+    private async _resolveSimulatorSource(): Promise<string | AddonGgufMetadata | null> {
+        const addonMetadata = await this._getAddonMetadata();
+        if (addonMetadata != null)
+            return addonMetadata;
+
+        if (this._ggufFileInfo.source?.type === "path")
+            return this._ggufFileInfo.source.path;
+
+        return null;
+    }
+
+    /** @internal */
+    public _createSimulatorSession(lruCacheSize: number = 10) {
+        return new GgufInsightsSimulatorSession(this._llama, lruCacheSize);
+    }
+
     /**
      * @param ggufFileInfo
      * @param llama - If you already have a `Llama` instance, pass it to reuse it for the `GgufInsights` instance.
@@ -739,6 +1181,203 @@ export class GgufInsights {
             resolvedLlama = await getLlamaWithoutBackend();
 
         return new GgufInsights(ggufFileInfo, resolvedLlama);
+    }
+}
+
+export class GgufInsightsSimulatorSession {
+    private readonly _llama: Llama;
+    private readonly _modelPromises: LruCache<string, Promise<AddonModel>>;
+    private _disposed = false;
+
+    public constructor(llama: Llama, lruCacheSize: number = 10) {
+        this._llama = llama;
+        this._modelPromises = new LruCache(lruCacheSize);
+    }
+
+    public async estimateModelResources({
+        modelSource,
+        gpuLayers,
+        useMmap = false
+    }: {
+        modelSource: string | AddonGgufMetadata,
+        gpuLayers: number,
+        useMmap?: boolean
+    }): Promise<GgufInsightsResourceRequirements> {
+        const model = await this._getModel({source: modelSource, gpuLayers, useMmap});
+        const memoryBreakdown = model.getMemoryBreakdown();
+        if (this._llama._shouldLog(LlamaLogLevel.debug))
+            this._llama._log(LlamaLogLevel.debug, "Simulating model resource usage. " + [
+                `gpuLayers=${gpuLayers}`,
+                `useMmap=${useMmap}`,
+                `memoryBreakdownCpuRam=${bytes(memoryBreakdown.cpuRam)}`,
+                `memoryBreakdownGpuVram=${bytes(memoryBreakdown.gpuVram)}`
+            ].join(" "));
+        return memoryBreakdown;
+    }
+
+    public async estimateContextResources({
+        modelSource,
+        gpuLayers,
+        contextSize,
+        batchSize,
+        sequences,
+        isEmbeddingContext = false,
+        flashAttention = "auto",
+        swaFullCache = false,
+        useMmap = false,
+        kvCacheKeyType = GgmlType.F16,
+        kvCacheValueType = GgmlType.F16
+    }: {
+        modelSource: string | AddonGgufMetadata,
+        gpuLayers: number,
+        contextSize: number,
+        batchSize: number,
+        sequences: number,
+        isEmbeddingContext?: boolean,
+        flashAttention?: LlamaContextOptions["flashAttention"],
+        swaFullCache?: boolean,
+        useMmap?: boolean,
+        kvCacheKeyType?: GgmlType,
+        kvCacheValueType?: GgmlType
+    }): Promise<GgufInsightsResourceRequirements> {
+        const model = await this._getModel({source: modelSource, gpuLayers, useMmap});
+        const context = new this._llama._bindings.AddonContext(model, removeUndefinedFields({
+            contextSize,
+            batchSize,
+            sequences,
+            embeddings: isEmbeddingContext,
+            flashAttention: flashAttention === "auto"
+                ? "auto"
+                : flashAttention,
+            kvCacheKeyType,
+            kvCacheValueType,
+            swaFullCache
+        } satisfies AddonContextParams));
+
+        try {
+            const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
+                ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
+                : undefined;
+            const disposeLogLevelOverride = this._llama._createLogLevelOverride(LlamaLogLevel.error);
+            try {
+                const contextLoaded = await context.init();
+                if (!contextLoaded)
+                    throw new Error("Failed to create context");
+            } finally {
+                disposeLogLevelOverride();
+                loadingLock?.dispose();
+            }
+            
+            const memoryBreakdown = context.getMemoryBreakdown();
+            if (this._llama._shouldLog(LlamaLogLevel.debug))
+                this._llama._log(LlamaLogLevel.debug, "Simulating context resource usage. " + [
+                    `gpuLayers=${gpuLayers}`,
+                    `contextSize=${contextSize.toLocaleString("en-US", {notation: "compact"})}`,
+                    `batchSize=${batchSize}`,
+                    `sequences=${sequences}`,
+                    `isEmbeddingContext=${isEmbeddingContext}`,
+                    `flashAttention=${flashAttention}`,
+                    `swaFullCache=${swaFullCache}`,
+                    `kvCacheKeyType=${kvCacheKeyType}`,
+                    `kvCacheValueType=${kvCacheValueType}`,
+                    `useMmap=${useMmap}`,
+                    `memoryBreakdownCpuRam=${bytes(memoryBreakdown.cpuRam)}`,
+                    `memoryBreakdownGpuVram=${bytes(memoryBreakdown.gpuVram)}`
+                ].join(" "));
+            return memoryBreakdown;
+        } finally {
+            await context.dispose();
+        }
+    }
+
+    public [Symbol.asyncDispose]() {
+        return this.dispose();
+    }
+
+    public async dispose() {
+        if (this._disposed)
+            return;
+
+        this._disposed = true;
+
+        const modelPromises = [...this._modelPromises.values()].map((modelPromise) => modelPromise.catch(() => void 0));
+        this._modelPromises.clear();
+        const loadedModels = (await Promise.all(modelPromises)).filter((model) => model != null);
+
+        await Promise.all(loadedModels.map((model) => model.dispose().catch(() => void 0)));
+    }
+
+    public get disposed() {
+        return this._disposed;
+    }
+
+    private async _getModel({
+        source,
+        gpuLayers,
+        useMmap = this._llama.supportsMmap
+    }: {
+        source: string | AddonGgufMetadata,
+        gpuLayers: number,
+        useMmap?: boolean
+    }) {
+        if (this._disposed)
+            throw new Error("simulator session is disposed");
+
+        const cacheKey = String(gpuLayers) + ":" + String(useMmap);
+        const existingModelPromise = this._modelPromises.get(cacheKey);
+        if (existingModelPromise != null)
+            return await existingModelPromise;
+
+        if (this._llama._shouldLog(LlamaLogLevel.debug))
+            this._llama._log(LlamaLogLevel.debug, `Loading model for simulator session. gpuLayers=${gpuLayers} useMmap=${useMmap}`);
+        const modelPromise = this._loadModel({
+            source,
+            gpuLayers,
+            useMmap
+        });
+        this._modelPromises.set(cacheKey, modelPromise);
+
+        try {
+            return await modelPromise;
+        } catch (error) {
+            this._modelPromises.delete(cacheKey);
+            throw error;
+        }
+    }
+
+    private async _loadModel({
+        source, gpuLayers, useMmap = false
+    }: {
+        source: string | AddonGgufMetadata, gpuLayers: number, useMmap?: boolean
+    }) {
+        const model = new this._llama._bindings.AddonModel(
+            typeof source === "string"
+                ? source
+                : "",
+            removeNullFields({
+                gpuLayers,
+                noAlloc: true,
+                useMmap,
+                useMlock: false
+            } satisfies AddonModelParams)
+        );
+
+        const loadingLock = doesLlamaBackendNeedAddonInitLock(this._llama.gpu)
+            ? await acquireLock([this._llama._memoryLock, LlamaLocks.addonInit])
+            : undefined;
+        const disposeLogLevelOverride = this._llama._createLogLevelOverride(LlamaLogLevel.error);
+        try {
+            const modelLoaded = typeof source === "string"
+                ? await model.init()
+                : await model.init(source);
+            if (!modelLoaded)
+                throw new Error("Failed to load model");
+        } finally {
+            disposeLogLevelOverride();
+            loadingLock?.dispose();
+        }
+
+        return model;
     }
 }
 
@@ -941,49 +1580,212 @@ function isTokenEmbedLayer(layerName: string) {
     return firstPart === "token_embd";
 }
 
+function isGraphRelevantTensor(tensorName: string): boolean {
+    return isInputLayer(tensorName) ||
+        isOutputLayer(tensorName) ||
+        tensorName.startsWith("blk.") ||
+        tensorName.startsWith("enc.blk.") ||
+        tensorName.startsWith("dec.blk.");
+}
+
 function ggmlPad(value: number, padding: number): number {
     return ((value + padding - 1) & ~(padding - 1));
 }
 
-function getSwaPatternForArchitecture(architecture?: GgufArchitectureType, slidingWindowPattern?: number | number[]): number {
-    if (typeof slidingWindowPattern === "number")
-        return slidingWindowPattern;
+function roundUpToMultiple(value: number, multiple: number): number {
+    if (multiple <= 1)
+        return value;
 
+    return Math.ceil(value / multiple) * multiple;
+}
+
+function resolveGraphContextSizeForOverheadEstimation({
+    fullAttentionKvSize,
+    trainContextSize,
+    flashAttention,
+    headCount,
+    batchSize,
+    paddedContextSize,
+    sequences
+}: {
+    fullAttentionKvSize: number,
+    trainContextSize: number | undefined,
+    flashAttention: boolean,
+    headCount: number,
+    batchSize: number,
+    paddedContextSize: number,
+    sequences: number
+}) {
+    // heuristic coefficients fit to estimate llama.cpp graph-reserve behavior
+    const flashAttentionMinContextMultiplier = 0.5;
+    const flashAttentionMaxContextMultiplier = 0.78;
+    const flashAttentionMinHeadCountForScaling = 4;
+    const flashAttentionContextRatioLog2Cap = 2;
+    const flashAttentionContextRatioLog2Scale = 0.05;
+    const longContextOverflowStartRatio = 1.25;
+    const longContextOverflowGrowthScale = 0.1;
+    const longContextMaxMultiplierIncrease = 0.4;
+
+    const normalizedTrainContextSize = trainContextSize == null || trainContextSize <= 0
+        ? Math.max(1, fullAttentionKvSize)
+        : trainContextSize;
+    const contextRatio = Math.max(1, fullAttentionKvSize / normalizedTrainContextSize);
+
+    if (flashAttention) {
+        const activeGraphTokens = roundUpToMultiple(
+            Math.max(1, Math.min(paddedContextSize, batchSize)),
+            Math.max(1, sequences)
+        );
+        const flashContextMultiplierBase =
+            flashAttentionMinContextMultiplier + (1 / Math.max(flashAttentionMinHeadCountForScaling, headCount));
+        const flashContextMultiplierLongContextAdjustment =
+            Math.min(flashAttentionContextRatioLog2Cap, Math.log2(contextRatio)) * flashAttentionContextRatioLog2Scale;
+        const flashContextMultiplier = Math.max(
+            flashAttentionMinContextMultiplier,
+            Math.min(
+                flashAttentionMaxContextMultiplier,
+                flashContextMultiplierBase + flashContextMultiplierLongContextAdjustment
+            )
+        );
+
+        return activeGraphTokens * flashContextMultiplier;
+    }
+
+    const contextOverflow = Math.max(0, contextRatio - longContextOverflowStartRatio);
+    const longContextMultiplier = 1 + Math.min(
+        longContextMaxMultiplierIncrease,
+        longContextOverflowGrowthScale * contextOverflow * contextOverflow
+    );
+
+    return fullAttentionKvSize * longContextMultiplier;
+}
+
+function estimateNonFlashAttentionWorkspace({
+    trainContextSize,
+    fullAttentionKvSize,
+    swaKvSize,
+    hasSwaAttention,
+    maxAttentionLayerKvSize,
+    maxAttentionLayerHeadCountKv,
+    activeGraphTokens,
+    headCount
+}: {
+    trainContextSize: number | undefined,
+    fullAttentionKvSize: number,
+    swaKvSize: number,
+    hasSwaAttention: boolean,
+    maxAttentionLayerKvSize: number,
+    maxAttentionLayerHeadCountKv: number,
+    activeGraphTokens: number,
+    headCount: number
+}) {
+    const floatBytes = 4; // sizeof(float)
+    const strongGqaMaxKvToQHeadRatio = 0.5;
+    const minAttentionScoreWorkspaceScale = 0.4;
+    const additionalAttentionScoreWorkspaceScale = 0.6;
+
+    if (maxAttentionLayerKvSize <= 0 || activeGraphTokens <= 0 || headCount <= 0)
+        return 0;
+
+    const attentionScoresWorkspace = floatBytes * activeGraphTokens * maxAttentionLayerKvSize * headCount;
+    const attentionMaskWorkspace = floatBytes * activeGraphTokens * (
+        hasSwaAttention
+            ? fullAttentionKvSize + swaKvSize
+            : maxAttentionLayerKvSize
+    );
+
+    if (!hasSwaAttention)
+        // source: non-FA reserve path in `llm_graph_context::build_attn_mha` + `build_attn_inp_kq_mask` in `llama-graph.cpp`
+        // reserves the full KQ tensor and the matching F32 attention mask for the ubatch-local graph
+        return attentionScoresWorkspace + attentionMaskWorkspace;
+
+    // the explicit KQ workspace floor matches the non-FA reserve path well for MHA-like layouts,
+    // but it becomes too aggressive for strong GQA / MQA hybrid models where KV heads are much fewer than Q heads
+    if (maxAttentionLayerHeadCountKv / headCount < strongGqaMaxKvToQHeadRatio)
+        return attentionMaskWorkspace;
+
+    const normalizedTrainContextSize = Math.max(1, trainContextSize ?? maxAttentionLayerKvSize);
+    const contextRatio = Math.min(1, Math.max(0, maxAttentionLayerKvSize / normalizedTrainContextSize));
+    const attentionScoreWorkspaceScale =
+        minAttentionScoreWorkspaceScale + (additionalAttentionScoreWorkspaceScale * contextRatio);
+
+    return (attentionScoresWorkspace * attentionScoreWorkspaceScale) + attentionMaskWorkspace;
+}
+
+function isSwaLayerAtIndex(
+    architecture: GgufArchitectureType | undefined,
+    slidingWindowPattern: number | number[] | undefined,
+    layerIndex: number
+): boolean {
+    if (layerIndex < 0)
+        return false;
+
+    if (slidingWindowPattern instanceof Array)
+        return Boolean(slidingWindowPattern[layerIndex]);
+
+    const [defaultPattern, denseFirst] = getSwaPatternForArchitecture(architecture);
+    const pattern = typeof slidingWindowPattern === "number"
+        ? Math.max(0, Math.floor(slidingWindowPattern))
+        : defaultPattern;
+
+    if (pattern === 0)
+        return true;
+
+    return denseFirst
+        ? (layerIndex % pattern !== 0)
+        : (layerIndex % pattern < (pattern - 1));
+}
+
+function getSwaPatternForArchitecture(architecture?: GgufArchitectureType): [pattern: number, denseFirst: boolean] {
     // source: `llama_model::load_hparams` in `llama-model.cpp` - calls to `hparams.set_swa_pattern`
     switch (architecture) {
         case GgufArchitectureType.llama4:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.afmoe:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.modernBert:
-            return 3;
+            return [3, true];
         case GgufArchitectureType.phi3:
-            return 1;
+            return [1, false];
         case GgufArchitectureType.plamo3:
-            return 8;
+            return [8, false];
         case GgufArchitectureType.gemma2:
-            return 2;
+            return [2, false];
         case GgufArchitectureType.gemma3:
-            return 6;
+            return [6, false];
         case GgufArchitectureType.gemma3n:
-            return 5;
+            return [5, false];
         case GgufArchitectureType.gemmaEmbedding:
-            return 6;
+            return [6, false];
         case GgufArchitectureType.cohere2:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.olmo2:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.exaone4:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.exaoneMoe:
-            return 4;
+            return [4, false];
         case GgufArchitectureType.gptOss:
-            return 2;
+            return [2, false];
         case GgufArchitectureType.smallthinker:
-            return 4;
+            return [4, true];
     }
 
-    return 1;
+    return [1, false];
+}
+
+function resolveLayerHeadDimension(defaultValue: number, swaValue: number | undefined, isSwaLayer: boolean): number {
+    if (isSwaLayer && swaValue != null)
+        return swaValue;
+
+    return defaultValue;
+}
+
+function doesLayerOwnKvCache(totalLayers: number, layerIndex: number, sharedKvLayers: number | undefined): boolean {
+    if (sharedKvLayers == null || sharedKvLayers <= 0)
+        return true;
+
+    return layerIndex < Math.max(0, totalLayers - sharedKvLayers);
 }
 
 function resolveLayerHeadCountKv(nHeadKv: number | number[], layerIndex: number, nHead: number): number {
@@ -1007,8 +1809,9 @@ function getRecurrentLayersPattern(
     architectureMetadata: GgufFileInfo["architectureMetadata"]
 ): RecurrentLayersPattern {
     const nHeadKv = architectureMetadata?.attention?.head_count_kv;
+    const nHeadKvValues: number | number[] | undefined = nHeadKv;
     const feedForwardLength = architectureMetadata?.feed_forward_length as number | number[] | undefined;
-    const hasRecurrentHeadCountKvEntry = Array.isArray(nHeadKv) && nHeadKv.some((value) => value === 0);
+    const hasRecurrentHeadCountKvEntry = nHeadKvValues instanceof Array && nHeadKvValues.some((value: number) => value === 0);
 
     if (architecture === GgufArchitectureType.falconH1)
         // source: `llama_model::load_hparams` in `llama-model.cpp`:
@@ -1019,10 +1822,10 @@ function getRecurrentLayersPattern(
         // source: `llama_model::load_hparams` in `llama-model.cpp`:
         // `case LLM_ARCH_NEMOTRON_H / LLM_ARCH_NEMOTRON_H_MOE`:
         // `recurrent_layer_arr[i] = (n_head_kv(i) == 0 && n_ff(i) == 0)`
-        if (Array.isArray(nHeadKv))
+        if (nHeadKvValues instanceof Array)
             return {
                 type: "headCountKvAndFeedForward",
-                headCountKvValues: nHeadKv,
+                headCountKvValues: nHeadKvValues,
                 feedForwardLength
             };
 
@@ -1055,10 +1858,10 @@ function getRecurrentLayersPattern(
             interval: Math.max(1, Math.floor(architectureMetadata?.full_attention_interval))
         };
 
-    if (hasRecurrentHeadCountKvEntry)
+    if (nHeadKvValues instanceof Array && hasRecurrentHeadCountKvEntry)
         return {
             type: "headCountKvArray",
-            values: nHeadKv
+            values: nHeadKvValues
         };
 
     return "none";
@@ -1081,7 +1884,7 @@ function isLayerRecurrent(pattern: RecurrentLayersPattern, layerIndex: number): 
 function resolveLayerFeedForwardLength(feedForwardLength: number | number[] | undefined, layerIndex: number): number {
     if (typeof feedForwardLength === "number")
         return feedForwardLength;
-    else if (Array.isArray(feedForwardLength))
+    else if (feedForwardLength instanceof Array)
         return feedForwardLength[layerIndex] ?? 0;
 
     return 0;

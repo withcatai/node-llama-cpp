@@ -1,4 +1,5 @@
-import {GgufFileInfo} from "../../../src/gguf/types/GgufFileInfoTypes.js";
+import path from "path";
+import {GgufFileInfo, GgufFileInfoSourceData, GgufFileInfoSource} from "../../../src/gguf/types/GgufFileInfoTypes.js";
 
 export function simplifyGgufInfoForTestSnapshot(ggufFileInfo: GgufFileInfo) {
     const ggufFileInfoCopy = structuredClone(ggufFileInfo);
@@ -13,6 +14,9 @@ export function simplifyGgufInfoForTestSnapshot(ggufFileInfo: GgufFileInfo) {
     shortenArray(ggufFileInfoCopy.tensorInfo, 4);
     shortenArray(ggufFileInfoCopy.fullTensorInfo, 4);
 
+    simplifySource(ggufFileInfoCopy.source);
+    simplifySourceData(ggufFileInfoCopy.sourceData);
+
     return ggufFileInfoCopy;
 }
 
@@ -21,4 +25,30 @@ function shortenArray(array?: readonly any[], maxSize: number = 10) {
         return;
 
     (array as any[]).splice(maxSize);
+}
+
+function simplifySourceData(sourceData: GgufFileInfoSourceData[]) {
+    for (const entry of sourceData) {
+        if (entry.type === "buffer")
+            entry.buffer = {
+                _type: "buffer",
+                length: entry.buffer.length
+            } as any;
+        else if (entry.type === "path")
+            entry.path = {
+                _type: "path",
+                path: "<prefix>/" + path.basename(entry.path)
+            } as any;
+    }
+}
+
+function simplifySource(source?: GgufFileInfoSource) {
+    if (source == null)
+        return;
+
+    if (source.type === "path")
+        source.path = {
+            _type: "path",
+            path: "<prefix>/" + path.basename(source.path)
+        } as any;
 }

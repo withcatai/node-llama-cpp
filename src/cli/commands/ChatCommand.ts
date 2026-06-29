@@ -5,6 +5,7 @@ import {CommandModule} from "yargs";
 import chalk from "chalk";
 import fs from "fs-extra";
 import prettyMilliseconds from "pretty-ms";
+import bytes from "bytes";
 import {chatCommandHistoryFilePath, defaultChatSystemPrompt, documentationPageUrls} from "../../config.js";
 import {getIsInDocumentationMode} from "../../state.js";
 import {ReplHistory} from "../../utils/ReplHistory.js";
@@ -50,6 +51,8 @@ type ChatCommand = {
     kvCacheKeyType?: "currentQuant" | keyof typeof GgmlType,
     kvCacheValueType?: "currentQuant" | keyof typeof GgmlType,
     swaFullCache?: boolean,
+    maxRam?: string,
+    maxVram?: string,
     noTrimWhitespace: boolean,
     grammar: "text" | Parameters<typeof LlamaGrammar.getFor>[1],
     jsonSchemaGrammarFile?: string,
@@ -80,7 +83,7 @@ type ChatCommand = {
     numa?: LlamaNuma,
     meter: boolean,
     timing: boolean,
-    noMmap: boolean,
+    mmap?: boolean,
     useDirectIo: boolean,
     printTimings: boolean
 };
@@ -172,8 +175,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
             .option("flashAttention", {
                 alias: "fa",
                 type: "boolean",
-                default: false,
-                description: "Enable flash attention"
+                description: "Force enable flash attention. Flash attention is enabled by default when supported. You can force disable flash attention via `--no-fa`"
             })
             .option("kvCacheKeyType", {
                 alias: "kvckt",
@@ -200,6 +202,16 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 type: "boolean",
                 default: false,
                 description: "Disable SWA (Sliding Window Attention) on supported models"
+            })
+            .option("maxRam", {
+                alias: ["ram"],
+                type: "string",
+                description: "Maximum RAM to use for all the resources allocated by `node-llama-cpp`"
+            })
+            .option("maxVram", {
+                alias: ["vram"],
+                type: "string",
+                description: "Maximum VRAM to use for all the resources allocated by `node-llama-cpp`"
             })
             .option("noTrimWhitespace", {
                 type: "boolean",
@@ -383,10 +395,9 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Print how how long it took to generate each response"
             })
-            .option("noMmap", {
+            .option("mmap", {
                 type: "boolean",
-                default: false,
-                description: "Disable mmap (memory-mapped file) usage"
+                description: "Force mmap (memory-mapped file) usage. You can force disable mmap usage with `--no-mmap`. By default, mmap usage is automatically determined by `node-llama-cpp`"
             })
             .option("useDirectIo", {
                 type: "boolean",
@@ -403,22 +414,22 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
     async handler({
         modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt,
         promptFile, wrapper, noJinja, contextSize, batchSize, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache,
-        noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
+        maxRam, maxVram, noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK,
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory,
-        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo,
+        environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo,
         printTimings
     }) {
         try {
             await RunChat({
                 modelPath, header, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja, contextSize,
-                batchSize, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, noTrimWhitespace, grammar, jsonSchemaGrammarFile,
-                threads, temperature, minP, topK, topP, seed, xtc,
+                batchSize, flashAttention, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
+                noTrimWhitespace, grammar, jsonSchemaGrammarFile, threads, temperature, minP, topK, topP, seed, xtc,
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-                debug, numa, meter, timing, noMmap, useDirectIo, printTimings
+                debug, numa, meter, timing, mmap, useDirectIo, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -431,16 +442,19 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
 
 async function RunChat({
     modelPath: modelArg, header: headerArg, gpu, systemInfo, systemPrompt, systemPromptFile, prompt, promptFile, wrapper, noJinja,
-    contextSize, batchSize, kvCacheKeyType, kvCacheValueType, flashAttention, swaFullCache, noTrimWhitespace, grammar: grammarArg,
-    jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
+    contextSize, batchSize, kvCacheKeyType, kvCacheValueType, flashAttention, swaFullCache, maxRam, maxVram,
+    noTrimWhitespace, grammar: grammarArg, jsonSchemaGrammarFile: jsonSchemaGrammarFilePath,
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
     dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
-    tokenPredictionModelContextSize, debug, numa, meter, timing, noMmap, useDirectIo, printTimings
+    tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
     if (reasoningBudget === -1) reasoningBudget = undefined;
+
+    const resolvedMaxRam = (typeof maxRam === "string" && maxRam !== "") ? bytes.parse(maxRam) ?? undefined : undefined;
+    const resolvedMaxVram = (typeof maxVram === "string" && maxVram !== "") ? bytes.parse(maxVram) ?? undefined : undefined;
 
     const headers = resolveHeaderFlag(headerArg);
     const trimWhitespace = !noTrimWhitespace;
@@ -462,7 +476,14 @@ async function RunChat({
             numa
         });
     const logBatchSize = batchSize != null;
-    const useMmap = !noMmap && llama.supportsMmap;
+    const useMmap = !llama.supportsMmap
+        ? false
+        : typeof mmap === "boolean"
+            ? mmap
+            : "auto";
+
+    await llama.setVramCap(resolvedMaxVram ?? null);
+    await llama.setRamCap(resolvedMaxRam ?? null);
 
     const resolvedModelPath = await resolveCommandGgufPath(modelArg, llama, headers, {
         flashAttention,
@@ -673,7 +694,10 @@ async function RunChat({
         printBos: true,
         printEos: true,
         logBatchSize,
-        tokenMeterEnabled: meter
+        tokenMeterEnabled: meter,
+        resolvedMaxRam,
+        resolvedMaxVram,
+        swaFullCache
     });
     printInfoLine({
         title: "Chat",

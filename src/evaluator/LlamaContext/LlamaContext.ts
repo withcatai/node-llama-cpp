@@ -14,8 +14,9 @@ import {ThreadsSplitterConsumer} from "../../utils/ThreadsSplitter.js";
 import {pushAll} from "../../utils/pushAll.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
-import {LlamaLogLevel} from "../../bindings/types.js";
+import {LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
+import {MemoryMarking} from "../../bindings/utils/MemoryOrchestrator.js";
 import {
     BatchingOptions, BatchItem, ContextShiftOptions, ContextTokensDeleteRange, ControlledEvaluateIndexOutput, ControlledEvaluateInputItem,
     EvaluationPriority, LlamaContextOptions, LlamaContextSequenceDryRepeatPenalty, LlamaContextSequenceRepeatPenalty, PrioritizedBatchItem,
@@ -71,7 +72,7 @@ export class LlamaContext {
     /** @internal */ private readonly _model: LlamaModel;
     /** @internal */ private readonly _contextSize: number;
     /** @internal */ private readonly _batchSize: number;
-    /** @internal */ private readonly _flashAttention: boolean;
+    /** @internal */ private readonly _flashAttention: "auto" | boolean;
     /** @internal */ private readonly _idealThreads: number;
     /** @internal */ private readonly _minThreads: number;
     /** @internal */ private readonly _performanceTracking: boolean;
@@ -86,6 +87,8 @@ export class LlamaContext {
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _modelPreventDisposalHandle: DisposalPreventionHandle;
     /** @internal */ private readonly _loraAdapters = new Set<AddonModelLora>();
+    /** @internal */ public _vramConsumptionMarking?: MemoryMarking;
+    /** @internal */ public _ramConsumptionMarking?: MemoryMarking;
     /** @internal */ private _nextGeneratedSequenceId = 0;
     /** @internal */ private _dispatchDecodeScheduled = false;
     /** @internal */ private _batchDispatchPending = false;
@@ -121,7 +124,7 @@ export class LlamaContext {
         sequences: number,
         contextSize: number,
         batchSize: number,
-        flashAttention: boolean,
+        flashAttention: "auto" | boolean,
         experimentalKvCacheKeyType: GgmlType,
         experimentalKvCacheValueType: GgmlType
     }) {
@@ -163,7 +166,9 @@ export class LlamaContext {
                     : 0
             ),
             sequences: this._totalSequences,
-            flashAttention: this._flashAttention,
+            flashAttention: this._flashAttention === "auto"
+                ? "auto"
+                : Boolean(this._flashAttention),
             threads: this._idealThreads,
             embeddings: _embeddings,
             ranking: _ranking,
@@ -194,6 +199,8 @@ export class LlamaContext {
         this._disposeAggregator.add(async () => {
             await this._backendContextDisposeGuard.acquireDisposeLock();
             await this._ctx.dispose();
+            this._vramConsumptionMarking?.dispose();
+            this._ramConsumptionMarking?.dispose();
             this._modelPreventDisposalHandle.dispose();
         });
     }
@@ -228,7 +235,7 @@ export class LlamaContext {
         return this._batchSize;
     }
 
-    public get flashAttention(): boolean {
+    public get flashAttention(): "auto" | boolean {
         return this._flashAttention;
     }
 
@@ -888,9 +895,10 @@ export class LlamaContext {
         const kvUnified = false;
 
         const sequences = Math.max(1, Math.floor(options.sequences ?? getDefaultContextSequences()));
-        const flashAttention = _model.flashAttentionSupported
-            ? Boolean(options.flashAttention ?? _model.defaultContextFlashAttention)
-            : false;
+        const flashAttentionOption = options.flashAttention ?? _model.defaultContextFlashAttention;
+        const flashAttention = flashAttentionOption === "auto"
+            ? "auto"
+            : Boolean(flashAttentionOption);
         const kvCacheKeyType = options.experimentalKvCacheKeyType === "currentQuant"
             ? _model.fileInsights.dominantTensorType ?? _model.defaultContextKvCacheKeyType
             : resolveGgmlTypeOption(options.experimentalKvCacheKeyType) ?? _model.defaultContextKvCacheKeyType;
@@ -940,7 +948,7 @@ export class LlamaContext {
 
         async function createContext(contextSize: number) {
             const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
-            const resourceRequirementsEstimation = _model.fileInsights.estimateContextResourceRequirements({
+            const resourceRequirementsEstimation = await _model.fileInsights.estimateContextResourceRequirementsV2({
                 contextSize,
                 sequences,
                 isEmbeddingContext: options._embeddings,
@@ -967,13 +975,19 @@ export class LlamaContext {
                 : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.gpuVram);
             const contextCreationRamReservation = options.ignoreMemorySafetyChecks
                 ? null
-                : _model._llama._vramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
+                : _model._llama._ramOrchestrator.reserveMemory(resourceRequirementsEstimation.cpuRam);
 
             try {
                 if (createSignal?.aborted)
                     throw createSignal.reason;
 
-                const contextLoaded = await context._ctx.init();
+                const initLock = await acquireLock([_model._llama._memoryLock, LlamaLocks.addonInit]);
+                let contextLoaded: boolean = false;
+                try {
+                    contextLoaded = await context._ctx.init();
+                } finally {
+                    initLock.dispose();
+                }
 
                 if (createSignal?.aborted) {
                     if (contextLoaded)
@@ -983,6 +997,9 @@ export class LlamaContext {
                 } else if (!contextLoaded)
                     throw new Error("Failed to create context");
 
+                const memoryBreakdown = context._ctx.getMemoryBreakdown();
+                context._vramConsumptionMarking = _model._llama._vramOrchestrator.markAllocation(memoryBreakdown.gpuVram);
+                context._ramConsumptionMarking = _model._llama._ramOrchestrator.markAllocation(memoryBreakdown.cpuRam);
                 contextCreationVramReservation?.dispose?.();
                 contextCreationRamReservation?.dispose?.();
 
@@ -1097,7 +1114,7 @@ export class LlamaContextSequence {
         };
         this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
-        this._gcRegistry.register(this, sequenceId);
+        this._gcRegistry.register(this, sequenceId, this);
         this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
 
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
@@ -1943,6 +1960,28 @@ export class LlamaContextSequence {
      */
     public get checkpointsMemoryUsage() {
         return this._checkpoints.memoryUsage;
+    }
+
+    /**
+     * Check how many tokens will be evaluated when trying to restore to checkpoint at a given index
+     */
+    public getRestoreToPrefixIndexEvaluationSize(tokenIndex: number) {
+        if (tokenIndex < 0)
+            return 0;
+        else if (tokenIndex >= this.nextTokenIndex)
+            return -1;
+
+        if (!this.needsCheckpoints)
+            return 0;
+
+        if (tokenIndex >= this.stateCellsStartIndex)
+            return 0;
+
+        const checkpoint = this._checkpoints.getLastCheckpoint(tokenIndex, this.contextSize);
+        if (checkpoint == null)
+            return tokenIndex;
+
+        return Math.max(0, tokenIndex - checkpoint.maxPos);
     }
 
     /** @internal */
