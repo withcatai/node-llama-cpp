@@ -1595,7 +1595,7 @@ describe("functionary", () => {
                         });
                         expect(res.gpuLayers).to.toMatchInlineSnapshot("9");
                         expect(res.contextSize).to.toMatchInlineSnapshot("7424");
-                        expect(res.useMmap).to.toMatchInlineSnapshot("true");
+                        expect(res.useMmap).to.toMatchInlineSnapshot("false");
                         expect(res.contextSize).to.be.gte(contextSize);
                     }
                     {
