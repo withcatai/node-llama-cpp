@@ -396,7 +396,7 @@ export type LlamaExperimentalOptions = {
 
 export const getLlamaFunctionName = "getLlama";
 
-export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.08, 1.2 * Math.pow(1024, 3)));
+export const defaultLlamaVramPadding = (totalVram: number) => Math.floor(Math.min(totalVram * 0.08, 1.6 * Math.pow(1024, 3)));
 export const defaultLlamaRamPadding = (totalRam: number) => {
     const platform = getPlatform();
 
