@@ -102,7 +102,8 @@ if (NLC_CI_MODE AND GGML_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT N
             list(APPEND CMAKE_CUDA_ARCHITECTURES 121a-real)
         endif()
 
-        # Remove `90-virtual` due to low usage and because it inflates the binary size too much
+        # Remove these architectures due to low usage in CUDA 12 and because it inflates the binary size too much
+        list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES 89-real)
         list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES 90-virtual)
         message(STATUS "CUDAToolkit version: ${CUDAToolkit_VERSION}, setting CMAKE_CUDA_ARCHITECTURES to ${CMAKE_CUDA_ARCHITECTURES}")
     endif()
