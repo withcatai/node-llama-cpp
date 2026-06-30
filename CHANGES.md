@@ -224,6 +224,20 @@ PrismML removed `gguf_init_from_buffer()` and provides `gguf_init_from_file_ptr(
 
 ---
 
+## Feature 3: Zero-Setup OpenVINO Bundling
+
+To provide a seamless experience for end-users, this fork statically injects the `$ORIGIN` RPATH into the native module and physically bundles the OpenVINO shared libraries alongside it. This eliminates the need for users to install the OpenVINO Toolkit or manage `LD_LIBRARY_PATH`.
+
+### Files Modified
+
+#### [src/bindings/utils/compileLLamaCpp.ts](file:///Users/macbook/Documents/research/inference-engine/node-llama-cpp/src/bindings/utils/compileLLamaCpp.ts)
+Added `CMAKE_BUILD_RPATH="$ORIGIN"` to the CMake configurations when building the `openvino` GPU target on Unix systems, so the OS dynamically links `libopenvino.so` from the exact directory the `.node` file resides in.
+
+#### [.github/workflows/build.yml](file:///Users/macbook/Documents/research/inference-engine/node-llama-cpp/.github/workflows/build.yml)
+Modified the CI binary compilation steps to physically copy all `libopenvino*.so` and `openvino*.dll` (plus `plugins.xml`) files from the installed OpenVINO Toolkit directory into the final `bins/linux-x64-openvino/` and `bins/win-x64-openvino/` directories before packaging them.
+
+---
+
 ## Build Matrix Summary
 
 | Platform | CPU | CUDA | Vulkan | Metal | OpenVINO | Q2_0 |
