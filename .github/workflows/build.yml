@@ -938,6 +938,7 @@ jobs:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
+        continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
           artifact_name: pages-docs
@@ -1019,6 +1020,7 @@ jobs:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
+        continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
           artifact_name: pages-docs
