@@ -417,6 +417,28 @@ jobs:
             }
           }
           
+          if (process.env.ARTIFACT_NAME === "linux-1" && process.env.OPENVINO_DIR) {
+            const openVinoLibDir = path.join(process.env.OPENVINO_DIR, "lib", "intel64");
+            const dest = path.join(llamaBinsDirectoryPath, "linux-x64-openvino");
+            if (await fs.pathExists(dest)) {
+              for (const file of await fs.readdir(openVinoLibDir)) {
+                if ((file.includes("libopenvino") && file.includes(".so")) || file.endsWith(".xml")) {
+                  await fs.copy(path.join(openVinoLibDir, file), path.join(dest, file));
+                }
+              }
+            }
+          } else if (process.env.ARTIFACT_NAME === "win-1" && process.env.OPENVINO_DIR) {
+            const openVinoBinDir = path.join(process.env.OPENVINO_DIR, "bin", "intel64", "Release");
+            const dest = path.join(llamaBinsDirectoryPath, "win-x64-openvino");
+            if (await fs.pathExists(dest)) {
+              for (const file of await fs.readdir(openVinoBinDir)) {
+                if ((file.includes("openvino") && file.endsWith(".dll")) || file.endsWith(".xml")) {
+                  await fs.copy(path.join(openVinoBinDir, file), path.join(dest, file));
+                }
+              }
+            }
+          }
+          
           await $`echo "Built binaries:"`;
           await $`ls bins`;
           

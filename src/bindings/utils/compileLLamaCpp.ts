@@ -128,8 +128,12 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("GGML_VULKAN"))
                     cmakeCustomOptions.set("GGML_VULKAN", "1");
 
-                if (buildOptions.gpu === "openvino" && !cmakeCustomOptions.has("GGML_OPENVINO"))
+                if (buildOptions.gpu === "openvino" && !cmakeCustomOptions.has("GGML_OPENVINO")) {
                     cmakeCustomOptions.set("GGML_OPENVINO", "ON");
+                    if (process.platform === "linux" || process.platform === "darwin") {
+                        cmakeCustomOptions.set("CMAKE_BUILD_RPATH", "$ORIGIN");
+                    }
+                }
 
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
