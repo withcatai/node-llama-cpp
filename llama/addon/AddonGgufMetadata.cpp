@@ -99,11 +99,18 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
                         /* .no_alloc = */ true,
                         /* .ctx = */ &tensorContext,
                     };
-                    gguf_context_ptr metadata(
-                        itemSource.type == AddonGgufMetadataSourceType::buffer
-                            ? gguf_init_from_buffer(itemSource.buffer.data, itemSource.buffer.length, ggufParams)
-                            : gguf_init_from_file(itemSource.path.c_str(), ggufParams)
-                    );
+                    gguf_context_ptr metadata;
+                    if (itemSource.type == AddonGgufMetadataSourceType::buffer) {
+                        FILE* tmp = tmpfile();
+                        if (tmp) {
+                            fwrite(itemSource.buffer.data, 1, itemSource.buffer.length, tmp);
+                            rewind(tmp);
+                            metadata.reset(gguf_init_from_file_ptr(tmp, ggufParams));
+                            fclose(tmp);
+                        }
+                    } else {
+                        metadata.reset(gguf_init_from_file(itemSource.path.c_str(), ggufParams));
+                    }
                     tensorContextGuard.reset(tensorContext);
 
                     if (metadata.get() == nullptr || tensorContext == nullptr) {
