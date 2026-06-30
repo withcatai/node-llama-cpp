@@ -148,8 +148,9 @@ jobs:
           npm run build
 
       - name: Download llama.cpp source
-        run: node ./dist/cli/cli.js source download --repo "PrismML-Eng/llama.cpp"
+        run: node ./dist/cli/cli.js source download --repo "PrismML-Eng/llama.cpp" --release latest --skipBuild --noBundle --noUsageExample
         env:
+          CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build binary
