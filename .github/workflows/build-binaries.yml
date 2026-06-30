@@ -118,20 +118,17 @@ jobs:
         if: matrix.gpu == 'openvino' && runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Install OpenCL runtime, development headers, and TBB for Intel GPU support
+          # Install OpenCL runtime and development headers for Intel GPU support
           sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev libtbb-dev || true
           
-          # Install OpenVINO via pip for development headers and libraries
-          pip install openvino-dev
+          # Download and install the official OpenVINO C++ toolkit archive for Ubuntu 22.04
+          curl -L https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.1/linux/l_openvino_toolkit_ubuntu22_2024.1.0.15008.f4afc9ea6b4_x86_64.tgz --output openvino.tgz
+          tar -xf openvino.tgz
           
-          # Export OPENVINO_DIR so CMake can find it
-          openvinoDir=$(python -c "import openvino; import os; print(os.path.dirname(openvino.__file__))")
+          # Export OPENVINO_DIR so CMake can find it natively
+          openvinoDir="$(pwd)/l_openvino_toolkit_ubuntu22_2024.1.0.15008.f4afc9ea6b4_x86_64/runtime"
           echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
-          
-          # Fix llama.cpp hardcoded TBB path by symlinking system TBB to the expected path
-          mkdir -p $openvinoDir/3rdparty/tbb/lib/cmake
-          ln -s /usr/lib/x86_64-linux-gnu/cmake/TBB $openvinoDir/3rdparty/tbb/lib/cmake/TBB
 
       - name: Install OpenVINO (Windows)
         if: matrix.gpu == 'openvino' && runner.os == 'Windows'
