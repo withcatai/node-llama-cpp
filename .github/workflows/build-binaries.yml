@@ -149,6 +149,8 @@ jobs:
 
       - name: Download llama.cpp source
         run: node ./dist/cli/cli.js source download --repo "PrismML-Eng/llama.cpp"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build binary
         run: node ./dist/cli/cli.js source build --gpu ${{ matrix.gpu }}
