@@ -119,8 +119,8 @@ jobs:
         if: matrix.gpu == 'openvino' && runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Install OpenCL runtime for Intel GPU support
-          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 || true
+          # Install OpenCL runtime and development headers for Intel GPU support
+          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev || true
           
           # Install OpenVINO via pip for development headers and libraries
           pip install openvino-dev
