@@ -122,11 +122,11 @@ jobs:
           sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev libtbb-dev || true
           
           # Download and install the official OpenVINO C++ toolkit archive for Ubuntu 22.04
-          curl -L https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.1/linux/l_openvino_toolkit_ubuntu22_2024.1.0.15008.f4afc9ea6b4_x86_64.tgz --output openvino.tgz
+          curl -L https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.2/linux/l_openvino_toolkit_ubuntu22_2024.2.0.15519.5c0f38f83f6_x86_64.tgz --output openvino.tgz
           tar -xf openvino.tgz
           
           # Export OPENVINO_DIR so CMake can find it natively
-          openvinoDir="$(pwd)/l_openvino_toolkit_ubuntu22_2024.1.0.15008.f4afc9ea6b4_x86_64/runtime"
+          openvinoDir="$(pwd)/l_openvino_toolkit_ubuntu22_2024.2.0.15519.5c0f38f83f6_x86_64/runtime"
           echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
 
