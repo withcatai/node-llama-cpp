@@ -114,13 +114,12 @@ jobs:
           vulkan-components: Vulkan-Headers, Vulkan-Loader
           vulkan-use-cache: true
 
-      # OpenVINO Setup (conditional)
       - name: Install OpenVINO (Linux)
         if: matrix.gpu == 'openvino' && runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Install OpenCL runtime and development headers for Intel GPU support
-          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev || true
+          # Install OpenCL runtime, development headers, and TBB for Intel GPU support
+          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev libtbb-dev || true
           
           # Install OpenVINO via pip for development headers and libraries
           pip install openvino-dev
@@ -129,6 +128,10 @@ jobs:
           openvinoDir=$(python -c "import openvino; import os; print(os.path.dirname(openvino.__file__))")
           echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
+          
+          # Fix llama.cpp hardcoded TBB path by symlinking system TBB to the expected path
+          mkdir -p $openvinoDir/3rdparty/tbb/lib/cmake
+          ln -s /usr/lib/x86_64-linux-gnu/cmake/TBB $openvinoDir/3rdparty/tbb/lib/cmake/TBB
 
       - name: Install OpenVINO (Windows)
         if: matrix.gpu == 'openvino' && runner.os == 'Windows'
