@@ -118,15 +118,17 @@ jobs:
       - name: Install OpenVINO (Linux)
         if: matrix.gpu == 'openvino' && runner.os == 'Linux'
         run: |
-          # Add Intel GPG key and repo
-          wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/intel-openvino-archive-keyring.gpg] https://apt.repos.intel.com/openvino/2025 ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
           sudo apt-get update
-          sudo apt-get install -y openvino-runtime openvino-dev
           # Install OpenCL runtime for Intel GPU support
           sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 || true
-          # Source environment
-          source /opt/intel/openvino/setupvars.sh || true
+          
+          # Install OpenVINO via pip for development headers and libraries
+          pip install openvino-dev
+          
+          # Export OPENVINO_DIR so CMake can find it
+          openvinoDir=$(python -c "import openvino; import os; print(os.path.dirname(openvino.__file__))")
+          echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
+          echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
 
       - name: Install OpenVINO (Windows)
         if: matrix.gpu == 'openvino' && runner.os == 'Windows'
