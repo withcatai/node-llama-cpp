@@ -97,7 +97,6 @@ jobs:
         with:
           cuda: ${{ matrix.cuda_version }}
           method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas-dev"]'
 
       - name: Install CUDA Toolkit (Windows)
         if: matrix.gpu == 'cuda' && runner.os == 'Windows'
@@ -142,13 +141,15 @@ jobs:
 
       # Build
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm run build
 
       - name: Download llama.cpp source
-        run: npx node-llama-cpp source download --repo "PrismML-Eng/llama.cpp"
+        run: node ./dist/cli/cli.js source download --repo "PrismML-Eng/llama.cpp"
 
       - name: Build binary
-        run: npx node-llama-cpp source build --gpu ${{ matrix.gpu }}
+        run: node ./dist/cli/cli.js source build --gpu ${{ matrix.gpu }}
         env:
           NLC_CI_MODE: "true"
 
