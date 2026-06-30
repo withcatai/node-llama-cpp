@@ -261,6 +261,33 @@ jobs:
           echo "VULKAN_SDK=/opt/vulkan-sdk/x86_64" >> $GITHUB_ENV
           echo "/opt/vulkan-sdk/x86_64/bin" >> $GITHUB_PATH
 
+      - name: Install OpenVINO on Ubuntu (1)
+        if: matrix.config.name == 'Ubuntu (1)'
+        run: |
+          sudo apt-get update
+          # Install OpenCL runtime and development headers for Intel GPU support
+          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev libtbb-dev || true
+          
+          # Download and install the official OpenVINO C++ toolkit archive for Ubuntu 22.04
+          curl -L https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.2/linux/l_openvino_toolkit_ubuntu22_2024.2.0.15519.5c0f38f83f6_x86_64.tgz --output openvino.tgz
+          tar -xf openvino.tgz
+          
+          # Export OPENVINO_DIR so CMake can find it natively
+          openvinoDir="$(pwd)/l_openvino_toolkit_ubuntu22_2024.2.0.15519.5c0f38f83f6_x86_64/runtime"
+          echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
+          echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
+
+      - name: Install OpenVINO on Windows (1)
+        if: matrix.config.name == 'Windows (1)'
+        shell: pwsh
+        run: |
+          # Download and install OpenVINO via pip for development headers
+          pip install openvino-dev
+          # Set environment variables
+          $openvinoDir = (python -c "import openvino; import os; print(os.path.dirname(openvino.__file__))")
+          echo "OPENVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
+          echo "OpenVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
+
       - name: Install dependencies on macOS
         if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'
         run: |
@@ -335,6 +362,7 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
+            await buildBinary("x64", ["--gpu", "openvino"]);
           } else if (process.env.ARTIFACT_NAME === "win-2") {
             await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
             await buildBinary("x64", ["--gpu", "cuda"]);
@@ -342,6 +370,7 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
+            await buildBinary("x64", ["--gpu", "openvino"]);
           } else if (process.env.ARTIFACT_NAME === "linux-2") {
             await buildBinary("x64", ["--gpu", "cuda"]);
           } else if (process.env.ARTIFACT_NAME === "linux-arm64") {
