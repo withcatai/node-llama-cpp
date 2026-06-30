@@ -39,7 +39,7 @@ export const localXpacksStoreDirectory = path.join(xpackDirectory, "store");
 export const localXpacksCacheDirectory = path.join(xpackDirectory, "cache");
 export const buildMetadataFileName = "_nlcBuildMetadata.json";
 export const xpmVersion = "^0.16.3";
-export const builtinLlamaCppGitHubRepo = "ggml-org/llama.cpp";
+export const builtinLlamaCppGitHubRepo = "PrismML-Eng/llama.cpp";
 // builtinLlamaCppRelease moved to binariesGithubRelease.ts
 
 export const isCI = env.get("CI")

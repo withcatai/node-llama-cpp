@@ -128,6 +128,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (buildOptions.gpu === "vulkan" && !cmakeCustomOptions.has("GGML_VULKAN"))
                     cmakeCustomOptions.set("GGML_VULKAN", "1");
 
+                if (buildOptions.gpu === "openvino" && !cmakeCustomOptions.has("GGML_OPENVINO"))
+                    cmakeCustomOptions.set("GGML_OPENVINO", "ON");
+
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
                     cmakeCustomOptions.set("GGML_CCACHE", "OFF");
 
@@ -641,6 +644,9 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
             else if (buildOptions.gpu === "vulkan")
                 // @ts-ignore
                 return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-vulkan"));
+            else if (buildOptions.gpu === "openvino")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64-openvino"));
             else if (buildOptions.gpu === false)
                 // @ts-ignore
                 return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64"));
@@ -665,6 +671,9 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
             else if (buildOptions.gpu === "vulkan")
                 // @ts-ignore
                 return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-vulkan"));
+            else if (buildOptions.gpu === "openvino")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64-openvino"));
             else if (buildOptions.gpu === false)
                 // @ts-ignore
                 return getBinariesPathFromModules(() => import("@node-llama-cpp/win-x64"));

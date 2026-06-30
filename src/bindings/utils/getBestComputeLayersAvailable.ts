@@ -35,6 +35,9 @@ export async function detectBestComputeLayersAvailable({
     if (availableComputeLayers.cuda.hasNvidiaDriver && (availableComputeLayers.cuda.hasCudaRuntime || hasCudaWithStaticBinaryBuild))
         res.push("cuda");
 
+    if (availableComputeLayers.openvino)
+        res.push("openvino");
+
     if (availableComputeLayers.vulkan)
         res.push("vulkan");
 

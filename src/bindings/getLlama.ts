@@ -38,12 +38,16 @@ const require = createRequire(import.meta.url);
 export type LlamaOptions = {
     /**
      * The compute layer implementation type to use for llama.cpp.
-     * - **`"auto"`**: Automatically detect and use the best GPU available (Metal on macOS, and CUDA or Vulkan on Windows and Linux)
+     * - **`"auto"`**: Automatically detect and use the best GPU available (Metal on macOS, and CUDA, OpenVINO, or Vulkan on Windows and Linux)
      * - **`"metal"`**: Use Metal.
      *   Only supported on macOS.
      *   Enabled by default on Apple Silicon Macs.
      * - **`"cuda"`**: Use CUDA.
      * - **`"vulkan"`**: Use Vulkan.
+     * - **`"openvino"`**: Use OpenVINO.
+     *   Supports Intel CPUs, GPUs (integrated and discrete), and NPUs.
+     *   Requires the OpenVINO runtime to be installed.
+     *   Only supported on Linux and Windows (x86_64 and aarch64).
      * - **`false`**: Disable any GPU support and only use the CPU.
      *
      * `"auto"` by default.

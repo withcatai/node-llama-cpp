@@ -17,17 +17,20 @@ export async function detectAvailableComputeLayers({
     const [
         cuda,
         vulkan,
-        metal
+        metal,
+        openvino
     ] = await Promise.all([
         detectCudaSupport({platform}),
         detectVulkanSupport({platform}),
-        detectMetalSupport({platform})
+        detectMetalSupport({platform}),
+        detectOpenVinoSupport({platform})
     ]);
 
     return {
         cuda,
         vulkan,
-        metal
+        metal,
+        openvino
     };
 }
 
@@ -178,6 +181,45 @@ async function detectMetalSupport({
     platform: BinaryPlatform
 }) {
     return platform === "mac";
+}
+
+async function detectOpenVinoSupport({
+    platform
+}: {
+    platform: BinaryPlatform
+}) {
+    // OpenVINO supports Linux and Windows (x86_64 and aarch64), not macOS
+    if (platform === "mac")
+        return false;
+
+    if (platform === "win") {
+        const hasOpenVinoEnv = process.env.OPENVINO_DIR != null || process.env.INTEL_OPENVINO_DIR != null;
+
+        return hasOpenVinoEnv || await asyncSome([
+            hasFileInPath("openvino.dll"),
+            hasFileInPath("openvino_c.dll")
+        ]);
+    } else if (platform === "linux") {
+        const hasOpenVinoEnv = process.env.OPENVINO_DIR != null || process.env.INTEL_OPENVINO_DIR != null;
+
+        const librarySearchPaths = [
+            process.env.LD_LIBRARY_PATH,
+            "/usr/lib",
+            "/usr/lib64",
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/opt/intel/openvino/runtime/lib/intel64"
+        ];
+
+        return hasOpenVinoEnv || await asyncSome([
+            hasFileInPath("libopenvino.so", librarySearchPaths),
+            hasFileInPath("libopenvino.so.2025", librarySearchPaths),
+            hasFileInPath("libopenvino.so.2026", librarySearchPaths),
+            fs.pathExists("/opt/intel/openvino")
+        ]);
+    }
+
+    return false;
 }
 
 async function getLinuxCudaLibraryPaths() {

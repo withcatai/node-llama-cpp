@@ -1,0 +1,161 @@
+name: Build Prebuilt Binaries
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: 'Build all platforms'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS arm64 with Metal
+          - os: macos-14
+            arch: arm64
+            gpu: metal
+            artifact: mac-arm64-metal
+
+          # macOS x64 CPU only
+          - os: macos-13
+            arch: x64
+            gpu: "false"
+            artifact: mac-x64
+
+          # Linux x64 CPU only
+          - os: ubuntu-22.04
+            arch: x64
+            gpu: "false"
+            artifact: linux-x64
+
+          # Linux x64 CUDA
+          - os: ubuntu-22.04
+            arch: x64
+            gpu: cuda
+            artifact: linux-x64-cuda
+            cuda_version: "12.8.0"
+
+          # Linux x64 Vulkan
+          - os: ubuntu-22.04
+            arch: x64
+            gpu: vulkan
+            artifact: linux-x64-vulkan
+
+          # Linux x64 OpenVINO
+          - os: ubuntu-22.04
+            arch: x64
+            gpu: openvino
+            artifact: linux-x64-openvino
+
+          # Windows x64 CPU only
+          - os: windows-2022
+            arch: x64
+            gpu: "false"
+            artifact: win-x64
+
+          # Windows x64 CUDA
+          - os: windows-2022
+            arch: x64
+            gpu: cuda
+            artifact: win-x64-cuda
+            cuda_version: "12.8.0"
+
+          # Windows x64 Vulkan
+          - os: windows-2022
+            arch: x64
+            gpu: vulkan
+            artifact: win-x64-vulkan
+
+          # Windows x64 OpenVINO
+          - os: windows-2022
+            arch: x64
+            gpu: openvino
+            artifact: win-x64-openvino
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # CUDA Setup (conditional)
+      - name: Install CUDA Toolkit (Linux)
+        if: matrix.gpu == 'cuda' && runner.os == 'Linux'
+        uses: Jimver/cuda-toolkit@v0.2.23
+        with:
+          cuda: ${{ matrix.cuda_version }}
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas-dev"]'
+
+      - name: Install CUDA Toolkit (Windows)
+        if: matrix.gpu == 'cuda' && runner.os == 'Windows'
+        uses: Jimver/cuda-toolkit@v0.2.23
+        with:
+          cuda: ${{ matrix.cuda_version }}
+          method: network
+
+      # Vulkan Setup (conditional)
+      - name: Install Vulkan SDK
+        if: matrix.gpu == 'vulkan'
+        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-version: 1.3.290.0
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
+
+      # OpenVINO Setup (conditional)
+      - name: Install OpenVINO (Linux)
+        if: matrix.gpu == 'openvino' && runner.os == 'Linux'
+        run: |
+          # Add Intel GPG key and repo
+          wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/intel-openvino-archive-keyring.gpg] https://apt.repos.intel.com/openvino/2025 ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
+          sudo apt-get update
+          sudo apt-get install -y openvino-runtime openvino-dev
+          # Install OpenCL runtime for Intel GPU support
+          sudo apt-get install -y intel-opencl-icd ocl-icd-libopencl1 || true
+          # Source environment
+          source /opt/intel/openvino/setupvars.sh || true
+
+      - name: Install OpenVINO (Windows)
+        if: matrix.gpu == 'openvino' && runner.os == 'Windows'
+        run: |
+          # Download and install OpenVINO via pip for development headers
+          pip install openvino-dev
+          # Set environment variables
+          $openvinoDir = (python -c "import openvino; import os; print(os.path.dirname(openvino.__file__))")
+          echo "OPENVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
+          echo "OpenVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      # Build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download llama.cpp source
+        run: npx node-llama-cpp source download --repo "PrismML-Eng/llama.cpp"
+
+      - name: Build binary
+        run: npx node-llama-cpp source build --gpu ${{ matrix.gpu }}
+        env:
+          NLC_CI_MODE: "true"
+
+      # Upload
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-${{ matrix.artifact }}
+          path: llama/localBuilds/
+          retention-days: 90

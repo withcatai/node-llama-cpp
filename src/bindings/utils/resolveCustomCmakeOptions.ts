@@ -10,6 +10,7 @@ export function resolveCustomCmakeOptions(customCmakeOptions?: Record<string, st
     if (process.env.GGML_METAL_EMBED_LIBRARY === "1") newCustomCmakeOptions.set("GGML_METAL_EMBED_LIBRARY", "1");
     if (process.env.GGML_CUDA === "1") newCustomCmakeOptions.set("GGML_CUDA", "1");
     if (process.env.GGML_VULKAN === "1") newCustomCmakeOptions.set("GGML_VULKAN", "1");
+    if (process.env.GGML_OPENVINO === "1") newCustomCmakeOptions.set("GGML_OPENVINO", "ON");
 
     if (process.env.GGML_OPENBLAS === "1") newCustomCmakeOptions.set("GGML_OPENBLAS", "1");
     if (process.env.GGML_BLAS_VENDOR != null) newCustomCmakeOptions.set("GGML_BLAS_VENDOR", process.env.GGML_BLAS_VENDOR);

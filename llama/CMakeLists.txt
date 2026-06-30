@@ -140,6 +140,11 @@ if (GGML_VULKAN OR GGML_KOMPUTE)
     endif()
 endif()
 
+if (GGML_OPENVINO)
+    message(STATUS "OpenVINO backend enabled")
+    add_compile_definitions(GPU_INFO_USE_OPENVINO)
+endif()
+
 list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
 list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
 list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)

@@ -50,6 +50,9 @@ export function resolveValidGpuOptionForPlatform(gpu: BuildGpu | "auto", {
     else if (platform === "mac") {
         if (arch !== "x64" && gpu === "cuda")
             return "auto";
+
+        if (gpu === "openvino")
+            return "auto";
     } else if (gpu === "metal")
         return "auto";
 
