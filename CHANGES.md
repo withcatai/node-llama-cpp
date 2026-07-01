@@ -300,3 +300,38 @@ The `win-1` Windows build job was repeatedly failing at the very end of its exec
 
 To prevent the MSVC compiler from running out of heap space, the `win-x64-openvino` build (and its associated install/copy steps) has been moved from the overloaded `win-1` job to the `win-2` job. The `win-2` job has much less workload (only building ARM64 CPU and CUDA 12.4), providing the OpenVINO linker with ample memory to complete successfully. Note that the NVCC warnings regarding `channel_bias` and `buf_iw_gate` in the logs are harmless template instantiation artifacts from upstream `llama.cpp` and did not cause the crash.
 To fully support building OpenVINO and prevent OOM on `win-2` due to building `x64-cuda` immediately before `x64-openvino`, the OpenVINO Windows build has been split out into its own dedicated `win-3` matrix job. `win-3` installs the full CUDA toolkit to obtain the necessary OpenCL headers required by OpenVINO. Additionally, because the `OpenVINO` build on Windows links several massive `ggml-cpu-*.dll` targets at the exact same time, `--parallel=4` was found to immediately exhaust the 7GB memory of the GitHub Actions runner, causing `ERROR OMG Process terminated: 1` during MSVC Link Time Code Generation (LTCG). To fix this, `getParallelBuildThreadsToUse` has been updated to force `1` parallel build thread for OpenVINO on Windows in CI mode. OpenVINO relies on `FindOpenCL`, which natively searches for OpenCL headers and libraries inside the `$CUDA_PATH` provided by the full CUDA Toolkit (this is why `win-1` succeeded previously).
+
+---
+
+### Fix 4: Missing `CL/cl2.hpp` Header on Windows (OpenCL-CLHPP)
+
+#### [.github/workflows/build.yml](file:///Users/macbook/Documents/research/inference-engine/node-llama-cpp/.github/workflows/build.yml)
+
+After isolating the OpenVINO build to `win-3`, the build progressed further but hit a new hard compilation error:
+
+```
+openvino\runtime\intel_gpu\ocl\ocl_wrapper.hpp(50,14): error C1083:
+Cannot open include file: 'CL/cl2.hpp': No such file or directory
+```
+
+**Root cause:** OpenVINO 2026.2.1's Intel GPU support header (`ocl_wrapper.hpp`) includes `CL/cl2.hpp`, which is the **OpenCL C++ 2.x binding header** from the [OpenCL-CLHPP](https://github.com/KhronosGroup/OpenCL-CLHPP) project (a Khronos library separate from the core OpenCL SDK). Neither the CUDA Toolkit nor the Vulkan SDK ships this header — on Ubuntu it is provided by the `opencl-clhpp-headers` apt package (already installed in the Ubuntu `(1)` step), but there is no equivalent on Windows.
+
+**Fix:** A new CI step `Install OpenCL-CLHPP headers on Windows (3)` was added after the OpenVINO installation step. It:
+1. Resolves the CUDA Toolkit include path via `$env:CUDA_PATH\include\CL`
+2. Creates the directory if it doesn't exist (CUDA may not provision an empty `CL/` folder)
+3. Downloads the single-file `cl2.hpp` v2.0.16 from the official Khronos GitHub release
+4. Places it directly into the CUDA include tree so MSVC can resolve it via `%CUDA_PATH%/include`
+
+```diff
++     - name: Install OpenCL-CLHPP headers on Windows (3)
++       if: matrix.config.name == 'Windows (3)'
++       shell: pwsh
++       run: |
++         # The CUDA Toolkit provides CL/cl.h but NOT CL/cl2.hpp (OpenCL C++ 2.x bindings).
++         # OpenVINO's ocl_wrapper.hpp includes CL/cl2.hpp, so we must supply it separately.
++         # The Ubuntu equivalent is: apt-get install opencl-clhpp-headers
++         $clDir = "$env:CUDA_PATH\include\CL"
++         New-Item -ItemType Directory -Force -Path $clDir | Out-Null
++         Invoke-WebRequest -Uri "https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.16/cl2.hpp" -OutFile "$clDir\cl2.hpp"
+```
+

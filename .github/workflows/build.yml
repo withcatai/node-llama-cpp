@@ -309,14 +309,14 @@ jobs:
           # The CUDA Toolkit provides CL/cl.h but NOT CL/cl2.hpp (OpenCL C++ 2.x bindings).
           # OpenVINO's ocl_wrapper.hpp includes CL/cl2.hpp, so we must supply it separately.
           # The Ubuntu equivalent is: apt-get install opencl-clhpp-headers
+          Write-Host "CUDA_PATH is: $env:CUDA_PATH"
           $clDir = "$env:CUDA_PATH\include\CL"
-          if (Test-Path $clDir) {
-            Invoke-WebRequest -Uri "https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.16/cl2.hpp" -OutFile "$clDir\cl2.hpp"
-            Write-Host "Installed cl2.hpp into $clDir"
-          } else {
-            Write-Error "CUDA CL include dir not found at $clDir"
-            exit 1
-          }
+          Write-Host "Target CL dir: $clDir"
+          # Create the directory if it doesn't exist (CUDA may not create it without cl headers selected)
+          New-Item -ItemType Directory -Force -Path $clDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.16/cl2.hpp" -OutFile "$clDir\cl2.hpp"
+          Write-Host "Installed cl2.hpp into $clDir"
+          Get-ChildItem $clDir
 
       - name: Install dependencies on macOS
         if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'
