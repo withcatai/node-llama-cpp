@@ -71,7 +71,7 @@ describe("llama 3.2", () => {
             const res = await chatSession.prompt("Hi there!", {
                 maxTokens: 50
             });
-            expect(res).toMatchInlineSnapshot("\"Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat for a bit?\"");
+            expect(res).toMatchInlineSnapshot("\"Hello! It's nice to meet you. Is there something I can help you with today?\"");
             expect(LlamaText.fromTokens(model.tokenizer, chatSession.sequence.contextTokens)).toMatchInlineSnapshot(`
               LlamaText([
                 new SpecialToken("BOS"),
@@ -99,7 +99,7 @@ describe("llama 3.2", () => {
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
-              Hello! It's nice to meet you. Is there something I can help you with, or would you like to chat for a bit?",
+              Hello! It's nice to meet you. Is there something I can help you with today?",
               ])
             `);
 
