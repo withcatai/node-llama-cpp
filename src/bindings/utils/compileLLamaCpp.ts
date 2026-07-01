@@ -133,6 +133,13 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                     if (process.platform === "linux" || process.platform === "darwin") {
                         cmakeCustomOptions.set("CMAKE_BUILD_RPATH", "$ORIGIN");
                     }
+                    try {
+                        const translateSessionPath = path.join(llamaDirectory, "llama.cpp", "ggml", "src", "ggml-openvino", "openvino", "translate_session.cpp");
+                        if (await fs.pathExists(translateSessionPath)) {
+                            const code = await fs.readFile(translateSessionPath, "utf8");
+                            await fs.writeFile(translateSessionPath, code.replace("std::map<std::string, int> model_output_indexes;", "std::map<std::string, size_t> model_output_indexes;"));
+                        }
+                    } catch (err) {}
                 }
 
                 if (!cmakeCustomOptions.has("GGML_CCACHE"))
