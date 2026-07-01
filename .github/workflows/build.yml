@@ -213,7 +213,6 @@ jobs:
         with:
           cuda: '12.4.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
           use-local-cache: false
 
       - name: Install Cuda 13.1 on Ubuntu (1)
