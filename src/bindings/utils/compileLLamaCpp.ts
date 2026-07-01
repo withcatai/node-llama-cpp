@@ -740,6 +740,10 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, 
     if (ciMode && platform === "win" && gpu === "cuda" && cpuCount === 4)
         return 3; // workaround for `compiler is out of heap space` error on GitHub Actions on Windows when building with CUDA
 
+    if (ciMode && platform === "win" && gpu === "openvino" && cpuCount === 4)
+        return 1; // workaround for `ERROR OMG Process terminated: 1` (OOM) during LTCG on GitHub Actions on Windows when building with OpenVINO
+
+
     if (cpuCount <= 4)
         return cpuCount;
 
