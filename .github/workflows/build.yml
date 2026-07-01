@@ -302,6 +302,22 @@ jobs:
           echo "OPENVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $env:GITHUB_ENV
 
+      - name: Install OpenCL-CLHPP headers on Windows (3)
+        if: matrix.config.name == 'Windows (3)'
+        shell: pwsh
+        run: |
+          # The Vulkan SDK provides CL/cl.h but NOT CL/cl2.hpp (OpenCL C++ 2.x bindings).
+          # OpenVINO's ocl_wrapper.hpp includes CL/cl2.hpp, so we must supply it separately.
+          # The Ubuntu equivalent is: apt-get install opencl-clhpp-headers
+          $clDir = "C:\VulkanSDK\1.4.313.2\Include\CL"
+          if (Test-Path $clDir) {
+            Invoke-WebRequest -Uri "https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.16/cl2.hpp" -OutFile "$clDir\cl2.hpp"
+            Write-Host "Installed cl2.hpp into $clDir"
+          } else {
+            Write-Error "Vulkan SDK CL include dir not found at $clDir"
+            exit 1
+          }
+
       - name: Install dependencies on macOS
         if: matrix.config.name == 'macOS x64' || matrix.config.name == 'macOS arm64'
         run: |
