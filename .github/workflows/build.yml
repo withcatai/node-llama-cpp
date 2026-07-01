@@ -306,17 +306,18 @@ jobs:
         if: matrix.config.name == 'Windows (3)'
         shell: pwsh
         run: |
-          # The CUDA Toolkit provides CL/cl.h but NOT CL/cl2.hpp (OpenCL C++ 2.x bindings).
-          # OpenVINO's ocl_wrapper.hpp includes CL/cl2.hpp, so we must supply it separately.
+          # The CUDA Toolkit provides CL/cl.h but NOT the C++ OpenCL headers.
+          # OpenVINO's ocl_wrapper.hpp includes CL/cl2.hpp, and the modern cl2.hpp
+          # is just a shim that re-includes CL/opencl.hpp, so we need BOTH files.
           # The Ubuntu equivalent is: apt-get install opencl-clhpp-headers
-          # NOTE: cl2.hpp is not a release asset; fetch it from raw source.
           Write-Host "CUDA_PATH is: $env:CUDA_PATH"
           $clDir = "$env:CUDA_PATH\include\CL"
           Write-Host "Target CL dir: $clDir"
-          # Create the directory if it doesn't exist (CUDA may not create it without cl headers selected)
           New-Item -ItemType Directory -Force -Path $clDir | Out-Null
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/KhronosGroup/OpenCL-CLHPP/main/include/CL/cl2.hpp" -OutFile "$clDir\cl2.hpp" -UseBasicParsing
-          Write-Host "Installed cl2.hpp into $clDir"
+          $base = "https://raw.githubusercontent.com/KhronosGroup/OpenCL-CLHPP/main/include/CL"
+          Invoke-WebRequest -Uri "$base/cl2.hpp"    -OutFile "$clDir\cl2.hpp"    -UseBasicParsing
+          Invoke-WebRequest -Uri "$base/opencl.hpp" -OutFile "$clDir\opencl.hpp" -UseBasicParsing
+          Write-Host "Installed cl2.hpp + opencl.hpp into $clDir"
           Get-ChildItem $clDir
 
       - name: Install dependencies on macOS
