@@ -365,6 +365,12 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
+            // Patch MSVC narrowing conversion in translate_session.cpp before OpenVINO build
+            const tsPath = path.join(process.cwd(), "llama", "llama.cpp", "ggml", "src", "ggml-openvino", "openvino", "translate_session.cpp");
+            if (await fs.pathExists(tsPath)) {
+              const code = await fs.readFile(tsPath, "utf8");
+              await fs.writeFile(tsPath, code.replace("std::map<std::string, int> model_output_indexes;", "std::map<std::string, size_t> model_output_indexes;"));
+            }
             await buildBinary("x64", ["--gpu", "openvino"]);
           } else if (process.env.ARTIFACT_NAME === "win-2") {
             await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
@@ -418,36 +424,24 @@ jobs:
           }
           
           if (process.env.ARTIFACT_NAME === "linux-1" && process.env.OPENVINO_DIR) {
-            try {
-              const openVinoLibDir = path.join(process.env.OPENVINO_DIR, "lib", "intel64");
-              const dest = path.join(llamaBinsDirectoryPath, "linux-x64-openvino");
-              if ((await fs.pathExists(dest)) && (await fs.pathExists(openVinoLibDir))) {
-                for (const file of await fs.readdir(openVinoLibDir)) {
-                  if ((file.includes("libopenvino") && file.includes(".so")) || file.endsWith(".xml")) {
-                    await fs.copy(path.join(openVinoLibDir, file), path.join(dest, file));
-                  }
+            const openVinoLibDir = path.join(process.env.OPENVINO_DIR, "lib", "intel64");
+            const dest = path.join(llamaBinsDirectoryPath, "linux-x64-openvino");
+            if (await fs.pathExists(dest)) {
+              for (const file of await fs.readdir(openVinoLibDir)) {
+                if ((file.includes("libopenvino") && file.includes(".so")) || file.endsWith(".xml")) {
+                  await fs.copy(path.join(openVinoLibDir, file), path.join(dest, file));
                 }
-              } else {
-                console.warn(`[OpenVINO Bundler] Source or destination does not exist. Dest: ${dest}, Source: ${openVinoLibDir}`);
               }
-            } catch (err) {
-              console.error("[OpenVINO Bundler] Failed to copy linux openvino libraries:", err);
             }
           } else if (process.env.ARTIFACT_NAME === "win-1" && process.env.OPENVINO_DIR) {
-            try {
-              const openVinoBinDir = path.join(process.env.OPENVINO_DIR, "bin", "intel64", "Release");
-              const dest = path.join(llamaBinsDirectoryPath, "win-x64-openvino");
-              if ((await fs.pathExists(dest)) && (await fs.pathExists(openVinoBinDir))) {
-                for (const file of await fs.readdir(openVinoBinDir)) {
-                  if ((file.includes("openvino") && file.endsWith(".dll")) || file.endsWith(".xml")) {
-                    await fs.copy(path.join(openVinoBinDir, file), path.join(dest, file));
-                  }
+            const openVinoBinDir = path.join(process.env.OPENVINO_DIR, "bin", "intel64", "Release");
+            const dest = path.join(llamaBinsDirectoryPath, "win-x64-openvino");
+            if (await fs.pathExists(dest)) {
+              for (const file of await fs.readdir(openVinoBinDir)) {
+                if ((file.includes("openvino") && file.endsWith(".dll")) || file.endsWith(".xml")) {
+                  await fs.copy(path.join(openVinoBinDir, file), path.join(dest, file));
                 }
-              } else {
-                console.warn(`[OpenVINO Bundler] Source or destination does not exist. Dest: ${dest}, Source: ${openVinoBinDir}`);
               }
-            } catch (err) {
-              console.error("[OpenVINO Bundler] Failed to copy windows openvino libraries:", err);
             }
           }
           
