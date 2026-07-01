@@ -65,6 +65,9 @@ jobs:
           - name: "Windows (2)"
             os: windows-2022
             artifact: "win-2"
+          - name: "Windows (3)"
+            os: windows-2022
+            artifact: "win-3"
           - name: "Ubuntu (1)"
             os: ubuntu-22.04
             artifact: "linux-1"
@@ -213,6 +216,15 @@ jobs:
         with:
           cuda: '12.4.0'
           method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
+          use-local-cache: false
+
+      - name: Install Cuda 12.4 on Windows (3)
+        if: matrix.config.name == 'Windows (3)'
+        uses: Jimver/cuda-toolkit@v0.2.15
+        with:
+          cuda: '12.4.0'
+          method: 'network'
           use-local-cache: false
 
       - name: Install Cuda 13.1 on Ubuntu (1)
@@ -276,8 +288,8 @@ jobs:
           echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
 
-      - name: Install OpenVINO on Windows (2)
-        if: matrix.config.name == 'Windows (2)'
+      - name: Install OpenVINO on Windows (3)
+        if: matrix.config.name == 'Windows (3)'
         shell: pwsh
         run: |
           # Download and install the official OpenVINO C++ toolkit archive for Windows matching upstream
@@ -367,6 +379,7 @@ jobs:
           } else if (process.env.ARTIFACT_NAME === "win-2") {
             await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
             await buildBinary("x64", ["--gpu", "cuda"]);
+          } else if (process.env.ARTIFACT_NAME === "win-3") {
             // Patch MSVC narrowing conversion in translate_session.cpp before OpenVINO build
             const tsPath = path.join(process.cwd(), "llama", "llama.cpp", "ggml", "src", "ggml-openvino", "openvino", "translate_session.cpp");
             if (await fs.pathExists(tsPath)) {
@@ -432,7 +445,7 @@ jobs:
                 }
               }
             }
-          } else if (process.env.ARTIFACT_NAME === "win-2" && process.env.OPENVINO_DIR) {
+          } else if (process.env.ARTIFACT_NAME === "win-3" && process.env.OPENVINO_DIR) {
             const openVinoBinDir = path.join(process.env.OPENVINO_DIR, "bin", "intel64", "Release");
             const dest = path.join(llamaBinsDirectoryPath, "win-x64-openvino");
             if (await fs.pathExists(dest)) {
