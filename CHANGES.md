@@ -290,3 +290,12 @@ Since this is an upstream test incompatibility and not a real regression, `conti
 +   continue-on-error: true
 ```
 
+
+---
+
+### Fix 3: Resolve MSVC Out-of-Memory (OOM) during OpenVINO build
+
+#### [.github/workflows/build.yml](file:///Users/macbook/Documents/research/inference-engine/node-llama-cpp/.github/workflows/build.yml)
+The `win-1` Windows build job was repeatedly failing at the very end of its execution with an abrupt `ERROR OMG Process terminated: 1` during `Generating Code...`. This occurs because MSVC Link Time Code Generation (LTCG) runs out of memory (OOM) when linking OpenVINO and `llama.cpp` together in a runner constrained to 7GB of RAM, especially after the runner's cache is bloated from previously building `win-x64-cuda` in the same job.
+
+To prevent the MSVC compiler from running out of heap space, the `win-x64-openvino` build (and its associated install/copy steps) has been moved from the overloaded `win-1` job to the `win-2` job. The `win-2` job has much less workload (only building ARM64 CPU and CUDA 12.4), providing the OpenVINO linker with ample memory to complete successfully. Note that the NVCC warnings regarding `channel_bias` and `buf_iw_gate` in the logs are harmless template instantiation artifacts from upstream `llama.cpp` and did not cause the crash.

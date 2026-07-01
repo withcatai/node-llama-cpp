@@ -277,8 +277,8 @@ jobs:
           echo "OPENVINO_DIR=$openvinoDir" >> $GITHUB_ENV
           echo "OpenVINO_DIR=$openvinoDir" >> $GITHUB_ENV
 
-      - name: Install OpenVINO on Windows (1)
-        if: matrix.config.name == 'Windows (1)'
+      - name: Install OpenVINO on Windows (2)
+        if: matrix.config.name == 'Windows (2)'
         shell: pwsh
         run: |
           # Download and install the official OpenVINO C++ toolkit archive for Windows matching upstream
@@ -365,6 +365,9 @@ jobs:
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
             await buildBinary("x64", ["--gpu", "vulkan"]);
+          } else if (process.env.ARTIFACT_NAME === "win-2") {
+            await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
+            await buildBinary("x64", ["--gpu", "cuda"]);
             // Patch MSVC narrowing conversion in translate_session.cpp before OpenVINO build
             const tsPath = path.join(process.cwd(), "llama", "llama.cpp", "ggml", "src", "ggml-openvino", "openvino", "translate_session.cpp");
             if (await fs.pathExists(tsPath)) {
@@ -372,9 +375,6 @@ jobs:
               await fs.writeFile(tsPath, code.replace("std::map<std::string, int> model_output_indexes;", "std::map<std::string, size_t> model_output_indexes;"));
             }
             await buildBinary("x64", ["--gpu", "openvino"]);
-          } else if (process.env.ARTIFACT_NAME === "win-2") {
-            await buildBinary("arm64", ["--gpu", "false"], windowsOnArmNodeVersion);
-            await buildBinary("x64", ["--gpu", "cuda"]);
           } else if (process.env.ARTIFACT_NAME === "linux-1") {
             await buildBinary("x64", ["--gpu", "false"]);
             await buildBinary("x64", ["--gpu", "cuda"]);
@@ -433,7 +433,7 @@ jobs:
                 }
               }
             }
-          } else if (process.env.ARTIFACT_NAME === "win-1" && process.env.OPENVINO_DIR) {
+          } else if (process.env.ARTIFACT_NAME === "win-2" && process.env.OPENVINO_DIR) {
             const openVinoBinDir = path.join(process.env.OPENVINO_DIR, "bin", "intel64", "Release");
             const dest = path.join(llamaBinsDirectoryPath, "win-x64-openvino");
             if (await fs.pathExists(dest)) {
