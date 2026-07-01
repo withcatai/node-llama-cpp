@@ -230,8 +230,8 @@ jobs:
           cuda: '12.4.0'
           method: 'network'
 
-      - name: Install Vulkan SDK on Windows (1)
-        if: matrix.config.name == 'Windows (1)'
+      - name: Install Vulkan SDK on Windows
+        if: matrix.config.name == 'Windows (1)' || matrix.config.name == 'Windows (2)'
         shell: powershell
         env:
           VULKAN_VERSION: 1.4.313.2
