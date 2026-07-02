@@ -1,0 +1,46 @@
+name: Test OpenVINO
+on: workflow_dispatch
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux-1
+          - os: windows-latest
+            artifact: win-3
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      
+      - name: Download Artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download -n bins-${{ matrix.artifact }} --dir bins
+      
+      - name: Setup OpenVINO Windows
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          $dir = "$pwd\bins\win-x64-openvino"
+          echo "OPENVINO_DIR=$dir" >> $env:GITHUB_ENV
+          echo "$dir" >> $env:GITHUB_PATH
+      
+      - name: Setup OpenVINO Linux
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          dir="$(pwd)/bins/linux-x64-openvino"
+          echo "OPENVINO_DIR=$dir" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          
+      - name: Download Model
+        run: node dist/cli/cli.js download --model hf:ggerganov/qwen2-0.5b-instruct-gguf
+        
+      - name: Test OpenVINO Inference
+        run: node dist/cli/cli.js chat --model hf:ggerganov/qwen2-0.5b-instruct-gguf --gpu openvino --system-prompt "You are a helpful test bot. Please output SUCCESS." -m "Say SUCCESS"
