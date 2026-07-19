@@ -4,6 +4,7 @@ node_modules
 .DS_Store
 
 /dist
+/tsconfig.tsbuildinfo
 /dist-electron
 /release
 /models

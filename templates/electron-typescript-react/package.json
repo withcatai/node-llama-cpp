@@ -20,7 +20,7 @@
     "lint": "npm run lint:eslint",
     "lint:eslint": "eslint --report-unused-disable-directives .",
     "format": "npm run lint:eslint -- --fix",
-    "clean": "rm -rf ./node_modules ./dist ./dist-electron ./release ./models"
+    "clean": "rm -rf ./node_modules ./dist ./tsconfig.tsbuildinfo ./dist-electron ./release ./models"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

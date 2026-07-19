@@ -5,6 +5,7 @@ node_modules
 *.cpuprofile
 
 /dist
+/tsconfig.tsbuildinfo
 /docs-site
 /docs/api
 /templates/packed

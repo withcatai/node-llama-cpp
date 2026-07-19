@@ -20,6 +20,7 @@
         "strictNullChecks": true,
         "isolatedModules": true,
         "noEmit": false,
+        "rootDir": "./src",
         "outDir": "./dist",
         "strict": true,
         "sourceMap": true,
