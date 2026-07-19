@@ -402,15 +402,15 @@ export class Llama {
     /**
      * Cap the amount of VRAM that this Llama instance is allowed to use in bytes.
      * This is useful for constraining the resource usage of models and contexts created with the Llama instance.
-     * 
+     *
      * Capping to a value that's too low may cause model loads and context creations to either fail or not fully offload to VRAM,
      * causing inference to be significantly slower.
-     * 
+     *
      * Setting a cap will only affect future model loads and context creations.
-     * 
+     *
      * Use with caution.
      * Setting to `null` disables the cap.
-     * 
+     *
      * Defaults to `null`.
      */
     public async setVramCap(bytes: number | null) {
@@ -425,7 +425,7 @@ export class Llama {
 
     /**
      * Get the current VRAM cap in bytes. See {@link setVramCap `setVramCap`} for more information.
-     * 
+     *
      * Defaults to `null`, which means no cap is set.
      */
     public getVramCap() {
@@ -435,21 +435,21 @@ export class Llama {
     /**
      * Cap the amount of RAM that this Llama instance is allowed to use in bytes.
      * This is useful for constraining the resource usage of models and contexts created with the Llama instance.
-     * 
+     *
      * Capping to a value that's too low may cause model loads and context creations to fail.
      * Capping to any value will exclude swap from the resource calculations,
      * so extremely large models may not load at all even if you have enough swap available.
-     * 
+     *
      * Setting a cap will only affect future model loads and context creations.
-     * 
+     *
      * On unified memory systems, capping the RAM may also effectively cap the VRAM, as they are shared.
      * On such systems, it's recommended to either cap the VRAM or the RAM (but not both),
      * and if you need to cap both then make sure to set the RAM cap to a value greater than the VRAM cap.
      * > **Note:** You can detect a unified memory system by checking whether `getVramState().unifiedSize` is greater than 0.
-     * 
+     *
      * Use with caution.
      * Setting to `null` disables the cap.
-     * 
+     *
      * Defaults to `null`.
      */
     public async setRamCap(bytes: number | null) {
@@ -459,14 +459,14 @@ export class Llama {
             throw new RangeError("RAM cap must be a non-negative number or null");
         else if (bytes != null)
             bytes = Math.floor(bytes);
-        
+
         this._ramOrchestrator.memoryCap = bytes;
         this._swapOrchestrator.memoryCap = bytes == null ? null : 0; // if RAM is capped, we can't count on swap for calculation
     }
 
     /**
      * Get the current RAM cap in bytes. See {@link setRamCap `setRamCap`} for more information.
-     * 
+     *
      * Defaults to `null`, which means no cap is set.
      */
     public getRamCap() {
@@ -641,15 +641,23 @@ export class Llama {
         // llama.cpp uses dots to indicate progress, so we don't want to print them as different lines,
         // and instead, append to the same log line
         if (logMessageIsOnlyDots(message) && this._logger === Llama.defaultConsoleLogger) {
+            const stdout = LlamaLogLevelGreaterThanOrEqual(level, LlamaLogLevel.warn)
+                ? process.stderr
+                : process.stdout;
+                
             if (logMessageIsOnlyDots(this._previousLog) && level === this._previousLogLevel) {
-                process.stdout.write(message);
+                stdout.write(message);
             } else {
                 this._nextLogNeedNewLine = true;
-                process.stdout.write(prefixAndColorMessage(message, getColorForLogLevel(level)));
+                stdout.write(prefixAndColorMessage(message, getColorForLogLevel(level)));
             }
         } else {
             if (this._nextLogNeedNewLine) {
-                process.stdout.write("\n");
+                const stdout = LlamaLogLevelGreaterThanOrEqual(this._previousLogLevel ?? level, LlamaLogLevel.warn)
+                    ? process.stderr
+                    : process.stdout;
+
+                stdout.write("\n");
                 this._nextLogNeedNewLine = false;
             }
 
@@ -707,7 +715,7 @@ export class Llama {
         const vramOrchestrator = new MemoryOrchestrator(getBalancedVramState.bind(undefined, bindings, true));
         const ramOrchestrator = new MemoryOrchestrator(async () => {
             const {total, wired} = await getBalancedRamState(bindings);
-            
+
             return {
                 total,
                 free: total - wired,
@@ -810,7 +818,7 @@ export class Llama {
             default:
                 void (level satisfies never);
                 console.warn(getConsoleLogPrefix() + getColorForLogLevel(LlamaLogLevel.warn)(`Unknown log level: ${level}`));
-                console.log(prefixAndColorMessage(message, getColorForLogLevel(level)));
+                console.warn(prefixAndColorMessage(message, getColorForLogLevel(level)));
         }
     }
 }
@@ -899,7 +907,7 @@ async function getBalancedVramState(bindings: BindingModule, balanceUnifiedMemor
 
             const nonUnifiedMemoryRam = systemMemoryInfo.total - unifiedSize;
             const lockedUnifiedVram = Math.max(0, Math.min(systemMemoryInfo.wired ?? 0, systemMemoryInfo.total) - nonUnifiedMemoryRam);
-    
+
             currentUsed = Math.max(currentUsed, Math.min(lockedUnifiedVram, unifiedSize));
         } catch (err) {
             // do nothing
