@@ -59,6 +59,7 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
 
     let latestCompressionAttempt = await getResultForCharacterRemovalCount(initialCharactersRemovalCount);
     const firstCompressionAttempt = latestCompressionAttempt;
+    let lastHelpfulCompressionAttempt = latestCompressionAttempt;
     let latestCompressionAttemptTokensCount = latestCompressionAttempt.tokensCount;
     let sameTokensCountRepetitions = 0;
 
@@ -75,17 +76,15 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
         let compressionAttempts = 0, decompressionAttempts = 0;
         bestCompressionAttempt.tokensCount !== tokensCountToFit;
     ) {
-        if (compressionAttempts > 0) {
-            if (latestCompressionAttempt.tokensCount != firstCompressionAttempt.tokensCount &&
-                latestCompressionAttempt.characterRemovalCount != firstCompressionAttempt.characterRemovalCount
-            )
-                currentEstimatedCharactersPerToken =
-                    Math.abs(latestCompressionAttempt.characterRemovalCount - firstCompressionAttempt.characterRemovalCount) /
-                    Math.abs(latestCompressionAttempt.tokensCount - firstCompressionAttempt.tokensCount);
+        if (lastHelpfulCompressionAttempt.tokensCount != firstCompressionAttempt.tokensCount &&
+            lastHelpfulCompressionAttempt.characterRemovalCount != firstCompressionAttempt.characterRemovalCount
+        )
+            currentEstimatedCharactersPerToken =
+                Math.abs(lastHelpfulCompressionAttempt.characterRemovalCount - firstCompressionAttempt.characterRemovalCount) /
+                Math.abs(lastHelpfulCompressionAttempt.tokensCount - firstCompressionAttempt.tokensCount);
 
-            if (!Number.isFinite(currentEstimatedCharactersPerToken) || currentEstimatedCharactersPerToken === 0)
-                currentEstimatedCharactersPerToken = estimatedCharactersPerToken;
-        }
+        if (!Number.isFinite(currentEstimatedCharactersPerToken) || currentEstimatedCharactersPerToken === 0)
+            currentEstimatedCharactersPerToken = estimatedCharactersPerToken;
 
         const tokensLeftToRemove = latestCompressionAttempt.tokensCount - tokensCountToFit;
         let additionalCharactersToRemove = Math.round(tokensLeftToRemove * currentEstimatedCharactersPerToken);
@@ -122,6 +121,17 @@ export async function findCharacterRemovalCountToFitChatHistoryInContext({
             latestCompressionAttempt.characterRemovalCount < bestCompressionAttempt.characterRemovalCount
         ))
             bestCompressionAttempt = latestCompressionAttempt;
+
+        const charactersDeltaFromLastHelpfulAttempt = (
+            latestCompressionAttempt.characterRemovalCount - lastHelpfulCompressionAttempt.characterRemovalCount
+        );
+        const tokensDeltaFromLastHelpfulAttempt = lastHelpfulCompressionAttempt.tokensCount - latestCompressionAttempt.tokensCount;
+        const attemptWasHelpful =
+            (charactersDeltaFromLastHelpfulAttempt > 0 && tokensDeltaFromLastHelpfulAttempt > 0) ||
+            (charactersDeltaFromLastHelpfulAttempt < 0 && tokensDeltaFromLastHelpfulAttempt < 0);
+
+        if (attemptWasHelpful)
+            lastHelpfulCompressionAttempt = latestCompressionAttempt;
 
         if (latestCompressionAttempt.tokensCount === latestCompressionAttemptTokensCount)
             sameTokensCountRepetitions++;
