@@ -468,65 +468,27 @@ export default defineConfig({
             options: {
                 detailedView: true,
                 miniSearch: {
-                    options: {
-                        processTerm(term) {
-                            function splitIdentifier(value: string): string[] {
-                                return value
-                                    // dryRun → dry Run
-                                    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-                                    // XMLHttpRequest → XML Http Request
-                                    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-                                    .toLowerCase()
-                                    .match(/[\p{L}\p{N}]+/gu) ?? [];
-                            }
-
-                            function addBoundedCompounds(parts: readonly string[], maxParts = 3): string[] {
-                                const terms = new Set<string>([parts.join("")]);
-
-                                for (let start = 0; start < parts.length; start++) {
-                                    let compound = "";
-
-                                    for (let end = start; end < parts.length && end < start + maxParts; end++) {
-                                        compound += parts[end];
-                                        terms.add(compound);
-                                    }
-                                }
-
-                                return [...terms];
-                            }
-
-                            return addBoundedCompounds(splitIdentifier(term));
-                        }
-                    },
                     searchOptions: {
                         fuzzy: 0.05,
-                        tokenize(query) {
-                            function splitIdentifier(value: string): string[] {
-                                return value
-                                    // dryRun → dry Run
-                                    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-                                    // XMLHttpRequest → XML Http Request
-                                    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-                                    .toLowerCase()
-                                    .match(/[\p{L}\p{N}]+/gu) ?? [];
-                            }
+                        tokenize(query: string) {
+                            const maxRemovedSpaces = 3;
+                            const words = query.match(/[\p{L}\p{N}]+/gu) ?? [];
+                            const terms = new Set(words);
 
-                            function addBoundedCompounds(parts: readonly string[], maxParts = 3): string[] {
-                                const terms = new Set<string>([parts.join("")]);
+                            for (let start = 0; start < words.length; start++) {
+                                let joined = words[start]!;
 
-                                for (let start = 0; start < parts.length; start++) {
-                                    let compound = "";
+                                for (let removedSpaces = 1; removedSpaces <= maxRemovedSpaces; removedSpaces++) {
+                                    const nextWord = words[start + removedSpaces];
+                                    if (nextWord == null)
+                                        break;
 
-                                    for (let end = start; end < parts.length && end < start + maxParts; end++) {
-                                        compound += parts[end];
-                                        terms.add(compound);
-                                    }
+                                    joined += nextWord;
+                                    terms.add(joined);
                                 }
-
-                                return [...terms];
                             }
 
-                            return addBoundedCompounds((query.match(/[\p{L}\p{N}]+/gu) ?? []).flatMap(splitIdentifier));
+                            return [...terms];
                         },
                         boostDocument(term, documentId, storedFields) {
                             const firstTitle = (storedFields?.titles as string[])?.[0];
