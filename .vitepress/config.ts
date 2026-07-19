@@ -414,7 +414,8 @@ export default defineConfig({
                         ],
                         module: ts.ModuleKind.ES2022,
                         target: ts.ScriptTarget.ES2022,
-                        moduleDetection: ts.ModuleDetectionKind.Force
+                        moduleDetection: ts.ModuleDetectionKind.Force,
+                        rootDir: undefined
                     },
                     tsModule: ts
                 }
@@ -467,7 +468,66 @@ export default defineConfig({
             options: {
                 detailedView: true,
                 miniSearch: {
+                    options: {
+                        processTerm(term) {
+                            function splitIdentifier(value: string): string[] {
+                                return value
+                                    // dryRun → dry Run
+                                    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+                                    // XMLHttpRequest → XML Http Request
+                                    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+                                    .toLowerCase()
+                                    .match(/[\p{L}\p{N}]+/gu) ?? [];
+                            }
+
+                            function addBoundedCompounds(parts: readonly string[], maxParts = 3): string[] {
+                                const terms = new Set<string>([parts.join("")]);
+
+                                for (let start = 0; start < parts.length; start++) {
+                                    let compound = "";
+
+                                    for (let end = start; end < parts.length && end < start + maxParts; end++) {
+                                        compound += parts[end];
+                                        terms.add(compound);
+                                    }
+                                }
+
+                                return [...terms];
+                            }
+
+                            return addBoundedCompounds(splitIdentifier(term));
+                        }
+                    },
                     searchOptions: {
+                        fuzzy: 0.05,
+                        tokenize(query) {
+                            function splitIdentifier(value: string): string[] {
+                                return value
+                                    // dryRun → dry Run
+                                    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+                                    // XMLHttpRequest → XML Http Request
+                                    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+                                    .toLowerCase()
+                                    .match(/[\p{L}\p{N}]+/gu) ?? [];
+                            }
+
+                            function addBoundedCompounds(parts: readonly string[], maxParts = 3): string[] {
+                                const terms = new Set<string>([parts.join("")]);
+
+                                for (let start = 0; start < parts.length; start++) {
+                                    let compound = "";
+
+                                    for (let end = start; end < parts.length && end < start + maxParts; end++) {
+                                        compound += parts[end];
+                                        terms.add(compound);
+                                    }
+                                }
+
+                                return [...terms];
+                            }
+
+                            return addBoundedCompounds((query.match(/[\p{L}\p{N}]+/gu) ?? []).flatMap(splitIdentifier));
+                        },
                         boostDocument(term, documentId, storedFields) {
                             const firstTitle = (storedFields?.titles as string[])?.[0];
                             if (firstTitle?.startsWith("Type Alias: "))
