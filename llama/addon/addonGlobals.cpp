@@ -1,5 +1,7 @@
 #include <sstream>
 #include <vector>
+#include <algorithm>
+#include <limits>
 #include "addonGlobals.h"
 #include "napi.h"
 

@@ -72,5 +72,27 @@ describe("qwen3.5 0.8b", () => {
             expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("448");
             expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("463");
         });
+
+        test("disposing the context asynchronously works", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("Qwen3.5-0.8B-Q8_0.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+
+            for (let i = 0; i < 4; i++) {
+                const context = await model.createContext({
+                    contextSize: 4096
+                });
+                const contextSequence = context.getSequence();
+                const chatSession = new LlamaChatSession({contextSequence});
+
+                await chatSession.prompt("Tell me a short story", {maxTokens: 40});
+
+                void contextSequence.takeCheckpoint();
+                await context.dispose(); // should not crash the process
+            }
+        });
     });
 });

@@ -530,7 +530,7 @@ Napi::Value AddonModel::Dispose(const Napi::CallbackInfo& info) {
         return worker->GetPromise();
     } else {
         disposeMT();
-    
+
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(info.Env());
         deferred.Resolve(info.Env().Undefined());
         return deferred.Promise();
