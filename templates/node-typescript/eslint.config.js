@@ -167,6 +167,7 @@ export default defineConfig({
             allow: []
         }],
         "@typescript-eslint/explicit-member-accessibility": ["warn"],
+        "@typescript-eslint/consistent-type-definitions": ["warn", "type"],
         "@stylistic/member-delimiter-style": ["warn", {
             multiline: {
                 delimiter: "comma",
