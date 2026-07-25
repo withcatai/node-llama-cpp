@@ -354,7 +354,7 @@ export class QwenChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _checkModelCompatibility(options: ChatWrapperCheckModelCompatibilityParams): boolean {
-        const architecture = options.fileInfo?.metadata.general.architecture;
+        const architecture = options.architecture;
         return (
             architecture == null ||
             architecture === GgufArchitectureType.qwen2 ||

@@ -382,6 +382,10 @@ export class LlamaModel {
         return this._fileInsights;
     }
 
+    public get architecture(): GgufArchitectureType {
+        return this._fileInfo.metadata?.general?.architecture ?? GgufArchitectureType.unknown;
+    }
+
     /**
      * Number of layers offloaded to the GPU.
      * If GPU support is disabled, this will always be `0`.

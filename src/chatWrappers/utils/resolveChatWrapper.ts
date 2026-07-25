@@ -24,6 +24,7 @@ import {SeedChatWrapper} from "../SeedChatWrapper.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
+import type {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
@@ -88,6 +89,7 @@ export type ResolveChatWrapperOptions = {
     type?: "auto" | SpecializedChatWrapperTypeName | TemplateChatWrapperTypeName,
 
     bosString?: string | null,
+    architecture?: GgufArchitectureType,
     filename?: string,
     fileInfo?: GgufFileInfo,
     tokenizer?: Tokenizer,
@@ -182,6 +184,7 @@ export type ResolveChatWrapperWithModelOptions = {
  *
  * const chatWrapper = resolveChatWrapper({
  *     bosString: model.tokens.bosString,
+ *     architecture: model.architecture,
  *     filename: model.filename,
  *     fileInfo: model.fileInfo,
  *     tokenizer: model.tokenizer
@@ -199,6 +202,7 @@ export function resolveChatWrapper(
             ...(modelOptions ?? {}),
             customWrapperSettings: modelOptions?.customWrapperSettings as ResolveChatWrapperOptions["customWrapperSettings"],
             bosString: options.tokens.bosString,
+            architecture: options.fileInfo?.metadata?.general?.architecture,
             filename: options.filename,
             fileInfo: options.fileInfo,
             tokenizer: options.tokenizer
@@ -207,6 +211,7 @@ export function resolveChatWrapper(
     const {
         type = "auto",
         bosString,
+        architecture: archOption,
         filename,
         fileInfo,
         tokenizer,
@@ -215,6 +220,8 @@ export function resolveChatWrapper(
         fallbackToOtherWrappersOnJinjaError = true,
         noJinja = false
     } = options;
+
+    const architecture = archOption ?? fileInfo?.metadata?.general?.architecture;
 
     function createSpecializedChatWrapper<const T extends typeof chatWrappers[SpecializedChatWrapperTypeName]>(
         specializedChatWrapper: T,
@@ -293,7 +300,8 @@ export function resolveChatWrapper(
 
             const isCompatible = Wrapper._checkModelCompatibility({
                 tokenizer,
-                fileInfo
+                fileInfo,
+                architecture
             });
 
             if (!isCompatible)
@@ -359,9 +367,9 @@ export function resolveChatWrapper(
     }
 
     for (const modelNames of getModelLinageNames(fileInfo?.metadata)) {
-        if (includesText(modelNames, ["llama 3.2", "llama-3.2", "llama3.2"]) && Llama3_2LightweightChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+        if (includesText(modelNames, ["llama 3.2", "llama-3.2", "llama3.2"]) && Llama3_2LightweightChatWrapper._checkModelCompatibility({tokenizer, fileInfo, architecture}))
             return createSpecializedChatWrapper(Llama3_2LightweightChatWrapper);
-        else if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+        else if (includesText(modelNames, ["llama 3.1", "llama-3.1", "llama3.1"]) && Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo, architecture}))
             return createSpecializedChatWrapper(Llama3_1ChatWrapper);
         else if (includesText(modelNames, ["llama 3", "llama-3", "llama3"]))
             return createSpecializedChatWrapper(Llama3ChatWrapper);
@@ -395,7 +403,7 @@ export function resolveChatWrapper(
                 addSpaceBeforeEos: modelJinjaTemplate.includes("' ' + eos_token")
             });
         else if (modelJinjaTemplate.includes("<|start_header_id|>") && modelJinjaTemplate.includes("<|end_header_id|>")) {
-            if (Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo}))
+            if (Llama3_1ChatWrapper._checkModelCompatibility({tokenizer, fileInfo, architecture}))
                 return createSpecializedChatWrapper(Llama3_1ChatWrapper);
             else
                 return createSpecializedChatWrapper(Llama3ChatWrapper);
@@ -455,16 +463,14 @@ export function resolveChatWrapper(
         }
     }
 
-    if (fileInfo != null) {
-        const arch = fileInfo.metadata.general?.architecture;
-
-        if (arch === "llama")
+    if (architecture != null) {
+        if (architecture === "llama")
             return createSpecializedChatWrapper(GeneralChatWrapper);
-        else if (arch === "falcon")
+        else if (architecture === "falcon")
             return createSpecializedChatWrapper(FalconChatWrapper);
-        else if (arch === "gemma" || arch === "gemma2")
+        else if (architecture === "gemma" || architecture === "gemma2")
             return createSpecializedChatWrapper(GemmaChatWrapper);
-        else if (arch === "gemma4")
+        else if (architecture === "gemma4")
             return createSpecializedChatWrapper(Gemma4ChatWrapper);
     }
 
