@@ -72,6 +72,7 @@ export type BindingModule = {
     getBlockSizeForGgmlType(ggmlType: number): number | undefined,
     getTypeSizeForGgmlType(ggmlType: number): number | undefined,
     getGgmlGraphOverheadCustom(size: number, grads: boolean): number,
+    getGgmlType(ggmlType: string | number): number | undefined,
     getConsts(): {
         ggmlMaxDims: number,
         ggmlTypeF16Size: number,

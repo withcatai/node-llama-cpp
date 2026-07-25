@@ -347,10 +347,10 @@ export const InspectEstimateCommand: CommandModule<object, InspectEstimateComman
                 useMmap,
                 kvCacheKeyType: kvCacheKeyType === "currentQuant"
                     ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheKeyType),
+                    : resolveGgmlTypeOption(kvCacheKeyType, llama),
                 kvCacheValueType: kvCacheValueType === "currentQuant"
                     ? ggufInsights.dominantTensorType
-                    : resolveGgmlTypeOption(kvCacheValueType),
+                    : resolveGgmlTypeOption(kvCacheValueType, llama),
                 swaFullCache
             });
         });

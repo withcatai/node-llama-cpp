@@ -290,10 +290,10 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
 
         const resolvedKvCacheKeyType = kvCacheKeyType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(kvCacheKeyType) ?? GgmlType.F16;
+            : resolveGgmlTypeOption(kvCacheKeyType, llama) ?? GgmlType.F16;
         const resolvedKvCacheValueType = kvCacheValueType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(kvCacheValueType) ?? GgmlType.F16;
+            : resolveGgmlTypeOption(kvCacheValueType, llama) ?? GgmlType.F16;
 
         if (resolvedKvCacheKeyType != GgmlType.F16 || resolvedKvCacheValueType != GgmlType.F16)
             console.info(`${chalk.yellow("KV cache:")} ${GgmlType[resolvedKvCacheKeyType] + " " + GgmlType[resolvedKvCacheValueType]}`);
@@ -609,7 +609,7 @@ function renderDiffPercentageWithColors(percentage: number, {
 } = {}): string {
     if (nanIsZero && Number.isNaN(percentage))
         percentage = 0;
-    
+
     const percentageText = percentage.toFixed(2).padStart(5, "0") + "%";
     const absPercentage = Math.abs(percentage);
 
@@ -916,7 +916,7 @@ async function runTestWorkerLogic() {
                         batchSize,
                         failedCreationRemedy: false
                     });
-    
+
                     if (evaluateText != null && evaluateText != "") {
                         const sequence = context.getSequence();
                         await sequence.evaluateWithoutGeneratingNewTokens(model.tokenize(evaluateText));

@@ -73,7 +73,7 @@ export type LlamaModelOptions = {
      *
      * When using mmap, you might notice a delay the first time you actually use the model,
      * which is caused by the OS itself loading the model into memory.
-     * 
+     *
      * When this option is set to `"auto"`, mmap may be disabled in scenarios where doing so allows more layers to be offloaded to the GPU.
      *
      * Defaults to `"auto"` if the current system supports it.
@@ -392,7 +392,7 @@ export class LlamaModel {
 
     /**
      * Whether the model is loaded using mmap (memory-mapped file) or not.
-     * 
+     *
      * When Direct I/O (setting the `useDirectIo` option to `true`) is used it'll override mmap and this value may be out of sync
      * with the actual usage of mmap for the loading of this model instance.
      */
@@ -810,11 +810,11 @@ export class LlamaModel {
         const resolvedDefaultContextSwaFullCache = modelOptions.defaultContextSwaFullCache ?? defaultContextSwaFullCache;
         const resolvedDefaultContextKvCacheKeyType = experimentalDefaultContextKvCacheKeyType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheKeyType) ?? GgmlType.F16;
+            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheKeyType, _llama) ?? GgmlType.F16;
         const resolvedDefaultContextKvCacheValueType = experimentalDefaultContextKvCacheValueType === "currentQuant"
             ? ggufInsights.dominantTensorType ?? GgmlType.F16
-            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheValueType) ?? GgmlType.F16;
-        
+            : resolveGgmlTypeOption(experimentalDefaultContextKvCacheValueType, _llama) ?? GgmlType.F16;
+
         let gpuLayers: number;
         let resolvedUseMmap: boolean;
         let resourceRequirementsEstimation: GgufInsightsResourceRequirements;
@@ -830,7 +830,7 @@ export class LlamaModel {
                         figuringGpuLayersValueLoadPercentage.percentagePerStepModelMemorySize
                     )
             );
-            
+
             const layersResolutionStartTime = Date.now();
             const layersResolution = await ggufInsights.configurationResolver.resolveModelGpuLayersV2(modelOptions.gpuLayers, {
                 ignoreMemorySafetyChecks: modelOptions.ignoreMemorySafetyChecks,
@@ -855,7 +855,7 @@ export class LlamaModel {
 
                         modelOptions.onLoadProgress?.(layersResolutionLoadedPercentage);
                     },
-    
+
                 _simulatorSession: simulatorSession
             });
             const layersResolutionEndTime = Date.now();
@@ -872,7 +872,7 @@ export class LlamaModel {
             resourceRequirementsEstimation = await ggufInsights.estimateModelResourceRequirementsV2({
                 gpuLayers,
                 useMmap: resolvedUseMmap,
-                
+
                 _simulatorSession: simulatorSession
             });
         } finally {

@@ -32,10 +32,10 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
             useMmap,
             kvCacheKeyType: kvCacheKeyType === "currentQuant"
                 ? "currentQuant"
-                : resolveGgmlTypeOption(kvCacheKeyType),
+                : resolveGgmlTypeOption(kvCacheKeyType, llama),
             kvCacheValueType: kvCacheValueType === "currentQuant"
                 ? "currentQuant"
-                : resolveGgmlTypeOption(kvCacheValueType)
+                : resolveGgmlTypeOption(kvCacheValueType, llama)
         });
 
     const resolvedModelDestination = resolveModelDestination(ggufPath);
@@ -134,7 +134,7 @@ export async function resolveCommandGgufPath(ggufPath: string | undefined, llama
                 fileStats.map(async ({stats, info}) => {
                     if (stats == null)
                         return;
-    
+
                     if (stats.size !== info.totalSize)
                         await fs.remove(info.filePath);
                 })

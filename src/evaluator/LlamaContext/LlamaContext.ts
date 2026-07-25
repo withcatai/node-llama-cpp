@@ -901,10 +901,10 @@ export class LlamaContext {
             : Boolean(flashAttentionOption);
         const kvCacheKeyType = options.experimentalKvCacheKeyType === "currentQuant"
             ? _model.fileInsights.dominantTensorType ?? _model.defaultContextKvCacheKeyType
-            : resolveGgmlTypeOption(options.experimentalKvCacheKeyType) ?? _model.defaultContextKvCacheKeyType;
+            : resolveGgmlTypeOption(options.experimentalKvCacheKeyType, _model._llama) ?? _model.defaultContextKvCacheKeyType;
         const kvCacheValueType = options.experimentalKvCacheValueType === "currentQuant"
             ? _model.fileInsights.dominantTensorType ?? _model.defaultContextKvCacheValueType
-            : resolveGgmlTypeOption(options.experimentalKvCacheValueType) ?? _model.defaultContextKvCacheValueType;
+            : resolveGgmlTypeOption(options.experimentalKvCacheValueType, _model._llama) ?? _model.defaultContextKvCacheValueType;
         const swaFullCache = options.swaFullCache ?? _model.defaultContextSwaFullCache;
         const loraOptions = typeof options.lora === "string"
             ? {adapters: [{filePath: options.lora}]} satisfies LlamaContextOptions["lora"]

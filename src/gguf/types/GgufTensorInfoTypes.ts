@@ -1,3 +1,5 @@
+import type {Llama} from "../../bindings/Llama.js";
+
 export type GgufTensorInfo = {
     readonly name: string,
     readonly dimensions: readonly (number | bigint)[],
@@ -62,14 +64,18 @@ export enum GgmlType {
     IQ4_NL_8_8 = 38,
     MXFP4 = 39, // MXFP4 (1 block)
     NVFP4 = 40, // NVFP4 (4 blocks, E4M3 scale)
-    Q1_0 = 41
+    Q1_0 = 41,
+    Q2_0 = 42
 }
 
-export function resolveGgmlTypeOption(option?: keyof typeof GgmlType | GgmlType) {
+export function resolveGgmlTypeOption(option?: keyof typeof GgmlType | GgmlType, llama?: Llama) {
     if (option == null)
         return undefined;
 
-    if (typeof option === "number" && Object.hasOwn(GgmlType, option))
+    const llamaGgmlType = llama?._bindings.getGgmlType(option) as GgmlType | undefined;
+    if (llamaGgmlType != null)
+        return llamaGgmlType;
+    else if (typeof option === "number" && Object.hasOwn(GgmlType, option))
         return option as GgmlType;
     else if (typeof option === "string" && Object.hasOwn(GgmlType, option))
         return GgmlType[option as keyof typeof GgmlType];

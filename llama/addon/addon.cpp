@@ -1,6 +1,8 @@
 #include <atomic>
+#include <cctype>
 #include <cstdlib>
 #include <mutex>
+#include <string_view>
 
 #include "AddonContext.h"
 #include "AddonGgufMetadata.h"
@@ -21,6 +23,20 @@
 std::mutex backendMutex;
 bool backendInitialized = false;
 bool backendDisposed = false;
+
+static bool compareWithUpperString(std::string_view source, std::string_view target) {
+    if (source.size() != target.size()) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < source.size(); i++) {
+        if (static_cast<unsigned char>(source[i]) != std::toupper(static_cast<unsigned char>(target[i]))) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 Napi::Value systemInfo(const Napi::CallbackInfo& info) {
     return Napi::String::From(info.Env(), llama_print_system_info());
@@ -92,6 +108,45 @@ Napi::Value addonGetGgmlGraphOverheadCustom(const Napi::CallbackInfo& info) {
     const auto graphOverhead = ggml_graph_overhead_custom(size, grads);
 
     return Napi::Number::New(info.Env(), graphOverhead);
+}
+
+Napi::Value addonGetGgmlType(const Napi::CallbackInfo& info) {
+    if (info.Length() < 1) {
+        return info.Env().Undefined();
+    }
+
+    const auto typeParam = info[0];
+    if (typeParam.IsNumber()) {
+        const auto typeParamValue = typeParam.As<Napi::Number>().Int32Value();
+        if (typeParamValue < 0 || typeParamValue >= GGML_TYPE_COUNT) {
+            return info.Env().Undefined();
+        }
+
+        if (ggml_type_size(static_cast<ggml_type>(typeParamValue)) == 0) {
+            return info.Env().Undefined();
+        }
+
+        return Napi::Number::New(info.Env(), typeParamValue);
+    } else if (typeParam.IsString()) {
+        const auto typeParamValue = typeParam.As<Napi::String>().Utf8Value();
+
+        for (int i = 0; i < GGML_TYPE_COUNT; i++) {
+            if (ggml_type_size(static_cast<ggml_type>(i)) == 0) {
+                continue;
+            }
+
+            const auto typeName = ggml_type_name(static_cast<ggml_type>(i));
+            if (typeName == nullptr) {
+                continue;
+            }
+
+            if (compareWithUpperString(typeParamValue, typeName)) {
+                return Napi::Number::New(info.Env(), i);
+            }
+        }
+    }
+
+    return info.Env().Undefined();
 }
 
 Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
@@ -301,6 +356,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getBlockSizeForGgmlType", addonGetBlockSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getTypeSizeForGgmlType", addonGetTypeSizeForGgmlType),
         Napi::PropertyDescriptor::Function("getGgmlGraphOverheadCustom", addonGetGgmlGraphOverheadCustom),
+        Napi::PropertyDescriptor::Function("getGgmlType", addonGetGgmlType),
         Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
