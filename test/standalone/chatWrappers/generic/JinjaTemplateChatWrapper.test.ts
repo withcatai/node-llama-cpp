@@ -1534,6 +1534,91 @@ describe("JinjaTemplateChatWrapper", () => {
         });
     });
 
+    test("preserves generation prompt text emitted after the assistant header", () => {
+        const chatWrapper = new JinjaTemplateChatWrapper({
+            template: "{%- for m in messages %}{{- '<|im_start|>' + m.role + '\\n' + m.content + '<|im_end|>\\n' }}{%- endfor %}" +
+                "{%- if add_generation_prompt %}{{- '<|im_start|>assistant\\n<think>\\n' }}{%- endif %}"
+        });
+        const {contextText, stopGenerationTriggers} = chatWrapper.generateContextState({
+            chatHistory: [{
+                type: "user",
+                text: "Hi"
+            }, {
+                type: "model",
+                response: []
+            }]
+        });
+
+        // the `<think>` tag pre-filled by the template's generation prompt must be preserved.
+        // This template has no `</think>`, so no thought segment is configured and the pre-filled
+        // text is kept inline in the context.
+        expect(contextText.toString()).toBe("<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n");
+        expect(contextText.toJSON()).toEqual([
+            {type: "specialTokensText", value: "<|im_start|>user\n"},
+            "Hi",
+            {type: "specialTokensText", value: "<|im_end|>\n<|im_start|>assistant\n<think>\n"}
+        ]);
+        expect(stopGenerationTriggers.map((trigger) => trigger.toString())).toEqual(["EOS", "<|im_end|>\n"]);
+    });
+
+    // renders `</think>` for the assistant, so a thought segment is detected,
+    // and pre-fills the given text in the generation prompt
+    const createThoughtTemplateChatWrapper = (generationPrompt: string) => new JinjaTemplateChatWrapper({
+        template: "{%- for m in messages %}" +
+            "{%- if m.role == 'assistant' %}{{- '<|im_start|>assistant\\n' + m.content + '</think>\\n<|im_end|>\\n' }}" +
+            "{%- else %}{{- '<|im_start|>' + m.role + '\\n' + m.content + '<|im_end|>\\n' }}{%- endif %}" +
+            "{%- endfor %}" +
+            "{%- if add_generation_prompt %}{{- '" + generationPrompt + "' }}{%- endif %}"
+    });
+
+    test("opens a segment for a pre-filled thought prefix in the generation prompt", () => {
+        const chatWrapper = createThoughtTemplateChatWrapper("<|im_start|>assistant\\n<think>\\n");
+
+        expect(chatWrapper.settings.segments?.thought).toBeDefined();
+
+        const contextState = chatWrapper.generateContextState({
+            chatHistory: [{
+                type: "user",
+                text: "Hi"
+            }, {
+                type: "model",
+                response: []
+            }]
+        });
+
+        // the pre-filled `<think>` opens a thought segment rather than being kept inline,
+        // so the model's output is correctly attributed to the thought segment
+        expect(contextState.contextText.toString()).toBe("<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n");
+        expect(contextState.noPrefixTrigger).toMatchObject({
+            type: "segment",
+            segmentType: "thought"
+        });
+        expect(contextState.noPrefixTrigger?.inject?.toString()).toBe("<think>\n");
+    });
+
+    test("does not open a segment for a pre-filled closed thought in the generation prompt", () => {
+        // pre-fills a complete, already-closed empty thought in the generation prompt
+        // (as used to suppress thoughts), which must not open a thought segment during generation
+        const chatWrapper = createThoughtTemplateChatWrapper("<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n");
+
+        expect(chatWrapper.settings.segments?.thought).toBeDefined();
+
+        const contextState = chatWrapper.generateContextState({
+            chatHistory: [{
+                type: "user",
+                text: "Hi"
+            }, {
+                type: "model",
+                response: []
+            }]
+        });
+
+        // the closed thought is kept inline in the context and no segment is opened
+        expect(contextState.contextText.toString())
+            .toBe("<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n");
+        expect(contextState.noPrefixTrigger).toBeUndefined();
+    });
+
     test("Fails when messages are not present in the render output", () => {
         try {
             new JinjaTemplateChatWrapper({

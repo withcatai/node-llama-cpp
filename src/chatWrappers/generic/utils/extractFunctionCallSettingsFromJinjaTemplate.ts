@@ -870,7 +870,7 @@ function extractWhitespacePrefixFromRevivedText(target: LlamaText) {
     };
 }
 
-function findCommonStartLength(text1: string, text2: string) {
+export function findCommonStartLength(text1: string, text2: string) {
     let commonStartLength = 0;
     while (commonStartLength < text1.length && commonStartLength < text2.length) {
         if (text1[commonStartLength] !== text2[commonStartLength])

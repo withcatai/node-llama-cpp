@@ -1,10 +1,13 @@
 import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
 import {
-    ChatHistoryItem, ChatModelFunctions, ChatUserMessage, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
+    allSegmentTypes, ChatHistoryItem, ChatModelFunctions, ChatModelSegmentType, ChatUserMessage,
+    ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperGeneratedPrefixTriggersContextState,
     ChatWrapperSettings, Tokenizer
 } from "../../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
+import {getChatWrapperSegmentDefinition} from "../../utils/getChatWrapperSegmentDefinition.js";
+import {includesText} from "../../utils/includesText.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {
     fromChatHistoryToIntermediateOpenAiMessages, fromIntermediateToCompleteOpenAiMessages, IntermediateOpenAiMessage,
@@ -19,7 +22,8 @@ import {
 } from "./utils/templateSegmentOptionsToChatWrapperSettings.js";
 import {UniqueIdGenerator} from "./utils/UniqueIdGenerator.js";
 import {
-    detectNeedToWrapFunctionArgumentsWithMap, extractFunctionCallSettingsFromJinjaTemplate, ExtractFunctionCallSettingsRenderTemplate
+    detectNeedToWrapFunctionArgumentsWithMap, extractFunctionCallSettingsFromJinjaTemplate, ExtractFunctionCallSettingsRenderTemplate,
+    findCommonStartLength
 } from "./utils/extractFunctionCallSettingsFromJinjaTemplate.js";
 import {squashChatHistoryItems} from "./utils/squashChatHistoryItems.js";
 import {extractSegmentSettingsFromTokenizerAndChatTemplate} from "./utils/extractSegmentSettingsFromTokenizerAndChatTemplate.js";
@@ -306,13 +310,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
                         const lastJinjaItem = messages.at(-1);
                         let eraseRenderedJinjaFromId: string | undefined;
-                        if (this._endJinjaMessagesWithUserMessage && lastJinjaItem?.role === this.modelRoleName &&
-                            typeof lastJinjaItem.content === "string" &&
-                            lastJinjaItem.content.length > 0 &&
-                            (
-                                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"] == null ||
-                                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"]?.length === 0
-                            )
+                        if (this._endJinjaMessagesWithUserMessage && isPlainModelMessage(lastJinjaItem, this.modelRoleName) &&
+                            lastJinjaItem.content.length > 0
                         ) {
                             eraseRenderedJinjaFromId = lastJinjaItem.content;
                             messages.push({
@@ -406,14 +405,12 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState & {
         transformedSystemMessagesToUserMessages: boolean
     } {
-        const {
-            contextText, stopGenerationTriggers, ignoreStartText, functionCall, transformedSystemMessagesToUserMessages
-        } = this._generateContextState({
+        const {endJinjaMessagesWithUserMessage, ...contextState} = this._generateContextState({
             chatHistory, availableFunctions, documentFunctionParams,
             endJinjaMessagesWithUserMessage: this._endJinjaMessagesWithUserMessage
         });
 
-        return {contextText, stopGenerationTriggers, ignoreStartText, functionCall, transformedSystemMessagesToUserMessages};
+        return contextState;
     }
 
     public override addAvailableFunctionsSystemMessageToHistory(
@@ -683,13 +680,8 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         const lastJinjaItem = jinjaItems.at(-1);
         let eraseRenderedJinjaFromId: string | undefined;
-        if (endJinjaMessagesWithUserMessage && lastJinjaItem?.role === this.modelRoleName &&
-            typeof lastJinjaItem.content === "string" &&
-            lastJinjaItem.content.length > 0 &&
-            (
-                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"] == null ||
-                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"]?.length === 0
-            )
+        if (endJinjaMessagesWithUserMessage && isPlainModelMessage(lastJinjaItem, this.modelRoleName) &&
+            lastJinjaItem.content.length > 0
         ) {
             eraseRenderedJinjaFromId = lastJinjaItem.content;
             jinjaItems.push({
@@ -698,24 +690,27 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             } as OpenAiChatMessage);
         }
 
-        const renderJinjaText = () => {
+        const renderJinja = (messages: OpenAiChatMessage[], options: Record<string, any>) => (
+            this._jinjaTemplate.render({
+                ...(
+                    this.additionalRenderParameters == null
+                        ? {}
+                        : structuredClone(this.additionalRenderParameters)
+                ),
+                messages,
+                ...removeUndefinedFields({tools}),
+                "bos_token": bosTokenId,
+                "eos_token": eosTokenId,
+                "eot_token": eotTokenId,
+                ...options
+            })
+        );
+
+        // the render inputs (`jinjaItems`, `tools`, `eraseRenderedJinjaFromId`) don't change past this point
+        const renderedJinjaText = (() => {
             let res = tryMatrix({
                 options: [{}, {"add_generation_prompt": true}]
-            }, ({options}) => (
-                this._jinjaTemplate.render({
-                    ...(
-                        this.additionalRenderParameters == null
-                            ? {}
-                            : structuredClone(this.additionalRenderParameters)
-                    ),
-                    messages: jinjaItems,
-                    ...removeUndefinedFields({tools}),
-                    "bos_token": bosTokenId,
-                    "eos_token": eosTokenId,
-                    "eot_token": eotTokenId,
-                    ...options
-                })
-            ));
+            }, ({options}) => renderJinja(jinjaItems, options));
 
             if (eraseRenderedJinjaFromId != null) {
                 const eraseIndex = res.lastIndexOf(eraseRenderedJinjaFromId);
@@ -724,6 +719,51 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             }
 
             return res;
+        })();
+
+        // When the last message is an empty model message (a generation prompt),
+        // some templates emit static text between the assistant header and the model's
+        // response (like a pre-filled `<think>` tag) only inside their `add_generation_prompt`
+        // block. That text is not produced when rendering the empty model message as a
+        // regular message, so it would otherwise be dropped from the context.
+        // This extracts that static text so it can be appended to the context.
+        const extractGenerationPromptPrefill = (): string | undefined => {
+            // when the template never consults `add_generation_prompt`, it cannot emit text
+            // exclusive to the generation prompt, so the extra render can be skipped
+            if (!lastItemIsModelMessage || endJinjaMessagesWithUserMessage ||
+                !this.template.includes("add_generation_prompt")
+            )
+                return undefined;
+
+            // the model message must be empty, since a non-empty one is a response prefix
+            // that the model continues from, not a generation prompt
+            const lastModelJinjaItem = jinjaItems.at(-1);
+            if (!isPlainModelMessage(lastModelJinjaItem, this.modelRoleName) ||
+                idToContent.get(lastModelJinjaItem.content)?.toString() !== ""
+            )
+                return undefined;
+
+            let generationPromptRender: string;
+            try {
+                generationPromptRender = renderJinja(jinjaItems.slice(0, -1), {"add_generation_prompt": true});
+            } catch (err) {
+                return undefined;
+            }
+
+            const commonPrefixLength = findCommonStartLength(generationPromptRender, renderedJinjaText);
+
+            // The two renders must diverge exactly where the empty model message content is,
+            // to ensure the extra text belongs to the model generation position
+            if (!renderedJinjaText.slice(commonPrefixLength).startsWith(lastModelJinjaItem.content))
+                return undefined;
+
+            const prefill = generationPromptRender.slice(commonPrefixLength);
+
+            // The extracted text must be static template text and not contain any message content
+            if (prefill.length === 0 || includesText(prefill, [...idToContent.keys()], true))
+                return undefined;
+
+            return prefill;
         };
 
         const validateThatAllMessageIdsAreUsed = (parts: ReturnType<typeof splitText<string>>) => {
@@ -741,7 +781,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         };
 
         const renderJinjaAndSplitIntoParts = () => {
-            const splitJinjaParts = splitText(renderJinjaText(), [...idToContent.keys()]);
+            const splitJinjaParts = splitText(renderedJinjaText, [...idToContent.keys()]);
 
             if (lastItemIsModelMessage) {
                 let lastModelResponseIndex = -1;
@@ -780,6 +820,29 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         const {splitJinjaParts, stopGenerationJinjaParts} = renderJinjaAndSplitIntoParts();
 
+        // Preserve static text a template emits after the assistant header for a generation
+        // prompt (like a pre-filled `<think>` tag) that would otherwise be dropped
+        let noPrefixTrigger: Extract<
+            NonNullable<ChatWrapperGeneratedPrefixTriggersContextState["noPrefixTrigger"]>, {type: "segment"}
+        > | undefined;
+        const generationPromptPrefill = extractGenerationPromptPrefill();
+        if (generationPromptPrefill != null) {
+            const segmentType = this._findSegmentTypeForGenerationPromptPrefill(generationPromptPrefill);
+
+            if (segmentType != null)
+                // The pre-filled text opens a segment (like a thought segment), so inject it and
+                // open the segment during generation instead of adding it to the context as-is,
+                // to ensure the model's output is correctly attributed to that segment
+                noPrefixTrigger = {
+                    type: "segment",
+                    segmentType,
+                    inject: LlamaText(new SpecialTokensText(generationPromptPrefill))
+                };
+            else
+                // Otherwise keep the pre-filled text as part of the context
+                splitJinjaParts.push(generationPromptPrefill);
+        }
+
         const messageIdsLeftToProcess = new Set(messageIds);
         const contextText = LlamaText(
             splitJinjaParts.map((part) => {
@@ -800,44 +863,85 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         if (messageIdsLeftToProcess.size !== 0)
             throw new Error("Some input messages are not present in the generated Jinja template output");
 
+        const stopGenerationTriggers = [
+            LlamaText(new SpecialToken("EOS")),
+            ...(
+                stopGenerationJinjaParts.length === 0
+                    ? []
+                    : [
+                        LlamaText(
+                            stopGenerationJinjaParts.map((part) => {
+                                if (typeof part === "string")
+                                    return new SpecialTokensText(part);
+
+                                const message = idToContent.get(part.separator);
+
+                                if (message == null)
+                                    throw new Error(`Message with id "${part.separator}" not found`);
+
+                                return message;
+                            })
+                        )
+                    ]
+            )
+        ];
+
         return {
             contextText,
-            ignoreStartText: !this.trimLeadingWhitespaceInResponses
-                ? []
-                : [
-                    // ignore up to 4 leading spaces
-                    ...Array(4).fill(0)
-                        .map((_, index) => LlamaText(" ".repeat(index + 1))),
-                    LlamaText("\t"),
-                    LlamaText("\t\t"),
-                    LlamaText("\t "),
-                    LlamaText(" \t")
-                ],
-            stopGenerationTriggers: [
-                LlamaText(new SpecialToken("EOS")),
-                ...(
-                    stopGenerationJinjaParts.length === 0
-                        ? []
-                        : [
-                            LlamaText(
-                                stopGenerationJinjaParts.map((part) => {
-                                    if (typeof part === "string")
-                                        return new SpecialTokensText(part);
-
-                                    const message = idToContent.get(part.separator);
-
-                                    if (message == null)
-                                        throw new Error(`Message with id "${part.separator}" not found`);
-
-                                    return message;
-                                })
-                            )
-                        ]
-                )
-            ],
+            ...(
+                noPrefixTrigger != null
+                    // `ignoreStartText` is unavailable alongside `noPrefixTrigger`,
+                    // since the injected text is followed directly by the model's output
+                    ? {noPrefixTrigger}
+                    : {
+                        ignoreStartText: !this.trimLeadingWhitespaceInResponses
+                            ? []
+                            : [
+                                // ignore up to 4 leading spaces
+                                ...Array(4).fill(0)
+                                    .map((_, index) => LlamaText(" ".repeat(index + 1))),
+                                LlamaText("\t"),
+                                LlamaText("\t\t"),
+                                LlamaText("\t "),
+                                LlamaText(" \t")
+                            ]
+                    }
+            ),
+            stopGenerationTriggers,
             transformedSystemMessagesToUserMessages,
             endJinjaMessagesWithUserMessage
         };
+    }
+
+    /**
+     * Find the segment type (like a thought segment) that a generation prompt prefill _opens_,
+     * so a pre-filled segment opening (like `<think>`) can open the matching segment during generation.
+     *
+     * Only matches when the prefill leaves the segment open (it contains the prefix but not the suffix).
+     * A prefill that also closes the segment (like `<think></think>`, used to suppress thoughts) is not
+     * matched, so it's kept as plain context text instead of leaving a segment open during generation.
+     * @internal
+     */
+    private _findSegmentTypeForGenerationPromptPrefill(prefill: string): ChatModelSegmentType | undefined {
+        for (const segmentType of allSegmentTypes) {
+            const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, segmentType);
+            if (segmentDefinition == null)
+                continue;
+
+            const segmentPrefix = LlamaText(segmentDefinition.prefix).toString();
+            if (segmentPrefix.length === 0 || !prefill.startsWith(segmentPrefix))
+                continue;
+
+            const segmentSuffix = segmentDefinition.suffix == null
+                ? ""
+                : LlamaText(segmentDefinition.suffix).toString();
+            if (segmentSuffix.length > 0 && prefill.includes(segmentSuffix))
+                continue;
+
+            return segmentType;
+        }
+
+        return undefined;
     }
 
     /**
@@ -879,6 +983,21 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             throw new Error("The provided Jinja template failed the sanity test: " + String(err) + ". Inspect the Jinja template to find out what went wrong");
         }
     }
+}
+
+/**
+ * Whether the given Jinja message is a plain model message - a model message that carries only text content,
+ * without any tool calls attached to it.
+ */
+function isPlainModelMessage(
+    item: OpenAiChatMessage | undefined, modelRoleName: string
+): item is OpenAiChatMessage & {content: string} {
+    return item != null && item.role === modelRoleName &&
+        typeof item.content === "string" &&
+        (
+            (item as OpenAiChatAssistantMessage)["tool_calls"] == null ||
+            (item as OpenAiChatAssistantMessage)["tool_calls"]?.length === 0
+        );
 }
 
 function resolveConvertUnsupportedSystemMessagesToUserMessagesOption(
