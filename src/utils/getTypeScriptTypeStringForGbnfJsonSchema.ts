@@ -143,7 +143,7 @@ function _getTypeScriptTypeStringForGbnfJsonSchema(
                     "\n    ",
                     valueTypes
                         .map((value) => value.split("\n").join("\n    "))
-                        .join(",\n    ")
+                        .join(",\n")
                         .trimStart(),
                     "\n"
                 ].join("")
