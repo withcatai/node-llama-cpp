@@ -363,11 +363,25 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
             if (withReasoningUserMessage1Index < 0)
                 return false;
 
-            return (
-                responseOnly.indexOf(reasoningSectionPrefix, userMessage1Index) < 0 &&
-                withGenerationPrompt.indexOf(reasoningSectionPrefix, withReasoningUserMessage1Index) >= 0 &&
-                withGenerationPrompt.indexOf(reasoningSectionSuffix, withReasoningUserMessage1Index) < 0
-            );
+            if (responseOnly.indexOf(reasoningSectionPrefix, userMessage1Index) >= 0)
+                return false;
+
+            const reasoningSectionPrefixIndex = withGenerationPrompt.indexOf(reasoningSectionPrefix, withReasoningUserMessage1Index);
+            if (reasoningSectionPrefixIndex < 0)
+                return false;
+
+            const reasoningSectionSuffixIndex = withGenerationPrompt.indexOf(reasoningSectionSuffix, reasoningSectionPrefixIndex);
+            if (reasoningSectionSuffixIndex >= 0) {
+                const reasoningSectionContent = withGenerationPrompt.slice(
+                    reasoningSectionPrefixIndex + reasoningSectionPrefix.length,
+                    reasoningSectionSuffixIndex
+                );
+
+                if (reasoningSectionContent.trim() === "")
+                    return false;
+            }
+
+            return true;
         }
 
         let controls: ReturnType<typeof extractControls>;
