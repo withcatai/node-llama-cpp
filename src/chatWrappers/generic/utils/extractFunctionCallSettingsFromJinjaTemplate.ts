@@ -426,7 +426,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
     const callPrefixLength = findCommonEndLength(modelMessage1ToFunc1Name.text, func1ParamsToFunc2Name.text);
     const callPrefixText = func1ParamsToFunc2Name.text.slice(func1ParamsToFunc2Name.text.length - callPrefixLength);
     const parallelismCallPrefix = modelMessage1ToFunc1Name.text.slice(0, modelMessage1ToFunc1Name.text.length - callPrefixLength);
-    
+
     const callSuffixAndParallelismBetweenCallsText = func1ParamsToFunc2Name.text.slice(
         0,
         func1ParamsToFunc2Name.text.length - callPrefixLength

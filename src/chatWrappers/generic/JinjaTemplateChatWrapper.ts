@@ -2,7 +2,7 @@ import {Template} from "@huggingface/jinja";
 import {splitText} from "lifecycle-utils";
 import {
     ChatHistoryItem, ChatModelFunctions, ChatUserMessage, ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState,
-    ChatWrapperSettings, Tokenizer
+    ChatWrapperSettings, isChatModelResponseSegment, Tokenizer
 } from "../../types.js";
 import {SpecialToken, LlamaText, SpecialTokensText} from "../../utils/LlamaText.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
@@ -26,6 +26,15 @@ import {extractSegmentSettingsFromTokenizerAndChatTemplate} from "./utils/extrac
 
 export type JinjaTemplateChatWrapperOptions = {
     template: string,
+
+    /**
+     * Whether to enable reasoning in the Jinja template.
+     *
+     * When set to `null`, the thinking setting will be omitted from the Jinja template, which would cause its default setting to be used.
+     *
+     * Defaults to `true`.
+     */
+    reasoning?: boolean | null,
 
     /**
      * Defaults to `"assistant"`.
@@ -98,6 +107,15 @@ export type JinjaTemplateChatWrapperOptions = {
     segments?: TemplateChatWrapperSegmentsOptions,
 
     /**
+     * Whether to keep only the chain of thought from the last model response.
+     *
+     * When `false`, all the chain of thoughts from the model responses will be kept in the context state.
+     *
+     * The default setting is extracted from the Jinja template, and the extraction fails, defaults to `false`.
+     */
+    keepOnlyLastThought?: boolean,
+
+    /**
      * Pass a model's tokenizer to attempt to detect common tokens used for chat formatting from it.
      *
      * Currently only used for detecting support for `<think>` tags for thought segments.
@@ -154,12 +172,14 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public override readonly settings: ChatWrapperSettings;
 
     public readonly template: string;
+    public readonly reasoning: boolean | null;
     public readonly modelRoleName: string;
     public readonly userRoleName: string;
     public readonly systemRoleName: string;
     public readonly convertUnsupportedSystemMessagesToUserMessages?: JinjaTemplateChatWrapperOptionsConvertMessageFormat;
     public readonly joinAdjacentMessagesOfTheSameType: boolean;
     public readonly trimLeadingWhitespaceInResponses: boolean;
+    public readonly keepOnlyLastThought: boolean;
     public readonly additionalRenderParameters?: Record<string, any>;
 
     /** @internal */ private readonly _jinjaTemplate: Template;
@@ -178,6 +198,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
         const {
             template,
+            reasoning = true,
             modelRoleName = "assistant",
             userRoleName = "user",
             systemRoleName = "system",
@@ -185,6 +206,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             functionCallMessageTemplate = "auto",
             joinAdjacentMessagesOfTheSameType = true,
             trimLeadingWhitespaceInResponses = true,
+            keepOnlyLastThought,
             additionalRenderParameters,
             segments,
             tokenizer,
@@ -196,6 +218,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             throw new Error("template cannot be null");
 
         this.template = template;
+        this.reasoning = reasoning;
         this.modelRoleName = modelRoleName;
         this.userRoleName = userRoleName;
         this.systemRoleName = systemRoleName;
@@ -218,11 +241,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const {supportsSystemMessages, needsToEndJinjaMessagesWithUserMessage} = this._runSanityTest();
         this.settings = {
             ...this.settings,
-            supportsSystemMessages,
-            segments: {
-                ...this.settings.segments,
-                ...extractSegmentSettingsFromTokenizerAndChatTemplate(this.template, tokenizer)
-            }
+            supportsSystemMessages
         };
 
         if (needsToEndJinjaMessagesWithUserMessage)
@@ -233,138 +252,137 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 ? undefined
                 : functionCallMessageTemplate
         );
-        if (functionCallSettings == null && functionCallMessageTemplate !== "noJinja") {
-            try {
-                const renderTemplate: ExtractFunctionCallSettingsRenderTemplate = ({
-                    chatHistory, functions, additionalParams, stringifyFunctionParams, stringifyFunctionResults,
-                    combineModelMessageAndToolCalls, squashModelTextResponses = true, setFunctionNameInResponse
-                }) => {
-                    const render = (
-                        convertSystemMessagesToUserMessagesFormat:
-                            JinjaTemplateChatWrapperOptionsConvertMessageFormat["format"] | undefined,
-                        wipeFunctionCallIds: boolean | "align",
-                        setFunctionNameInResponse?: string | boolean
-                    ) => {
-                        let inputChatHistory = chatHistory;
-                        if (this._wrapFunctionParamsInsideMapKey != null)
-                            inputChatHistory = inputChatHistory.map((item) => {
-                                if (item.type !== "model")
-                                    return item;
+        const renderTemplate: ExtractFunctionCallSettingsRenderTemplate = ({
+            chatHistory, functions, additionalParams, stringifyFunctionParams, stringifyFunctionResults,
+            combineModelMessageAndToolCalls, squashModelTextResponses = true, setFunctionNameInResponse
+        }) => {
+            const render = (
+                convertSystemMessagesToUserMessagesFormat: JinjaTemplateChatWrapperOptionsConvertMessageFormat["format"] | undefined,
+                wipeFunctionCallIds: boolean | "align",
+                setFunctionNameInResponse?: string | boolean
+            ) => {
+                let inputChatHistory = chatHistory;
+                if (this._wrapFunctionParamsInsideMapKey != null)
+                    inputChatHistory = inputChatHistory.map((item) => {
+                        if (item.type !== "model")
+                            return item;
+
+                        return {
+                            ...item,
+                            response: item.response.map((response) => {
+                                if (typeof response === "string" || response.type !== "functionCall")
+                                    return response;
 
                                 return {
-                                    ...item,
-                                    response: item.response.map((response) => {
-                                        if (typeof response === "string" || response.type !== "functionCall")
-                                            return response;
-
-                                        return {
-                                            ...response,
-                                            params: {[this._wrapFunctionParamsInsideMapKey!]: response.params}
-                                        };
-                                    })
+                                    ...response,
+                                    params: {[this._wrapFunctionParamsInsideMapKey!]: response.params}
                                 };
-                            });
-
-                        const {messages: intermediateMessages, tools} = fromChatHistoryToIntermediateOpenAiMessages({
-                            chatHistory: this._transformChatHistory(inputChatHistory, {
-                                convertSystemMessagesToUserMessagesFormat,
-                                joinAdjacentMessagesOfTheSameType: !squashModelTextResponses
-                                    ? false
-                                    : undefined
-                            }).transformedHistory,
-                            chatWrapperSettings: this.settings,
-                            useRawValues: false,
-                            functions,
-                            stringifyFunctionParams,
-                            stringifyFunctionResults,
-                            combineModelMessageAndToolCalls,
-                            squashModelTextResponses,
-                            setFunctionNameInResponse
-                        });
-
-                        const messages = fromIntermediateToCompleteOpenAiMessages(intermediateMessages)
-                            .map((item) => {
-                                if (!wipeFunctionCallIds)
-                                    return item;
-
-                                if (item.role === "assistant" && item["tool_calls"] != null && item["tool_calls"].length > 0) {
-                                    for (const toolCall of item["tool_calls"]) {
-                                        if (wipeFunctionCallIds === "align")
-                                            toolCall.id = "fc_1_0001";
-                                        else
-                                            delete (toolCall as {id?: string}).id;
-                                    }
-                                } else if (item.role === "tool") {
-                                    if (wipeFunctionCallIds === "align")
-                                        item["tool_call_id"] = "fc_1_0001";
-                                    else
-                                        delete (item as {"tool_call_id"?: string})["tool_call_id"];
-                                }
-
-                                return item;
-                            });
-
-                        const lastJinjaItem = messages.at(-1);
-                        let eraseRenderedJinjaFromId: string | undefined;
-                        if (this._endJinjaMessagesWithUserMessage && lastJinjaItem?.role === this.modelRoleName &&
-                            typeof lastJinjaItem.content === "string" &&
-                            lastJinjaItem.content.length > 0 &&
-                            (
-                                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"] == null ||
-                                (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"]?.length === 0
-                            )
-                        ) {
-                            eraseRenderedJinjaFromId = lastJinjaItem.content;
-                            messages.push({
-                                role: this.userRoleName,
-                                content: idsGenerator.generateId()
-                            } as OpenAiChatMessage);
-                        }
-
-                        let res = this._jinjaTemplate.render({
-                            ...(
-                                this.additionalRenderParameters == null
-                                    ? {}
-                                    : structuredClone(this.additionalRenderParameters)
-                            ),
-                            ...additionalParams,
-                            messages,
-                            ...removeUndefinedFields({tools})
-                        });
-
-                        if (eraseRenderedJinjaFromId != null) {
-                            const eraseIndex = res.lastIndexOf(eraseRenderedJinjaFromId);
-                            if (eraseIndex >= 0)
-                                res = res.slice(0, eraseIndex + eraseRenderedJinjaFromId.length);
-                        }
-
-                        // attempt to remove the ID pattern from the output
-                        if (wipeFunctionCallIds === "align")
-                            res = res
-                                .replaceAll(/,\s*"(tool_call_id|call_id|id)":\s*"fc_1_0001"/g, "")
-                                .replaceAll(/"(tool_call_id|call_id|id)":\s*"fc_1_0001"\s*,/g, "");
-
-                        return res;
-                    };
-
-                    return tryMatrix({
-                        convertSystemMessagesToUserMessagesFormat:
-                            getConvertUnsupportedSystemMessagesToUserMessagesTryOptions(
-                                this.convertUnsupportedSystemMessagesToUserMessages
-                            ),
-                        wipeFunctionCallIds: [true, "align", false],
-                        setFunctionNameInResponse: setFunctionNameInResponse == null
-                            ? [false]
-                            : [false, setFunctionNameInResponse]
-                    }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse}) => {
-                        return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse);
+                            })
+                        };
                     });
-                };
-                const idsGenerator = new UniqueIdGenerator(
-                    this.template + this.modelRoleName + this.userRoleName + this.systemRoleName +
-                    (this.convertUnsupportedSystemMessagesToUserMessages?.format ?? "")
-                );
 
+                const {messages: intermediateMessages, tools} = fromChatHistoryToIntermediateOpenAiMessages({
+                    chatHistory: this._transformChatHistory(inputChatHistory, {
+                        convertSystemMessagesToUserMessagesFormat,
+                        joinAdjacentMessagesOfTheSameType: !squashModelTextResponses
+                            ? false
+                            : undefined
+                    }).transformedHistory,
+                    chatWrapperSettings: this.settings,
+                    useRawValues: false,
+                    functions,
+                    stringifyFunctionParams,
+                    stringifyFunctionResults,
+                    combineModelMessageAndToolCalls,
+                    squashModelTextResponses,
+                    setFunctionNameInResponse
+                });
+
+                const messages = fromIntermediateToCompleteOpenAiMessages(intermediateMessages)
+                    .map((item) => {
+                        if (!wipeFunctionCallIds)
+                            return item;
+
+                        if (item.role === "assistant" && item["tool_calls"] != null && item["tool_calls"].length > 0) {
+                            for (const toolCall of item["tool_calls"]) {
+                                if (wipeFunctionCallIds === "align")
+                                    toolCall.id = "fc_1_0001";
+                                else
+                                    delete (toolCall as {id?: string}).id;
+                            }
+                        } else if (item.role === "tool") {
+                            if (wipeFunctionCallIds === "align")
+                                item["tool_call_id"] = "fc_1_0001";
+                            else
+                                delete (item as {"tool_call_id"?: string})["tool_call_id"];
+                        }
+
+                        return item;
+                    });
+
+                const lastJinjaItem = messages.at(-1);
+                let eraseRenderedJinjaFromId: string | undefined;
+                if (this._endJinjaMessagesWithUserMessage && lastJinjaItem?.role === this.modelRoleName &&
+                    typeof lastJinjaItem.content === "string" &&
+                    lastJinjaItem.content.length > 0 &&
+                    (
+                        (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"] == null ||
+                        (lastJinjaItem as OpenAiChatAssistantMessage)["tool_calls"]?.length === 0
+                    )
+                ) {
+                    eraseRenderedJinjaFromId = lastJinjaItem.content;
+                    messages.push({
+                        role: this.userRoleName,
+                        content: idsGenerator.generateId()
+                    } as OpenAiChatMessage);
+                }
+
+                let res = this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
+                    ...additionalParams,
+                    messages,
+                    ...removeUndefinedFields({tools})
+                });
+
+                if (eraseRenderedJinjaFromId != null) {
+                    const eraseIndex = res.lastIndexOf(eraseRenderedJinjaFromId);
+                    if (eraseIndex >= 0)
+                        res = res.slice(0, eraseIndex + eraseRenderedJinjaFromId.length);
+                }
+
+                // attempt to remove the ID pattern from the output
+                if (wipeFunctionCallIds === "align")
+                    res = res
+                        .replaceAll(/,\s*"(tool_call_id|call_id|id)":\s*"fc_1_0001"/g, "")
+                        .replaceAll(/"(tool_call_id|call_id|id)":\s*"fc_1_0001"\s*,/g, "");
+
+                return res;
+            };
+
+            return tryMatrix({
+                convertSystemMessagesToUserMessagesFormat:
+                    getConvertUnsupportedSystemMessagesToUserMessagesTryOptions(
+                        this.convertUnsupportedSystemMessagesToUserMessages
+                    ),
+                wipeFunctionCallIds: [true, "align", false],
+                setFunctionNameInResponse: setFunctionNameInResponse == null
+                    ? [false]
+                    : [false, setFunctionNameInResponse]
+            }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse}) => {
+                return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse);
+            });
+        };
+        const idsGenerator = new UniqueIdGenerator(
+            this.template + this.modelRoleName + this.userRoleName + this.systemRoleName +
+            (this.convertUnsupportedSystemMessagesToUserMessages?.format ?? "")
+        );
+
+        if (functionCallSettings == null && functionCallMessageTemplate !== "noJinja") {
+            try {
                 this._wrapFunctionParamsInsideMapKey = detectNeedToWrapFunctionArgumentsWithMap({idsGenerator, renderTemplate});
                 const extractedSettings = extractFunctionCallSettingsFromJinjaTemplate({
                     idsGenerator,
@@ -386,10 +404,31 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 throw new Error("failed to extract function call settings from the Jinja template");
         }
 
+        const extractedSegmentSettings = extractSegmentSettingsFromTokenizerAndChatTemplate({
+            chatTemplate: this.template,
+            tokenizer,
+            renderRawJinjaTemplate: (params: Record<string, any>) => {
+                return this._jinjaTemplate.render({
+                    ...(
+                        this.additionalRenderParameters == null
+                            ? {}
+                            : structuredClone(this.additionalRenderParameters)
+                    ),
+                    ...params
+                });
+            },
+            idsGenerator,
+            enableReasoning: this.reasoning
+        });
         this.settings = {
             ...this.settings,
-            functions: functionCallSettings ?? ChatWrapper.defaultSettings.functions
+            functions: functionCallSettings ?? ChatWrapper.defaultSettings.functions,
+            segments: {
+                ...this.settings.segments,
+                ...extractedSegmentSettings.settings
+            }
         };
+        this.keepOnlyLastThought = keepOnlyLastThought ?? extractedSegmentSettings.keepOnlyLastThought ?? false;
     }
 
     /**
@@ -565,7 +604,9 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         } = this._transformChatHistory(history, {convertSystemMessagesToUserMessagesFormat, availableFunctions, documentFunctionParams});
 
         const generateMessagesWithEmbeddedTools = (chatHistory: readonly ChatHistoryItem[]) => ({
-            messages: chatHistory.map((item): IntermediateOpenAiMessage => {
+            messages: chatHistory.map((item, index): IntermediateOpenAiMessage => {
+                const isLastItem = index === chatHistory.length - 1;
+
                 if (item.type === "system")
                     return {
                         role: "system",
@@ -579,7 +620,13 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 else if (item.type === "model")
                     return {
                         role: "assistant",
-                        content: this.generateModelResponseText(item.response)
+                        content: this.generateModelResponseText(
+                            (!this.keepOnlyLastThought || isLastItem)
+                                ? item.response
+                                : item.response.filter((response) => (
+                                    !isChatModelResponseSegment(response) || response.segmentType !== "thought")
+                                )
+                        )
                     };
 
                 void (item satisfies never);
@@ -648,6 +695,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         } as const;
         const idToContent = new Map<string, LlamaText | SpecialToken>();
         const modelMessageIds = new Set<string>();
+        const lastModelMessageIds = new Set<string>();
         const messageIds = new Set<string>();
 
         for (const intermediateMessage of intermediateMessages) {
@@ -669,8 +717,11 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 content: id
             } as OpenAiChatMessage);
 
-            if (intermediateMessage.role === "assistant" || intermediateMessage.role === "tool")
+            if (intermediateMessage.role === "assistant" || intermediateMessage.role === "tool") {
                 modelMessageIds.add(id);
+                lastModelMessageIds.add(id);
+            } else if (intermediateMessage.role === "user")
+                lastModelMessageIds.clear();
         }
 
         const bosTokenId = idsGenerator.generateId();
@@ -713,6 +764,11 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                     "bos_token": bosTokenId,
                     "eos_token": eosTokenId,
                     "eot_token": eotTokenId,
+                    ...(
+                        this.reasoning == null
+                            ? {}
+                            : {"enable_thinking": this.reasoning}
+                    ),
                     ...options
                 })
             ));
@@ -781,21 +837,59 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const {splitJinjaParts, stopGenerationJinjaParts} = renderJinjaAndSplitIntoParts();
 
         const messageIdsLeftToProcess = new Set(messageIds);
-        const contextText = LlamaText(
-            splitJinjaParts.map((part) => {
-                if (typeof part === "string")
-                    return new SpecialTokensText(part); // things that are not message content can be tokenized with special tokens
+        const thoughSegmentPrefix = getLlamaTextOnlyText(this.settings.segments?.thought?.prefix);
+        const thoughSegmentSuffix = getLlamaTextOnlyText(this.settings.segments?.thought?.suffix);
+        let inLastModelResponseSection: boolean | null = (
+            thoughSegmentPrefix == null ||
+            thoughSegmentSuffix == null ||
+            this.settings.segments?.thought?.openOnResponseStart !== true
+        )
+            ? null
+            : false;
+        const llamaTextContent: Array<LlamaText | SpecialToken | SpecialTokensText> = [];
+        for (let i = 0; i < splitJinjaParts.length; i++) {
+            const part = splitJinjaParts[i]!;
 
-                const message = idToContent.get(part.separator);
+            if (typeof part === "string") {
+                // things that are not message content can be tokenized with special tokens
+                llamaTextContent.push(new SpecialTokensText(part));
+                continue;
+            }
 
-                if (message == null)
-                    throw new Error(`Message with id "${part.separator}" not found`);
+            const message = idToContent.get(part.separator);
 
-                messageIdsLeftToProcess.delete(part.separator);
+            if (message == null)
+                throw new Error(`Message with id "${part.separator}" not found`);
 
-                return message;
-            })
-        );
+            messageIdsLeftToProcess.delete(part.separator);
+
+            if (inLastModelResponseSection === false && lastModelMessageIds.has(part.separator))
+                inLastModelResponseSection = true;
+
+            // remove empty thinking blocks added by the template if the last model response is supposed to always have a thought
+            // segment rendered by the chat wrapper
+            if (inLastModelResponseSection === true) {
+                const lastPart = llamaTextContent.at(-1);
+                if (lastPart instanceof SpecialTokensText && thoughSegmentPrefix != null && thoughSegmentSuffix != null) {
+                    const thoughPrefixIndex = lastPart.value.indexOf(thoughSegmentPrefix);
+                    const thoughSuffixIndex = thoughPrefixIndex >= 0
+                        ? lastPart.value.indexOf(thoughSegmentSuffix, thoughPrefixIndex + thoughSegmentPrefix.length)
+                        : -1;
+
+                    if (thoughPrefixIndex >= 0 && thoughSuffixIndex >= 0) {
+                        const thoughtText = lastPart.value.slice(thoughPrefixIndex + thoughSegmentPrefix.length, thoughSuffixIndex);
+                        if (thoughtText.trim() === "")
+                            llamaTextContent[llamaTextContent.length - 1] = new SpecialTokensText(
+                                lastPart.value.slice(0, thoughPrefixIndex) +
+                                lastPart.value.slice(thoughSuffixIndex + thoughSegmentSuffix.length)
+                            );
+                    }
+                }
+            }
+
+            llamaTextContent.push(message);
+        }
+        const contextText = LlamaText(llamaTextContent);
 
         if (messageIdsLeftToProcess.size !== 0)
             throw new Error("Some input messages are not present in the generated Jinja template output");
@@ -917,6 +1011,24 @@ function getConvertUnsupportedSystemMessagesToUserMessagesTryOptions(
         return [convertUnsupportedSystemMessagesToUserMessages.format];
 
     return [undefined, convertUnsupportedSystemMessagesToUserMessages.format];
+}
+
+function getLlamaTextOnlyText(llamaText: LlamaText | string | undefined): string | undefined {
+    if (llamaText == null || typeof llamaText === "string")
+        return llamaText;
+
+    const texts: string[] = [];
+
+    for (const value of llamaText.values) {
+        if (typeof value === "string")
+            texts.push(value);
+        else if (value instanceof SpecialTokensText)
+            texts.push(value.value);
+        else
+            return undefined;
+    }
+
+    return texts.join("");
 }
 
 const chatHistoriesForSanityTest: ChatHistoryItem[][] = [

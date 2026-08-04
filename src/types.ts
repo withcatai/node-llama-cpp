@@ -112,6 +112,7 @@ export type ChatWrapperSettings = {
 
         /** Chain of Thought text segment */
         readonly thought?: ChatWrapperSettingsSegment & {
+            openOnResponseStart?: boolean,
             reopenAfterFunctionCalls?: boolean
         },
 

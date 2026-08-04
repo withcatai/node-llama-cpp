@@ -608,7 +608,8 @@ export type OpenAiChatAssistantMessage = {
             name: string,
             arguments: string
         }
-    }>
+    }>,
+    "reasoning_content"?: string
 };
 export type OpenAiChatToolMessage = {
     role: "tool",
