@@ -4,7 +4,7 @@ import process from "process";
 import {fileURLToPath} from "url";
 import fs from "fs-extra";
 import {createContentLoader, defineConfig, HeadConfig, Plugin as VitepressPlugin} from "vitepress";
-import {transformerTwoslash} from "@shikijs/vitepress-twoslash";
+import {rendererFloatingVue, transformerTwoslash} from "@shikijs/vitepress-twoslash";
 import ts from "typescript";
 import envVar from "env-var";
 import {Feed} from "feed";
@@ -19,6 +19,8 @@ import {ensureLocalImage} from "./utils/ensureLocalImage.js";
 import {getExcerptFromMarkdownFile} from "./utils/getExcerptFromMarkdownFile.js";
 import {getVitepressSidebar, getVitepressSidebarWithBlog} from "./config/sidebar.js";
 import {getBlogPosts} from "./config/getBlogPosts.js";
+import {apiTypeLinksTransformer} from "./config/apiLinksTransformer.js";
+import {createCustomTwoSlashRenderer, preserveTwoslashLanguage} from "./config/createCustomTwoSlashRenderer.js";
 import type {Element as HastElement, Parent} from "hast";
 
 import type {Node as UnistNode} from "unist";
@@ -386,40 +388,53 @@ export default defineConfig({
             "js-highlight": "javascript"
         },
         codeTransformers: [
-            transformerTwoslash({
-                floatingVue: {
-                    classFloatingPanel: "twoslash-floating vp-code"
-                },
-                explicitTrigger: false,
-                filter(lang, code, options) {
-                    return options.lang?.toLowerCase() === "typescript";
-                },
-                twoslashOptions: {
-                    compilerOptions: {
-                        ...(await fs.readJSON(path.join(__dirname, "..", "tsconfig.json"))).compilerOptions,
-                        moduleResolution: undefined,
-                        paths: {
-                            "node-llama-cpp": [
-                                path.resolve(__dirname, "..", "dist", "index.d.ts"),
-                                path.resolve(__dirname, "..", "src", "index.ts")
-                            ],
-                            "node-llama-cpp/commands": [
-                                path.resolve(__dirname, "..", "dist", "commands.d.ts"),
-                                path.resolve(__dirname, "..", "src", "commands.ts")
-                            ]
-                        },
-                        typeRoots: [
-                            path.resolve(__dirname, "..", "node_modules"),
-                            path.resolve(__dirname, "..", "node_modules", "@types")
-                        ],
-                        module: ts.ModuleKind.ES2022,
-                        target: ts.ScriptTarget.ES2022,
-                        moduleDetection: ts.ModuleDetectionKind.Force,
-                        rootDir: undefined
+            preserveTwoslashLanguage(
+                transformerTwoslash({
+                    renderer: createCustomTwoSlashRenderer({
+                        baseRenderer: rendererFloatingVue({
+                            lang: "ts",
+                            floatingVue: {
+                                classFloatingPanel: "twoslash-floating vp-code"
+                            }
+                        }),
+                        transformers: [apiTypeLinksTransformer({resolveHref})]
+                    }),
+                    floatingVue: {
+                        classFloatingPanel: "twoslash-floating vp-code"
                     },
-                    tsModule: ts
-                }
-            }) as ShikiTransformer
+                    explicitTrigger: false,
+                    filter(lang, code, options) {
+                        return options.lang?.toLowerCase() === "typescript";
+                    },
+                    twoslashOptions: {
+                        compilerOptions: {
+                            ...(await fs.readJSON(path.join(__dirname, "..", "tsconfig.json"))).compilerOptions,
+                            moduleResolution: undefined,
+                            paths: {
+                                "node-llama-cpp": [
+                                    path.resolve(__dirname, "..", "dist", "index.d.ts"),
+                                    path.resolve(__dirname, "..", "src", "index.ts")
+                                ],
+                                "node-llama-cpp/commands": [
+                                    path.resolve(__dirname, "..", "dist", "commands.d.ts"),
+                                    path.resolve(__dirname, "..", "src", "commands.ts")
+                                ]
+                            },
+                            typeRoots: [
+                                path.resolve(__dirname, "..", "node_modules"),
+                                path.resolve(__dirname, "..", "node_modules", "@types")
+                            ],
+                            module: ts.ModuleKind.ES2022,
+                            target: ts.ScriptTarget.ES2022,
+                            moduleDetection: ts.ModuleDetectionKind.Force,
+                            rootDir: undefined
+                        },
+                        tsModule: ts
+                    }
+                }) as ShikiTransformer
+            ),
+
+            apiTypeLinksTransformer({resolveHref})
         ]
     },
     themeConfig: {

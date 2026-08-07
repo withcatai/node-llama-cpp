@@ -37,7 +37,19 @@ export default {
     },
     enhanceApp({app, router, siteData}: EnhanceAppContext) {
         app.component("YouTubePlayer", YouTubePlayer);
-        app.use(TwoslashFloatingVue);
+        app.use(TwoslashFloatingVue, {
+            disposeTimeout: 300,
+            themes: {
+                twoslash: {
+                    instantMove: false,
+                    distance: 2,
+                    delay: {
+                        show: 50,
+                        hide: 150
+                    }
+                }
+            }
+        });
         app.use(NolebaseGitChangelogPlugin, {
             displayAuthorsInsideCommitLine: true,
             hideChangelogHeader: true,

@@ -288,6 +288,36 @@ img.blog-coverImage {
     text-wrap: wrap;
 }
 
+.twoslash-floating>.v-popper__wrapper {
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    transform-origin: 50% 0%;
+    transform: scale(var(--hide-scale)) translateY(var(--hide-distance));
+    --hide-scale: 0.96;
+    --hide-distance: -2px;
+    opacity: 0;
+}
+.twoslash-floating.v-popper__popper--shown>.v-popper__wrapper {
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    transform-origin: 50% 0%;
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+.twoslash-floating[data-popper-placement^="bottom-"] > .v-popper__wrapper {
+    transform-origin: 50% 0%;
+}
+.twoslash-floating[data-popper-placement^="top-"] > .v-popper__wrapper {
+    transform-origin: 50% 100%;
+}
+.twoslash-floating.v-popper__popper--hidden[data-popper-placement^="bottom-"]>.v-popper__wrapper {
+    transform: scale(var(--hide-scale)) translateY(var(--hide-distance));
+}
+.twoslash-floating.v-popper__popper--hidden[data-popper-placement^="top-"]>.v-popper__wrapper {
+    transform: scale(var(--hide-scale)) translateY(calc(var(--hide-distance) * -1));
+}
+.twoslash-floating .v-popper__arrow-container {
+    display: none;
+}
+
 span.twoslash-popup-docs-tag-value>code:has(>pre>code) {
     background-color: transparent;
 }
@@ -295,6 +325,68 @@ span.twoslash-popup-docs-tag-value>code:has(>pre>code) {
 .twoslash-highlighted {
     border-width: 2px;
     border-radius: 6px;
+}
+
+.dark .vp-code a.nlc-api-link {
+    color: var(--shiki-dark, inherit);
+    --color: var(--shiki-dark, inherit);
+}
+
+html:not(.dark) .vp-code a.nlc-api-link {
+    color: var(--shiki-light, inherit);
+    --color: var(--shiki-light, inherit);
+}
+
+.dark .vp-code a.nlc-api-link:hover {
+    color: color-mix(in srgb, var(--color) 64%, white);
+}
+html:not(.dark) .vp-code a.nlc-api-link:hover {
+    color: color-mix(in srgb, var(--color) 64%, black);
+}
+
+.vp-code a.nlc-api-link {
+    border-bottom: none;
+    text-decoration: none;
+    position: relative;
+    transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+.vp-code a.nlc-api-link:after {
+    content: "";
+    display: block;
+    position: absolute;
+    height: 2px;
+    inset-inline-end: 0px;
+    width: 100%;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--color);
+    border-radius: 12px;
+    overflow: hidden;
+    bottom: -3px;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out, transform 0s 0.3s ease-in-out;
+    transform: scaleX(0.72);
+    transform-origin: 50% 50%;
+}
+.vp-code .twoslash-popup-code a.nlc-api-link:after {
+    transform: scaleX(0.86);
+    opacity: 0.16;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+.vp-code:hover a.nlc-api-link:after,
+.vp-code:focus-visible a.nlc-api-link:after,
+.vp-code:has(:focus-visible) a.nlc-api-link:after {
+    transform: scaleX(1);
+    opacity: 0.32;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+.vp-code a.nlc-api-link:focus-visible {
+    outline: color-mix(in srgb, var(--color) 48%, transparent) solid 2px;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+.vp-code a.nlc-api-link:focus-visible:after {
+    display: none;
 }
 
 .VPFeature {
