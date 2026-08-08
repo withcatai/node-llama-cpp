@@ -1,6 +1,11 @@
 #include <stddef.h>
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
+#include <limits>
 #include <map>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <vulkan/vulkan.hpp>
@@ -13,13 +18,83 @@ constexpr std::uint32_t VK_VENDOR_ID_QUALCOMM = 0x5143;
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-static vk::Instance vulkanInstance() {
-    vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
-    vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
-    return vk::createInstance(createInfo);
+static bool addWithoutOverflow(uint64_t& target, uint64_t value) {
+    if (value > std::numeric_limits<uint64_t>::max() - target) {
+        return false;
+    }
+
+    target += value;
+    return true;
 }
 
-static std::vector<vk::PhysicalDevice> dedupedDevices() {
+static vk::Instance vulkanInstance() {
+    static vk::Instance instance = []() {
+        const uint32_t apiVersion = vk::enumerateInstanceVersion();
+        if (apiVersion < VK_API_VERSION_1_2) {
+            throw std::runtime_error("Vulkan 1.2 is not supported by the current system. Please update your Vulkan driver");
+        }
+
+        vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
+        vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
+        return vk::createInstance(createInfo);
+    }();
+
+    return instance;
+}
+
+static bool deviceSupportsMemoryBudget(const vk::PhysicalDevice& physicalDevice) {
+    std::vector<vk::ExtensionProperties> extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
+
+    return std::any_of(
+        extensionProperties.begin(),
+        extensionProperties.end(),
+        [](const vk::ExtensionProperties& ext) {
+            return std::string(ext.extensionName.data()) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+        }
+    );
+}
+
+static bool isVulkanDeviceSupported(const vk::PhysicalDevice& physicalDevice, std::string* unsupportedReason = nullptr) {
+    if (unsupportedReason != nullptr) {
+        unsupportedReason->clear();
+    }
+
+    VkPhysicalDeviceFeatures2 features2 = {};
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    VkPhysicalDeviceVulkan11Features vk11Features = {};
+    vk11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    features2.pNext = &vk11Features;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+
+    if (!vk11Features.storageBuffer16BitAccess) {
+        if (unsupportedReason != nullptr) {
+            vk::PhysicalDeviceProperties deviceProps = physicalDevice.getProperties();
+            *unsupportedReason =
+                "Vulkan storageBuffer16BitAccess not supported for device \"" +
+                std::string(deviceProps.deviceName.data()) + "\"";
+        }
+
+        return false;
+    }
+
+    if (!deviceSupportsMemoryBudget(physicalDevice)) {
+        // VK_EXT_memory_budget extension is not supported, so we cannot determine used memory
+
+        if (unsupportedReason != nullptr) {
+            vk::PhysicalDeviceProperties deviceProps = physicalDevice.getProperties();
+            *unsupportedReason = "Vulkan VK_EXT_memory_budget extension not supported for device \"" +
+                                 std::string(deviceProps.deviceName.data()) + "\", so VRAM info cannot be determined for it";
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+static std::vector<vk::PhysicalDevice> dedupedDevices(gpuInfoVulkanWarningLogCallback_t warningLogCallback = nullptr) {
     vk::Instance instance = vulkanInstance();
     auto physicalDevices = instance.enumeratePhysicalDevices();
     std::vector<vk::PhysicalDevice> dedupedDevices;
@@ -27,6 +102,22 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
 
     // adapted from `ggml_vk_instance_init` in `ggml-vulkan.cpp`
     for (const auto& device : physicalDevices) {
+        vk::PhysicalDeviceProperties deviceProps = device.getProperties();
+
+        // ignore CPU devices, as we don't want to count RAM from the CPU as VRAM
+        if (deviceProps.deviceType == vk::PhysicalDeviceType::eCpu) {
+            continue;
+        }
+
+        std::string unsupportedReason;
+        if (!isVulkanDeviceSupported(device, warningLogCallback != nullptr ? &unsupportedReason : nullptr)) {
+            if (warningLogCallback != nullptr) {
+                warningLogCallback(unsupportedReason.c_str());
+            }
+
+            continue;
+        }
+
         vk::PhysicalDeviceProperties2 newProps;
         vk::PhysicalDeviceDriverProperties newDriver;
         vk::PhysicalDeviceIDProperties newId;
@@ -109,78 +200,58 @@ static std::vector<vk::PhysicalDevice> dedupedDevices() {
     return dedupedDevices;
 }
 
-static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback, bool * checkSupported) {
-    auto physicalDevices = dedupedDevices();
+static bool enumerateVulkanDevices(uint64_t* total, uint64_t* used, uint64_t* unifiedMemorySize, bool addDeviceNames, std::vector<std::string> * deviceNames, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    auto physicalDevices = dedupedDevices(warningLogCallback);
 
-    size_t usedMem = 0;
-    size_t totalMem = 0;
-    size_t totalUnifiedMemorySize = 0;
+    uint64_t usedMem = 0;
+    uint64_t totalMem = 0;
+    uint64_t totalUnifiedMemorySize = 0;
 
     for (size_t i = 0; i < physicalDevices.size(); i++) {
         vk::PhysicalDevice physicalDevice = physicalDevices[i];
-        vk::PhysicalDeviceMemoryProperties memProps = physicalDevice.getMemoryProperties();
         vk::PhysicalDeviceProperties deviceProps = physicalDevice.getProperties();
 
-        if (deviceProps.deviceType == vk::PhysicalDeviceType::eCpu) {
-            // ignore CPU devices, as we don't want to count RAM from the CPU as VRAM
-            continue;
-        }
+        vk::PhysicalDeviceMemoryBudgetPropertiesEXT memoryBudgetProperties;
+        vk::PhysicalDeviceMemoryProperties2 memProps2 = {};
+        memProps2.pNext = &memoryBudgetProperties;
 
-        std::vector<vk::ExtensionProperties> extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
-        bool memoryBudgetExtensionSupported =
-            std::any_of(
-                extensionProperties.begin(),
-                extensionProperties.end(),
-                [](const vk::ExtensionProperties& ext) { return std::string(ext.extensionName.data()) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;}
-            );
+        physicalDevice.getMemoryProperties2(&memProps2);
 
-        if (memoryBudgetExtensionSupported) {
-            vk::PhysicalDeviceMemoryBudgetPropertiesEXT memoryBudgetProperties;
-            vk::PhysicalDeviceMemoryProperties2 memProps2 = {};
-            memProps2.pNext = &memoryBudgetProperties;
+        bool hasDeviceLocalHeap = false;
 
-            physicalDevice.getMemoryProperties2(&memProps2);
+        for (uint32_t i = 0; i < memProps2.memoryProperties.memoryHeapCount; ++i) {
+            const auto heap = memProps2.memoryProperties.memoryHeaps[i];
 
-            for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
-                const auto heap = memProps2.memoryProperties.memoryHeaps[i];
+            if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+                const uint64_t heapSize = heap.size;
+                const uint64_t heapBudget = (std::min)<uint64_t>(memoryBudgetProperties.heapBudget[i], heapSize);
+                const uint64_t heapUsage = (std::min)<uint64_t>(memoryBudgetProperties.heapUsage[i], heapBudget);
+                const uint64_t heapUsed = heapSize - (heapBudget - heapUsage);
 
-                if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-                    totalMem += heap.size;
-                    usedMem += memoryBudgetProperties.heapUsage[i] + (heap.size - memoryBudgetProperties.heapBudget[i]);
+                hasDeviceLocalHeap = heapSize != 0;
 
-                    if (heap.flags & vk::MemoryHeapFlagBits::eMultiInstance) {
-                        totalUnifiedMemorySize += heap.size;
+                if (!addWithoutOverflow(totalMem, heapSize) || !addWithoutOverflow(usedMem, heapUsed)) {
+                    if (warningLogCallback != nullptr) {
+                        warningLogCallback("Vulkan VRAM size overflow");
                     }
 
-                    if (heap.size > 0 && addDeviceNames) {
-                        (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
-                    }
+                    return false;
+                }
 
-                    if (checkSupported != nullptr && checkSupported) {
-                        VkPhysicalDeviceFeatures2 features2 = {};
-                        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
-                        VkPhysicalDeviceVulkan11Features vk11Features = {};
-                        vk11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-                        features2.pNext = &vk11Features;
-
-                        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
-
-                        if (!vk11Features.storageBuffer16BitAccess) {
-                            *checkSupported = false;
+                if (deviceProps.deviceType == vk::PhysicalDeviceType::eIntegratedGpu) {
+                    if (!addWithoutOverflow(totalUnifiedMemorySize, heapSize)) {
+                        if (warningLogCallback != nullptr) {
+                            warningLogCallback("Vulkan unified VRAM size overflow");
                         }
+
+                        return false;
                     }
                 }
             }
-        } else {
-            // VK_EXT_memory_budget extension is not supported, so we cannot determine used memory
-            warningLogCallback(
-                (
-                    "Vulkan VK_EXT_memory_budget extension not supported for device \"" +
-                    std::string(deviceProps.deviceName.data()) + "\", so VRAM info cannot be determined for it"
-                ).c_str()
-            );
-            return false;
+        }
+
+        if (hasDeviceLocalHeap && addDeviceNames) {
+            (*deviceNames).push_back(std::string(deviceProps.deviceName.data()));
         }
     }
 
@@ -191,17 +262,29 @@ static bool enumerateVulkanDevices(size_t* total, size_t* used, size_t* unifiedM
     return true;
 }
 
-bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback, nullptr);
+bool gpuInfoGetTotalVulkanDevicesInfo(uint64_t* total, uint64_t* used, uint64_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
+    try {
+        return enumerateVulkanDevices(total, used, unifiedMemorySize, false, nullptr, warningLogCallback);
+    } catch (const std::exception& err) {
+        if (warningLogCallback != nullptr) {
+            std::string message = "Failed to get Vulkan GPU info: " + std::string(err.what());
+            warningLogCallback(message.c_str());
+        }
+
+        return false;
+    }
 }
 
 bool checkIsVulkanEnvSupported(gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
-    size_t total = 0;
-    size_t used = 0;
-    size_t unifiedMemorySize = 0;
+    try {
+        vulkanInstance().enumeratePhysicalDevices();
+        return true;
+    } catch (const std::exception& err) {
+        if (warningLogCallback != nullptr) {
+            std::string message = "Failed to check Vulkan support: " + std::string(err.what());
+            warningLogCallback(message.c_str());
+        }
 
-    bool isSupported = true;
-    enumerateVulkanDevices(&total, &used, &unifiedMemorySize, false, nullptr, warningLogCallback, &isSupported);
-
-    return isSupported;
+        return false;
+    }
 }

@@ -5,5 +5,5 @@
 
 typedef void (*gpuInfoVulkanWarningLogCallback_t)(const char* message);
 
-bool gpuInfoGetTotalVulkanDevicesInfo(size_t* total, size_t* used, size_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback);
+bool gpuInfoGetTotalVulkanDevicesInfo(uint64_t* total, uint64_t* used, uint64_t* unifiedMemorySize, gpuInfoVulkanWarningLogCallback_t warningLogCallback);
 bool checkIsVulkanEnvSupported(gpuInfoVulkanWarningLogCallback_t warningLogCallback);
