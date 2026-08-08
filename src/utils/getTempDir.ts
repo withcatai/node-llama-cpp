@@ -101,18 +101,17 @@ function onExit() {
     }
 }
 
+const fsHandleFinalizationRegistry = new FinalizationRegistry(removePathUsageSync);
 export class FsPathHandle {
     public readonly path: string;
 
-    private _finalizationRegistry: FinalizationRegistry<string>;
     private _disposed: boolean = false;
 
     public constructor(dirPath: string) {
         this.path = dirPath;
-        this._finalizationRegistry = new FinalizationRegistry(removePathUsageSync);
 
         addPathUsage(this.path);
-        this._finalizationRegistry.register(this, this.path, this);
+        fsHandleFinalizationRegistry.register(this, this.path, this);
     }
 
     public async dispose() {
@@ -120,7 +119,7 @@ export class FsPathHandle {
             return;
 
         this._disposed = true;
-        this._finalizationRegistry.unregister(this);
+        fsHandleFinalizationRegistry.unregister(this);
         await removePathUsage(this.path, true);
     }
 
@@ -133,7 +132,7 @@ export class FsPathHandle {
             return;
 
         this._disposed = true;
-        this._finalizationRegistry.unregister(this);
+        fsHandleFinalizationRegistry.unregister(this);
         removePathUsage(this.path, false);
     }
 }

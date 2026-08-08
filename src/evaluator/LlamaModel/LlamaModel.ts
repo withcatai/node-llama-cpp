@@ -1,6 +1,6 @@
 import process from "process";
 import path from "path";
-import {acquireLock, AsyncDisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposedError, EventRelay, withLock, registerFinalizer} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token, Tokenizer} from "../../types.js";
 import {AddonModel, AddonModelLora, ModelTypeDescription} from "../../bindings/AddonTypes.js";
@@ -317,11 +317,11 @@ export class LlamaModel {
             this._disposedState.disposed = true;
         });
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
-        this._disposeAggregator.add(
-            this._llama.onDispose.createListener(
-                disposeModelIfReferenced.bind(null, new WeakRef(this))
-            )
+        const onLlamaDisposeListener = this._llama.onDispose.createListener(
+            disposeModelIfReferenced.bind(null, new WeakRef(this))
         );
+        this._disposeAggregator.add(onLlamaDisposeListener);
+        this._disposeAggregator.add(registerFinalizer(this, onLlamaDisposeListener));
 
         this._disposeAggregator.add(async () => {
             await this._backendModelDisposeGuard.acquireDisposeLock();

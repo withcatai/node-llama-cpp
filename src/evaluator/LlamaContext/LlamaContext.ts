@@ -1,5 +1,5 @@
 import path from "path";
-import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, registerFinalizer, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
 import {AddonContext, AddonModelLora, BatchLogitIndex} from "../../bindings/AddonTypes.js";
@@ -87,6 +87,7 @@ export class LlamaContext {
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
     /** @internal */ private readonly _modelPreventDisposalHandle: DisposalPreventionHandle;
     /** @internal */ private readonly _loraAdapters = new Set<AddonModelLora>();
+    /** @internal */ public readonly _sequenceGcRegistry: FinalizationRegistry<number>;
     /** @internal */ public _vramConsumptionMarking?: MemoryMarking;
     /** @internal */ public _ramConsumptionMarking?: MemoryMarking;
     /** @internal */ private _nextGeneratedSequenceId = 0;
@@ -184,17 +185,19 @@ export class LlamaContext {
 
         this._reclaimUnusedSequenceId = this._reclaimUnusedSequenceId.bind(this);
         this._freeReservedThreads = this._freeReservedThreads.bind(this);
+        this._sequenceGcRegistry = new FinalizationRegistry(this._reclaimUnusedSequenceId);
 
         this._disposeAggregator.add(() => {
             this._disposed = true;
         });
         this._disposeAggregator.add(this._onReclaimUnusedSequenceId);
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
-        this._disposeAggregator.add(
-            this.model.onDispose.createListener(
-                disposeContextIfReferenced.bind(null, new WeakRef(this))
-            )
+
+        const onModelDisposeListener = this.model.onDispose.createListener(
+            disposeContextIfReferenced.bind(null, new WeakRef(this))
         );
+        this._disposeAggregator.add(onModelDisposeListener);
+        this._disposeAggregator.add(registerFinalizer(this, onModelDisposeListener));
 
         this._disposeAggregator.add(async () => {
             await this._backendContextDisposeGuard.acquireDisposeLock();
@@ -1067,7 +1070,6 @@ export class LlamaContext {
 
 export class LlamaContextSequence {
     /** @internal */ private readonly _sequenceId: number;
-    /** @internal */ private readonly _gcRegistry: FinalizationRegistry<number>;
     /** @internal */ private readonly _context: LlamaContext;
     /** @internal */ private readonly _contextShift: Required<ContextShiftOptions>;
     /** @internal */ private readonly _tokenPredictor?: TokenPredictor;
@@ -1112,18 +1114,18 @@ export class LlamaContextSequence {
             interval: checkpoints?.interval ?? defaultCheckpointOptions.interval,
             maxMemory: checkpoints?.maxMemory ?? defaultCheckpointOptions.maxMemory
         };
-        this._gcRegistry = new FinalizationRegistry(this._context._reclaimUnusedSequenceId);
 
-        this._gcRegistry.register(this, sequenceId, this);
-        this._disposeAggregator.add(() => this._gcRegistry.unregister(this));
+        this._context._sequenceGcRegistry.register(this, sequenceId, this);
+        this._disposeAggregator.add(() => this._context._sequenceGcRegistry.unregister(this));
 
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
 
-        this._disposeAggregator.add(
-            this.model.onDispose.createListener(
-                disposeContextSequenceIfReferenced.bind(null, new WeakRef(this))
-            )
+        const onContextDisposeListener = this.context.onDispose.createListener(
+            disposeContextSequenceIfReferenced.bind(null, new WeakRef(this))
         );
+        this._disposeAggregator.add(onContextDisposeListener);
+        this._disposeAggregator.add(registerFinalizer(this, onContextDisposeListener));
+        
         this._disposeAggregator.add(() => {
             this._checkpoints.clearAllCheckpoints();
             this._context._reclaimUnusedSequenceId(this._sequenceId);

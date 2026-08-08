@@ -8,6 +8,9 @@ export class ThreadsSplitter {
     private _totalWantedThreads: number = 0;
     public maxThreads: number;
 
+    /** @internal */ public readonly _wantedThreadsGcRegistry: FinalizationRegistry<number>;
+    /** @internal */ public readonly _demandedThreadsGcRegistry: FinalizationRegistry<number>;
+
     /**
      * Set to `0` to disable the limit
      * @param maxThreads
@@ -17,6 +20,9 @@ export class ThreadsSplitter {
 
         this._removeWantedThreads = this._removeWantedThreads.bind(this);
         this._removeThreadDemand = this._removeThreadDemand.bind(this);
+
+        this._wantedThreadsGcRegistry = new FinalizationRegistry(this._removeWantedThreads);
+        this._demandedThreadsGcRegistry = new FinalizationRegistry(this._removeThreadDemand);
     }
 
     public createConsumer(wantedThreads: number, minThreads: number = 1) {
@@ -126,8 +132,6 @@ export class ThreadsSplitterConsumer {
     private readonly _threadsSplitter: ThreadsSplitter;
     private readonly _wantedThreads: number;
     private readonly _demandedThreads: number;
-    private readonly _wantedThreadsGcRegistry: FinalizationRegistry<number>;
-    private readonly _demandedThreadsGcRegistry: FinalizationRegistry<number>;
     private _usedThreads: number = 0;
     private _disposed: boolean = false;
 
@@ -139,11 +143,8 @@ export class ThreadsSplitterConsumer {
         this._threadsSplitter._addWantedThreads(this._wantedThreads);
         this._threadsSplitter._addThreadDemand(this._demandedThreads);
 
-        this._wantedThreadsGcRegistry = new FinalizationRegistry(this._threadsSplitter._removeWantedThreads);
-        this._wantedThreadsGcRegistry.register(this, this._wantedThreads, this);
-
-        this._demandedThreadsGcRegistry = new FinalizationRegistry(this._threadsSplitter._removeThreadDemand);
-        this._demandedThreadsGcRegistry.register(this, this._demandedThreads, this);
+        this._threadsSplitter._wantedThreadsGcRegistry.register(this, this._wantedThreads, this);
+        this._threadsSplitter._demandedThreadsGcRegistry.register(this, this._demandedThreads, this);
     }
 
     public [Symbol.dispose]() {
@@ -159,8 +160,8 @@ export class ThreadsSplitterConsumer {
         this._threadsSplitter._removeWantedThreads(this._wantedThreads);
         this._threadsSplitter._removeThreadDemand(this._demandedThreads);
 
-        this._wantedThreadsGcRegistry.unregister(this);
-        this._demandedThreadsGcRegistry.unregister(this);
+        this._threadsSplitter._wantedThreadsGcRegistry.unregister(this);
+        this._threadsSplitter._demandedThreadsGcRegistry.unregister(this);
     }
 
     public getAllocationToConsume(): Promisable<[threadsToUse: number, usageHandle: DisposableHandle]> {

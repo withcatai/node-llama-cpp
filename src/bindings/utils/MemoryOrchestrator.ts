@@ -7,6 +7,7 @@ export class MemoryOrchestrator {
     /** @internal */ public _markedMemory: number = 0;
     /** @internal */ private _memoryCap: number | null = null;
     /** @internal */ private _padding: number = 0;
+    /** @internal */ public _markingsFinalizationRegistry: FinalizationRegistry<number>;
 
     public readonly onMemoryReservationRelease = new EventRelay<void>();
     public readonly onMemoryMarkingRelease = new EventRelay<void>();
@@ -15,6 +16,8 @@ export class MemoryOrchestrator {
         this._getMemoryState = getMemoryState;
 
         this._onMarkFinalized = this._onMarkFinalized.bind(this);
+
+        this._markingsFinalizationRegistry = new FinalizationRegistry(this._onMarkFinalized);
     }
 
     public reserveMemory(bytes: number) {
@@ -77,7 +80,7 @@ export class MemoryOrchestrator {
     public _onMarkFinalized(bytes: number) {
         this._markedMemory -= bytes;
         this.onMemoryMarkingRelease.dispatchEvent();
-    }   
+    }
 }
 
 export class MemoryReservation {
@@ -116,13 +119,11 @@ export class MemoryReservation {
 export class MemoryMarking {
     /** @internal */ private readonly _size: number;
     /** @internal */ private _orchestrator?: MemoryOrchestrator;
-    /** @internal */ private _finalizationRegistry: FinalizationRegistry<number>;
 
     private constructor(size: number, orchestrator: MemoryOrchestrator) {
         this._size = size;
         this._orchestrator = orchestrator;
-        this._finalizationRegistry = new FinalizationRegistry(orchestrator._onMarkFinalized);
-        this._finalizationRegistry.register(this, size, this);
+        this._orchestrator._markingsFinalizationRegistry.register(this, size, this);
     }
 
     public get size(): number {
@@ -140,7 +141,7 @@ export class MemoryMarking {
     public dispose(): void {
         if (this._orchestrator != null) {
             this._orchestrator._onMarkFinalized(this._size);
-            this._finalizationRegistry.unregister(this);
+            this._orchestrator._markingsFinalizationRegistry.unregister(this);
         }
 
         this._orchestrator = undefined;
