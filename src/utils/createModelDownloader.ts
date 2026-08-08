@@ -1,6 +1,6 @@
 import process from "process";
 import path from "path";
-import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence} from "ipull";
+import {DownloadEngineMultiDownload, DownloadEngineNodejs, downloadFile, downloadSequence, DownloadStatus} from "ipull";
 import fs from "fs-extra";
 import chalk from "chalk";
 import {createSplitPartFilename, resolveSplitGgufParts} from "../gguf/utils/resolveSplitGgufParts.js";
@@ -45,7 +45,7 @@ export type ModelDownloaderOptions = ({
      */
     showCliProgress?: boolean,
 
-    onProgress?: (status: {totalSize: number, downloadedSize: number}) => void,
+    onProgress?: (status: {totalSize: number, downloadedSize: number, estimatedTimeLeft: number, averageSpeed: number}) => void,
 
     /**
      * If true, the downloader will skip the download if the file already exists, and its size matches the size of the remote file.
@@ -294,6 +294,31 @@ export class ModelDownloader {
             .reduce((acc, transferredBytes) => acc + transferredBytes, 0);
     }
 
+    public get estimatedTimeLeft() {
+        let maxTimeLeft: number | undefined = undefined;
+        for (const downloader of this._specificFileDownloaders) {
+            const timeLeft = downloader.status.timeLeft;
+            if (timeLeft == null)
+                continue;
+
+            if (maxTimeLeft == null || timeLeft > maxTimeLeft)
+                maxTimeLeft = timeLeft;
+        }
+
+        return maxTimeLeft ?? Infinity;
+    }
+
+    public get averageSpeed() {
+        const speeds = this._specificFileDownloaders
+            .filter((downloader) => downloader.status.downloadStatus === DownloadStatus.Active)
+            .map((downloader) => downloader.status.speed);
+
+        if (speeds.length === 0)
+            return 0;
+
+        return speeds.reduce((res, speed) => res + speed, 0) / speeds.length;
+    }
+
     /**
      * Info about all the files that will be saved to the download directory,
      * including their filenames, full paths, total sizes and downloaded sizes.
@@ -368,7 +393,9 @@ export class ModelDownloader {
     private _onDownloadProgress() {
         this._onProgress?.({
             totalSize: this.totalSize,
-            downloadedSize: this.downloadedSize
+            downloadedSize: this.downloadedSize,
+            estimatedTimeLeft: this.estimatedTimeLeft,
+            averageSpeed: this.averageSpeed
         });
     }
 
