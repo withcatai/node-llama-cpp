@@ -51,26 +51,29 @@ describe("qwen3.5 0.8b", () => {
 
               The second word is "secret"."
             `);
-            expect(chatSession.sequence.tokenMeter.usedInputTokens).toMatchInlineSnapshot("389");
-            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("425");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("437");
+            expect(chatSession.sequence.tokenMeter.usedInputTokens).toMatchInlineSnapshot("391");
+            expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("550");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("585");
 
             const initialMeterState = chatSession.sequence.tokenMeter.getState();
             const res2 = await chatSession.prompt("Explain what this word means. short", {
                 ...promptOptions,
-                maxTokens: 15
+                maxTokens: 15,
+                budgets: {
+                    thoughtTokens: 4
+                }
             });
 
             const diffMeterState = chatSession.sequence.tokenMeter.diff(initialMeterState);
             expect(res2).to.toMatchInlineSnapshot(`
               "
 
-              "Secret" means something that is hidden or not known"
+              "secret" means something hidden or confidential. It"
             `);
-            expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("90");
+            expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("94");
             expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(95);
             expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("448");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("463");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("467");
         });
 
         test("disposing the context asynchronously works", {timeout: 1000 * 60 * 60 * 2}, async () => {

@@ -14,7 +14,7 @@ export class QwenChatWrapper extends ChatWrapper {
     public readonly variation: "3" | "3.5";
 
     public readonly keepOnlyLastThought: boolean;
-    public readonly thoughts: "auto" | "discourage";
+    public readonly thoughts: "auto" | "discourage" | "modelInitiated";
     /** @internal */ private readonly _flatFunctionResultString: boolean;
     /** @internal */ private readonly _ensureModelThoughtBeforeTextOnLastResponse: boolean;
 
@@ -33,9 +33,12 @@ export class QwenChatWrapper extends ChatWrapper {
         /**
          * Control the usage of thoughts in the model responses.
          *
+         * When set to `"modelInitiated"`, thought segments won't be force-opened at the start of the model response,
+         * even if that's what the model would normally expect.
+         *
          * Defaults to `"auto"`.
          */
-        thoughts?: "auto" | "discourage",
+        thoughts?: "auto" | "discourage" | "modelInitiated",
 
         /**
          * Chat template variation to use.
@@ -145,7 +148,8 @@ export class QwenChatWrapper extends ChatWrapper {
                     reiterateStackAfterFunctionCalls: true,
                     thought: {
                         prefix: LlamaText(new SpecialTokensText("<think>\n")),
-                        suffix: LlamaText(new SpecialTokensText("\n</think>"))
+                        suffix: LlamaText(new SpecialTokensText("\n</think>")),
+                        openOnResponseStart: thoughts === "auto"
                     }
                 }
             };
@@ -390,26 +394,33 @@ export class QwenChatWrapper extends ChatWrapper {
                 {_requireFunctionCallSettingsExtraction: true}
             ],
 
-            [
-                {variation: "3.5"},
-                {variation: "3.5"},
-                {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
-            ],
-            [
-                {variation: "3.5", _lineBreakBeforeFunctionCallPrefix: true},
-                {variation: "3.5"},
-                {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
-            ],
-            [
-                {variation: "3.5", _ensureModelThoughtBeforeTextOnLastResponse: true, _lineBreakBeforeFunctionCallPrefix: true},
-                {variation: "3.5"},
-                {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
-            ],
-            [
-                {variation: "3.5", _ensureModelThoughtBeforeTextOnLastResponse: true},
-                {variation: "3.5"},
-                {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
-            ]
+            ...([undefined, "modelInitiated"] satisfies (undefined | typeof this.prototype.thoughts)[]).flatMap((thoughts) => [
+                [
+                    {variation: "3.5", thoughts},
+                    {variation: "3.5", thoughts},
+                    {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
+                ],
+                [
+                    {variation: "3.5", thoughts, _lineBreakBeforeFunctionCallPrefix: true},
+                    {variation: "3.5", thoughts},
+                    {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
+                ],
+                [
+                    {
+                        variation: "3.5",
+                        thoughts,
+                        _ensureModelThoughtBeforeTextOnLastResponse: true,
+                        _lineBreakBeforeFunctionCallPrefix: true
+                    },
+                    {variation: "3.5", thoughts},
+                    {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
+                ],
+                [
+                    {variation: "3.5", thoughts, _ensureModelThoughtBeforeTextOnLastResponse: true},
+                    {variation: "3.5", thoughts},
+                    {_requireFunctionCallSettingsExtraction: true, _functionCallExtractionExamineNonFirst: true}
+                ]
+            ])
         ];
     }
 }

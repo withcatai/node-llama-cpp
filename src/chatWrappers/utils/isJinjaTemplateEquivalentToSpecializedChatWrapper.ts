@@ -136,6 +136,11 @@ function checkEquivalence(
                 (specializedChatWrapper as Writable<ChatWrapper>).settings = originalSpecializedSettings;
         }
 
+        if (jinjaChatWrapper.settings.segments?.thought?.openOnResponseStart === true &&
+            specializedChatWrapper.settings.segments?.thought?.openOnResponseStart !== true
+        )
+            return false;
+
         if (!compareContextTexts(jinjaRes.contextText, specializedWrapperRes.contextText, tokenizer))
             return false;
 

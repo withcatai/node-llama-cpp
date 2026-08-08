@@ -323,12 +323,11 @@ export function resolveChatWrapper(
                     : undefined;
 
                 const testChatWrapperSettings = {
-                    ...(wrapperSettings ?? {}),
                     ...(testConfig ?? {})
                 };
                 const applyChatWrapperSettings = {
-                    ...(wrapperSettings ?? {}),
-                    ...(applyConfig ?? {})
+                    ...(applyConfig ?? {}),
+                    ...(wrapperSettings ?? {})
                 };
                 const chatWrapper = new (Wrapper as any)(testChatWrapperSettings);
 

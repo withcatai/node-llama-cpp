@@ -691,7 +691,6 @@ export class LlamaChat {
                 let tookInitialCheckpoint = false;
 
                 generateResponseState.ensureLastHistoryItemIsModel();
-                generateResponseState.openThoughtSegmentOnModelResponseStartIfNeeded();
                 generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
 
                 const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
@@ -712,6 +711,22 @@ export class LlamaChat {
                     generateResponseState.canAvoidReloadingHistory = false;
                     await loadContextWindow();
                     generateResponseState.isRerender = false;
+
+                    if (generateResponseState.isFirstEvaluation && generateResponseState.onModelResponseStateShouldOpenThoughtSegment()) {
+                        if (!tookInitialCheckpoint && this.sequence.needsCheckpoints) {
+                            await generateResponseState.alignCurrentSequenceStateWithCurrentTokens(false);
+                            await generateResponseState.evaluateWithoutGeneratingNewTokens();
+
+                            await this.sequence.takeCheckpoint();
+                            tookInitialCheckpoint = true;
+                        }
+
+                        generateResponseState.openThoughtSegmentOnModelResponseStartIfNeeded();
+                        generateResponseState.canAvoidReloadingHistory = false;
+                        generateResponseState.isRerender = shouldHandlePrefixTriggers;
+                        await loadContextWindow();
+                        generateResponseState.isRerender = false;
+                    }
 
                     generateResponseState.addStopGenerationTriggersFromChatWrapper();
 
@@ -2019,42 +2034,49 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             });
     }
 
-    public openThoughtSegmentOnModelResponseStartIfNeeded() {
+    public onModelResponseStateShouldOpenThoughtSegment() {
         if (this.chatWrapper.settings.segments?.thought?.openOnResponseStart !== true)
-            return;
+            return false;
 
         const lastModelResponseItem = this.resolvedHistory.at(-1);
         if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
-            return;
+            return false;
 
-        if (lastModelResponseItem.response.length > 1)
-            return;
-        else if (lastModelResponseItem.response.length === 1 && lastModelResponseItem.response[0] !== "")
-            return;
+        if (lastModelResponseItem.response.length > 0)
+            return false;
 
         const currentResponseSegmentsStack = SegmentHandler.getStackFromModelResponse(lastModelResponseItem.response);
         if (currentResponseSegmentsStack.includes("thought"))
-            return;
+            return false;
+
+        if (this.abortOnNonText)
+            return false;
+        else
+            return true;
+    }
+
+    public openThoughtSegmentOnModelResponseStartIfNeeded() {
+        if (this.chatWrapper.settings.segments?.thought?.openOnResponseStart !== true)
+            return false;
+
+        const lastModelResponseItem = this.resolvedHistory.at(-1);
+        if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
+            return false;
+
+        if (lastModelResponseItem.response.length > 0)
+            return false;
+
+        const currentResponseSegmentsStack = SegmentHandler.getStackFromModelResponse(lastModelResponseItem.response);
+        if (currentResponseSegmentsStack.includes("thought"))
+            return false;
 
         if (this.abortOnNonText)
             // we won't force-open a though segment if we are aborting on non-text,
             // as it would never allow a textual generation even if the model would choose it otherwise
-            return;
+            return false;
         else {
-            this.resolvedHistory[this.resolvedHistory.length - 1] = {
-                ...lastModelResponseItem,
-                response: [
-                    ...lastModelResponseItem.response,
-                    {
-                        type: "segment",
-                        segmentType: "thought",
-                        text: "",
-                        ended: false,
-                        startTime: new Date().toISOString()
-                    }
-                ]
-            };
             this.segmentHandler.openSegment("thought");
+            return true;
         }
     }
 
@@ -3233,21 +3255,24 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         throw new Error("The context size is too small to generate a response");
     }
 
-    public async alignCurrentSequenceStateWithCurrentTokens() {
+    public async alignCurrentSequenceStateWithCurrentTokens(popOneTokenIfNeeded: boolean = true) {
         if (this.tokens.length === 1 && this.llamaChat.sequence.nextTokenIndex !== 0) {
             await this.llamaChat.sequence.eraseContextTokenRanges([{
                 start: 0,
                 end: this.llamaChat.sequence.nextTokenIndex
             }]);
             return;
+        } else if (!popOneTokenIfNeeded)
+            await this.llamaChat.sequence.adaptStateToTokens(this.tokens, false);
+        else {
+            const lastToken = this.tokens[this.tokens.length - 1]!;
+
+            // we need to decode at least one token to generate a response
+            this.tokens.pop();
+            await this.llamaChat.sequence.adaptStateToTokens(this.tokens, false);
+            this.tokens.push(lastToken);
         }
 
-        const lastToken = this.tokens[this.tokens.length - 1]!;
-
-        // we need to decode at least one token to generate a response
-        this.tokens.pop();
-        await this.llamaChat.sequence.adaptStateToTokens(this.tokens, false);
-        this.tokens.push(lastToken);
         this.ensureNotAborted();
 
         const firstDifferentIndex = this.llamaChat.sequence.nextTokenIndex;
@@ -3774,6 +3799,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
     private readonly _segmentsStack: S[] = [];
     private readonly _segmentsStackSet: Set<S> = new Set<S>();
     private _ownedSegmentsStackLength: number = 0;
+    private _contextWindowOwnedSegmentsStackLength: number = 0;
     private readonly _segments: RawSegment<S>[] = [];
     private readonly _segmentsStartTokenTrail: Token[] = [];
     private readonly _segmentTokenCounts: Map<S | undefined, number>;
@@ -3821,6 +3847,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         this._segmentsStack = initialSegmentStack;
         this._segmentsStackSet = new Set(initialSegmentStack);
         this._ownedSegmentsStackLength = initialSegmentStack.length;
+        this._contextWindowOwnedSegmentsStackLength = initialSegmentStack.length;
         this._segmentDefinitions = segmentDefinitions;
         this._segmentTokenCounts = new Map(initialTokenCounts);
 
@@ -3866,6 +3893,8 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
         this._contextWindowStartTokenTrail.length = 0;
         pushAll(this._contextWindowStartTokenTrail, this._getTokenTrailFromResult());
+
+        this._contextWindowOwnedSegmentsStackLength = this._segmentsStack.length;
     }
 
     public openSegment(type: S) {
@@ -3990,6 +4019,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                     }
 
                     this._ownedSegmentsStackLength = 0;
+                    this._contextWindowOwnedSegmentsStackLength = 0;
                 }
 
                 if (leftTokens.length > 0)
@@ -4101,6 +4131,9 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             if (this._segmentsStack.length < this._ownedSegmentsStackLength)
                 this._ownedSegmentsStackLength = this._segmentsStack.length;
 
+            if (this._segmentsStack.length < this._contextWindowOwnedSegmentsStackLength)
+                this._contextWindowOwnedSegmentsStackLength = this._segmentsStack.length;
+
             return;
         }
 
@@ -4114,6 +4147,9 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
             if (this._segmentsStack.length < this._ownedSegmentsStackLength)
                 this._ownedSegmentsStackLength = this._segmentsStack.length;
+
+            if (this._segmentsStack.length < this._contextWindowOwnedSegmentsStackLength)
+                this._contextWindowOwnedSegmentsStackLength = this._segmentsStack.length;
 
             this._segments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
             this._contextWindowSegments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
@@ -4248,7 +4284,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                     type,
                     tokens: tokens.slice(),
                     ended: false,
-                    start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                    start: this._segmentsStack.length > this._contextWindowOwnedSegmentsStackLength,
                     startTime: now
                 });
             else {
@@ -4257,7 +4293,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                         type,
                         tokens: tokens.slice(),
                         ended: false,
-                        start: this._segmentsStack.length > this._ownedSegmentsStackLength,
+                        start: this._segmentsStack.length > this._contextWindowOwnedSegmentsStackLength,
                         startTime: now
                     });
                 else
