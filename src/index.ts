@@ -97,6 +97,7 @@ import {
 import {type ModelDownloadEndpoints} from "./utils/modelDownloadEndpoints.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
+import {ggufFileQuantNames} from "./gguf/utils/ggufQuantNames.js";
 
 import {
     type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelSegmentType, type ChatModelSegment, type ChatModelFunctions,
@@ -346,5 +347,6 @@ export {
     type CombinedModelDownloaderOptions,
     jsonDumps,
     type OverridesObject,
-    experimentalChunkDocument
+    experimentalChunkDocument,
+    ggufFileQuantNames
 };

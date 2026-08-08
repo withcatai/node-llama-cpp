@@ -198,7 +198,8 @@ export enum GgufFileType {
     MOSTLY_TQ2_0 = 37,
     MOSTLY_MXFP4_MOE = 38,
     MOSTLY_NVFP4 = 39,
-    MOSTLY_Q1_0 = 40
+    MOSTLY_Q1_0 = 40,
+    MOSTLY_Q2_0 = 41
 }
 
 

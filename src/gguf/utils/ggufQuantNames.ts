@@ -2,6 +2,7 @@ import {GgufFileType} from "../types/GgufMetadataTypes.js";
 
 export const ggufQuantNames = new Map<string, GgufFileType>([
     ["Q1_0", GgufFileType.MOSTLY_Q1_0],
+    ["Q2_0", GgufFileType.MOSTLY_Q2_0],
     ["Q4_0", GgufFileType.MOSTLY_Q4_0],
     ["Q4_1", GgufFileType.MOSTLY_Q4_1],
     ["MXFP4_MOE", GgufFileType.MOSTLY_MXFP4_MOE],
@@ -41,3 +42,14 @@ export const ggufQuantNames = new Map<string, GgufFileType>([
     ["F32", GgufFileType.ALL_F32],
     ["COPY", GgufFileType.ALL_F32]
 ]);
+
+export const ggufFileQuantNames = Object.freeze([
+    ...ggufQuantNames.keys(),
+    "Q2_K_XL",
+    "Q3_K_XL",
+    "Q4_K_XL",
+    "Q5_K_XL",
+    "Q6_K_XL",
+    "Q7_K_XL",
+    "Q8_K_XL"
+].filter((name) => name !== "COPY"));
