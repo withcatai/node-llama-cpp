@@ -492,6 +492,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
 
         if (shouldCreateSampler) {
             repeatPenaltySampler = llama_sampler_init_penalties(
+                llama_vocab_n_tokens(model->vocab),
                 repeatPenaltyMaxTokens,
                 repeatPenalty,
                 repeatPenaltyFrequencyPenalty,
@@ -541,7 +542,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             sequenceBreakers.reserve(sequenceBreakersArray.Length());
             for (size_t i = 0; i < sequenceBreakersArray.Length(); i++) {
                 std::string breaker = sequenceBreakersArray.Get(i).As<Napi::String>().Utf8Value();
-                
+
                 if (sequenceBreaksIsTheSame && dryRepeatPenalty_sequenceBreakers[i] != breaker) {
                     sequenceBreaksIsTheSame = false;
                 }
@@ -596,7 +597,6 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
 
             dryRepeatPenaltySampler = llama_sampler_init_dry(
                 model->vocab,
-                llama_model_n_ctx_train(model->model),
                 strength,
                 base,
                 allowedLength,
