@@ -13,6 +13,8 @@ export class Gemma4ChatWrapper extends ChatWrapper {
     public readonly reasoning: boolean;
     public readonly keepOnlyLastThought: boolean;
 
+    /** @internal */ private readonly _lineBreakAfterThinkIndicator: boolean;
+
     public override readonly settings: ChatWrapperSettings = {
         supportsSystemMessages: true,
         functions: {
@@ -52,17 +54,22 @@ export class Gemma4ChatWrapper extends ChatWrapper {
          *
          * Defaults to `true`.
          */
-        keepOnlyLastThought?: boolean
+        keepOnlyLastThought?: boolean,
+
+        /** @internal */
+        _lineBreakAfterThinkIndicator?: boolean
     } = {}) {
         super();
 
         const {
             reasoning = true,
-            keepOnlyLastThought = true
+            keepOnlyLastThought = true,
+            _lineBreakAfterThinkIndicator = true
         } = options;
 
         this.reasoning = reasoning;
         this.keepOnlyLastThought = keepOnlyLastThought;
+        this._lineBreakAfterThinkIndicator = _lineBreakAfterThinkIndicator;
     }
 
     public override generateContextState({
@@ -86,6 +93,9 @@ export class Gemma4ChatWrapper extends ChatWrapper {
         if (this.reasoning)
             systemMessage = LlamaText([
                 new SpecialTokensText("<|think|>"),
+                this._lineBreakAfterThinkIndicator
+                    ? new SpecialTokensText("\n")
+                    : "",
                 systemMessage
             ]);
 
@@ -248,6 +258,12 @@ export class Gemma4ChatWrapper extends ChatWrapper {
             [{reasoning: false}, {}],
             [
                 {},
+                {},
+                {additionalRenderParameters: {"enable_thinking": true}}
+            ],
+            [{_lineBreakAfterThinkIndicator: false}, {}],
+            [
+                {_lineBreakAfterThinkIndicator: false},
                 {},
                 {additionalRenderParameters: {"enable_thinking": true}}
             ]

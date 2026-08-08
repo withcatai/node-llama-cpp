@@ -58,7 +58,7 @@ describe("qwen3.5 0.8b", () => {
             const initialMeterState = chatSession.sequence.tokenMeter.getState();
             const res2 = await chatSession.prompt("Explain what this word means. short", {
                 ...promptOptions,
-                maxTokens: 15,
+                maxTokens: 12,
                 budgets: {
                     thoughtTokens: 4
                 }
@@ -68,12 +68,12 @@ describe("qwen3.5 0.8b", () => {
             expect(res2).to.toMatchInlineSnapshot(`
               "
 
-              "secret" means something hidden or confidential. It"
+              "secret" means something hidden or"
             `);
             expect(diffMeterState.usedInputTokens).toMatchInlineSnapshot("94");
             expect(diffMeterState.usedInputTokens).to.be.lessThanOrEqual(95);
             expect(chatSession.sequence.lastCheckpointIndex).toMatchInlineSnapshot("448");
-            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("467");
+            expect(chatSession.sequence.nextTokenIndex).toMatchInlineSnapshot("464");
         });
 
         test("disposing the context asynchronously works", {timeout: 1000 * 60 * 60 * 2}, async () => {

@@ -275,7 +275,7 @@ export type GgufMetadataGeneral<A extends GgufArchitectureType = GgufArchitectur
          * URL to the model's repository. This can be a GitHub repo, a paper, etc.
          */
         readonly repo_url?: string,
-    
+
         readonly huggingface?: {
             readonly repository?: string
         }

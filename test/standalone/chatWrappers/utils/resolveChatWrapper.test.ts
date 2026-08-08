@@ -6,7 +6,7 @@ import {
 } from "../../../../src/index.js";
 import {
     harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5,
-    gemma4JinjaTemplate1, gemma4JinjaTemplate2
+    gemma4JinjaTemplate1, gemma4JinjaTemplate2, gemma4JinjaTemplate3
 } from "./jinjaTemplates.js";
 
 
@@ -803,6 +803,19 @@ describe("resolveChatWrapper", () => {
             customWrapperSettings: {
                 jinjaTemplate: {
                     template: gemma4JinjaTemplate2
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+
+        expect(chatWrapper).to.be.instanceof(Gemma4ChatWrapper);
+    });
+
+    test("should resolve to specialized Gemma4ChatWrapper 3", () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: gemma4JinjaTemplate3
                 }
             },
             fallbackToOtherWrappersOnJinjaError: false
