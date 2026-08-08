@@ -216,7 +216,8 @@ describe("Gemma4ChatWrapper", () => {
           LlamaText([
             new SpecialToken("BOS"),
             new SpecialTokensText("<|turn>system
-          <|think|>"),
+          <|think|>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             new SpecialTokensText("<turn|>
@@ -252,7 +253,8 @@ describe("Gemma4ChatWrapper", () => {
           LlamaText([
             new SpecialToken("BOS"),
             new SpecialTokensText("<|turn>system
-          <|think|>"),
+          <|think|>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             new SpecialTokensText("<|tool>"),
@@ -306,7 +308,8 @@ describe("Gemma4ChatWrapper", () => {
           LlamaText([
             new SpecialToken("BOS"),
             new SpecialTokensText("<|turn>system
-          <|think|>"),
+          <|think|>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             new SpecialTokensText("<turn|>
@@ -334,7 +337,8 @@ describe("Gemma4ChatWrapper", () => {
           LlamaText([
             new SpecialToken("BOS"),
             new SpecialTokensText("<|turn>system
-          <|think|>"),
+          <|think|>
+          "),
             "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
           If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
             new SpecialTokensText("<turn|>
