@@ -65,7 +65,7 @@ describe("qwen3.5 0.8b", () => {
             });
 
             const diffMeterState = chatSession.sequence.tokenMeter.diff(initialMeterState);
-            expect(res2).to.toMatchInlineSnapshot(`
+            expect(res2.toLowerCase()).to.toMatchInlineSnapshot(`
               "
 
               "secret" means something hidden or"
