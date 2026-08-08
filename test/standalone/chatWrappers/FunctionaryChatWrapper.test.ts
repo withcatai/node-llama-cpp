@@ -243,7 +243,7 @@ describe("FunctionaryChatWrapper", () => {
               type notifyOwner2 = (_: /* Type: notification */ {
                   // Notification message
                   message: string,
-                  
+
                   // Sub notifications
                   subNotifications: (/* notification type */ any)[]
               }) => any;
@@ -253,15 +253,15 @@ describe("FunctionaryChatWrapper", () => {
                   // Some message
                   // minimum length: 3, maximum length: 10
                   message: string,
-                  
+
                   // Some words
                   // maximum items: 5
                   words: [string, string, ...string[]],
-                  
+
                   // Some headers
                   // minimum number of properties: 4, maximum number of properties: 12
                   headers: {[key: string]: string},
-                  
+
                   // Some mappings
                   // minimum number of properties: 4, maximum number of properties: 12
                   mappings: {a: boolean, b: number, c: string | null} & {[key: string]: string}
@@ -452,7 +452,7 @@ describe("FunctionaryChatWrapper", () => {
               type notifyOwner2 = (_: /* Type: notification */ {
                   // Notification message
                   message: string,
-                  
+
                   // Sub notifications
                   subNotifications: (/* notification type */ any)[]
               }) => any;
@@ -462,15 +462,15 @@ describe("FunctionaryChatWrapper", () => {
                   // Some message
                   // minimum length: 3, maximum length: 10
                   message: string,
-                  
+
                   // Some words
                   // maximum items: 5
                   words: [string, string, ...string[]],
-                  
+
                   // Some headers
                   // minimum number of properties: 4, maximum number of properties: 12
                   headers: {[key: string]: string},
-                  
+
                   // Some mappings
                   // minimum number of properties: 4, maximum number of properties: 12
                   mappings: {a: boolean, b: number, c: string | null} & {[key: string]: string}
