@@ -136,11 +136,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build libtbb-dev
-          
+
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
-          
+
           cmake --version
 
       - name: Install dependencies on Ubuntu (2)
@@ -148,13 +148,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build libtbb-dev
-          
+
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-x86_64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-x86_64.tar.gz
           rm -f ./cmake-4.2.1-linux-x86_64.tar.gz
-          
+
           cmake --version
-      
+
       - name: Install dependencies on Ubuntu (arm64)
         if: matrix.config.name == 'Ubuntu (arm64)'
         env:
@@ -163,7 +163,7 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh "${LLVM_VERSION}"
-          
+
           sudo apt-get update
           sudo apt-get install -y ninja-build libtbb-dev "clang-${LLVM_VERSION}" "lld-${LLVM_VERSION}" "llvm-${LLVM_VERSION}" g++-arm-linux-gnueabihf gcc-arm-linux-gnueabihf
 
@@ -171,11 +171,11 @@ jobs:
           sudo update-alternatives --install /usr/bin/c++ c++ "/usr/bin/clang++-${LLVM_VERSION}" 100
           sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/clang-${LLVM_VERSION}" 100
           sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/clang++-${LLVM_VERSION}" 100
-          
+
           wget -c https://github.com/Kitware/CMake/releases/download/v4.2.1/cmake-4.2.1-linux-aarch64.tar.gz
           sudo tar --strip-components=1 -C /usr/local -xzf cmake-4.2.1-linux-aarch64.tar.gz
           rm -f ./cmake-4.2.1-linux-aarch64.tar.gz
-          
+
           cc --version
           c++ --version
           gcc --version
@@ -183,7 +183,7 @@ jobs:
 
           which arm-linux-gnueabihf-gcc
           which arm-linux-gnueabihf-g++
-          
+
           cmake --version
 
       # llama.cpp's ggml-cpu uses the RVV _Float16 (zvfh) vector intrinsics,
@@ -238,7 +238,7 @@ jobs:
         run: |
           # $env:VULKAN_VERSION = & curl.exe -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt
           # Write-Host "Downloading Vulkan SDK version $env:VULKAN_VERSION"
-          
+
           curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
           & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
           Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
@@ -251,7 +251,7 @@ jobs:
         run: |
           # export VULKAN_VERSION="$(curl -fsSL https://vulkan.lunarg.com/sdk/latest/linux.txt)"
           # echo "Downloading Vulkan SDK version ${VULKAN_VERSION}"
-          
+
           sudo apt-get update
           sudo apt-get install xz-utils
           curl --no-progress-meter "https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/linux/vulkan_sdk.tar.xz" -o "/opt/vulkan-sdk.tar.xz"
@@ -282,54 +282,56 @@ jobs:
             # TypeErrors during npm ci (e.g. "key.match is not a function")
             retry --times=3 npm ci
           else
+            npm install -g npm@latest
+            npm --version
             npm ci
           fi
 
           npx zx -y <<'EOF'
-          
+
           async function getLatestNodeVersions(maxDate) {
             const res = await fetch("https://nodejs.org/dist/index.json");
             const data = await res.json();
             const versions = new Map();
             let latestVersion = null;
-            
+
             for (const version of data) {
               const majorVersion = Number(version.version.split(".")[0].slice("v".length));
               const versionDate = new Date(version.date);
-              
+
               if (maxDate != null && versionDate.getTime() > maxDate)
                 continue;
-              
+
               if (!versions.has(majorVersion)) {
                 versions.set(majorVersion, version.version);
               }
-              
+
               if (latestVersion === null || majorVersion > latestVersion) {
                 latestVersion = majorVersion;
               }
             }
-            
+
             return {versions, latestVersion};
           }
-          
+
           const {versions: latestNodeVersions} = await getLatestNodeVersions(Date.now() - 1000 * 60 * 60 * 24 * 14);
-          
+
           const nodeVersion = latestNodeVersions.get(20);
           const windowsOnArmNodeVersion = latestNodeVersions.get(20);
-          
+
           if (nodeVersion == null || windowsOnArmNodeVersion == null) {
             throw new Error("Could not find node versions");
           }
-          
+
           $.verbose = true;
           await $`mkdir -p bins`;
-          
+
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
-            
+
             await $`node ./dist/cli/cli.js source build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
           }
-          
+
           // build binaries
           if (process.env.ARTIFACT_NAME === "win-1") {
             await buildBinary("x64", ["--gpu", "false"]);
@@ -354,7 +356,7 @@ jobs:
           } else if (process.env.ARTIFACT_NAME === "linux-riscv64") {
             await buildBinary("riscv64", ["--gpu", "false"]);
           }
-          
+
           // move binaries to bins
           const localBuildsDirectoryPath = path.join(process.cwd(), "llama", "localBuilds");
           const llamaBinsDirectoryPath = path.join(process.cwd(), "bins");
@@ -364,13 +366,13 @@ jobs:
               path.join(llamaBinsDirectoryPath, folderName)
             );
           }
-          
+
           if (process.env.ARTIFACT_NAME === "win-2") {
             await fs.move(
               path.join(llamaBinsDirectoryPath, "win-x64-cuda"),
               path.join(llamaBinsDirectoryPath, "win-x64-cuda-2")
             );
-            
+
             if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "win-x64-cuda-2", "ggml-cuda.dll")))) {
               throw new Error("ggml-cuda.dll not found in win-x64-cuda-2");
             }
@@ -379,15 +381,15 @@ jobs:
               path.join(llamaBinsDirectoryPath, "linux-x64-cuda"),
               path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2")
             );
-            
+
             if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2", "libggml-cuda.so")))) {
               throw new Error("libggml-cuda.so not found in linux-x64-cuda-2");
             }
           }
-          
+
           await $`echo "Built binaries:"`;
           await $`ls bins`;
-          
+
           EOF
 
 #      - name: Cache UPX
@@ -530,7 +532,7 @@ jobs:
       - name: Install dependencies on ubuntu
         run: |
           sudo apt-get update
-          sudo apt-get install ninja-build cmake 
+          sudo apt-get install ninja-build cmake
 
       - name: Install modules
         run: npm ci
@@ -650,30 +652,30 @@ jobs:
           mkdir -p bins
           mv artifacts/bins-*/* bins/
           mv artifacts/build dist/
-          
+
           mkdir -p ./bins/win-x64-cuda/fallback
           mv ./bins/win-x64-cuda-2/ggml-cuda.dll ./bins/win-x64-cuda/fallback/ggml-cuda.dll
           rm -rf ./bins/win-x64-cuda-2
-          
+
           mkdir -p ./bins/linux-x64-cuda/fallback
           mv ./bins/linux-x64-cuda-2/libggml-cuda.so ./bins/linux-x64-cuda/fallback/libggml-cuda.so
           rm -rf ./bins/linux-x64-cuda-2
-          
+
           cp -r artifacts/llama.cpp/llama.cpp/grammars llama/grammars
-          
+
           rm -f ./llama/binariesGithubRelease.json
           mv artifacts/llama.cpp/binariesGithubRelease.json ./llama/binariesGithubRelease.json
-          
+
           rm -f ./llama/llama.cpp.info.json
           mv artifacts/llama.cpp/llama.cpp.info.json ./llama/llama.cpp.info.json
-          
+
           rm -f ./llama/gitRelease.bundle
           mv artifacts/llama.cpp/gitRelease.bundle ./llama/gitRelease.bundle
-          
+
           mv artifacts/build-templates templates/packed/
           rm -f ./templates/package.json
           rm -f ./templates/package-lock.json
-          
+
           echo "Built binaries:"
           ls bins
       - name: Move binaries to standalone prebuilt binary modules
@@ -690,7 +692,7 @@ jobs:
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           export DRY_RUN_RESULT_FILE_PATH="$(pwd)/semanticReleaseDryRunReleaseResult.json"
-          
+
           git apply --ignore-whitespace ./scripts/patches/@semantic-release+github+11.0.0.patch
           npx semantic-release
       - name: Set npm package url to GITHUB_OUTPUT
@@ -709,13 +711,13 @@ jobs:
         if: steps.set-npm-url.outputs.npm-url != ''
         run: |
           export DEPLOYED_PACKAGE_VERSION=$(cat .semanticRelease.npmPackage.deployedVersion.txt)
-          
+
           pushd packages/create-node-llama-cpp
           npm ci --ignore-scripts
           popd
-          
+
           npx --no vite-node ./scripts/prepareCreateNodeLlamaCppModuleForPublish.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION"
-          
+
           pushd packages/create-node-llama-cpp
           npm run build
       - name: Release `create-node-llama-cpp` module
@@ -725,7 +727,7 @@ jobs:
           GH_RELEASE_REF: ${{ github.ref }}
         run: |
           cd packages/create-node-llama-cpp
-          
+
           if [ "$GH_RELEASE_REF" == "refs/heads/beta" ]; then
               npm publish --tag beta
           else
@@ -817,12 +819,12 @@ jobs:
           RELEASE_TAG: ${{ needs.release.outputs.package-version }}
         run: |
           shopt -s nullglob
-          
+
           for file in ./electron-app-example/release/*.{dmg,zip,exe,appx,AppImage,snap,assert,deb,tar.gz}; do
             echo "Adding $file to release $RELEASE_TAG"
             gh release upload "v$RELEASE_TAG" "$file"
           done
-          
+
           shopt -u nullglob
 
   update-documentation-website:
@@ -875,7 +877,7 @@ jobs:
       - name: Move artifacts
         run: |
           mv artifacts/build dist/
-          
+
           cp -r artifacts/llama.cpp/llama.cpp llama/llama.cpp
 
           rm -f ./llama/binariesGithubRelease.json
@@ -898,7 +900,7 @@ jobs:
         run: |
           export DOCS_PACKAGE_VERSION="$(cat ./docsVersion.txt)"
           echo "Package version: $DOCS_PACKAGE_VERSION"
-          
+
           npm run docs:build
       - name: Upload docs to GitHub Pages
         uses: actions/upload-pages-artifact@v5
