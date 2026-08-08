@@ -8,6 +8,14 @@ const packageJsonPath = path.join(__dirname, "..", "package.json");
 const packageJson = await fs.readJson(packageJsonPath);
 const currentVersion = packageJson.version;
 
+if (packageJson._optionalDependencies != null) {
+    packageJson.optionalDependencies = {
+        ...(packageJson.optionalDependencies ?? {}),
+        ...packageJson._optionalDependencies
+    };
+    delete packageJson._optionalDependencies;
+}
+
 if (packageJson.optionalDependencies != null) {
     for (const packageName of Object.keys(packageJson.optionalDependencies)) {
         if (!packageName.startsWith("@node-llama-cpp/"))

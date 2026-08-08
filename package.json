@@ -223,7 +223,7 @@
       "optional": true
     }
   },
-  "optionalDependencies": {
+  "_optionalDependencies": {
     "@node-llama-cpp/linux-arm64": "0.1.0",
     "@node-llama-cpp/linux-armv7l": "0.1.0",
     "@node-llama-cpp/linux-riscv64": "0.1.0",

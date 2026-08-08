@@ -282,8 +282,6 @@ jobs:
             # TypeErrors during npm ci (e.g. "key.match is not a function")
             retry --times=3 npm ci
           else
-            npm install -g npm@latest
-            npm --version
             npm ci
           fi
 
