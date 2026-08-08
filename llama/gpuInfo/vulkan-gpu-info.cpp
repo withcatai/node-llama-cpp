@@ -224,8 +224,8 @@ static bool enumerateVulkanDevices(uint64_t* total, uint64_t* used, uint64_t* un
 
             if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
                 const uint64_t heapSize = heap.size;
-                const uint64_t heapBudget = (std::min)<uint64_t>(memoryBudgetProperties.heapBudget[i], heapSize);
-                const uint64_t heapUsage = (std::min)<uint64_t>(memoryBudgetProperties.heapUsage[i], heapBudget);
+                const uint64_t heapBudget = std::min<uint64_t>(memoryBudgetProperties.heapBudget[i], heapSize);
+                const uint64_t heapUsage = std::min<uint64_t>(memoryBudgetProperties.heapUsage[i], heapBudget);
                 const uint64_t heapUsed = heapSize - (heapBudget - heapUsage);
 
                 hasDeviceLocalHeap = heapSize != 0;
@@ -277,7 +277,7 @@ bool gpuInfoGetTotalVulkanDevicesInfo(uint64_t* total, uint64_t* used, uint64_t*
 
 bool checkIsVulkanEnvSupported(gpuInfoVulkanWarningLogCallback_t warningLogCallback) {
     try {
-        vulkanInstance().enumeratePhysicalDevices();
+        static_cast<void>(vulkanInstance().enumeratePhysicalDevices());
         return true;
     } catch (const std::exception& err) {
         if (warningLogCallback != nullptr) {
