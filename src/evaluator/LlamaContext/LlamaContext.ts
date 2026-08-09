@@ -1,5 +1,5 @@
 import path from "path";
-import {acquireLock, AsyncDisposeAggregator, DisposeAggregator, DisposedError, EventRelay, Lock, registerFinalizer, withLock} from "lifecycle-utils";
+import {acquireLock, AsyncDisposeAggregator, DisposedError, EventRelay, Lock, registerFinalizer, withLock} from "lifecycle-utils";
 import {removeNullFields} from "../../utils/removeNullFields.js";
 import {Token} from "../../types.js";
 import {AddonContext, AddonModelLora, BatchLogitIndex} from "../../bindings/AddonTypes.js";
@@ -752,13 +752,17 @@ export class LlamaContext {
         if (this._disposed)
             return;
 
-        void withLock([this as LlamaContext, "context"], async () => {
+        return withLock([this as LlamaContext, "context"], async () => {
             if (this._disposed)
                 return;
 
-            this._ctx.disposeSequence(sequenceId);
-            this._unusedSequenceIds.push(sequenceId);
-            this._onReclaimUnusedSequenceId.dispatchEvent();
+            try {
+                this._ctx.disposeSequence(sequenceId);
+                this._unusedSequenceIds.push(sequenceId);
+                this._onReclaimUnusedSequenceId.dispatchEvent();
+            } catch (err) {
+                this._llama._log(LlamaLogLevel.warn, `Failed to reclaim unused sequence ID ${sequenceId}: ${err}`);
+            }
         });
     }
 
@@ -1076,7 +1080,7 @@ export class LlamaContextSequence {
     /** @internal */ private readonly _checkpoints = new LlamaContextSequenceCheckpoints();
     /** @internal */ private readonly _checkpointOptions: Required<SequenceCheckpointOptions>;
     /** @internal */ private readonly _tokenMeter: TokenMeter;
-    /** @internal */ private readonly _disposeAggregator = new DisposeAggregator();
+    /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator({parallel: true});
     /** @internal */ private readonly _lock = {};
     /** @internal */ private _resetTokenPredictor: boolean = false;
     /** @internal */ private _tokenPredictorOwner: {} = {};
@@ -1116,7 +1120,7 @@ export class LlamaContextSequence {
         };
 
         this._context._sequenceGcRegistry.register(this, sequenceId, this);
-        this._disposeAggregator.add(() => this._context._sequenceGcRegistry.unregister(this));
+        this._disposeAggregator.add(() => void this._context._sequenceGcRegistry.unregister(this));
 
         this._disposeAggregator.add(this.onDispose.dispatchEvent);
 
@@ -1125,23 +1129,23 @@ export class LlamaContextSequence {
         );
         this._disposeAggregator.add(onContextDisposeListener);
         this._disposeAggregator.add(registerFinalizer(this, onContextDisposeListener));
-        
-        this._disposeAggregator.add(() => {
+
+        this._disposeAggregator.add(async () => {
             this._checkpoints.clearAllCheckpoints();
-            this._context._reclaimUnusedSequenceId(this._sequenceId);
+            await this._context._reclaimUnusedSequenceId(this._sequenceId);
         });
 
         if (this._tokenPredictor != null)
-            this._disposeAggregator.add(this._tokenPredictor);
+            this._disposeAggregator.add(() => void this._tokenPredictor?.dispose());
 
         this._takeIntervalCheckpointIfNeededAfterBatch = this._takeIntervalCheckpointIfNeededAfterBatch.bind(this);
     }
 
-    public dispose() {
+    public async dispose() {
         if (this._disposed)
             return;
 
-        this._disposeAggregator.dispose();
+        await this._disposeAggregator.dispose();
 
         this._contextTokens.length = 0;
 
@@ -1149,8 +1153,16 @@ export class LlamaContextSequence {
     }
 
     /** @hidden */
-    public [Symbol.dispose]() {
+    public [Symbol.asyncDispose]() {
         return this.dispose();
+    }
+
+    /**
+     * @deprecated Use `[Symbol.asyncDispose]()` instead
+     * @hidden
+     */
+    public [Symbol.dispose]() {
+        void this.dispose();
     }
 
     public get disposed() {
