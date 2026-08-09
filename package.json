@@ -199,7 +199,7 @@
     "ignore": "^7.0.4",
     "ipull": "^3.9.5",
     "is-unicode-supported": "^2.1.0",
-    "lifecycle-utils": "^3.2.0",
+    "lifecycle-utils": "^4.0.1",
     "log-symbols": "^7.0.1",
     "nanoid": "^5.1.6",
     "node-addon-api": "^8.6.0",
