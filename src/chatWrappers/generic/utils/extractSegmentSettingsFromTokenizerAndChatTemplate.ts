@@ -245,7 +245,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                 throw new Error(`Unsupported variation: ${variation}`);
             });
 
-            let reasoningSectionStartPrefix: string | undefined = undefined;
+            let reasoningSectionStartPrefix: string | {type: "openedOnStart"} | undefined = undefined;
             let reasoningSectionEndPrefix: string | undefined = undefined;
 
             if (responseOnly === withReasoning.long)
@@ -258,17 +258,27 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
             const modelResponsePrefix = responseOnly.slice(0, modelResponseIndex);
             const withReasoningPrefixContent = withReasoning.short.slice(0, modelResponseIndex);
 
-            if (modelResponsePrefix !== withReasoningPrefixContent)
-                return undefined;
+            let reasoningContentEndIndex: number;
+            if (modelResponsePrefix !== withReasoningPrefixContent) {
+                const reasoningContentStartIndex = withReasoning.short.indexOf(modelReasoning2);
+                if (reasoningContentStartIndex < 0)
+                    return undefined;
 
-            const reasoningSectionStartIndex = modelResponseIndex;
-            const reasoningContentStartIndex = withReasoning.short.indexOf(modelReasoning2, reasoningSectionStartIndex);
-            if (reasoningContentStartIndex < 0)
-                return undefined;
+                if (responseOnly.slice(0, reasoningContentStartIndex) !== withReasoning.short.slice(0, reasoningContentStartIndex))
+                    return undefined;
 
-            reasoningSectionStartPrefix = withReasoning.short.slice(modelResponseIndex, reasoningContentStartIndex);
+                reasoningSectionStartPrefix = {type: "openedOnStart"};
+                reasoningContentEndIndex = reasoningContentStartIndex + modelReasoning2.length;
+            } else {
+                const reasoningSectionStartIndex = modelResponseIndex;
+                const reasoningContentStartIndex = withReasoning.short.indexOf(modelReasoning2, reasoningSectionStartIndex);
+                if (reasoningContentStartIndex < 0)
+                    return undefined;
 
-            const reasoningContentEndIndex = reasoningContentStartIndex + modelReasoning2.length;
+                reasoningSectionStartPrefix = withReasoning.short.slice(modelResponseIndex, reasoningContentStartIndex);
+                reasoningContentEndIndex = reasoningContentStartIndex + modelReasoning2.length;
+            }
+
             const modelResponseStartIndex = withReasoning.short.indexOf(modelResponse2, reasoningContentEndIndex);
             if (modelResponseStartIndex < 0)
                 return undefined;
@@ -330,7 +340,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
             return renderedOutput.includes(modelReasoning2) && renderedOutput.includes(modelReasoning3);
         }
 
-        function shouldOpenThinkingSegmentOnModelResponseStart(reasoningSectionPrefix: string, reasoningSectionSuffix: string) {
+        function shouldOpenThinkingSegmentOnModelResponseStart(reasoningSectionPrefix: string | undefined, reasoningSectionSuffix: string) {
             if (!enableReasoning)
                 return false;
 
@@ -363,19 +373,25 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
             if (withReasoningUserMessage1Index < 0)
                 return false;
 
-            if (responseOnly.indexOf(reasoningSectionPrefix, userMessage1Index) >= 0)
-                return false;
+            let reasoningSectionPrefixIndex: number;
+            let reasoningSectionEndIndex: number;
+            if (reasoningSectionPrefix != null) {
+                if (responseOnly.indexOf(reasoningSectionPrefix, userMessage1Index) >= 0)
+                    return false;
 
-            const reasoningSectionPrefixIndex = withGenerationPrompt.indexOf(reasoningSectionPrefix, withReasoningUserMessage1Index);
-            if (reasoningSectionPrefixIndex < 0)
-                return false;
+                reasoningSectionPrefixIndex = withGenerationPrompt.indexOf(reasoningSectionPrefix, withReasoningUserMessage1Index);
+                if (reasoningSectionPrefixIndex < 0)
+                    return false;
+
+                reasoningSectionEndIndex = reasoningSectionPrefixIndex + reasoningSectionPrefix.length;
+            } else {
+                reasoningSectionPrefixIndex = userMessage1Index;
+                reasoningSectionEndIndex = reasoningSectionPrefixIndex;
+            }
 
             const reasoningSectionSuffixIndex = withGenerationPrompt.indexOf(reasoningSectionSuffix, reasoningSectionPrefixIndex);
             if (reasoningSectionSuffixIndex >= 0) {
-                const reasoningSectionContent = withGenerationPrompt.slice(
-                    reasoningSectionPrefixIndex + reasoningSectionPrefix.length,
-                    reasoningSectionSuffixIndex
-                );
+                const reasoningSectionContent = withGenerationPrompt.slice(reasoningSectionEndIndex, reasoningSectionSuffixIndex);
 
                 if (reasoningSectionContent.trim() === "")
                     return false;
@@ -390,7 +406,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
         try {
             controls = extractControls();
 
-            if (controls == null || controls.prefix.trim() === "")
+            if (controls == null || (typeof controls.prefix === "string" && controls.prefix.trim() === ""))
                 return {
                     thoughtSegment: undefined,
                     keepPastReasoning: undefined
@@ -409,25 +425,41 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
         }
 
         try {
-            openOnResponseStart = controls != null && shouldOpenThinkingSegmentOnModelResponseStart(controls.prefix, controls.suffix);
+            if (controls != null) {
+                if (typeof controls.prefix !== "string") {
+                    if (controls.prefix.type === "openedOnStart")
+                        openOnResponseStart = true;
+                    else
+                        void (controls.prefix.type satisfies never);
+                } else
+                    openOnResponseStart = shouldOpenThinkingSegmentOnModelResponseStart(controls.prefix, controls.suffix);
+            } else
+                openOnResponseStart = false;
         } catch (err) {
             // do nothing
         }
 
         const thoughtSuffix = controls.suffix.trim() === ""
-            ? (
-                knownThinkingSegmentControls.get(controls.prefix) ??
-                knownThinkingSegmentControls.get(controls.prefix.trim())
-            )
+            ? typeof controls.prefix === "string"
+                ? (
+                    knownThinkingSegmentControls.get(controls.prefix) ??
+                    knownThinkingSegmentControls.get(controls.prefix.trim())
+                )
+                : undefined
             : controls.suffix;
 
         return {
             thoughtSegment: {
-                prefix: LlamaText(new SpecialTokensText(controls.prefix)),
+                prefix: typeof controls.prefix !== "string"
+                    ? controls.prefix.type === "openedOnStart"
+                        ? {type: "openedOnStart"}
+                        : void (controls.prefix.type satisfies never) as never
+                    : LlamaText(new SpecialTokensText(controls.prefix)),
                 suffix: thoughtSuffix != null
                     ? LlamaText(new SpecialTokensText(thoughtSuffix))
                     : undefined,
-                openOnResponseStart
+                openOnResponseStart,
+                reopenAfterFunctionCalls: typeof controls.prefix !== "string" && controls.prefix.type === "openedOnStart"
             },
             keepPastReasoning
         };

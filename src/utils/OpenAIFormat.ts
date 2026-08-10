@@ -8,7 +8,7 @@ import {LlamaGrammar} from "../evaluator/LlamaGrammar.js";
 import {Llama} from "../bindings/Llama.js";
 import {LlamaModel} from "../evaluator/LlamaModel/LlamaModel.js";
 import {GbnfJsonSchema} from "./gbnfJson/types.js";
-import {getChatWrapperSegmentDefinition} from "./getChatWrapperSegmentDefinition.js";
+import {getStandardizedChatWrapperSegmentDefinition} from "./getStandardizedChatWrapperSegmentDefinition.js";
 import {LlamaText} from "./LlamaText.js";
 import {removeUndefinedFields} from "./removeNullFields.js";
 
@@ -221,7 +221,10 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                 if (typeof response === "string")
                     addResponseText(response);
                 else if (response.type === "segment") {
-                    const segmentDefinition = getChatWrapperSegmentDefinition(chatWrapperSettings, response.segmentType);
+                    const standardizedSegmentDefinition = getStandardizedChatWrapperSegmentDefinition(
+                        chatWrapperSettings,
+                        response.segmentType
+                    );
 
                     if (response.raw != null && useRawValues)
                         addResponseText(LlamaText.fromJSON(response.raw));
@@ -230,10 +233,10 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                             LlamaText([
                                 (segmentStack.length > 0 && segmentStack.at(-1) === response.segmentType)
                                     ? ""
-                                    : segmentDefinition?.prefix ?? "",
+                                    : (standardizedSegmentDefinition?.prefix ?? ""),
                                 response.text,
                                 response.ended
-                                    ? (segmentDefinition?.suffix ?? "")
+                                    ? (standardizedSegmentDefinition?.suffix ?? "")
                                     : ""
                             ])
                         );
@@ -243,7 +246,7 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                     else if (response.ended && segmentStack.at(-1) === response.segmentType) {
                         segmentStack.pop();
 
-                        if (segmentStack.length === 0 && segmentDefinition?.suffix == null &&
+                        if (segmentStack.length === 0 && standardizedSegmentDefinition?.suffix == null &&
                             chatWrapperSettings.segments?.closeAllSegments != null
                         )
                             addResponseText(LlamaText(chatWrapperSettings.segments.closeAllSegments));
@@ -440,17 +443,19 @@ function fromOpenAiMessagesToChatHistory({
             const text = resolveOpenAiText(message.content);
             if (text != null && text !== "") {
                 const segmentDefinitions = new Map<ChatModelSegmentType, {
-                    prefix: string,
+                    prefix?: string,
                     suffix?: string
                 }>();
 
                 for (const segmentType of allSegmentTypes) {
-                    const segmentDefinition = getChatWrapperSegmentDefinition(chatWrapper.settings, segmentType);
-                    if (segmentDefinition != null)
+                    const standardizedSegmentDefinition = getStandardizedChatWrapperSegmentDefinition(chatWrapper.settings, segmentType);
+                    if (standardizedSegmentDefinition != null)
                         segmentDefinitions.set(segmentType, {
-                            prefix: LlamaText(segmentDefinition.prefix).toString(),
-                            suffix: segmentDefinition.suffix != null
-                                ? LlamaText(segmentDefinition.suffix).toString()
+                            prefix: standardizedSegmentDefinition.prefix != null
+                                ? LlamaText(standardizedSegmentDefinition.prefix).toString()
+                                : undefined,
+                            suffix: standardizedSegmentDefinition.suffix != null
+                                ? LlamaText(standardizedSegmentDefinition.suffix).toString()
                                 : undefined
                         });
                 }
@@ -653,7 +658,7 @@ function segmentModelResponseText<const S extends ChatModelSegmentType = ChatMod
     segmentDefinitions, closeAllSegments
 }: {
     segmentDefinitions: Map<S, {
-        prefix: string,
+        prefix?: string,
         suffix?: string
     }>,
     closeAllSegments?: string
@@ -665,7 +670,8 @@ function segmentModelResponseText<const S extends ChatModelSegmentType = ChatMod
     )>();
 
     for (const [segmentType, {prefix, suffix}] of segmentDefinitions) {
-        separatorActions.set(prefix, {type: "prefix", segmentType});
+        if (prefix != null)
+            separatorActions.set(prefix, {type: "prefix", segmentType});
 
         if (suffix != null)
             separatorActions.set(suffix, {type: "suffix", segmentType});

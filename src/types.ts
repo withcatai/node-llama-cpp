@@ -36,7 +36,13 @@ export type ChatWrapperSettings = {
              *
              * Defaults to `""`.
              */
-            readonly emptyCallParamsPlaceholder?: object | string | number | boolean | null
+            readonly emptyCallParamsPlaceholder?: object | string | number | boolean | null,
+
+            /**
+             * Alternate prefixes that can be used to detect a function call,
+             * but won't be used to construct the context when building it from scratch.
+             */
+            readonly prefixAlternateMatches?: Array<string | LlamaText>
         },
 
         readonly result: {
@@ -111,7 +117,9 @@ export type ChatWrapperSettings = {
         readonly reiterateStackAfterFunctionCalls?: boolean,
 
         /** Chain of Thought text segment */
-        readonly thought?: ChatWrapperSettingsSegment & {
+        readonly thought?: {
+            readonly prefix: string | LlamaText | {type: "openedOnStart"},
+            readonly suffix?: string | LlamaText,
             openOnResponseStart?: boolean,
             reopenAfterFunctionCalls?: boolean
         },

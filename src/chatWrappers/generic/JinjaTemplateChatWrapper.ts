@@ -13,6 +13,7 @@ import {
 import {removeUndefinedFields} from "../../utils/removeNullFields.js";
 import {jsonDumps} from "../utils/jsonDumps.js";
 import {tryMatrix} from "../../utils/optionsMatrix.js";
+import {getStandardizedChatWrapperSegmentDefinition} from "../../utils/getStandardizedChatWrapperSegmentDefinition.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     templateSegmentOptionsToChatWrapperSettings, TemplateChatWrapperSegmentsOptions
@@ -747,6 +748,15 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 role: this.userRoleName,
                 content: idsGenerator.generateId()
             } as OpenAiChatMessage);
+        } else if (
+            lastJinjaItem?.role === this.modelRoleName &&
+            typeof this.settings.segments?.thought?.prefix === "object" &&
+            !LlamaText.isLlamaText(this.settings.segments?.thought?.prefix) &&
+            this.settings.segments?.thought?.prefix.type === "openedOnStart" &&
+            typeof lastJinjaItem.content === "string"
+        ) {
+            (lastJinjaItem as OpenAiChatAssistantMessage)["reasoning_content"] = lastJinjaItem.content;
+            lastJinjaItem.content = "";
         }
 
         const renderJinjaText = () => {
@@ -837,8 +847,9 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         const {splitJinjaParts, stopGenerationJinjaParts} = renderJinjaAndSplitIntoParts();
 
         const messageIdsLeftToProcess = new Set(messageIds);
-        const thoughSegmentPrefix = getLlamaTextOnlyText(this.settings.segments?.thought?.prefix);
-        const thoughSegmentSuffix = getLlamaTextOnlyText(this.settings.segments?.thought?.suffix);
+        const standardizedSegmentDefinition = getStandardizedChatWrapperSegmentDefinition(this.settings, "thought");
+        const thoughSegmentPrefix = getLlamaTextOnlyText(standardizedSegmentDefinition?.prefix);
+        const thoughSegmentSuffix = getLlamaTextOnlyText(standardizedSegmentDefinition?.suffix);
         let inLastModelResponseSection: boolean | null = (
             thoughSegmentPrefix == null ||
             thoughSegmentSuffix == null ||

@@ -96,6 +96,7 @@ export const enum GgufArchitectureType {
     dots1 = "dots1",
     arcee = "arcee",
     afmoe = "afmoe",
+    laguna = "laguna",
     ernie4_5 = "ernie4_5",
     ernie4_5Moe = "ernie4_5-moe",
     hunyuanMoe = "hunyuan-moe",
