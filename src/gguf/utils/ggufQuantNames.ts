@@ -42,8 +42,7 @@ export const ggufQuantNames = new Map<string, GgufFileType>([
     ["F32", GgufFileType.ALL_F32],
     ["COPY", GgufFileType.ALL_F32]
 ]);
-
-export const ggufFileQuantNames = Object.freeze([
+export const ggufFileQuantNamesSet = new Set([
     ...ggufQuantNames.keys(),
     "Q2_K_XL",
     "Q3_K_XL",
@@ -52,4 +51,7 @@ export const ggufFileQuantNames = Object.freeze([
     "Q6_K_XL",
     "Q7_K_XL",
     "Q8_K_XL"
-].filter((name) => name !== "COPY"));
+]);
+ggufFileQuantNamesSet.delete("COPY");
+
+export const ggufFileQuantNames = Object.freeze([...ggufFileQuantNamesSet]);

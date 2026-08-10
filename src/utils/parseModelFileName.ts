@@ -1,4 +1,4 @@
-import {ggufQuantNames} from "../gguf/utils/ggufQuantNames.js";
+import {ggufFileQuantNamesSet} from "../gguf/utils/ggufQuantNames.js";
 
 export function parseModelFileName(filename: string) {
     const parts = filename.split("-");
@@ -36,13 +36,13 @@ export function parseModelFileName(filename: string) {
 
     if (parts.length > 0 && (quantization == null || quantization === "")) {
         const lastPart = parts.at(-1)!.toUpperCase();
-        if (ggufQuantNames.has(lastPart)) {
+        if (ggufFileQuantNamesSet.has(lastPart)) {
             quantization = lastPart;
             parts.pop();
         }
     }
 
-    if (quantization != null && !ggufQuantNames.has(quantization))
+    if (quantization != null && !ggufFileQuantNamesSet.has(quantization))
         quantization = undefined;
 
     if (quantization == null) {
@@ -54,7 +54,7 @@ export function parseModelFileName(filename: string) {
 
         for (const part of potentialParts) {
             const upperPart = part.toUpperCase();
-            if (ggufQuantNames.has(upperPart)) {
+            if (ggufFileQuantNamesSet.has(upperPart)) {
                 quantization = upperPart;
                 break;
             }

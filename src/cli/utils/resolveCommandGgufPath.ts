@@ -5,7 +5,7 @@ import {cliModelsDirectory} from "../../config.js";
 import {Llama} from "../../bindings/Llama.js";
 import {createModelDownloader} from "../../utils/createModelDownloader.js";
 import {resolveModelDestination} from "../../utils/resolveModelDestination.js";
-import {ggufQuantNames} from "../../gguf/utils/ggufQuantNames.js";
+import {ggufFileQuantNamesSet} from "../../gguf/utils/ggufQuantNames.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {isModelUri} from "../../utils/parseModelUri.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
@@ -179,7 +179,7 @@ export function tryCoercingModelUri(ggufPath: string) {
             // <user>/<model>
             // <user>/<model>:<valid quant or "latest">
             foundSlashes === 1 &&
-            (possibleQuant == null || possibleQuant === "latest" || ggufQuantNames.has(possibleQuant.toUpperCase()))
+            (possibleQuant == null || possibleQuant === "latest" || ggufFileQuantNamesSet.has(possibleQuant.toUpperCase()))
         )
     ) {
         const possibleUri = "hf:" + ggufPath;

@@ -3,7 +3,7 @@ import prettyMilliseconds from "pretty-ms";
 import {normalizeGgufDownloadUrl} from "../gguf/utils/normalizeGgufDownloadUrl.js";
 import {getFilenameForBinarySplitGgufPartUrls, resolveBinarySplitGgufPartUrls} from "../gguf/utils/resolveBinarySplitGgufPartUrls.js";
 import {createSplitPartFilename, getGgufSplitPartsInfo} from "../gguf/utils/resolveSplitGgufParts.js";
-import {ggufQuantNames} from "../gguf/utils/ggufQuantNames.js";
+import {ggufFileQuantNamesSet} from "../gguf/utils/ggufQuantNames.js";
 import {isUrl} from "./isUrl.js";
 import {ModelFileAccessTokens, resolveModelFileAccessTokensTryHeaders} from "./modelFileAccessTokens.js";
 import {isHuggingFaceUrl, ModelDownloadEndpoints, resolveHuggingFaceEndpoint} from "./modelDownloadEndpoints.js";
@@ -164,7 +164,7 @@ export async function resolveParsedModelUri(
             return defaultHuggingFaceFileQuantization;
 
         const quantizationText = parseModelFileName(filename).quantization;
-        if (quantizationText != null && ggufQuantNames.has(quantizationText))
+        if (quantizationText != null && ggufFileQuantNamesSet.has(quantizationText))
             return quantizationText;
 
         return "";
@@ -220,12 +220,12 @@ async function fetchHuggingFaceModelManifest({
         ...await resolveModelFileAccessTokensTryHeaders(manifestUrl, tokens, endpoints)
     ];
     let rateLimitPendingRetries = 0;
-    
+
     for (let i = 0; i < headersToTry.length * (1 + rateLimitPendingRetries); i++) {
         const headers = headersToTry[i % headersToTry.length];
         if (headers == null)
             continue;
-        
+
         let response: Awaited<ReturnType<typeof fetch>> | undefined;
         try {
             response = await fetch(manifestUrl, {
@@ -326,7 +326,7 @@ function parseHuggingFaceUriContent(uri: string, fullUri: string, endpoints: Mod
         const actualTag = tagParts.length > 0
             ? [tag, ...tagParts].join(":").trimEnd()
             : (tag ?? "").trimEnd();
-        const assumedQuant = ggufQuantNames.has(actualTag.toUpperCase())
+        const assumedQuant = ggufFileQuantNamesSet.has(actualTag.toUpperCase())
             ? actualTag.toUpperCase()
             : undefined;
         const resolvedTag = assumedQuant != null
