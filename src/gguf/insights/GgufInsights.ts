@@ -30,6 +30,7 @@ export class GgufInsights {
     /** @internal */ private _supportsRanking?: boolean;
     /** @internal */ private _dominantTensorType?: GgmlType;
     /** @internal */ private _addonMetadata?: AddonGgufMetadata;
+    /** @internal */ private _totalParameters?: number;
     /** @internal */ public _defaultUseMmap?: boolean;
     /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
@@ -114,17 +115,8 @@ export class GgufInsights {
 
     /** The total number of parameters in the model */
     public get totalParameters() {
-        let totalParameters = 0n;
-
-        for (const tensor of this._ggufFileInfo.fullTensorInfo ?? []) {
-            let tensorParameters = 1n;
-            for (const dim of tensor.dimensions ?? [])
-                tensorParameters *= BigInt(dim);
-
-            totalParameters += tensorParameters;
-        }
-
-        return Number(totalParameters);
+        this._totalParameters ??= getTotalModelParameters(this._ggufFileInfo.fullTensorInfo ?? []);
+        return this._totalParameters;
     }
 
     public get flashAttentionSupported() {
@@ -2025,4 +2017,18 @@ export function getDominantTensorType(tensorInfo: GgufTensorInfo[]): GgmlType | 
     }
 
     return dominantType;
+}
+
+export function getTotalModelParameters(tensorInfo: GgufTensorInfo[]) {
+    let totalParameters = 0n;
+
+    for (const tensor of tensorInfo) {
+        let tensorParameters = 1n;
+        for (const dim of tensor.dimensions ?? [])
+            tensorParameters *= BigInt(dim);
+
+        totalParameters += tensorParameters;
+    }
+
+    return Number(totalParameters);
 }
