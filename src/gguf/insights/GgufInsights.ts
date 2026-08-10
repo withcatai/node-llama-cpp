@@ -1173,6 +1173,9 @@ export class GgufInsights {
 
     /** @internal */
     public _createSimulatorSession(lruCacheSize: number = 10) {
+        if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.clip)
+            return new GgufInsightsSimulatorSession(this._llama, lruCacheSize, new Error("Cannot simulate CLIP architecture models"));
+
         return new GgufInsightsSimulatorSession(this._llama, lruCacheSize);
     }
 
@@ -1195,9 +1198,10 @@ export class GgufInsights {
 export class GgufInsightsSimulatorSession {
     private readonly _llama: Llama;
     private readonly _modelHandlePromises: LruCache<string, Promise<SimulatorModelHandle>>;
+    private readonly _loadModelError?: Error;
     private _disposed = false;
 
-    public constructor(llama: Llama, lruCacheSize: number = 10) {
+    public constructor(llama: Llama, lruCacheSize: number = 10, loadModelError?: Error) {
         this._llama = llama;
         this._modelHandlePromises = new LruCache(lruCacheSize, {
             async onDelete(key, value) {
@@ -1210,6 +1214,7 @@ export class GgufInsightsSimulatorSession {
                 }
             }
         });
+        this._loadModelError = loadModelError;
     }
 
     public async estimateModelResources({
@@ -1365,6 +1370,8 @@ export class GgufInsightsSimulatorSession {
     }) {
         if (this._disposed)
             throw new Error("simulator session is disposed");
+        else if (this._loadModelError != null)
+            throw this._loadModelError;
 
         let preventDisposalHandle: DisposalPreventionHandle;
         try {

@@ -207,7 +207,7 @@ export class GgufInsightsConfigurationResolver {
             ? this._ggufInsights._getUseMmap()
             : useMmap;
         let gpuLayersFitMemory = false;
-        const simulatorSession = this._ggufInsights._createSimulatorSession();
+        await using simulatorSession = this._ggufInsights._createSimulatorSession();
 
         try {
             const layersResolution = await this.resolveModelGpuLayersV2(
@@ -547,7 +547,7 @@ export class GgufInsightsConfigurationResolver {
 
             _simulatorSession
         } = options;
-        
+
         return await resolveContextContextSizeOption({
             contextSize,
             batchSize,
