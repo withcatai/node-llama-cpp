@@ -177,22 +177,24 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
         function extractControls() {
             const {responseOnly, withReasoning} = tryMatrix({
                 enableThinking: [true, null],
-                variation: ["simple", "separateReasoning", "nullContent", "reasoningFirst", "reasoningFirstNullMessage"]
-            }, ({enableThinking, variation}) => {
+                composition: ["simple", "separateReasoning", "nullContent", "reasoningFirst", "reasoningFirstNullMessage"]
+            }, ({enableThinking, composition}) => {
                 const thinkingParam = enableThinking === true
                     ? {"enable_thinking": true}
                     : {};
 
-                if (variation === "simple")
+                if (composition === "simple")
                     return {
+                        thinkingParam,
                         responseOnly: renderTemplate(messagesWithModelResponseLongBase, thinkingParam),
                         withReasoning: {
                             long: renderTemplate(messagesWithModelReasoningLongBase, thinkingParam),
                             short: renderTemplate(messagesWithModelReasoning, thinkingParam)
                         }
                     };
-                else if (variation === "separateReasoning" || variation === "nullContent")
+                else if (composition === "separateReasoning" || composition === "nullContent")
                     return {
+                        thinkingParam,
                         responseOnly: renderTemplate([...messagesWithModelResponseLongBase, {
                             role: "assistant",
                             content: ""
@@ -200,27 +202,28 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                         withReasoning: {
                             long: renderTemplate([...messagesWithModelResponseLongBase, {
                                 role: "assistant",
-                                ...(variation === "nullContent" ? {} : {
+                                ...(composition === "nullContent" ? {} : {
                                     content: ""
                                 }),
                                 "reasoning_content": modelReasoning2
                             }], thinkingParam),
                             short: renderTemplate([...messagesWithModelResponse, {
                                 role: "assistant",
-                                ...(variation === "nullContent" ? {} : {
+                                ...(composition === "nullContent" ? {} : {
                                     content: ""
                                 }),
                                 "reasoning_content": modelReasoning2
                             }], thinkingParam)
                         }
                     };
-                else if (variation === "reasoningFirst" || variation === "reasoningFirstNullMessage")
+                else if (composition === "reasoningFirst" || composition === "reasoningFirstNullMessage")
                     return {
+                        thinkingParam,
                         responseOnly: renderTemplate(messagesWithModelResponseLongBase, thinkingParam),
                         withReasoning: {
                             long: renderTemplate([...longBaseMessages, {
                                 role: "assistant",
-                                ...(variation === "reasoningFirstNullMessage" ? {} : {
+                                ...(composition === "reasoningFirstNullMessage" ? {} : {
                                     content: ""
                                 }),
                                 "reasoning_content": modelReasoning2
@@ -230,7 +233,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                             }], thinkingParam),
                             short: renderTemplate([...baseMessages, {
                                 role: "assistant",
-                                ...(variation === "reasoningFirstNullMessage" ? {} : {
+                                ...(composition === "reasoningFirstNullMessage" ? {} : {
                                     content: ""
                                 }),
                                 "reasoning_content": modelReasoning2
@@ -241,8 +244,8 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                         }
                     };
 
-                void (variation satisfies never);
-                throw new Error(`Unsupported variation: ${variation}`);
+                void (composition satisfies never);
+                throw new Error(`Unsupported composition: ${composition}`);
             });
 
             let reasoningSectionStartPrefix: string | {type: "openedOnStart"} | undefined = undefined;
@@ -294,13 +297,13 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
         function shouldKeepPastThinking() {
             const renderedOutput = tryMatrix({
                 enableThinking: [true, null],
-                variation: ["simple", "reasoningFirst", "reasoningFirstNullMessage"]
-            }, ({enableThinking, variation}) => {
+                composition: ["simple", "reasoningFirst", "reasoningFirstNullMessage"]
+            }, ({enableThinking, composition}) => {
                 const thinkingParam = enableThinking === true
                     ? {"enable_thinking": true}
                     : {};
 
-                if (variation === "simple")
+                if (composition === "simple")
                     return renderTemplate([...messagesWithModelReasoning, {
                         role: "user",
                         content: userMessage2
@@ -309,10 +312,10 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                         content: modelResponse3,
                         "reasoning_content": modelReasoning3
                     }], thinkingParam);
-                else if (variation === "reasoningFirst" || variation === "reasoningFirstNullMessage")
+                else if (composition === "reasoningFirst" || composition === "reasoningFirstNullMessage")
                     return renderTemplate([...baseMessages, {
                         role: "assistant",
-                        ...(variation === "reasoningFirstNullMessage" ? {} : {
+                        ...(composition === "reasoningFirstNullMessage" ? {} : {
                             content: ""
                         }),
                         "reasoning_content": modelReasoning2
@@ -324,7 +327,7 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                         content: userMessage2
                     }, {
                         role: "assistant",
-                        ...(variation === "reasoningFirstNullMessage" ? {} : {
+                        ...(composition === "reasoningFirstNullMessage" ? {} : {
                             content: ""
                         }),
                         "reasoning_content": modelReasoning3
@@ -333,8 +336,8 @@ export function extractSegmentSettingsFromTokenizerAndChatTemplate({
                         content: modelResponse3
                     }], thinkingParam);
 
-                void (variation satisfies never);
-                throw new Error(`Unsupported variation: ${variation}`);
+                void (composition satisfies never);
+                throw new Error(`Unsupported composition: ${composition}`);
             });
 
             return renderedOutput.includes(modelReasoning2) && renderedOutput.includes(modelReasoning3);

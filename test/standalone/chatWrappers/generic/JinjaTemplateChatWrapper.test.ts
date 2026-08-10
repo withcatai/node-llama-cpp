@@ -1703,6 +1703,7 @@ describe("JinjaTemplateChatWrapper", () => {
             expect(chatWrapper.keepOnlyLastThought).to.be.eql(true);
             expect(chatWrapper.settings.segments?.thought).to.eql({
                 openOnResponseStart: true,
+                reopenAfterFunctionCalls: false,
                 prefix: LlamaText(new SpecialTokensText("<think>\n")),
                 suffix: LlamaText(new SpecialTokensText("\n</think>\n\n"))
             });
@@ -1724,6 +1725,7 @@ describe("JinjaTemplateChatWrapper", () => {
             const chatWrapper = new JinjaTemplateChatWrapper({template});
             expect(chatWrapper.settings.segments?.thought).to.eql({
                 openOnResponseStart: true,
+                reopenAfterFunctionCalls: false,
                 prefix: LlamaText(new SpecialTokensText("<think>\n")),
                 suffix: LlamaText(new SpecialTokensText("\n</think>\n"))
             });

@@ -210,11 +210,14 @@ describe("JinjaTemplateChatWrapper", () => {
                 },
                 "segments": {
                   "thought": {
-                    "prefix": LlamaText([
-                      new SpecialTokensText("<think>"),
-                    ]),
+                    "openOnResponseStart": true,
+                    "prefix": {
+                      "type": "openedOnStart",
+                    },
+                    "reopenAfterFunctionCalls": true,
                     "suffix": LlamaText([
-                      new SpecialTokensText("</think>"),
+                      new SpecialTokensText("</think>
+              "),
                     ]),
                   },
                 },
