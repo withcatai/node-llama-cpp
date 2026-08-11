@@ -173,6 +173,10 @@ void AddonSampler::acceptToken(llama_token token) {
 void AddonSampler::sample(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP, bool forceGrammar) {
     setTokenCandidates(llamaContext, batchLogitIndex, curP);
 
+    if (curP.size == 0) {
+        return;
+    }
+
     if (forceGrammar && grammarEvaluationState != nullptr && grammarEvaluationState->sampler != nullptr) {
         llama_sampler_apply(grammarEvaluationState->sampler, &curP);
         llama_sampler_apply(chain, &curP);
@@ -287,7 +291,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
                 temperatureSampler = nullptr;
             }
 
-            if (temperatureSampler_temperature <= 0) {
+            if (temperatureSampler_temperature <= 0.0f) {
                 greedySampler = llama_sampler_init_greedy();
             } else {
                 temperatureSampler = llama_sampler_init_temp(temperatureSampler_temperature);
@@ -321,7 +325,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
                 minPSampler = nullptr;
             }
 
-            if (minPSampler_minP != 0) {
+            if (minPSampler_minP > 0.0f) {
                 minPSampler = llama_sampler_init_min_p(minPSampler_minP, min_keep);
             }
         }
@@ -366,7 +370,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
                 topPSampler = nullptr;
             }
 
-            if (topPSampler_topP >= 1) {
+            if (topPSampler_topP >= 0.0f && topPSampler_topP <= 1.0f) {
                 topPSampler = llama_sampler_init_top_p(topPSampler_topP, min_keep);
             }
         }

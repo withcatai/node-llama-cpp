@@ -14,7 +14,9 @@
  * 2 y
  * ```
  */
-export function* optionsMatrix<const T extends Record<string, any>>(options: {[K in keyof T]: T[K][]}): Generator<{[K in keyof T]: T[K]}> {
+export function* optionsMatrix<const T extends Record<string, any>>(
+    options: {[K in keyof T]: readonly T[K][]}
+): Generator<{[K in keyof T]: T[K]}> {
     const keys: Array<keyof T> = Object.keys(options);
     const indexes = keys.map(() => 0);
 
@@ -83,7 +85,7 @@ export function* optionsMatrix<const T extends Record<string, any>>(options: {[K
  * ```
  */
 export function tryMatrix<const T extends Record<string, any>, R>(
-    options: {[K in keyof T]: T[K][]},
+    options: {[K in keyof T]: readonly T[K][]},
     callback: (options: {[K in keyof T]: T[K]}) => R
 ): R {
     let nextOption: {[K in keyof T]: T[K]} | undefined = undefined;

@@ -235,7 +235,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             llama_token_data_array cur_p;
             sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence);
 
-            if (!(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
+            if (cur_p.size == 0 || !(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;
                 return;
             }

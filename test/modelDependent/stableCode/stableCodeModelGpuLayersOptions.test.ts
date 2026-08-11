@@ -619,9 +619,9 @@ describe("stableCode", () => {
                         totalVram: s1GB * 2,
                         freeVram: s1GB * 1
                     });
-                    expect(res.gpuLayers).to.toMatchInlineSnapshot("0");
-                    expect(res.contextSize).to.toMatchInlineSnapshot("16384");
-                    expect(res.useMmap).to.toMatchInlineSnapshot("true");
+                    expect(res.gpuLayers).to.toMatchInlineSnapshot("8");
+                    expect(res.contextSize).to.toMatchInlineSnapshot("6144");
+                    expect(res.useMmap).to.toMatchInlineSnapshot("false");
                     expect(res.contextSize).to.be.gte(contextSize);
                 }
                 {

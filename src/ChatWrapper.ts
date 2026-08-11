@@ -7,7 +7,8 @@ import {LlamaText, SpecialTokensText} from "./utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {defaultChatSystemPrompt} from "./config.js";
-import {getChatWrapperSegmentDefinition} from "./utils/getChatWrapperSegmentDefinition.js";
+import {getStandardizedChatWrapperSegmentDefinition} from "./utils/getStandardizedChatWrapperSegmentDefinition.js";
+import {replaceRegularTextInLlamaText} from "./chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import type {JinjaTemplateChatWrapperOptions} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
 
 export abstract class ChatWrapper {
@@ -19,7 +20,9 @@ export abstract class ChatWrapper {
                 prefix: "||call: ",
                 paramsPrefix: LlamaText(new SpecialTokensText("(")),
                 suffix: LlamaText(new SpecialTokensText(")")),
-                emptyCallParamsPlaceholder: ""
+                emptyCallParamsPlaceholder: "",
+
+                prefixAlternateMatches: ["||call:"]
             },
             result: {
                 prefix: LlamaText(new SpecialTokensText("\n"), "||result: "),
@@ -117,7 +120,7 @@ export abstract class ChatWrapper {
                         : jsonDumps(emptyCallParamsPlaceholder)
                     : jsonDumps(params)
             ),
-            this.settings.functions.call.suffix
+            replaceRegularTextInLlamaText(this.settings.functions.call.suffix, "{{functionName}}", name)
         ]);
     }
 
@@ -174,11 +177,11 @@ export abstract class ChatWrapper {
                 res.push(LlamaText(this.settings.segments.closeAllSegments));
             } else if (needsToAddSegmentReminder && segmentStack.length > 0 && this.settings.segments?.reiterateStackAfterFunctionCalls) {
                 for (const segmentType of segmentStack) {
-                    const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, segmentType);
-                    if (segmentDefinition == null)
+                    const standardizedSegmentDefinition = getStandardizedChatWrapperSegmentDefinition(this.settings, segmentType);
+                    if (standardizedSegmentDefinition?.prefix == null)
                         continue;
 
-                    res.push(LlamaText(segmentDefinition.prefix));
+                    res.push(LlamaText(standardizedSegmentDefinition.prefix));
                 }
             }
         };
@@ -193,7 +196,7 @@ export abstract class ChatWrapper {
             } else if (isChatModelResponseSegment(response)) {
                 addFunctionCalls();
 
-                const segmentDefinition = getChatWrapperSegmentDefinition(this.settings, response.segmentType);
+                const standardizedSegmentDefinition = getStandardizedChatWrapperSegmentDefinition(this.settings, response.segmentType);
                 if (response.raw != null && useRawValues)
                     res.push(LlamaText.fromJSON(response.raw));
                 else
@@ -201,22 +204,24 @@ export abstract class ChatWrapper {
                         LlamaText([
                             (segmentStack.length > 0 && segmentStack.at(-1) === response.segmentType)
                                 ? ""
-                                : segmentDefinition?.prefix ?? "",
+                                : (standardizedSegmentDefinition?.prefix ?? ""),
                             response.text,
                             response.ended
-                                ? (segmentDefinition?.suffix ?? "")
+                                ? (standardizedSegmentDefinition?.suffix ?? "")
                                 : ""
                         ])
                     );
 
-                lastSegmentEndedWithoutSuffix = response.ended && segmentDefinition?.suffix == null;
+                lastSegmentEndedWithoutSuffix = response.ended && standardizedSegmentDefinition?.suffix == null;
 
                 if (!response.ended && segmentStack.at(-1) !== response.segmentType)
                     segmentStack.push(response.segmentType);
                 else if (response.ended && segmentStack.at(-1) === response.segmentType) {
                     segmentStack.pop();
 
-                    if (segmentStack.length === 0 && segmentDefinition?.suffix == null && this.settings.segments?.closeAllSegments != null)
+                    if (segmentStack.length === 0 && standardizedSegmentDefinition?.suffix == null &&
+                        this.settings.segments?.closeAllSegments != null
+                    )
                         res.push(LlamaText(this.settings.segments.closeAllSegments));
                 }
 
@@ -309,6 +314,6 @@ export type ChatWrapperJinjaMatchConfiguration<T extends typeof ChatWrapper> = A
     [
         testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
         applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
-        testJinjaChatWrapperOptions?: JinjaTemplateChatWrapperOptions
+        testJinjaChatWrapperOptions?: Omit<JinjaTemplateChatWrapperOptions, "template">
     ]
 >;

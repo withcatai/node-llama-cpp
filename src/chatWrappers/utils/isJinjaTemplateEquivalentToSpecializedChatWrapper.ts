@@ -136,8 +136,16 @@ function checkEquivalence(
                 (specializedChatWrapper as Writable<ChatWrapper>).settings = originalSpecializedSettings;
         }
 
-        if (jinjaChatWrapper.settings.segments?.thought?.openOnResponseStart === true &&
-            specializedChatWrapper.settings.segments?.thought?.openOnResponseStart !== true
+        const jinjaThoughtSegment = jinjaChatWrapper.settings.segments?.thought;
+        const specializedThoughtSegment = specializedChatWrapper.settings.segments?.thought;
+
+        const jinjaOpenOnStart = hasThoughtSegmentOpenedOnStart(jinjaChatWrapper.settings);
+        const specializedOpenOnStart = hasThoughtSegmentOpenedOnStart(specializedChatWrapper.settings);
+        if (jinjaOpenOnStart !== specializedOpenOnStart)
+            return false;
+        else if (
+            !jinjaOpenOnStart &&
+            (jinjaThoughtSegment?.openOnResponseStart ?? false) !== (specializedThoughtSegment?.openOnResponseStart ?? false)
         )
             return false;
 
@@ -318,8 +326,8 @@ function convertChatWrapperSettingsToUseSpecialTokensText(settings: ChatWrapperS
             call: {
                 ...settings.functions.call,
                 prefix: convertToSpecialTokensText(settings.functions.call.prefix),
-                suffix: convertToSpecialTokensText(settings.functions.call.suffix),
-                paramsPrefix: convertToSpecialTokensText(settings.functions.call.paramsPrefix)
+                suffix: convertToSpecialTokensText(settings.functions.call.suffix, ["{{functionName}}"]),
+                paramsPrefix: convertToSpecialTokensText(settings.functions.call.paramsPrefix, ["{{functionName}}"])
             },
             result: {
                 ...settings.functions.result,
@@ -511,4 +519,11 @@ function removeLeadingBos(llamaText: LlamaText) {
         return LlamaText(llamaText.values.slice(1));
 
     return llamaText;
+}
+
+function hasThoughtSegmentOpenedOnStart(settings: ChatWrapperSettings): boolean {
+    const thoughtSegment = settings.segments?.thought;
+
+    return typeof thoughtSegment?.prefix === "object" && !LlamaText.isLlamaText(thoughtSegment.prefix) &&
+        thoughtSegment.prefix.type === "openedOnStart";
 }

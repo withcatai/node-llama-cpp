@@ -26,7 +26,39 @@ export type ChatWrapperSettings = {
         readonly call: {
             readonly optionalPrefixSpace: boolean,
             readonly prefix: string | LlamaText,
+
+            /**
+             * Supported template parameters:
+             * - <span v-pre>`{{functionName}}`</span>
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of supported values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of unsupported values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
             readonly paramsPrefix: string | LlamaText,
+
+            /**
+             * Supported template parameters:
+             * - <span v-pre>`{{functionName}}`</span>
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of supported values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of unsupported values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
             readonly suffix: string | LlamaText,
 
             /**
@@ -36,7 +68,13 @@ export type ChatWrapperSettings = {
              *
              * Defaults to `""`.
              */
-            readonly emptyCallParamsPlaceholder?: object | string | number | boolean | null
+            readonly emptyCallParamsPlaceholder?: object | string | number | boolean | null,
+
+            /**
+             * Alternate prefixes that can be used to detect a function call,
+             * but won't be used to construct the context when building it from scratch.
+             */
+            readonly prefixAlternateMatches?: Array<string | LlamaText>
         },
 
         readonly result: {
@@ -111,7 +149,9 @@ export type ChatWrapperSettings = {
         readonly reiterateStackAfterFunctionCalls?: boolean,
 
         /** Chain of Thought text segment */
-        readonly thought?: ChatWrapperSettingsSegment & {
+        readonly thought?: {
+            readonly prefix: string | LlamaText | {type: "openedOnStart"},
+            readonly suffix?: string | LlamaText,
             openOnResponseStart?: boolean,
             reopenAfterFunctionCalls?: boolean
         },

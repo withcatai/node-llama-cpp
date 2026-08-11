@@ -30,6 +30,7 @@ export class GgufInsights {
     /** @internal */ private _supportsRanking?: boolean;
     /** @internal */ private _dominantTensorType?: GgmlType;
     /** @internal */ private _addonMetadata?: AddonGgufMetadata;
+    /** @internal */ private _totalParameters?: number;
     /** @internal */ public _defaultUseMmap?: boolean;
     /** @internal */ public readonly _ggufFileInfo: GgufFileInfo;
     /** @internal */ private readonly _configurationResolver: GgufInsightsConfigurationResolver;
@@ -114,17 +115,8 @@ export class GgufInsights {
 
     /** The total number of parameters in the model */
     public get totalParameters() {
-        let totalParameters = 0n;
-
-        for (const tensor of this._ggufFileInfo.fullTensorInfo ?? []) {
-            let tensorParameters = 1n;
-            for (const dim of tensor.dimensions ?? [])
-                tensorParameters *= BigInt(dim);
-
-            totalParameters += tensorParameters;
-        }
-
-        return Number(totalParameters);
+        this._totalParameters ??= getTotalModelParameters(this._ggufFileInfo.fullTensorInfo ?? []);
+        return this._totalParameters;
     }
 
     public get flashAttentionSupported() {
@@ -1181,6 +1173,9 @@ export class GgufInsights {
 
     /** @internal */
     public _createSimulatorSession(lruCacheSize: number = 10) {
+        if (this.ggufFileInfo.metadata.general.architecture === GgufArchitectureType.clip)
+            return new GgufInsightsSimulatorSession(this._llama, lruCacheSize, new Error("Cannot simulate CLIP architecture models"));
+
         return new GgufInsightsSimulatorSession(this._llama, lruCacheSize);
     }
 
@@ -1203,9 +1198,10 @@ export class GgufInsights {
 export class GgufInsightsSimulatorSession {
     private readonly _llama: Llama;
     private readonly _modelHandlePromises: LruCache<string, Promise<SimulatorModelHandle>>;
+    private readonly _loadModelError?: Error;
     private _disposed = false;
 
-    public constructor(llama: Llama, lruCacheSize: number = 10) {
+    public constructor(llama: Llama, lruCacheSize: number = 10, loadModelError?: Error) {
         this._llama = llama;
         this._modelHandlePromises = new LruCache(lruCacheSize, {
             async onDelete(key, value) {
@@ -1218,6 +1214,7 @@ export class GgufInsightsSimulatorSession {
                 }
             }
         });
+        this._loadModelError = loadModelError;
     }
 
     public async estimateModelResources({
@@ -1373,6 +1370,8 @@ export class GgufInsightsSimulatorSession {
     }) {
         if (this._disposed)
             throw new Error("simulator session is disposed");
+        else if (this._loadModelError != null)
+            throw this._loadModelError;
 
         let preventDisposalHandle: DisposalPreventionHandle;
         try {
@@ -2025,4 +2024,18 @@ export function getDominantTensorType(tensorInfo: GgufTensorInfo[]): GgmlType | 
     }
 
     return dominantType;
+}
+
+export function getTotalModelParameters(tensorInfo: GgufTensorInfo[]) {
+    let totalParameters = 0n;
+
+    for (const tensor of tensorInfo) {
+        let tensorParameters = 1n;
+        for (const dim of tensor.dimensions ?? [])
+            tensorParameters *= BigInt(dim);
+
+        totalParameters += tensorParameters;
+    }
+
+    return Number(totalParameters);
 }

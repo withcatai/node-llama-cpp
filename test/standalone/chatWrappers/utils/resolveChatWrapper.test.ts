@@ -2,11 +2,11 @@ import {describe, expect, test} from "vitest";
 import {
     AlpacaChatWrapper, ChatMLChatWrapper, DeepSeekChatWrapper, FalconChatWrapper, FunctionaryChatWrapper, GemmaChatWrapper,
     Gemma4ChatWrapper, GeneralChatWrapper, Llama2ChatWrapper, Llama3_1ChatWrapper, MistralChatWrapper, QwenChatWrapper,
-    resolveChatWrapper, HarmonyChatWrapper
+    resolveChatWrapper, HarmonyChatWrapper, MuseChatWrapper
 } from "../../../../src/index.js";
 import {
     harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5,
-    gemma4JinjaTemplate1, gemma4JinjaTemplate2, gemma4JinjaTemplate3
+    gemma4JinjaTemplate1, gemma4JinjaTemplate2, gemma4JinjaTemplate3, museGlimmerJinjaTemplate
 } from "./jinjaTemplates.js";
 
 
@@ -991,5 +991,18 @@ describe("resolveChatWrapper", () => {
             fallbackToOtherWrappersOnJinjaError: false
         });
         expect(chatWrapper).to.be.instanceof(HarmonyChatWrapper);
+    });
+
+    test("should resolve to specialized MuseChatWrapper ", {timeout: 1000 * 60 * 60 * 2}, async () => {
+        const chatWrapper = resolveChatWrapper({
+            customWrapperSettings: {
+                jinjaTemplate: {
+                    template: museGlimmerJinjaTemplate
+                }
+            },
+            fallbackToOtherWrappersOnJinjaError: false
+        });
+
+        expect(chatWrapper).to.be.instanceof(MuseChatWrapper);
     });
 });

@@ -18,7 +18,8 @@ import {GgmlType, GgufTensorInfo} from "../../../../gguf/types/GgufTensorInfoTyp
 import {toBytes} from "../../../utils/toBytes.js";
 import {printDidYouMeanUri} from "../../../utils/resolveCommandGgufPath.js";
 import {isModelUri} from "../../../../utils/parseModelUri.js";
-import {getDominantTensorType} from "../../../../gguf/insights/GgufInsights.js";
+import {getDominantTensorType, getTotalModelParameters} from "../../../../gguf/insights/GgufInsights.js";
+import {formatModelParameterCount} from "../../../../utils/formatModelParameterCount.js";
 
 const chatTemplateKey = ".chatTemplate";
 
@@ -226,6 +227,7 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
                 console.info(`${chalk.yellow("Spliced parts:")} ${parsedMetadata.splicedParts}`);
 
             const dominantTensorType = getDominantTensorType(parsedMetadata.fullTensorInfo ?? []);
+            const modelParameters = getTotalModelParameters(parsedMetadata.fullTensorInfo ?? []);
 
             console.info(`${chalk.yellow("GGUF version:")} ${parsedMetadata.version}`);
             console.info(`${chalk.yellow("Tensor count:")} ${parsedMetadata.totalTensorCount.toLocaleString("en-US", numberLocaleFormattingOptions)}`);
@@ -235,6 +237,9 @@ export const InspectGgufCommand: CommandModule<object, InspectGgufCommand> = {
 
             if (dominantTensorType != null)
                 console.info(`${chalk.yellow("Dominant tensor type:")} ${dominantTensorType} (${GgmlType[dominantTensorType]})`);
+
+            if (!noSplice && modelParameters !== 0)
+                console.info(`${chalk.yellow("Total " + (parsedMetadata.splicedParts === 1 ? "file" : "files") + " parameters:")} ${formatModelParameterCount(modelParameters)}`);
 
             console.info(`${chalk.yellow("Metadata:")} ${prettyPrintObject(parsedMetadata.metadata, undefined, metadataPrettyPrintOptions)}`);
             console.info(`${chalk.yellow("Tensor info:")} ${prettyPrintObject(parsedMetadata.fullTensorInfo, undefined, tensorInfoPrettyPrintOptions)}`);

@@ -21,15 +21,16 @@ import {LlamaModel} from "../../evaluator/LlamaModel/LlamaModel.js";
 import {QwenChatWrapper} from "../QwenChatWrapper.js";
 import {HarmonyChatWrapper} from "../HarmonyChatWrapper.js";
 import {SeedChatWrapper} from "../SeedChatWrapper.js";
+import {MuseChatWrapper} from "../MuseChatWrapper.js";
+import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
-import type {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
     "general", "deepSeek", "qwen", "llama3.2-lightweight", "llama3.1", "llama3", "llama2Chat", "mistral", "alpacaChat", "functionary",
-    "chatML", "falconChat", "gemma4", "gemma", "harmony", "seed"
+    "chatML", "falconChat", "gemma4", "gemma", "harmony", "muse", "seed"
 ] as const);
 export type SpecializedChatWrapperTypeName = (typeof specializedChatWrapperTypeNames)[number];
 
@@ -61,6 +62,7 @@ export const chatWrappers = Object.freeze({
     "gemma4": Gemma4ChatWrapper,
     "gemma": GemmaChatWrapper,
     "harmony": HarmonyChatWrapper,
+    "muse": MuseChatWrapper,
     "seed": SeedChatWrapper,
     "template": TemplateChatWrapper,
     "jinjaTemplate": JinjaTemplateChatWrapper
@@ -74,6 +76,7 @@ const chatWrapperToConfigType = new Map(
 
 const specializedChatWrapperRelatedTexts = {
     "harmony": ["gpt", "gpt-oss"],
+    "muse": ["muse", "muse glimmer", "muse-glimmer", "muse_glimmer"],
     "gemma4": ["gemma 4", "gemma-4"]
 } satisfies Partial<Record<ResolvableChatWrapperTypeName, string[]>>;
 
@@ -380,6 +383,8 @@ export function resolveChatWrapper(
             return createSpecializedChatWrapper(GemmaChatWrapper);
         else if (includesText(modelNames, ["gpt-oss", "Gpt Oss", "Gpt-Oss", "openai_gpt-oss", "Openai_Gpt Oss", "openai.gpt-oss", "Openai.Gpt Oss"]))
             return createSpecializedChatWrapper(HarmonyChatWrapper);
+        else if (includesText(modelNames, ["Muse Glimmer", "Muse-Glimmer", "Muse_Glimmer", "muse-glimmer", "muse_glimmer"]))
+            return createSpecializedChatWrapper(MuseChatWrapper);
         else if (includesText(modelNames, ["seed-oss", "Seed Oss", "Seed OSS", "Seed-Oss", "Seed-OSS", "ByteDance-Seed_Seed-OSS", "ByteDance-Seed.Seed-OSS"]))
             return createSpecializedChatWrapper(SeedChatWrapper);
     }
@@ -463,14 +468,16 @@ export function resolveChatWrapper(
     }
 
     if (architecture != null) {
-        if (architecture === "llama")
+        if (architecture === GgufArchitectureType.llama)
             return createSpecializedChatWrapper(GeneralChatWrapper);
-        else if (architecture === "falcon")
+        else if (architecture === GgufArchitectureType.falcon)
             return createSpecializedChatWrapper(FalconChatWrapper);
-        else if (architecture === "gemma" || architecture === "gemma2")
+        else if (architecture === GgufArchitectureType.gemma || architecture === GgufArchitectureType.gemma2)
             return createSpecializedChatWrapper(GemmaChatWrapper);
-        else if (architecture === "gemma4")
+        else if (architecture === GgufArchitectureType.gemma4)
             return createSpecializedChatWrapper(Gemma4ChatWrapper);
+        else if (architecture === GgufArchitectureType.museGlimmer)
+            return createSpecializedChatWrapper(MuseChatWrapper);
     }
 
     return null;
