@@ -65,6 +65,7 @@ import {FunctionaryChatWrapper} from "./chatWrappers/FunctionaryChatWrapper.js";
 import {GemmaChatWrapper} from "./chatWrappers/GemmaChatWrapper.js";
 import {Gemma4ChatWrapper} from "./chatWrappers/Gemma4ChatWrapper.js";
 import {HarmonyChatWrapper} from "./chatWrappers/HarmonyChatWrapper.js";
+import {MuseChatWrapper} from "./chatWrappers/MuseChatWrapper.js";
 import {SeedChatWrapper} from "./chatWrappers/SeedChatWrapper.js";
 import {TemplateChatWrapper, type TemplateChatWrapperOptions} from "./chatWrappers/generic/TemplateChatWrapper.js";
 import {
@@ -240,6 +241,7 @@ export {
     GemmaChatWrapper,
     Gemma4ChatWrapper,
     HarmonyChatWrapper,
+    MuseChatWrapper,
     SeedChatWrapper,
     TemplateChatWrapper,
     type TemplateChatWrapperOptions,

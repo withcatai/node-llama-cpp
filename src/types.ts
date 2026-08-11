@@ -26,7 +26,39 @@ export type ChatWrapperSettings = {
         readonly call: {
             readonly optionalPrefixSpace: boolean,
             readonly prefix: string | LlamaText,
+
+            /**
+             * Supported template parameters:
+             * - <span v-pre>`{{functionName}}`</span>
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of supported values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of unsupported values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
             readonly paramsPrefix: string | LlamaText,
+
+            /**
+             * Supported template parameters:
+             * - <span v-pre>`{{functionName}}`</span>
+             *
+             * Template parameters can only appear in a string or a string in a `LlamaText`.
+             *
+             * Template parameters inside a `SpecialTokensText` inside a `LlamaText` won't be replaced.
+             *
+             * Example of supported values:
+             * - `"text{{functionName}}text"`
+             * - `LlamaText(["text{{functionName}}text"])`
+             *
+             * Example of unsupported values:
+             * - `LlamaText([new SpecialTokensText("text{{functionName}}text")])`
+             */
             readonly suffix: string | LlamaText,
 
             /**

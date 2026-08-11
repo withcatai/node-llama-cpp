@@ -27,6 +27,7 @@ import {getStandardizedChatWrapperSegmentDefinition} from "../../utils/getStanda
 import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
 import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
+import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import {
     eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
 } from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
@@ -2934,7 +2935,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 this.currentFunctionCallPreviousText = LlamaText([
                     this.chatWrapper.settings.functions.call.prefix,
                     this.functionEvaluationFunctionName,
-                    this.chatWrapper.settings.functions.call.paramsPrefix
+                    replaceRegularTextInLlamaText(
+                        this.chatWrapper.settings.functions.call.paramsPrefix,
+                        "{{functionName}}",
+                        this.functionEvaluationFunctionName
+                    )
                 ]);
                 const lastPartTokens = resolveLastTokens([this.currentFunctionCallCurrentPartTokens]);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
@@ -3046,9 +3051,17 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                 const functionCallText = LlamaText([
                     this.chatWrapper.settings.functions.call.prefix,
                     this.functionEvaluationFunctionName,
-                    this.chatWrapper.settings.functions.call.paramsPrefix,
+                    replaceRegularTextInLlamaText(
+                        this.chatWrapper.settings.functions.call.paramsPrefix,
+                        "{{functionName}}",
+                        this.functionEvaluationFunctionName
+                    ),
                     paramsText,
-                    this.chatWrapper.settings.functions.call.suffix
+                    replaceRegularTextInLlamaText(
+                        this.chatWrapper.settings.functions.call.suffix,
+                        "{{functionName}}",
+                        this.functionEvaluationFunctionName
+                    )
                 ]);
                 this.resFunctionCalls.push({
                     functionName: this.functionEvaluationFunctionName,

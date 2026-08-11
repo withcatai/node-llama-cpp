@@ -14,6 +14,7 @@ import {removeUndefinedFields} from "../../utils/removeNullFields.js";
 import {jsonDumps} from "../utils/jsonDumps.js";
 import {tryMatrix} from "../../utils/optionsMatrix.js";
 import {getStandardizedChatWrapperSegmentDefinition} from "../../utils/getStandardizedChatWrapperSegmentDefinition.js";
+import {replaceRegularTextInLlamaText} from "../utils/replaceRegularTextInLlamaText.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     templateSegmentOptionsToChatWrapperSettings, TemplateChatWrapperSegmentsOptions
@@ -483,7 +484,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                         : JSON.stringify(jsonDumps(emptyCallParamsPlaceholder))
                     : JSON.stringify(jsonDumps(params))
             ),
-            this.settings.functions.call.suffix
+            replaceRegularTextInLlamaText(this.settings.functions.call.suffix, "{{functionName}}", name)
         ]);
     }
 

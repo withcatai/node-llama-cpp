@@ -8,6 +8,7 @@ import {ChatModelFunctionsDocumentationGenerator} from "./chatWrappers/utils/Cha
 import {jsonDumps} from "./chatWrappers/utils/jsonDumps.js";
 import {defaultChatSystemPrompt} from "./config.js";
 import {getStandardizedChatWrapperSegmentDefinition} from "./utils/getStandardizedChatWrapperSegmentDefinition.js";
+import {replaceRegularTextInLlamaText} from "./chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import type {JinjaTemplateChatWrapperOptions} from "./chatWrappers/generic/JinjaTemplateChatWrapper.js";
 
 export abstract class ChatWrapper {
@@ -119,7 +120,7 @@ export abstract class ChatWrapper {
                         : jsonDumps(emptyCallParamsPlaceholder)
                     : jsonDumps(params)
             ),
-            this.settings.functions.call.suffix
+            replaceRegularTextInLlamaText(this.settings.functions.call.suffix, "{{functionName}}", name)
         ]);
     }
 
@@ -313,6 +314,6 @@ export type ChatWrapperJinjaMatchConfiguration<T extends typeof ChatWrapper> = A
     [
         testConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
         applyConfig: FirstItemOfTupleOrFallback<ConstructorParameters<T>, object>,
-        testJinjaChatWrapperOptions?: JinjaTemplateChatWrapperOptions
+        testJinjaChatWrapperOptions?: Omit<JinjaTemplateChatWrapperOptions, "template">
     ]
 >;

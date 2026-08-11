@@ -326,8 +326,8 @@ function convertChatWrapperSettingsToUseSpecialTokensText(settings: ChatWrapperS
             call: {
                 ...settings.functions.call,
                 prefix: convertToSpecialTokensText(settings.functions.call.prefix),
-                suffix: convertToSpecialTokensText(settings.functions.call.suffix),
-                paramsPrefix: convertToSpecialTokensText(settings.functions.call.paramsPrefix)
+                suffix: convertToSpecialTokensText(settings.functions.call.suffix, ["{{functionName}}"]),
+                paramsPrefix: convertToSpecialTokensText(settings.functions.call.paramsPrefix, ["{{functionName}}"])
             },
             result: {
                 ...settings.functions.result,
