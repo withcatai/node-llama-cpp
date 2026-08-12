@@ -524,7 +524,7 @@ export async function getLlamaForOptions({
 }: LlamaOptions, {
     updateLastBuildInfoOnCompile = false,
     skipLlamaInit = false,
-    pipeBinaryTestErrorLogs = false
+    pipeBinaryTestErrorLogs = process.platform === "win32"
 }: {
     updateLastBuildInfoOnCompile?: boolean,
     skipLlamaInit?: boolean,

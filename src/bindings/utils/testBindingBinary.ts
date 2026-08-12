@@ -20,7 +20,7 @@ export async function testBindingBinary(
     extBackendsPath: string | undefined,
     gpu: BuildGpu,
     testTimeout: number = 1000 * 60 * 5,
-    pipeOutputOnNode: boolean = false
+    pipeOutputOnNode: boolean = process.platform === "win32"
 ): Promise<boolean> {
     if (!detectedFileName.startsWith(expectedFileName)) {
         console.warn(
