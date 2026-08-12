@@ -21,6 +21,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
     public readonly headers: Record<string, string>;
     public readonly tokens?: ModelFileAccessTokens;
     public readonly endpoints?: ModelDownloadEndpoints;
+    private _fileSize?: number;
     private readonly _signal?: AbortSignal;
     private _tryHeaders: Record<string, string>[] | undefined = undefined;
 
@@ -55,7 +56,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
         const readOffset = GgufReadOffset.resolveReadOffset(offset);
         const endOffset = readOffset.offset + length;
 
-        if (endOffset >= this._buffer.length)
+        if (endOffset > this._buffer.length)
             return this._fetchToExpandBufferUpToOffset(endOffset)
                 .then(() => {
                     if (endOffset >= this._buffer.length)
@@ -67,7 +68,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
 
     private async _fetchToExpandBufferUpToOffset(endOffset: number, extraAllocationSize: number = defaultExtraAllocationSize) {
         await withLock([this as GgufNetworkFetchFileReader, "modifyBuffer"], this._signal, async () => {
-            if (endOffset < this._buffer.length)
+            if (endOffset <= this._buffer.length)
                 return;
 
             const missingBytesBuffer = await retry(async (bail) => {
@@ -77,6 +78,9 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
                     if (this._signal?.aborted) {
                         bail(this._signal.reason);
                         throw this._signal.reason;
+                    } else if (err instanceof FetchError && !err.canRetry) {
+                        bail(err);
+                        throw err;
                     }
 
                     throw err;
@@ -96,6 +100,9 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
 
         const headersToTry = [this.headers, ...this._tryHeaders];
 
+        if (this._fileSize != null && start >= this._fileSize)
+            throw new FetchError(`Requested byte range starting at index ${start} exceeds the file size of ${this._fileSize}`, false);
+
         while (headersToTry.length > 0) {
             const headers = headersToTry.shift();
 
@@ -108,16 +115,40 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
                 signal: this._signal
             });
 
-            if ((response.status >= 500 || response.status === 429 || response.status === 401) && headersToTry.length > 0)
+            const technicalIssue = response.status >= 500 || response.status === 429;
+            const cannotAccess = response.status >= 400 && response.status <= 404;
+            if (headersToTry.length > 0 && (technicalIssue || cannotAccess))
                 continue;
 
             if (!response.ok)
-                throw new Error(`Failed to fetch byte range: ${response.status} ${response.statusText}`);
+                throw new FetchError(`Failed to fetch byte range: ${response.status} ${response.statusText}`, technicalIssue);
+
+            const fileSizeHeader = response.headers.get("content-range")?.split("/")[1] ?? response.headers.get("x-linked-size");
+            if (fileSizeHeader != null) {
+                const fileSize = Number(fileSizeHeader);
+                if (Number.isSafeInteger(fileSize) && fileSize >= 0 && (this._fileSize == null || fileSize > this._fileSize))
+                    this._fileSize = fileSize;
+            }
 
             const arrayBuffer = await response.arrayBuffer();
             return Buffer.from(arrayBuffer);
         }
 
         throw new Error("Failed to fetch byte range: no more headers to try");
+    }
+}
+
+class FetchError extends Error {
+    public readonly canRetry: boolean;
+
+    public constructor(message: string, canRetry: boolean) {
+        super(message);
+        this.canRetry = canRetry;
+
+        Object.defineProperty(this, "canRetry" satisfies keyof this, {
+            enumerable: false,
+            configurable: false,
+            value: canRetry
+        });
     }
 }
