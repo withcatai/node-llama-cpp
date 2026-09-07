@@ -3501,3 +3501,796 @@ export const museGlimmerJinjaTemplate = String.raw`
     {{- "<|start|>assistant" -}}
 {%- endif -%}
 `.slice(1, -1).replaceAll("\\`", "`");
+
+export const museGlimmerJinjaTemplate2 = String.raw`
+{#
+  Template: Muse Glimmer ATEM Chat Template
+  Renders the ATEM tool-calling protocol: reasoning channel (to=self), tool
+  channels (to=<tool>), and the user channel, plus tool definitions and the
+  valid-recipient list in the system block.
+
+  Whitespace note: every tag uses the {%- -%} / {{- -}} stripping markers, so
+  the indentation below is purely for readability and contributes nothing to
+  the rendered output.
+#}
+{%- macro render_content(content) -%}
+    {%- if content is string -%}
+        {{- content -}}
+    {%- elif content is not none -%}
+        {%- for part in content -%}
+            {%- if part['type'] == 'image' -%}
+                {{- '<|patch|>' -}}
+            {%- elif part['type'] == 'video' -%}
+                {{- '<|video|>' -}}
+            {%- elif part['type'] == 'text' -%}
+                {{- part['text'] -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endif -%}
+{%- endmacro -%}
+{%- macro render_atem(tc) -%}
+    {%- set args = tc.function.arguments -%}
+    {%- if args is not mapping -%}
+        {{- raise_exception('Muse Glimmer ATEM chat template requires tool_call.function.arguments to be a dict (mapping); a JSON string cannot be parsed in the HF jinja sandbox.') -}}
+    {%- endif -%}
+    {{- '<atem:function_calls>\\n<atem:invoke name="' + tc.function.name + '">\\n' -}}
+    {%- for k, v in args.items() -%}
+        {{- '<atem:parameter name="' + k + '">' -}}
+        {%- if v is boolean -%}
+            {%- if v -%}
+                true
+            {%- else -%}
+                false
+            {%- endif -%}
+        {%- elif v is none -%}
+            null
+        {%- elif v is mapping or (v is iterable and v is not string) -%}
+            {{- v | tojson -}}
+        {%- else -%}
+            {{- v -}}
+        {%- endif -%}
+        {{- '</atem:parameter>\\n' -}}
+    {%- endfor -%}
+    {{- '</atem:invoke>\\n</atem:function_calls>' -}}
+{%- endmacro -%}
+{%- macro render_tool_defs(tools) -%}
+    {{- 'In this environment you have access to a set of tools you can use to answer the user\\'s question.\\n\\n' -}}
+    {{- 'You can invoke a function by writing a "<atem:function_calls>" block like the following:\\n' -}}
+    {{- '<atem:function_calls>\\n<atem:invoke name="$FUNCTION_NAME">\\n<atem:parameter name="$PARAMETER_NAME">$PARAMETER_VALUE</atem:parameter>\\n...\\n</atem:invoke>\\n</atem:function_calls>\\n\\n' -}}
+    {{- 'String and scalar parameters should be specified as is, while lists and objects should use JSON format. Note that spaces for string values are not stripped. The output is not expected to be valid XML and is parsed with regular expressions.\\n' -}}
+    {{- 'Here are the functions available in JSONSchema format:\\n' -}}
+    {{- '// Tool metadata\\n' -}}
+    {%- set nsns = namespace(seen=[]) -%}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {%- set tns = fn.name.split('.')[0] -%}
+        {%- if tns not in nsns.seen -%}
+            {%- set nsns.seen = nsns.seen + [tns] -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- set nd = tool_namespace_descriptions if tool_namespace_descriptions is defined else {} -%}
+    {%- for tns in nsns.seen -%}
+        {{- '{"name": ' + (tns | tojson) + ', "description": ' + ((nd[tns] if tns in nd else '') | tojson) + '}\\n' -}}
+    {%- endfor -%}
+    {{- '// Function schemas' -}}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {{- '\\n{"name": ' + (fn.name | tojson) + ', "description": ' + (fn.description | tojson) + ', "parameters": ' + (fn.parameters | tojson) + '}' -}}
+    {%- endfor -%}
+    {{- '\\n\\nHere\\'s an example of how to call a function in the tool set:\\n' -}}
+    {{- '(If the tool namespace is not specified, invoke the function directly as \`example_function_name\` rather than \`example_tool_name.example_function_name\`)\\n\\n' -}}
+    {{- 'to=example_tool_name.example_function_name\\n\\n' -}}
+    {{- '<atem:function_calls>\\n<atem:invoke name="example_tool_name.example_function_name">\\n' -}}
+    {{- '<atem:parameter name="example_parameter_1">value_1</atem:parameter>\\n' -}}
+    {{- '<atem:parameter name="example_parameter_2">This is the value for the second parameter\\nthat can span\\n"multiple" lines\\n</atem:parameter>\\n' -}}
+    {{- '</atem:invoke>\\n</atem:function_calls>' -}}
+{%- endmacro -%}
+{%- macro render_reasoning() -%}
+    {%- set rs = reasoning_strength if reasoning_strength is defined and reasoning_strength else 'high' -%}
+    {{- 'Reasoning strength: ' + rs + '.' -}}
+{%- endmacro -%}
+{%- macro render_system_meta(tools) -%}
+    {%- set rns = namespace(recipients=['"self"'], nslist=[]) -%}
+    {%- if tools -%}
+        {%- for tool in tools -%}
+            {%- set fn = tool.function if tool.function is defined else tool -%}
+            {%- set tns = fn.name.split('.')[0] -%}
+            {%- if tns not in rns.nslist -%}
+                {%- set rns.nslist = rns.nslist + [tns] -%}
+            {%- endif -%}
+        {%- endfor -%}
+        {%- for tns in rns.nslist -%}
+            {%- set rns.recipients = rns.recipients + ['"' + tns + '.*"'] -%}
+        {%- endfor -%}
+    {%- endif -%}
+    {%- set rns.recipients = rns.recipients + ['"user"'] -%}
+    {{- '# Valid recipients: ' + rns.recipients | join(', ') + '.' -}}
+{%- endmacro -%}
+{{- bos_token -}}
+{%- set ns = namespace(has_system=false) -%}
+{%- for m in messages -%}
+    {%- if m['role'] == 'system' -%}
+        {%- set ns.has_system = true -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if not ns.has_system -%}
+    {{- '<|start|>system<|message|>You are a helpful AI assistant.' -}}
+    {%- set kc = knowledge_cutoff if knowledge_cutoff is defined and knowledge_cutoff else '2026-01-04' -%}
+    {{- '\\nKnowledge cutoff: ' + kc + '.' -}}
+    {%- if current_date is defined and current_date -%}
+        {{- '\\nCurrent date: ' + current_date + '.' -}}
+    {%- elif strftime_now is defined -%}
+        {{- '\\nCurrent date: ' + strftime_now('%Y-%m-%d') + '.' -}}
+    {%- endif -%}
+    {{- '\\n\\n' -}}
+    {{- render_reasoning() -}}
+    {%- if tools -%}
+        {{- '\\n\\n' -}}
+        {{- render_tool_defs(tools) -}}
+    {%- endif -%}
+    {{- '\\n\\n' -}}
+    {{- render_system_meta(tools) -}}
+    {{- '<|eot|>' -}}
+{%- endif -%}
+{%- for message in messages -%}
+    {%- set role = message['role'] -%}
+    {%- set end_token = '<|eom|>' if (not loop.last and messages[loop.index0 + 1]['role'] == role) else '<|eot|>' -%}
+    {%- if role == 'system' -%}
+        {#- Callers sometimes write the directive into the system prompt themselves.
+            Normalise "Reasoning effort" to "Reasoning strength" (jinja has no
+            case-insensitive replace, hence the four realistic casings), then skip
+            the kwarg-driven line below if the prompt already carries one. -#}
+        {%- set sys_text = render_content(message['content'])
+              | replace('Reasoning effort', 'Reasoning strength')
+              | replace('Reasoning Effort', 'Reasoning Strength')
+              | replace('reasoning effort', 'reasoning strength')
+              | replace('REASONING EFFORT', 'REASONING STRENGTH') -%}
+        {{- '<|start|>system<|message|>' -}}
+        {{- sys_text -}}
+        {%- if 'reasoning strength' not in (sys_text | lower) -%}
+            {{- '\\n\\n' -}}
+            {{- render_reasoning() -}}
+        {%- endif -%}
+        {%- if tools -%}
+            {{- '\\n\\n' -}}
+            {{- render_tool_defs(tools) -}}
+        {%- endif -%}
+        {{- '\\n\\n' -}}
+        {{- render_system_meta(tools) -}}
+        {{- '<|eot|>' -}}
+    {%- elif role == 'user' -%}
+        {{- '<|start|>user<|message|>' -}}
+        {{- render_content(message['content']) -}}
+        {{- '<|eot|>' -}}
+    {%- elif role == 'tool' -%}
+        {%- set tname = message.get('name') -%}
+        {%- if not tname -%}
+            {%- set tcid = message.get('tool_call_id') -%}
+            {%- set rns = namespace(name=tcid if tcid else '') -%}
+            {%- for m in messages -%}
+                {%- if m.get('tool_calls') -%}
+                    {%- for tc in m['tool_calls'] -%}
+                        {%- if tcid is not none and tc.id is defined and tc.id == tcid -%}
+                            {%- set rns.name = tc.function.name -%}
+                        {%- endif -%}
+                    {%- endfor -%}
+                {%- endif -%}
+            {%- endfor -%}
+            {%- set tname = rns.name -%}
+        {%- endif -%}
+        {{- '<|start|>tool ' + tname + '<|message|><tool_output name="' + tname + '">\\n' -}}
+        {{- render_content(message['content']) -}}
+        {{- '\\n</tool_output><|eot|>' -}}
+    {%- elif role == 'assistant' -%}
+        {%- if message.get('reasoning_content') -%}
+            {{- '<|start|>assistant to=self<|message|>' + message['reasoning_content'] + '<|eom|>' -}}
+        {%- endif -%}
+        {%- if message.get('tool_calls') -%}
+            {%- for tc in message['tool_calls'] -%}
+                {{- '<|start|>assistant to=' + tc.function.name + '<|message|>' -}}
+                {{- render_atem(tc) -}}
+                {%- if loop.last -%}
+                    {{- end_token -}}
+                {%- else -%}
+                    {{- '<|eom|>' -}}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- else -%}
+            {%- set recipient = message.get('recipient') or 'user' -%}
+            {%- set end_turn = message.get('end_turn') -%}
+            {%- if end_turn is none -%}
+                {%- set end_turn = not (recipient and recipient != 'user') -%}
+            {%- endif -%}
+            {{- '<|start|>assistant' -}}
+            {%- if recipient -%}
+                {{- ' to=' + recipient -}}
+            {%- endif -%}
+            {{- '<|message|>' -}}
+            {{- render_content(message['content']) -}}
+            {{- ('<|eot|>' if end_turn else '<|eom|>') -}}
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+    {{- '<|start|>assistant' -}}
+{%- endif -%}
+`.slice(1, -1).replaceAll("\\`", "`");
+
+export const museGlimmerJinjaTemplate3 = String.raw`
+{%- macro render_content(content) -%}
+    {%- if content is string -%}
+        {{- content -}}
+    {%- elif content is not none -%}
+        {%- for part in content -%}
+            {%- if part["type"] == "image" -%}
+                {{- "<|patch|>" -}}
+            {%- elif part["type"] == "video" -%}
+                {{- "<|video|>" -}}
+            {%- elif part["type"] == "text" -%}
+                {{- part["text"] -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endif -%}
+{%- endmacro -%}
+{%- macro render_atem(tc) -%}
+    {%- set args = tc.function.arguments -%}
+    {%- if args is not mapping -%}
+        {{- raise_exception("Onyx ATEM chat template requires tool_call.function.arguments to be a dict (mapping); a JSON string cannot be parsed in the HF jinja sandbox.") -}}
+    {%- endif -%}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"" + tc.function.name + "\">\n" -}}
+    {%- for (k, v) in args.items() -%}
+        {{- "<atem:parameter name=\"" + k + "\">" -}}
+        {%- if v is boolean -%}
+            {%- if v -%}
+                {{- "true" -}}
+            {%- else -%}
+                {{- "false" -}}
+            {%- endif -%}
+        {%- elif v is none -%}
+            {{- "null" -}}
+        {%- elif v is mapping or v is iterable and v is not string -%}
+            {{- v | tojson -}}
+        {%- else -%}
+            {{- v -}}
+        {%- endif -%}
+        {{- "</atem:parameter>\n" -}}
+    {%- endfor -%}
+    {{- "</atem:invoke>\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_tool_defs(tools) -%}
+    {{- "In this environment you have access to a set of tools you can use to answer the user's question.\n\n" -}}
+    {{- "You can invoke a function by writing a \"<atem:function_calls>\" block like the following:\n" -}}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"$FUNCTION_NAME\">\n<atem:parameter name=\"$PARAMETER_NAME\">$PARAMETER_VALUE</atem:parameter>\n...\n</atem:invoke>\n</atem:function_calls>\n\n" -}}
+    {{- "String and scalar parameters should be specified as is, while lists and objects should use JSON format. Note that spaces for string values are not stripped. The output is not expected to be valid XML and is parsed with regular expressions.\n" -}}
+    {{- "Here are the functions available in JSONSchema format:\n" -}}
+    {{- "// Tool metadata\n" -}}
+    {%- set nsns = namespace(seen=[]) -%}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {%- set tns = fn.name.split(".")[0] -%}
+        {%- if tns not in nsns.seen -%}
+            {%- set nsns.seen = nsns.seen + [tns] -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- set nd = tool_namespace_descriptions if tool_namespace_descriptions is defined else {} -%}
+    {%- for tns in nsns.seen -%}
+        {{- "{\"name\": " + tns | tojson + ", \"description\": " + (nd[tns] if tns in nd else "") | tojson + "}\n" -}}
+    {%- endfor -%}
+    {{- "// Function schemas" -}}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {{- "\n{\"name\": " + fn.name | tojson + ", \"description\": " + fn.description | tojson + ", \"parameters\": " + fn.parameters | tojson + "}" -}}
+    {%- endfor -%}
+    {{- "\n\nHere's an example of how to call a function in the tool set:\n" -}}
+    {{- "(If the tool namespace is not specified, invoke the function directly as \`example_function_name\` rather than \`example_tool_name.example_function_name\`)\n\n" -}}
+    {{- "to=example_tool_name.example_function_name\n\n" -}}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"example_tool_name.example_function_name\">\n" -}}
+    {{- "<atem:parameter name=\"example_parameter_1\">value_1</atem:parameter>\n" -}}
+    {{- "<atem:parameter name=\"example_parameter_2\">This is the value for the second parameter\nthat can span\n\"multiple\" lines\n</atem:parameter>\n" -}}
+    {{- "</atem:invoke>\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_reasoning() -%}
+    {%- set rs = reasoning_strength if reasoning_strength is defined and reasoning_strength else "high" -%}
+    {{- "Reasoning strength: " + rs + "." -}}
+{%- endmacro -%}
+{%- macro render_system_meta(tools) -%}
+    {%- set rns = namespace(recipients=["\"self\""], nslist=[]) -%}
+    {%- if tools -%}
+        {%- for tool in tools -%}
+            {%- set fn = tool.function if tool.function is defined else tool -%}
+            {%- set tns = fn.name.split(".")[0] -%}
+            {%- if tns not in rns.nslist -%}
+                {%- set rns.nslist = rns.nslist + [tns] -%}
+            {%- endif -%}
+        {%- endfor -%}
+        {%- for tns in rns.nslist -%}
+            {%- set rns.recipients = rns.recipients + ["\"" + tns + ".*\""] -%}
+        {%- endfor -%}
+    {%- endif -%}
+    {%- set rns.recipients = rns.recipients + ["\"user\""] -%}
+    {{- "# Valid recipients: " + rns.recipients | join(", ") + "." -}}
+{%- endmacro -%}
+{{- bos_token -}}
+{%- set ns = namespace(has_system=false) -%}
+{%- for m in messages -%}
+    {%- if m["role"] == "system" -%}
+        {%- set ns.has_system = true -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if not ns.has_system -%}
+    {{- "<|start|>system<|message|>You are a helpful AI assistant." -}}
+    {%- set kc = knowledge_cutoff if knowledge_cutoff is defined and knowledge_cutoff else "2026-01-04" -%}
+    {{- "\nKnowledge cutoff: " + kc + "." -}}
+    {%- if current_date is defined and current_date -%}
+        {{- "\nCurrent date: " + current_date + "." -}}
+    {%- elif strftime_now is defined -%}
+        {{- "\nCurrent date: " + strftime_now("%Y-%m-%d") + "." -}}
+    {%- endif -%}
+    {{- "\n\n" -}}
+    {{- render_reasoning() -}}
+    {%- if tools -%}
+        {{- "\n\n" -}}
+        {{- render_tool_defs(tools) -}}
+    {%- endif -%}
+    {{- "\n\n" -}}
+    {{- render_system_meta(tools) -}}
+    {{- "<|eot|>" -}}
+{%- endif -%}
+{%- for message in messages -%}
+    {%- set role = message["role"] -%}
+    {%- set end_token = "<|eom|>" if not loop.last and messages[loop.index0 + 1]["role"] == role else "<|eot|>" -%}
+    {%- if role == "system" -%}
+        {{- "<|start|>system<|message|>" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "\n\n" -}}
+        {{- render_reasoning() -}}
+        {%- if tools -%}
+            {{- "\n\n" -}}
+            {{- render_tool_defs(tools) -}}
+        {%- endif -%}
+        {{- "\n\n" -}}
+        {{- render_system_meta(tools) -}}
+        {{- "<|eot|>" -}}
+    {%- elif role == "user" -%}
+        {{- "<|start|>user<|message|>" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "<|eot|>" -}}
+    {%- elif role == "tool" -%}
+        {%- set tname = message.get("name") -%}
+        {%- if not tname -%}
+            {%- set tcid = message.get("tool_call_id") -%}
+            {%- set rns = namespace(name=tcid if tcid else "") -%}
+            {%- for m in messages -%}
+                {%- if m.get("tool_calls") -%}
+                    {%- for tc in m["tool_calls"] -%}
+                        {%- if tcid is not none and tc.id is defined and tc.id == tcid -%}
+                            {%- set rns.name = tc.function.name -%}
+                        {%- endif -%}
+                    {%- endfor -%}
+                {%- endif -%}
+            {%- endfor -%}
+            {%- set tname = rns.name -%}
+        {%- endif -%}
+        {{- "<|start|>tool " + tname + "<|message|><tool_output name=\"" + tname + "\">\n" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "\n</tool_output><|eot|>" -}}
+    {%- elif role == "assistant" -%}
+        {%- if message.get("reasoning_content") -%}
+            {{- "<|start|>assistant to=self<|message|>" + message["reasoning_content"] + "<|eom|>" -}}
+        {%- endif -%}
+        {%- if message.get("tool_calls") -%}
+            {%- for tc in message["tool_calls"] -%}
+                {{- "<|start|>assistant to=" + tc.function.name + "<|message|>" -}}
+                {{- render_atem(tc) -}}
+                {%- if loop.last -%}
+                    {{- end_token -}}
+                {%- else -%}
+                    {{- "<|eom|>" -}}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- else -%}
+            {%- set recipient = message.get("recipient") or "user" -%}
+            {%- set end_turn = message.get("end_turn") -%}
+            {%- if end_turn is none -%}
+                {%- set end_turn = not (recipient and recipient != "user") -%}
+            {%- endif -%}
+            {{- "<|start|>assistant" -}}
+            {%- if recipient -%}
+                {{- " to=" + recipient -}}
+            {%- endif -%}
+            {{- "<|message|>" -}}
+            {{- render_content(message["content"]) -}}
+            {{- "<|eot|>" if end_turn else "<|eom|>" -}}
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+    {{- "<|start|>assistant" -}}
+{%- endif -%}
+`.slice(1, -1).replaceAll("\\`", "`");
+
+export const museGlimmerJinjaTemplate4 = String.raw`
+{%- macro render_content(content) -%}
+    {%- if content is string -%}
+        {{- content -}}
+    {%- elif content is not none -%}
+        {%- for part in content -%}
+            {%- if part["type"] == "image" -%}
+                {{- "<|patch|>" -}}
+            {%- elif part["type"] == "video" -%}
+                {{- "<|video|>" -}}
+            {%- elif part["type"] == "text" -%}
+                {{- part["text"] -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endif -%}
+{%- endmacro -%}
+{%- macro render_atem(tc) -%}
+    {%- set args = tc.function.arguments -%}
+    {%- if args is not mapping -%}
+        {{- raise_exception("Onyx ATEM chat template requires tool_call.function.arguments to be a dict (mapping); a JSON string cannot be parsed in the HF jinja sandbox.") -}}
+    {%- endif -%}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"" + tc.function.name + "\">\n" -}}
+    {%- for (k, v) in args.items() -%}
+        {{- "<atem:parameter name=\"" + k + "\">" -}}
+        {%- if v is boolean -%}
+            {%- if v -%}
+                {{- "true" -}}
+            {%- else -%}
+                {{- "false" -}}
+            {%- endif -%}
+        {%- elif v is none -%}
+            {{- "null" -}}
+        {%- elif v is mapping or v is iterable and v is not string -%}
+            {{- v | tojson -}}
+        {%- else -%}
+            {{- v -}}
+        {%- endif -%}
+        {{- "</atem:parameter>\n" -}}
+    {%- endfor -%}
+    {{- "</atem:invoke>\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_tool_defs(tools) -%}
+    {{- "In this environment you have access to a set of tools you can use to answer the user's question.\n\n" -}}
+    {{- "You can invoke a function by writing a \"<atem:function_calls>\" block like the following:\n" -}}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"$FUNCTION_NAME\">\n<atem:parameter name=\"$PARAMETER_NAME\">$PARAMETER_VALUE</atem:parameter>\n...\n</atem:invoke>\n</atem:function_calls>\n\n" -}}
+    {{- "String and scalar parameters should be specified as is, while lists and objects should use JSON format. Note that spaces for string values are not stripped. The output is not expected to be valid XML and is parsed with regular expressions.\n" -}}
+    {{- "Here are the functions available in JSONSchema format:\n" -}}
+    {{- "// Tool metadata\n" -}}
+    {%- set nsns = namespace(seen=[]) -%}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {%- set tns = fn.name.split(".")[0] -%}
+        {%- if tns not in nsns.seen -%}
+            {%- set nsns.seen = nsns.seen + [tns] -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- set nd = tool_namespace_descriptions if tool_namespace_descriptions is defined else {} -%}
+    {%- for tns in nsns.seen -%}
+        {{- "{\"name\": " + tns | tojson + ", \"description\": " + (nd[tns] if tns in nd else "") | tojson + "}\n" -}}
+    {%- endfor -%}
+    {{- "// Function schemas" -}}
+    {%- for tool in tools -%}
+        {%- set fn = tool.function if tool.function is defined else tool -%}
+        {{- "\n{\"name\": " + fn.name | tojson + ", \"description\": " + fn.description | tojson + ", \"parameters\": " + fn.parameters | tojson + "}" -}}
+    {%- endfor -%}
+    {{- "\n\nHere's an example of how to call a function in the tool set:\n" -}}
+    {{- "(If the tool namespace is not specified, invoke the function directly as \`example_function_name\` rather than \`example_tool_name.example_function_name\`)\n\n" -}}
+    {{- "to=example_tool_name.example_function_name\n\n" -}}
+    {{- "<atem:function_calls>\n<atem:invoke name=\"example_tool_name.example_function_name\">\n" -}}
+    {{- "<atem:parameter name=\"example_parameter_1\">value_1</atem:parameter>\n" -}}
+    {{- "<atem:parameter name=\"example_parameter_2\">This is the value for the second parameter\nthat can span\n\"multiple\" lines\n</atem:parameter>\n" -}}
+    {{- "</atem:invoke>\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_reasoning() -%}
+    {%- set rs = reasoning_strength if reasoning_strength is defined and reasoning_strength else "high" -%}
+    {{- "Reasoning strength: " + rs + "." -}}
+{%- endmacro -%}
+{%- macro render_system_meta(tools) -%}
+    {%- set rns = namespace(recipients=["\"self\""], nslist=[]) -%}
+    {%- if tools -%}
+        {%- for tool in tools -%}
+            {%- set fn = tool.function if tool.function is defined else tool -%}
+            {%- set tns = fn.name.split(".")[0] -%}
+            {%- if tns not in rns.nslist -%}
+                {%- set rns.nslist = rns.nslist + [tns] -%}
+            {%- endif -%}
+        {%- endfor -%}
+        {%- for tns in rns.nslist -%}
+            {%- set rns.recipients = rns.recipients + ["\"" + tns + ".*\""] -%}
+        {%- endfor -%}
+    {%- endif -%}
+    {%- set rns.recipients = rns.recipients + ["\"user\""] -%}
+    {{- "# Valid recipients: " + rns.recipients | join(", ") + "." -}}
+{%- endmacro -%}
+{{- bos_token -}}
+{%- set ns = namespace(has_system=false) -%}
+{%- for m in messages -%}
+    {%- if m["role"] == "system" -%}
+        {%- set ns.has_system = true -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if not ns.has_system -%}
+    {{- "<|start|>system<|message|>You are a helpful AI assistant." -}}
+    {%- set kc = knowledge_cutoff if knowledge_cutoff is defined and knowledge_cutoff else "2026-01-04" -%}
+    {{- "\nKnowledge cutoff: " + kc + "." -}}
+    {%- if current_date is defined and current_date -%}
+        {{- "\nCurrent date: " + current_date + "." -}}
+    {%- elif strftime_now is defined -%}
+        {{- "\nCurrent date: " + strftime_now("%Y-%m-%d") + "." -}}
+    {%- endif -%}
+    {{- "\n\n" -}}
+    {{- render_reasoning() -}}
+    {%- if tools -%}
+        {{- "\n\n" -}}
+        {{- render_tool_defs(tools) -}}
+    {%- endif -%}
+    {{- "\n\n" -}}
+    {{- render_system_meta(tools) -}}
+    {{- "<|eot|>" -}}
+{%- endif -%}
+{%- for message in messages -%}
+    {%- set role = message["role"] -%}
+    {%- set end_token = "<|eom|>" if not loop.last and messages[loop.index0 + 1]["role"] == role else "<|eot|>" -%}
+    {%- if role == "system" -%}
+        {{- "<|start|>system<|message|>" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "\n\n" -}}
+        {{- render_reasoning() -}}
+        {%- if tools -%}
+            {{- "\n\n" -}}
+            {{- render_tool_defs(tools) -}}
+        {%- endif -%}
+        {{- "\n\n" -}}
+        {{- render_system_meta(tools) -}}
+        {{- "<|eot|>" -}}
+    {%- elif role == "user" -%}
+        {{- "<|start|>user<|message|>" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "<|eot|>" -}}
+    {%- elif role == "tool" -%}
+        {%- set tname = message.get("name") -%}
+        {%- if not tname -%}
+            {%- set tcid = message.get("tool_call_id") -%}
+            {%- set rns = namespace(name=tcid if tcid else "") -%}
+            {%- for m in messages -%}
+                {%- if m.get("tool_calls") -%}
+                    {%- for tc in m["tool_calls"] -%}
+                        {%- if tcid is not none and tc.id is defined and tc.id == tcid -%}
+                            {%- set rns.name = tc.function.name -%}
+                        {%- endif -%}
+                    {%- endfor -%}
+                {%- endif -%}
+            {%- endfor -%}
+            {%- set tname = rns.name -%}
+        {%- endif -%}
+        {{- "<|start|>tool " + tname + "<|message|><tool_output name=\"" + tname + "\">\n" -}}
+        {{- render_content(message["content"]) -}}
+        {{- "\n</tool_output><|eot|>" -}}
+    {%- elif role == "assistant" -%}
+        {%- if message.get("reasoning_content") -%}
+            {{- "<|start|>assistant to=self<|message|>" + message["reasoning_content"] + "<|eom|>" -}}
+        {%- endif -%}
+        {%- if message.get("tool_calls") -%}
+            {%- for tc in message["tool_calls"] -%}
+                {{- "<|start|>assistant to=" + tc.function.name + "<|message|>" -}}
+                {{- render_atem(tc) -}}
+                {%- if loop.last -%}
+                    {{- end_token -}}
+                {%- else -%}
+                    {{- "<|eom|>" -}}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- else -%}
+            {%- set recipient = message.get("recipient") or "user" -%}
+            {%- set end_turn = message.get("end_turn") -%}
+            {%- if end_turn is none -%}
+                {%- set end_turn = not (recipient and recipient != "user") -%}
+            {%- endif -%}
+            {{- "<|start|>assistant" -}}
+            {%- if recipient -%}
+                {{- " to=" + recipient -}}
+            {%- endif -%}
+            {{- "<|message|>" -}}
+            {{- render_content(message["content"]) -}}
+            {{- "<|eot|>" if end_turn else "<|eom|>" -}}
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+    {{- "<|start|>assistant" -}}
+{%- endif -%}
+`.slice(1, -1).replaceAll("\\`", "`");
+
+export const museGlimmerJinjaTemplate5 = `
+{%- macro render_content(content) -%}
+\t{%- if content is string -%}
+\t\t{{- content -}}
+\t{%- elif content is not none -%}
+\t\t{%- for part in content -%}
+\t\t\t{%- if part["type"] == "image" -%}
+\t\t\t\t{{- "<|patch|>" -}}
+\t\t\t{%- elif part["type"] == "video" -%}
+\t\t\t\t{{- "<|video|>" -}}
+\t\t\t{%- elif part["type"] == "text" -%}
+\t\t\t\t{{- part["text"] -}}
+\t\t\t{%- endif -%}
+\t\t{%- endfor -%}
+\t{%- endif -%}
+{%- endmacro -%}
+{%- macro render_atem(tc) -%}
+\t{%- set args = tc.function.arguments -%}
+\t{%- if args is not mapping -%}
+\t\t{{- raise_exception("Onyx ATEM chat template requires tool_call.function.arguments to be a dict (mapping); a JSON string cannot be parsed in the HF jinja sandbox.") -}}
+\t{%- endif -%}
+\t{{- "<atem:function_calls>\\n<atem:invoke name=\\"" + tc.function.name + "\\">\\n" -}}
+\t{%- for (k, v) in args.items() -%}
+\t\t{{- "<atem:parameter name=\\"" + k + "\\">" -}}
+\t\t{%- if v is boolean -%}
+\t\t\t{%- if v -%}
+\t\t\t\t{{- "true" -}}
+\t\t\t{%- else -%}
+\t\t\t\t{{- "false" -}}
+\t\t\t{%- endif -%}
+\t\t{%- elif v is none -%}
+\t\t\t{{- "null" -}}
+\t\t{%- elif v is mapping or v is iterable and v is not string -%}
+\t\t\t{{- v | tojson -}}
+\t\t{%- else -%}
+\t\t\t{{- v -}}
+\t\t{%- endif -%}
+\t\t{{- "</atem:parameter>\\n" -}}
+\t{%- endfor -%}
+\t{{- "</atem:invoke>\\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_tool_defs(tools) -%}
+\t{{- "In this environment you have access to a set of tools you can use to answer the user's question.\\n\\n" -}}
+\t{{- "You can invoke a function by writing a \\"<atem:function_calls>\\" block like the following:\\n" -}}
+\t{{- "<atem:function_calls>\\n<atem:invoke name=\\"$FUNCTION_NAME\\">\\n<atem:parameter name=\\"$PARAMETER_NAME\\">$PARAMETER_VALUE</atem:parameter>\\n...\\n</atem:invoke>\\n</atem:function_calls>\\n\\n" -}}
+\t{{- "String and scalar parameters should be specified as is, while lists and objects should use JSON format. Note that spaces for string values are not stripped. The output is not expected to be valid XML and is parsed with regular expressions.\\n" -}}
+\t{{- "Here are the functions available in JSONSchema format:\\n" -}}
+\t{{- "// Tool metadata\\n" -}}
+\t{%- set nsns = namespace(seen=[]) -%}
+\t{%- for tool in tools -%}
+\t\t{%- set fn = tool.function if tool.function is defined else tool -%}
+\t\t{%- set tns = fn.name.split(".")[0] -%}
+\t\t{%- if tns not in nsns.seen -%}
+\t\t\t{%- set nsns.seen = nsns.seen + [tns] -%}
+\t\t{%- endif -%}
+\t{%- endfor -%}
+\t{%- set nd = tool_namespace_descriptions if tool_namespace_descriptions is defined else {} -%}
+\t{%- for tns in nsns.seen -%}
+\t\t{{- "{\\"name\\": " + tns | tojson + ", \\"description\\": " + (nd[tns] if tns in nd else "") | tojson + "}\\n" -}}
+\t{%- endfor -%}
+\t{{- "// Function schemas" -}}
+\t{%- for tool in tools -%}
+\t\t{%- set fn = tool.function if tool.function is defined else tool -%}
+\t\t{{- "\\n{\\"name\\": " + fn.name | tojson + ", \\"description\\": " + fn.description | tojson + ", \\"parameters\\": " + fn.parameters | tojson + "}" -}}
+\t{%- endfor -%}
+\t{{- "\\n\\nHere's an example of how to call a function in the tool set:\\n" -}}
+\t{{- "(If the tool namespace is not specified, invoke the function directly as \`example_function_name\` rather than \`example_tool_name.example_function_name\`)\\n\\n" -}}
+\t{{- "to=example_tool_name.example_function_name\\n\\n" -}}
+\t{{- "<atem:function_calls>\\n<atem:invoke name=\\"example_tool_name.example_function_name\\">\\n" -}}
+\t{{- "<atem:parameter name=\\"example_parameter_1\\">value_1</atem:parameter>\\n" -}}
+\t{{- "<atem:parameter name=\\"example_parameter_2\\">This is the value for the second parameter\\nthat can span\\n\\"multiple\\" lines\\n</atem:parameter>\\n" -}}
+\t{{- "</atem:invoke>\\n</atem:function_calls>" -}}
+{%- endmacro -%}
+{%- macro render_reasoning() -%}
+\t{%- set rs = reasoning_strength if reasoning_strength is defined and reasoning_strength else "high" -%}
+\t{{- "Reasoning strength: " + rs + "." -}}
+{%- endmacro -%}
+{%- macro render_system_meta(tools) -%}
+\t{%- set rns = namespace(recipients=["\\"self\\""], nslist=[]) -%}
+\t{%- if tools -%}
+\t\t{%- for tool in tools -%}
+\t\t\t{%- set fn = tool.function if tool.function is defined else tool -%}
+\t\t\t{%- set tns = fn.name.split(".")[0] -%}
+\t\t\t{%- if tns not in rns.nslist -%}
+\t\t\t\t{%- set rns.nslist = rns.nslist + [tns] -%}
+\t\t\t{%- endif -%}
+\t\t{%- endfor -%}
+\t\t{%- for tns in rns.nslist -%}
+\t\t\t{%- set rns.recipients = rns.recipients + ["\\"" + tns + ".*\\""] -%}
+\t\t{%- endfor -%}
+\t{%- endif -%}
+\t{%- set rns.recipients = rns.recipients + ["\\"user\\""] -%}
+\t{{- "# Valid recipients: " + rns.recipients | join(", ") + "." -}}
+{%- endmacro -%}
+{{- bos_token -}}
+{%- set ns = namespace(has_system=false) -%}
+{%- for m in messages -%}
+\t{%- if m["role"] == "system" -%}
+\t\t{%- set ns.has_system = true -%}
+\t{%- endif -%}
+{%- endfor -%}
+{%- if not ns.has_system -%}
+\t{{- "<|start|>system<|message|>You are a helpful AI assistant." -}}
+\t{%- set kc = knowledge_cutoff if knowledge_cutoff is defined and knowledge_cutoff else "2026-01-04" -%}
+\t{{- "\\nKnowledge cutoff: " + kc + "." -}}
+\t{%- if current_date is defined and current_date -%}
+\t\t{{- "\\nCurrent date: " + current_date + "." -}}
+\t{%- elif strftime_now is defined -%}
+\t\t{{- "\\nCurrent date: " + strftime_now("%Y-%m-%d") + "." -}}
+\t{%- endif -%}
+\t{{- "\\n\\n" -}}
+\t{{- render_reasoning() -}}
+\t{%- if tools -%}
+\t\t{{- "\\n\\n" -}}
+\t\t{{- render_tool_defs(tools) -}}
+\t{%- endif -%}
+\t{{- "\\n\\n" -}}
+\t{{- render_system_meta(tools) -}}
+\t{{- "<|eot|>" -}}
+{%- endif -%}
+{%- for message in messages -%}
+\t{%- set role = message["role"] -%}
+\t{%- set end_token = "<|eom|>" if not loop.last and messages[loop.index0 + 1]["role"] == role else "<|eot|>" -%}
+\t{%- if role == "system" -%}
+\t\t{{- "<|start|>system<|message|>" -}}
+\t\t{{- render_content(message["content"]) -}}
+\t\t{{- "\\n\\n" -}}
+\t\t{{- render_reasoning() -}}
+\t\t{%- if tools -%}
+\t\t\t{{- "\\n\\n" -}}
+\t\t\t{{- render_tool_defs(tools) -}}
+\t\t{%- endif -%}
+\t\t{{- "\\n\\n" -}}
+\t\t{{- render_system_meta(tools) -}}
+\t\t{{- "<|eot|>" -}}
+\t{%- elif role == "user" -%}
+\t\t{{- "<|start|>user<|message|>" -}}
+\t\t{{- render_content(message["content"]) -}}
+\t\t{{- "<|eot|>" -}}
+\t{%- elif role == "tool" -%}
+\t\t{%- set tname = message.get("name") -%}
+\t\t{%- if not tname -%}
+\t\t\t{%- set tcid = message.get("tool_call_id") -%}
+\t\t\t{%- set rns = namespace(name=tcid if tcid else "") -%}
+\t\t\t{%- for m in messages -%}
+\t\t\t\t{%- if m.get("tool_calls") -%}
+\t\t\t\t\t{%- for tc in m["tool_calls"] -%}
+\t\t\t\t\t\t{%- if tcid is not none and tc.id is defined and tc.id == tcid -%}
+\t\t\t\t\t\t\t{%- set rns.name = tc.function.name -%}
+\t\t\t\t\t\t{%- endif -%}
+\t\t\t\t\t{%- endfor -%}
+\t\t\t\t{%- endif -%}
+\t\t\t{%- endfor -%}
+\t\t\t{%- set tname = rns.name -%}
+\t\t{%- endif -%}
+\t\t{{- "<|start|>tool " + tname + "<|message|><tool_output name=\\"" + tname + "\\">\\n" -}}
+\t\t{{- render_content(message["content"]) -}}
+\t\t{{- "\\n</tool_output><|eot|>" -}}
+\t{%- elif role == "assistant" -%}
+\t\t{%- if message.get("reasoning_content") -%}
+\t\t\t{{- "<|start|>assistant to=self<|message|>" + message["reasoning_content"] + "<|eom|>" -}}
+\t\t{%- endif -%}
+\t\t{%- if message.get("tool_calls") -%}
+\t\t\t{%- for tc in message["tool_calls"] -%}
+\t\t\t\t{{- "<|start|>assistant to=" + tc.function.name + "<|message|>" -}}
+\t\t\t\t{{- render_atem(tc) -}}
+\t\t\t\t{%- if loop.last -%}
+\t\t\t\t\t{{- end_token -}}
+\t\t\t\t{%- else -%}
+\t\t\t\t\t{{- "<|eom|>" -}}
+\t\t\t\t{%- endif -%}
+\t\t\t{%- endfor -%}
+\t\t{%- else -%}
+\t\t\t{%- set recipient = message.get("recipient") or "user" -%}
+\t\t\t{%- set end_turn = message.get("end_turn") -%}
+\t\t\t{%- if end_turn is none -%}
+\t\t\t\t{%- set end_turn = not (recipient and recipient != "user") -%}
+\t\t\t{%- endif -%}
+\t\t\t{{- "<|start|>assistant" -}}
+\t\t\t{%- if recipient -%}
+\t\t\t\t{{- " to=" + recipient -}}
+\t\t\t{%- endif -%}
+\t\t\t{{- "<|message|>" -}}
+\t\t\t{{- render_content(message["content"]) -}}
+\t\t\t{{- "<|eot|>" if end_turn else "<|eom|>" -}}
+\t\t{%- endif -%}
+\t{%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+\t{{- "<|start|>assistant" -}}
+{%- endif -%}
+`.slice(1, -1);
