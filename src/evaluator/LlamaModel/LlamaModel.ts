@@ -435,6 +435,17 @@ export class LlamaModel {
         return this._defaultContextKvCacheValueType;
     }
 
+    /** Assumed memory footprint of the model in bytes */
+    public get memoryUsage(): {
+        ram: number,
+        vram: number
+    } {
+        return {
+            ram: this._ramConsumptionMarking?.size ?? 0,
+            vram: this._vramConsumptionMarking?.size ?? 0
+        };
+    }
+
     /**
      * Transform text into tokens that can be fed to the model
      * @param text - the text to tokenize

@@ -293,6 +293,17 @@ export class LlamaContext {
         return this._totalSequences - this._nextGeneratedSequenceId + this._unusedSequenceIds.length;
     }
 
+    /** Assumed memory footprint of the context in bytes */
+    public get memoryUsage(): {
+        ram: number,
+        vram: number
+    } {
+        return {
+            ram: this._ramConsumptionMarking?.size ?? 0,
+            vram: this._vramConsumptionMarking?.size ?? 0
+        };
+    }
+
     /**
      * Before calling this method, make sure to call `sequencesLeft` to check if there are any sequences left.
      * When there are no sequences left, this method will throw an error.
