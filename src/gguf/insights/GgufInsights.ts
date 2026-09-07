@@ -158,40 +158,22 @@ export class GgufInsights {
         return true;
     }
 
-    public get isRecurrent() {
-        // source: `llm_arch_is_recurrent` in `llama-arch.cpp`
-        switch (this._ggufFileInfo.metadata?.general?.architecture) {
-            case GgufArchitectureType.mamba:
-            case GgufArchitectureType.mamba2:
-            case GgufArchitectureType.rwkv6:
-            case GgufArchitectureType.rwkv6qwen2:
-            case GgufArchitectureType.rwkv7:
-            case GgufArchitectureType.arwkv7:
-                return true;
-        }
-
-        return false;
+    public get isRecurrent(): boolean {
+        return this._llama._bindings.getIsArchRecurrent(this._ggufFileInfo.metadata?.general?.architecture ?? "") ?? false;
     }
 
-    public get isHybrid() {
-        // source: `llm_arch_is_hybrid` in `llama-arch.cpp`
-        switch (this._ggufFileInfo.metadata?.general?.architecture) {
-            case GgufArchitectureType.jamba:
-            case GgufArchitectureType.falconH1:
-            case GgufArchitectureType.plamo2:
-            case GgufArchitectureType.granitehybrid:
-            case GgufArchitectureType.lfm2:
-            case GgufArchitectureType.lfm2moe:
-            case GgufArchitectureType.nemotronH:
-            case GgufArchitectureType.nemotronHMoe:
-            case GgufArchitectureType.qwen3next:
-            case GgufArchitectureType.kimiLinear:
-            case GgufArchitectureType.qwen35:
-            case GgufArchitectureType.qwen35moe:
-                return true;
-        }
+    public get isHybrid(): boolean {
+        return this._llama._bindings.getIsArchHybrid(this._ggufFileInfo.metadata?.general?.architecture ?? "") ?? false;
+    }
 
-        return false;
+    public get isSupportedByLlamaCpp(): boolean {
+        return this._llama._bindings.getIsArchSupported(this._ggufFileInfo.metadata?.general?.architecture ?? "");
+    }
+
+    public get hasMtpWeights() {
+        const predictLayers = this._ggufFileInfo.architectureMetadata?.nextn_predict_layers ?? 0;
+
+        return typeof predictLayers === "number" && predictLayers > 0 && predictLayers < this.totalLayers;
     }
 
     /**

@@ -84,6 +84,10 @@ export type BindingModule = {
         llamaPosSize: number,
         llamaSeqIdSize: number
     },
+    getAllArchs(): string[],
+    getIsArchSupported(architecture: string): boolean,
+    getIsArchRecurrent(architecture: string): boolean | undefined,
+    getIsArchHybrid(architecture: string): boolean | undefined,
     setLogger(logger: (level: number, message: string) => void): void,
     setLoggerLogLevel(level: number): void,
     setLoggerLogLevelOverride(level: number | undefined): void,
@@ -216,6 +220,10 @@ export type BatchLogitIndex = number & {
 
 export type AddonGrammar = {
     isTextCompatible(testText: string): boolean
+};
+
+export type AddonJinjaRenderer = {
+    render(items?: Record<string, unknown>): string
 };
 
 export type AddonGrammarEvaluationState = "AddonGrammarEvaluationState" & {

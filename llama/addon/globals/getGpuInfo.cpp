@@ -133,7 +133,7 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
         } else if (backendName == "Vulkan") {
             return Napi::String::New(info.Env(), "vulkan");
         }
-        
+
         // else if (
         //     backendName == "CUDA" || backendName == "ROCm" || backendName == "MUSA") {
         //     return Napi::String::New(info.Env(), "cuda");

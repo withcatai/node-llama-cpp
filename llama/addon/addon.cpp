@@ -20,6 +20,7 @@
 #include "globals/getSwapInfo.h"
 #include "globals/getSystemMemoryInfo.h"
 #include "globals/addonEnv.h"
+#include "llama-arch.h"
 
 std::mutex backendMutex;
 bool backendInitialized = false;
@@ -160,6 +161,77 @@ Napi::Value addonGetConsts(const Napi::CallbackInfo& info) {
     consts.Set("llamaSeqIdSize", Napi::Number::New(info.Env(), sizeof(llama_seq_id)));
 
     return consts;
+}
+
+Napi::Value addonGetAllArchs(const Napi::CallbackInfo& info) {
+    auto allArchs = llm_arch_all();
+    Napi::Array archs = Napi::Array::New(info.Env(), allArchs.size());
+
+    for (size_t i = 0; i < allArchs.size(); ++i) {
+        auto archName = llm_arch_name(allArchs[i]);
+        if (archName == nullptr) {
+            archs[i] = info.Env().Undefined();
+            continue;
+        }
+
+        archs[i] = Napi::String::New(info.Env(), archName);
+    }
+
+    return archs;
+}
+
+Napi::Value addonGetIsArchSupported(const Napi::CallbackInfo& info) {
+    if (info.Length() == 0 || !info[0].IsString()) {
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    std::string archName = info[0].As<Napi::String>().Utf8Value();
+    if (archName.empty()) {
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    auto arch = llm_arch_from_string(archName);
+    if (arch == LLM_ARCH_UNKNOWN) {
+        return Napi::Boolean::New(info.Env(), false);
+    }
+
+    return Napi::Boolean::New(info.Env(), true);
+}
+
+Napi::Value addonGetIsArchRecurrent(const Napi::CallbackInfo& info) {
+    if (info.Length() == 0 || !info[0].IsString()) {
+        return info.Env().Undefined();
+    }
+
+    std::string archName = info[0].As<Napi::String>().Utf8Value();
+    if (archName.empty()) {
+        return info.Env().Undefined();
+    }
+
+    auto arch = llm_arch_from_string(archName);
+    if (arch == LLM_ARCH_UNKNOWN) {
+        return info.Env().Undefined();
+    }
+
+    return Napi::Boolean::New(info.Env(), llm_arch_is_recurrent(arch));
+}
+
+Napi::Value addonGetIsArchHybrid(const Napi::CallbackInfo& info) {
+    if (info.Length() == 0 || !info[0].IsString()) {
+        return info.Env().Undefined();
+    }
+
+    std::string archName = info[0].As<Napi::String>().Utf8Value();
+    if (archName.empty()) {
+        return info.Env().Undefined();
+    }
+
+    auto arch = llm_arch_from_string(archName);
+    if (arch == LLM_ARCH_UNKNOWN) {
+        return info.Env().Undefined();
+    }
+
+    return Napi::Boolean::New(info.Env(), llm_arch_is_hybrid(arch));
 }
 
 class AddonBackendLoadWorker : public Napi::AsyncWorker {
@@ -359,6 +431,10 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
         Napi::PropertyDescriptor::Function("getGgmlGraphOverheadCustom", addonGetGgmlGraphOverheadCustom),
         Napi::PropertyDescriptor::Function("getGgmlType", addonGetGgmlType),
         Napi::PropertyDescriptor::Function("getConsts", addonGetConsts),
+        Napi::PropertyDescriptor::Function("getAllArchs", addonGetAllArchs),
+        Napi::PropertyDescriptor::Function("getIsArchSupported", addonGetIsArchSupported),
+        Napi::PropertyDescriptor::Function("getIsArchRecurrent", addonGetIsArchRecurrent),
+        Napi::PropertyDescriptor::Function("getIsArchHybrid", addonGetIsArchHybrid),
         Napi::PropertyDescriptor::Function("setLogger", setLogger),
         Napi::PropertyDescriptor::Function("setLoggerLogLevel", setLoggerLogLevel),
         Napi::PropertyDescriptor::Function("setLoggerLogLevelOverride", setLoggerLogLevelOverride),
