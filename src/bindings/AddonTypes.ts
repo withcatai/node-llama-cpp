@@ -57,6 +57,9 @@ export type BindingModule = {
         new (model: AddonModel, grammar: AddonGrammar): AddonGrammarEvaluationState,
         new (existingState: AddonGrammarEvaluationState): AddonGrammarEvaluationState
     },
+    AddonJinjaRenderer: {
+        new (template: string): AddonJinjaRenderer
+    },
     AddonSampler: {
         new (model: AddonModel): AddonSampler,
         acceptGrammarEvaluationStateToken(grammarEvaluationState: AddonGrammarEvaluationState, token: Token): void,

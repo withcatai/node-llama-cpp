@@ -8,6 +8,7 @@
 #include "AddonGgufMetadata.h"
 #include "AddonGrammar.h"
 #include "AddonGrammarEvaluationState.h"
+#include "AddonJinjaRenderer.h"
 #include "AddonModel.h"
 #include "AddonModelLora.h"
 #include "AddonSampler.h"
@@ -379,6 +380,7 @@ Napi::Object registerCallback(Napi::Env env, Napi::Object exports) {
     AddonModelLora::init(exports);
     AddonGrammar::init(exports);
     AddonGrammarEvaluationState::init(exports);
+    AddonJinjaRenderer::init(exports);
     AddonContext::init(exports);
     AddonContextSequenceCheckpoint::init(exports);
     AddonSampler::init(exports);

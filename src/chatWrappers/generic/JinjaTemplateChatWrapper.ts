@@ -15,6 +15,7 @@ import {jsonDumps} from "../utils/jsonDumps.js";
 import {tryMatrix} from "../../utils/optionsMatrix.js";
 import {getStandardizedChatWrapperSegmentDefinition} from "../../utils/getStandardizedChatWrapperSegmentDefinition.js";
 import {replaceRegularTextInLlamaText} from "../utils/replaceRegularTextInLlamaText.js";
+import {LruCache} from "../../utils/LruCache.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     templateSegmentOptionsToChatWrapperSettings, TemplateChatWrapperSegmentsOptions
@@ -25,6 +26,8 @@ import {
 } from "./utils/extractFunctionCallSettingsFromJinjaTemplate.js";
 import {squashChatHistoryItems} from "./utils/squashChatHistoryItems.js";
 import {extractSegmentSettingsFromTokenizerAndChatTemplate} from "./utils/extractSegmentSettingsFromTokenizerAndChatTemplate.js";
+import type {Llama} from "../../bindings/Llama.js";
+import type {AddonJinjaRenderer} from "../../bindings/AddonTypes.js";
 
 export type JinjaTemplateChatWrapperOptions = {
     template: string,
@@ -128,7 +131,13 @@ export type JinjaTemplateChatWrapperOptions = {
     _requireFunctionCallSettingsExtraction?: boolean,
 
     /** @internal */
-    _functionCallExtractionExamineNonFirst?: boolean
+    _functionCallExtractionExamineNonFirst?: boolean,
+
+    /** @internal */
+    _cachedJinjaEngine?: CachedJinjaEngine,
+
+    /** @internal */
+    _templateCacheKeys?: object[]
 };
 
 export type JinjaTemplateChatWrapperOptionsConvertMessageFormat = {
@@ -184,7 +193,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     public readonly keepOnlyLastThought: boolean;
     public readonly additionalRenderParameters?: Record<string, any>;
 
-    /** @internal */ private readonly _jinjaTemplate: Template;
+    /** @internal */ private readonly _jinjaTemplate: JinjaRenderer;
     /** @internal */ private readonly _usingJinjaFunctionCallTemplate: boolean = false;
     /** @internal */ private readonly _stringifyFunctionParams: boolean = false;
     /** @internal */ private readonly _wrapFunctionParamsInsideMapKey?: string;
@@ -213,7 +222,9 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
             segments,
             tokenizer,
             _requireFunctionCallSettingsExtraction = false,
-            _functionCallExtractionExamineNonFirst = false
+            _functionCallExtractionExamineNonFirst = false,
+            _cachedJinjaEngine = CachedJinjaEngine._create(),
+            _templateCacheKeys = []
         } = options;
 
         if (template == null)
@@ -233,7 +244,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         if (this.convertUnsupportedSystemMessagesToUserMessages != null && !this.convertUnsupportedSystemMessagesToUserMessages.format.includes("{{message}}"))
             throw new Error('convertUnsupportedSystemMessagesToUserMessages format must include "{{message}}"');
 
-        this._jinjaTemplate = new Template(this.template);
+        this._jinjaTemplate = _cachedJinjaEngine.getFor(_templateCacheKeys, this.template);
 
         this.settings = {
             ...ChatWrapper.defaultSettings,
@@ -984,6 +995,102 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         } catch (err) {
             throw new Error("The provided Jinja template failed the sanity test: " + String(err) + ". Inspect the Jinja template to find out what went wrong");
         }
+    }
+}
+
+export class CachedJinjaEngine {
+    private _llama?: Llama;
+    private _cache: LruCache<string, JinjaRenderer> = new LruCache(40);
+    private _weakCache = new WeakMap<object, JinjaRenderer>();
+
+    private constructor(_llama?: Llama) {
+        this._llama = _llama;
+    }
+
+    public getFor(keys: Array<object>, template: string): JinjaRenderer {
+        let renderer: JinjaRenderer | undefined;
+        for (const key of keys) {
+            renderer = this._weakCache.get(key);
+            if (renderer != null)
+                break;
+        }
+
+        if (renderer == null) {
+            renderer = this._cache.get(template);
+
+            if (renderer == null)
+                renderer = JinjaRenderer._create(this._llama, template);
+        }
+
+        for (const key of keys)
+            this._weakCache.set(key, renderer);
+
+        this._cache.set(renderer._template, renderer);
+
+        return renderer;
+    }
+
+    /** @internal */
+    public static _create(_llama?: Llama) {
+        return new CachedJinjaEngine(_llama);
+    }
+}
+
+export class JinjaRenderer {
+    /** @internal */ public _template: string;
+    /** @internal */ private _llama?: Llama;
+    /** @internal */ private _jsRenderer?: null | Template;
+    /** @internal */ private _jsRendererError?: unknown;
+    /** @internal */ private _nativeRenderer?: null | AddonJinjaRenderer;
+    /** @internal */ private _nativeRendererInitError?: unknown;
+
+    private constructor(llama: Llama | undefined, template: string) {
+        this._llama = llama;
+        this._template = template;
+    }
+
+    public render(items?: Record<string, unknown>): string {
+        try {
+            if (this._jsRenderer === undefined)
+                this._jsRenderer = new Template(this._template);
+        } catch (error) {
+            this._jsRenderer = null;
+            this._jsRendererError = error;
+        }
+
+        if (this._jsRenderer != null)
+            return this._jsRenderer.render(items);
+
+        try {
+            if (this._nativeRenderer === undefined && this._llama != null)
+                this._nativeRenderer = new this._llama._bindings.AddonJinjaRenderer(this._template);
+        } catch (error) {
+            this._nativeRenderer = null;
+            this._nativeRendererInitError = error;
+        }
+
+        if (this._nativeRenderer != null)
+            return this._nativeRenderer.render(items);
+
+        if (this._jsRendererError != null && this._nativeRendererInitError != null)
+            throw new AggregateError(
+                [this._jsRendererError, this._nativeRendererInitError],
+                "Jinja renderer failed. " +
+                String((this._jsRendererError as Error)?.message ?? this._jsRendererError) + ". " +
+                String((this._nativeRendererInitError as Error)?.message ?? this._nativeRendererInitError),
+                {cause: this._jsRendererError}
+            );
+        else if (this._jsRendererError != null)
+            throw this._jsRendererError;
+        else if (this._nativeRendererInitError != null)
+            throw this._nativeRendererInitError;
+
+        throw new Error("Failed to render Jinja template");
+    }
+
+    /** @internal */
+    public static _create(llama: Llama | undefined, template: string) {
+        return new JinjaRenderer(llama, template);
     }
 }
 
