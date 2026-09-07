@@ -115,8 +115,8 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
                 signal: this._signal
             });
 
-            const technicalIssue = response.status >= 500 || response.status === 429;
-            const cannotAccess = response.status >= 400 && response.status <= 404;
+            const technicalIssue = response.status >= 500 || response.status === 429 || response.status === 403;
+            const cannotAccess = (response.status >= 400 && response.status <= 402) || response.status === 404;
             if (headersToTry.length > 0 && (technicalIssue || cannotAccess))
                 continue;
 
