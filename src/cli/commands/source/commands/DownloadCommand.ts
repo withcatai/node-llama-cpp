@@ -26,6 +26,7 @@ import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {applyLlamaCppRepoPatches, hasLlamaCppRepoPatchesToApply} from "../../../../bindings/utils/applyLlamaCppRepoPatches.js";
+import {downloadMetalToolchainIfNeeded} from "../../../../bindings/utils/metal.js";
 
 type DownloadCommandArgs = {
     repo?: string,
@@ -136,6 +137,7 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
         throw new Error(`Invalid GitHub repository: ${repo}`);
 
     let downloadedCmake = false;
+    let downloadedMetalToolchain = false;
 
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
@@ -200,6 +202,11 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
                 downloadedCmake = true;
             }
 
+            if (!downloadedMetalToolchain) {
+                await downloadMetalToolchainIfNeeded(true);
+                downloadedMetalToolchain = true;
+            }
+
             const buildOptions: BuildOptions = {
                 customCmakeOptions,
                 progressLogs: true,
@@ -225,6 +232,7 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
                         nodeTarget: nodeTarget ? nodeTarget : undefined,
                         updateLastBuildInfo: true,
                         downloadCmakeIfNeeded: false,
+                        downloadMetalToolchainIfNeeded: false,
                         ensureLlamaCppRepoIsCloned: false,
                         includeBuildOptionsInBinaryFolderName: true
                     });
