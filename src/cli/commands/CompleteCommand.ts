@@ -67,6 +67,7 @@ type CompleteCommand = {
     timing: boolean,
     mmap?: boolean,
     useDirectIo: boolean,
+    lazyMode?: "auto" | boolean,
     printTimings: boolean
 };
 
@@ -324,6 +325,24 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 default: false,
                 description: "Use Direct I/O usage when available"
             })
+            .option("lazyMode", {
+                type: "string",
+                alias: ["lazy"],
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: ["auto", true, false] as const as string[],
+                coerce: (value) => {
+                    if (value === "false")
+                        return false;
+                    else if (value === "true")
+                        return true;
+                    else if (value === "auto")
+                        return "auto";
+
+                    return value;
+                },
+                description: "Lazily read tensors from the file on demand when they are needed, rather than loading all tensors upfront. Only works when using mmap"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -337,7 +356,7 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
         topP, seed, xtc, gpuLayers, repeatPenalty, lastTokensRepeatPenalty, penalizeRepeatingNewLine,
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-        debug, numa, meter, timing, mmap, useDirectIo, printTimings
+        debug, numa, meter, timing, mmap, useDirectIo, lazyMode, printTimings
     }) {
         try {
             await RunCompletion({
@@ -346,7 +365,8 @@ export const CompleteCommand: CommandModule<object, CompleteCommand> = {
                 threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty,
                 repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength,
                 dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens, maxTokens,
-                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, printTimings
+                tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, lazyMode,
+                printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -363,7 +383,8 @@ async function RunCompletion({
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers,
     lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
     dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
-    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, mmap, useDirectIo, printTimings
+    tokenPredictionDraftModel, tokenPredictionModelContextSize, maxTokens, debug, numa, meter, timing, mmap, useDirectIo, lazyMode,
+    printTimings
 }: CompleteCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -455,6 +476,7 @@ async function RunCompletion({
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 useDirectIo,
+                lazyMode,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -492,6 +514,7 @@ async function RunCompletion({
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     useDirectIo,
+                    lazyMode,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
                     },
@@ -571,6 +594,7 @@ async function RunCompletion({
         draftContext,
         useMmap,
         useDirectIo,
+        lazyMode,
         minTitleLength: "Complete".length + 1,
         logBatchSize,
         tokenMeterEnabled: meter,

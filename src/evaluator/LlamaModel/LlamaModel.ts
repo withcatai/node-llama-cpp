@@ -111,6 +111,21 @@ export type LlamaModelOptions = {
     checkTensors?: boolean,
 
     /**
+     * Lazily read tensors from the file on demand when they are needed, rather than loading all tensors upfront.
+     * Only works when mmap ({@link useMmap `useMmap`}) is enabled.
+     *
+     * This will cause the inference to potentially start slower the first time a tensor is accessed,
+     * but can significantly reduce the total amount of memory used by the model.
+     *
+     * - `true`: for supported tensors, read them on demand then they are needed
+     * - `"auto"`: for supported tensors, only read on demand ones that are larger than 4GiB
+     * - `false`: do not read tensors on demand, load all tensors upfront
+     *
+     * Defaults to `false`.
+     */
+    lazyMode?: "auto" | boolean,
+
+    /**
      * Enable flash attention by default for contexts created with this model.
      * Only works with models that support flash attention.
      *
@@ -216,6 +231,7 @@ export class LlamaModel {
     /** @internal */ private readonly _fileInsights: GgufInsights;
     /** @internal */ private readonly _gpuLayers: number;
     /** @internal */ public readonly _useMmap: boolean;
+    /** @internal */ private readonly _lazyMode: "auto" | boolean;
     /** @internal */ private readonly _vocabOnly: boolean;
     /** @internal */ private readonly _filename?: string;
     /** @internal */ private readonly _disposedState: DisposedState = {disposed: false};
@@ -239,8 +255,8 @@ export class LlamaModel {
     public readonly onDispose = new EventRelay<void>();
 
     private constructor({
-        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock = false, checkTensors, onLoadProgress, loadSignal,
-        metadataOverrides
+        modelPath, gpuLayers, vocabOnly = false, useMmap, useDirectIo, useMlock = false, checkTensors, lazyMode, onLoadProgress,
+        loadSignal, metadataOverrides
     }: LlamaModelOptions & {
         gpuLayers: number,
         useMmap: boolean
@@ -276,6 +292,13 @@ export class LlamaModel {
         this._gpuLayers = gpuLayers;
         this._useMmap = useMmap ?? false;
         this._vocabOnly = vocabOnly ?? false;
+        this._lazyMode = !useMmap
+            ? false
+            : lazyMode == null
+                ? false
+                : (typeof lazyMode === "boolean" || lazyMode === "auto")
+                    ? lazyMode
+                    : false;
         this._backendModelDisposeGuard = new DisposeGuard([this._llama._backendDisposeGuard]);
         this._llamaPreventDisposalHandle = this._llama._backendDisposeGuard.createPreventDisposalHandle();
         this._defaultContextFlashAttentionOptionEnabled = _defaultContextFlashAttentionOptionEnabled;
@@ -295,6 +318,7 @@ export class LlamaModel {
                 ? useMlock
                 : undefined,
             checkTensors: checkTensors ?? false,
+            lazyMode: this._lazyMode,
             onLoadProgress: onLoadProgress == null
                 ? undefined
                 : (loadPercentage: number) => {
@@ -402,6 +426,10 @@ export class LlamaModel {
      */
     public get useMmap(): boolean {
         return this._useMmap;
+    }
+
+    public get lazyMode(): "auto" | boolean {
+        return this._lazyMode;
     }
 
     /**

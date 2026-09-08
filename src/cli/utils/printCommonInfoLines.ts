@@ -12,6 +12,7 @@ export async function printCommonInfoLines({
     minTitleLength = 0,
     useMmap,
     useDirectIo,
+    lazyMode,
     logBatchSize = false,
     tokenMeterEnabled = false,
     printBos = false,
@@ -25,6 +26,7 @@ export async function printCommonInfoLines({
     minTitleLength?: number,
     useMmap?: "auto" | boolean,
     useDirectIo?: boolean,
+    lazyMode?: "auto" | boolean,
     logBatchSize?: boolean,
     tokenMeterEnabled?: boolean,
     printBos?: boolean,
@@ -124,6 +126,18 @@ export async function printCommonInfoLines({
                 : (useDirectIo || useDirectIo == null)
                     ? "enabled"
                     : "disabled"
+        }, {
+            show: lazyMode != null,
+            title: "Lazy mode",
+            value: !model._llama.supportsMmap
+                ? "mmap unsupported"
+                : model.useMmap === false
+                    ? "mmap disabled"
+                    : lazyMode === "auto"
+                        ? "auto"
+                        : lazyMode === true
+                            ? "enabled"
+                            : "disabled"
         }, {
             show: printBos,
             title: "BOS",

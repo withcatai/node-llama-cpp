@@ -9,6 +9,7 @@ export type AddonModelParams = {
     useDirectIo?: boolean,
     useMlock?: boolean,
     checkTensors?: boolean,
+    lazyMode?: "auto" | boolean,
     overridesList?: Array<[key: string, value: number | bigint | boolean | string, type: 0 | 1 | undefined]>
 };
 

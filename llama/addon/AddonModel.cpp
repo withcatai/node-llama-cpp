@@ -312,6 +312,7 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
     Napi::ObjectWrap<AddonModel>(info) {
     data = new AddonModelData();
     model_params = llama_model_default_params();
+    model_params.lazy_mode = LLAMA_LAZY_MODE_OFF;
 
     modelPath = info[0].As<Napi::String>().Utf8Value();
 
@@ -347,6 +348,18 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
 
         if (options.Has("noAlloc")) {
             model_params.no_alloc = options.Get("noAlloc").As<Napi::Boolean>().Value();
+        }
+
+        if (options.Has("lazyMode")) {
+            auto lazyMode = options.Get("lazyMode");
+
+            if (lazyMode.IsString() && (lazyMode.As<Napi::String>().Utf8Value() == "auto")) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_AUTO;
+            } else if (lazyMode.IsBoolean() && lazyMode.As<Napi::Boolean>().Value()) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_ON;
+            } else if (lazyMode.IsBoolean() && !lazyMode.As<Napi::Boolean>().Value()) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_OFF;
+            }
         }
 
         if (options.Has("onLoadProgress")) {
