@@ -63,12 +63,39 @@ export type LlamaRankingContextOptions = {
     ignoreMemorySafetyChecks?: boolean
 };
 
+export type RankingOptions = {
+    /**
+     * When the given document it too big that it exceeds the context size, this option determines how to handle it.
+     *
+     * - `"throw"`: throw an error
+     * - `"maxChunk"`: split the document into smaller chunks that would fit the context, rank all of them,
+     *     and return the highest ranking score among the chunks. By default, sequential chunks will overlap by at least 50%.
+     *
+     * Default to `"throw"`.
+     */
+    onOverflow?: "throw" | "maxChunk" | {
+        type: "throw"
+    } | {
+        type: "maxChunk",
+
+        /**
+         * The percentage of overlap between sequential chunks when splitting the document.
+         *
+         * Defaults to `0.5`.
+         */
+        overlapPercentage?: number
+    }
+};
+
+const defaultOverlapPercentage = 0.5;
+
 /**
  * @see [Reranking Documents](https://node-llama-cpp.withcat.ai/guide/embedding#reranking) tutorial
  */
 export class LlamaRankingContext {
     /** @internal */ private readonly _llamaContext: LlamaContext;
     /** @internal */ private readonly _template: string | undefined;
+    /** @internal */ private readonly _templateDocumentInstances?: number;
     /** @internal */ private readonly _sequence: LlamaContextSequence;
     /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
 
@@ -83,6 +110,9 @@ export class LlamaRankingContext {
     }) {
         this._llamaContext = _llamaContext;
         this._template = _template;
+        this._templateDocumentInstances = _template == null
+            ? undefined
+            : _template.split("{{document}}").length - 1;
         this._sequence = this._llamaContext.getSequence();
 
         this._disposeAggregator.add(
@@ -102,17 +132,25 @@ export class LlamaRankingContext {
      * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
      * @returns a ranking score between 0 and 1 representing the probability that the document is relevant to the query.
      */
-    public async rank(query: Token[] | string | LlamaText, document: Token[] | string | LlamaText) {
-        const resolvedInput = this._getEvaluationInput(query, document);
+    public async rank(
+        query: Token[] | string | LlamaText,
+        document: Token[] | string | LlamaText,
+        options?: RankingOptions
+    ): Promise<number> {
+        const resolvedQuery = tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+        const resolvedDocument = tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+        const resolvedInput = this._chunkEvaluatedInputs(resolvedQuery, resolvedDocument, options);
 
-        if (resolvedInput.length > this._llamaContext.contextSize)
+        if (resolvedInput[0] == null)
+            throw new Error("Failed to generate a valid input for ranking.");
+        else if (resolvedInput.length === 1 && resolvedInput[0].length >= this._llamaContext.contextSize)
             throw new Error(
                 "The input length exceed the context size. " +
-                `Try to increase the context size to at least ${resolvedInput.length + 1} ` +
+                `Try to increase the context size to at least ${resolvedInput[0].length + 1} ` +
                 "or use another model that supports longer contexts."
             );
 
-        return this._evaluateRankingForInput(resolvedInput);
+        return getMaxScore(await this._evaluateChunks(resolvedInput));
     }
 
     /**
@@ -121,21 +159,34 @@ export class LlamaRankingContext {
      * A ranking score is a number between 0 and 1 representing the probability that the document is relevant to the query.
      * @returns an array of ranking scores between 0 and 1 representing the probability that the document is relevant to the query.
      */
-    public async rankAll(query: Token[] | string | LlamaText, documents: Array<Token[] | string | LlamaText>): Promise<number[]> {
-        const resolvedTokens = documents.map((document) => this._getEvaluationInput(query, document));
-        const maxInputTokensLength = resolvedTokens.reduce((max, tokens) => Math.max(max, tokens.length), 0);
+    public async rankAll(
+        query: Token[] | string | LlamaText,
+        documents: Array<Token[] | string | LlamaText>,
+        options?: RankingOptions
+    ): Promise<number[]> {
+        const resolvedQuery = tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+        const resolvedInputs = documents.map((document) => this._chunkEvaluatedInputs(
+            resolvedQuery,
+            tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false),
+            options
+        ));
+        const maxInputTokensLength = resolvedInputs.reduce((max, chunks) => (
+            (chunks[0] == null || chunks.length !== 1)
+                ? max
+                : Math.max(max, chunks[0].length)
+        ), 0);
 
-        if (maxInputTokensLength > this._llamaContext.contextSize)
+        if (maxInputTokensLength >= this._llamaContext.contextSize)
             throw new Error(
                 "The input lengths of some of the given documents exceed the context size. " +
                 `Try to increase the context size to at least ${maxInputTokensLength + 1} ` +
                 "or use another model that supports longer contexts."
             );
-        else if (resolvedTokens.length === 0)
+        else if (resolvedInputs.length === 0)
             return [];
 
         return await Promise.all(
-            resolvedTokens.map((tokens) => this._evaluateRankingForInput(tokens))
+            resolvedInputs.map(async (chunks) => getMaxScore(await this._evaluateChunks(chunks)))
         );
     }
 
@@ -159,6 +210,13 @@ export class LlamaRankingContext {
             .sort((a, b) => b.score - a.score);
     }
 
+    /** Calculate the input length for a given query and document so you can determine whether it fits in the context size */
+    public calculateInputLength(query: Token[] | string | LlamaText, document: Token[] | string | LlamaText) {
+        const resolvedQuery = tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+        const resolvedDocument = tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+        return this._getEvaluationInput(resolvedQuery, resolvedDocument).length;
+    }
+
     public async dispose() {
         await this._disposeAggregator.dispose();
     }
@@ -176,17 +234,21 @@ export class LlamaRankingContext {
         return this._llamaContext.model;
     }
 
+    public get contextSize() {
+        return this._llamaContext.contextSize;
+    }
+
     /** @internal */
-    private _getEvaluationInput(query: Token[] | string | LlamaText, document: Token[] | string | LlamaText) {
+    private _getEvaluationInput(query: Token[], document: Token[]) {
         if (this._template != null) {
             const resolvedInput = splitText(this._template, ["{{query}}", "{{document}}"])
                 .flatMap((item) => {
                     if (typeof item === "string")
                         return this._llamaContext.model.tokenize(item, true, "trimLeadingSpace");
                     else if (item.separator === "{{query}}")
-                        return tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+                        return query;
                     else if (item.separator === "{{document}}")
-                        return tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
+                        return document;
                     else
                         void (item satisfies never);
 
@@ -209,18 +271,15 @@ export class LlamaRankingContext {
         if (this.model.tokens.eos == null && this.model.tokens.sep == null)
             throw new Error("Computing rankings is not supported for this model.");
 
-        const resolvedQuery = tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
-        const resolvedDocument = tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
-
-        if (resolvedQuery.length === 0 && resolvedDocument.length === 0)
+        if (query.length === 0 && document.length === 0)
             return [];
 
         const resolvedInput = [
             ...(this.model.tokens.bos == null ? [] : [this.model.tokens.bos]),
-            ...resolvedQuery,
+            ...query,
             ...(this.model.tokens.eos == null ? [] : [this.model.tokens.eos]),
             ...(this.model.tokens.sep == null ? [] : [this.model.tokens.sep]),
-            ...resolvedDocument,
+            ...document,
             ...(this.model.tokens.eos == null ? [] : [this.model.tokens.eos])
         ];
 
@@ -255,6 +314,48 @@ export class LlamaRankingContext {
 
             return probability;
         });
+    }
+
+    private _evaluateChunks(input: Token[][]): Promise<number[]> {
+        return Promise.all(input.map((chunk) => this._evaluateRankingForInput(chunk)));
+    }
+
+    /** @internal */
+    private _chunkEvaluatedInputs(query: Token[], document: Token[], options?: RankingOptions): Token[][] {
+        const fullInput = this._getEvaluationInput(query, document);
+        if (fullInput.length < this._llamaContext.contextSize || options?.onOverflow == null || options?.onOverflow === "throw" || (
+            typeof options?.onOverflow === "object" && options.onOverflow.type === "throw"
+        ))
+            return [fullInput];
+
+        const templateDocumentInstances = Math.max(1, this._templateDocumentInstances ?? 1);
+        const maxChunkSize = Math.floor(
+            (
+                this._llamaContext.contextSize - (fullInput.length - (document.length * templateDocumentInstances)) - 1
+            ) / templateDocumentInstances
+        );
+        if (maxChunkSize <= 0)
+            throw new Error("The document is too long to fit into the context window with the given query");
+
+        const overlapPercentage = (typeof options?.onOverflow === "object" && options.onOverflow.type === "maxChunk" && options.onOverflow.overlapPercentage != null)
+            ? Math.min(1, Math.max(0, Math.min(1, options.onOverflow.overlapPercentage)))
+            : defaultOverlapPercentage;
+
+        const overlapTokens = Math.min(Math.max(0, Math.ceil(maxChunkSize * overlapPercentage)), maxChunkSize - 1);
+
+        const result: Token[][] = [];
+        let start = 0;
+        while (start < document.length) {
+            const end = Math.min(start + maxChunkSize, document.length);
+            result.push(this._getEvaluationInput(query, document.slice(start, end)));
+
+            if (end === document.length)
+                break;
+
+            start = Math.min(end - overlapTokens, document.length - maxChunkSize);
+        }
+
+        return result;
     }
 
     /** @internal */
@@ -315,4 +416,14 @@ export class LlamaRankingContext {
 
 function logitToSigmoid(logit: number) {
     return 1 / (1 + Math.exp(-logit));
+}
+
+function getMaxScore(arr: number[]) {
+    let max = 0;
+    for (const num of arr) {
+        if (num > max) {
+            max = num;
+        }
+    }
+    return max;
 }

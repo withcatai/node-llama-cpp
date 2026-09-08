@@ -712,6 +712,7 @@ async function RunChat({
         draftContext,
         useMmap,
         useDirectIo,
+        lazyMode,
         printBos: true,
         printEos: true,
         logBatchSize,
