@@ -6,8 +6,8 @@ import {
 } from "../../../../src/index.js";
 import {
     harmonyJinjaTemplate, harmonyJinjaTemplate2, harmonyJinjaTemplate3, harmonyJinjaTemplate4, harmonyJinjaTemplate5,
-    gemma4JinjaTemplate1, gemma4JinjaTemplate2, gemma4JinjaTemplate3, museGlimmerJinjaTemplate, museGlimmerJinjaTemplate2,
-    museGlimmerJinjaTemplate3, museGlimmerJinjaTemplate4, museGlimmerJinjaTemplate5
+    gemma4JinjaTemplate1, gemma4JinjaTemplate2, gemma4JinjaTemplate3,
+    museGlimmerJinjaTemplate, museGlimmerJinjaTemplate2, museGlimmerJinjaTemplate3, museGlimmerJinjaTemplate4
 } from "./jinjaTemplates.js";
 
 
@@ -1038,19 +1038,6 @@ describe("resolveChatWrapper", () => {
             customWrapperSettings: {
                 jinjaTemplate: {
                     template: museGlimmerJinjaTemplate4
-                }
-            },
-            fallbackToOtherWrappersOnJinjaError: false
-        });
-
-        expect(chatWrapper).to.be.instanceof(MuseChatWrapper);
-    });
-
-    test("should resolve to specialized MuseChatWrapper 5", {timeout: 1000 * 60 * 60 * 2}, async () => {
-        const chatWrapper = resolveChatWrapper({
-            customWrapperSettings: {
-                jinjaTemplate: {
-                    template: museGlimmerJinjaTemplate5
                 }
             },
             fallbackToOtherWrappersOnJinjaError: false
