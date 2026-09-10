@@ -136,7 +136,6 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
         throw new Error(`Invalid GitHub repository: ${repo}`);
 
     let downloadedCmake = false;
-    let downloadedMetalToolchain = false;
 
     console.log(`${chalk.yellow("Repo:")} ${repo}`);
     console.log(`${chalk.yellow("Release:")} ${release}`);
@@ -226,7 +225,6 @@ export async function DownloadLlamaCppCommand(args: DownloadCommandArgs) {
                         nodeTarget: nodeTarget ? nodeTarget : undefined,
                         updateLastBuildInfo: true,
                         downloadCmakeIfNeeded: false,
-                        downloadMetalToolchainIfNeeded: false,
                         ensureLlamaCppRepoIsCloned: false,
                         includeBuildOptionsInBinaryFolderName: true
                     });

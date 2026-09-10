@@ -110,7 +110,6 @@ export async function BuildLlamaCppCommand({
     const customCmakeOptions = resolveCustomCmakeOptions();
     const buildGpusToTry: BuildGpu[] = await getGpuTypesToUseForOption(gpu, {platform, arch});
     let downloadedCmake = false;
-    let downloadedMetalToolchain = false;
 
     for (let i = 0; i < buildGpusToTry.length; i++) {
         const gpuToTry = buildGpusToTry[i];
@@ -151,7 +150,6 @@ export async function BuildLlamaCppCommand({
                     nodeTarget: nodeTarget ? nodeTarget : undefined,
                     updateLastBuildInfo: true,
                     downloadCmakeIfNeeded: false,
-                    downloadMetalToolchainIfNeeded: false,
                     ensureLlamaCppRepoIsCloned: false,
                     includeBuildOptionsInBinaryFolderName,
                     ciMode: isCI && ciMode

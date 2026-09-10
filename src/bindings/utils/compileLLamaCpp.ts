@@ -37,7 +37,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
     includeBuildOptionsInBinaryFolderName?: boolean,
     ensureLlamaCppRepoIsCloned?: boolean,
     downloadCmakeIfNeeded?: boolean,
-    downloadMetalToolchainIfNeeded?: boolean,
     ignoreWorkarounds?: ("cudaArchitecture" | "reduceParallelBuildThreads" | "singleBuildThread" | "avoidWindowsLlvm")[],
     envVars?: typeof process.env,
     ciMode?: boolean
@@ -48,7 +47,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
         includeBuildOptionsInBinaryFolderName = true,
         ensureLlamaCppRepoIsCloned: ensureLlamaCppRepoIsClonedArg = false,
         downloadCmakeIfNeeded: downloadCmakeIfNeededArg = false,
-        downloadMetalToolchainIfNeeded: downloadMetalToolchainIfNeededArg = false,
         ignoreWorkarounds = [],
         envVars = process.env,
         ciMode = false
