@@ -724,18 +724,31 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     }
 
     int32_t inputTokensLength = info[0].As<Napi::Number>().Int32Value();
-    int32_t maxVectorSize = (info.Length() > 1 && info[1].IsNumber()) ? info[1].As<Napi::Number>().Int32Value() : 0;
+    const double maxVectorSize = (info.Length() > 1 && info[1].IsNumber()) ? info[1].As<Napi::Number>().DoubleValue() : 0;
 
     if (inputTokensLength <= 0) {
         Napi::Error::New(info.Env(), "Invalid input tokens length").ThrowAsJavaScriptException();
         return info.Env().Undefined();
     }
 
-    const int n_embd = llama_model_n_embd(model->model);
+    if (!std::isfinite(maxVectorSize) || maxVectorSize < 0 || std::floor(maxVectorSize) != maxVectorSize) {
+        Napi::Error::New(info.Env(), "Invalid maximum embedding vector size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
     const enum llama_pooling_type pooling_type = llama_pooling_type(ctx);
+    const int64_t n_embd = pooling_type == LLAMA_POOLING_TYPE_RANK
+        ? static_cast<int64_t>(llama_model_n_cls_out(model->model))
+        : llama_model_n_embd_out(model->model);
+
+    if (n_embd <= 0) {
+        Napi::Error::New(info.Env(), "Invalid embedding vector size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
     const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
-        embeddings = llama_get_embeddings_ith(ctx, inputTokensLength - 1);
+        embeddings = llama_get_embeddings_ith(ctx, -1);
     }
 
     if (embeddings == NULL) {
@@ -743,7 +756,7 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    size_t resultSize = maxVectorSize == 0 ? n_embd : std::min(n_embd, maxVectorSize);
+    const size_t resultSize = maxVectorSize == 0 ? n_embd : std::min<double>(n_embd, maxVectorSize);
     Napi::Float64Array result = Napi::Float64Array::New(info.Env(), resultSize);
     for (size_t i = 0; i < resultSize; i++) {
         result[i] = embeddings[i];

@@ -640,7 +640,7 @@ Napi::Value AddonModel::GetEmbeddingVectorSize(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return Napi::Number::From(info.Env(), llama_model_n_embd(model));
+    return Napi::Number::From(info.Env(), llama_model_n_embd_out(model));
 }
 
 Napi::Value AddonModel::GetTotalSize(const Napi::CallbackInfo& info) {
