@@ -19,7 +19,6 @@ import {getPrettyBuildGpuName} from "../../../../bindings/consts.js";
 import {getPlatformInfo} from "../../../../bindings/utils/getPlatformInfo.js";
 import {withCliCommandDescriptionDocsUrl} from "../../../utils/withCliCommandDescriptionDocsUrl.js";
 import {builtinLlamaCppRelease} from "../../../../bindings/utils/binariesGithubRelease.js";
-import {downloadMetalToolchainIfNeeded} from "../../../../bindings/utils/metal.js";
 
 type BuildCommand = {
     arch?: typeof process.arch,
@@ -125,11 +124,6 @@ export async function BuildLlamaCppCommand({
         if (!downloadedCmake) {
             await downloadCmakeIfNeeded(true);
             downloadedCmake = true;
-        }
-
-        if (!downloadedMetalToolchain) {
-            await downloadMetalToolchainIfNeeded(true);
-            downloadedMetalToolchain = true;
         }
 
         const buildOptions: BuildOptions = {

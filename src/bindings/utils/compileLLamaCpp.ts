@@ -24,7 +24,6 @@ import {testCmakeBinary} from "./testCmakeBinary.js";
 import {getCudaNvccPaths} from "./detectAvailableComputeLayers.js";
 import {detectWindowsBuildTools} from "./detectBuildTools.js";
 import {asyncSome} from "./asyncSome.js";
-import {downloadMetalToolchainIfNeeded, hasMetalToolchain} from "./metal.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildConfigType: "Release" | "RelWithDebInfo" | "Debug" = "Release";
@@ -95,9 +94,6 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 if (downloadCmakeIfNeededArg)
                     await downloadCmakeIfNeeded(buildOptions.progressLogs);
 
-                if (platform === "mac" && downloadMetalToolchainIfNeededArg)
-                    await downloadMetalToolchainIfNeeded(buildOptions.progressLogs);
-
                 const cmakePathArgs = await getCmakePathArgs();
                 const cmakeGeneratorArgs = getCmakeGeneratorArgs(buildOptions.platform, buildOptions.arch, useWindowsLlvm);
                 const toolchainFile = await getToolchainFileForArch(buildOptions.arch, useWindowsLlvm);
@@ -123,14 +119,9 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 )
                     cmakeToolchainOptions.set("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN", toolchainFile);
 
-                if (buildOptions.gpu === "metal" && platform === "mac" && !cmakeCustomOptions.has("GGML_METAL")) {
+                if (buildOptions.gpu === "metal" && platform === "mac" && !cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "1");
-
-                    if (!cmakeCustomOptions.has("GGML_METAL_EMBED_LIBRARY")) {
-                        if (ciMode || await hasMetalToolchain())
-                            cmakeCustomOptions.set("GGML_METAL_EMBED_LIBRARY", "OFF");
-                    }
-                } else if (!cmakeCustomOptions.has("GGML_METAL"))
+                else if (!cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "OFF");
 
                 if (buildOptions.gpu === "cuda" && !cmakeCustomOptions.has("GGML_CUDA"))
