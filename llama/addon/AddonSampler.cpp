@@ -292,7 +292,9 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             }
 
             if (temperatureSampler_temperature <= 0.0f) {
-                greedySampler = llama_sampler_init_greedy();
+                if (greedySampler == nullptr) {
+                    greedySampler = llama_sampler_init_greedy();
+                }
             } else {
                 temperatureSampler = llama_sampler_init_temp(temperatureSampler_temperature);
 
@@ -303,15 +305,17 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             }
         }
     } else {
-         if (temperatureSampler != nullptr) {
+        if (temperatureSampler != nullptr) {
             freeChain();
             llama_sampler_free(temperatureSampler);
             temperatureSampler = nullptr;
-         }
+        }
 
         if (greedySampler == nullptr) {
             greedySampler = llama_sampler_init_greedy();
         }
+
+        temperatureSampler_initialized = false;
     }
 
     if (config.Has("minP")) {
@@ -333,6 +337,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         freeChain();
         llama_sampler_free(minPSampler);
         minPSampler = nullptr;
+        minPSampler_minP = 0.0f;
     }
 
     if (config.Has("topK")) {
@@ -357,6 +362,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         freeChain();
         llama_sampler_free(topKSampler);
         topKSampler = nullptr;
+        topKSampler_initialized = false;
     }
 
     if (config.Has("topP")) {
@@ -378,11 +384,14 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         freeChain();
         llama_sampler_free(topPSampler);
         topPSampler = nullptr;
+        topPSampler_topP = 1.0f;
     }
 
+    bool seedChanged = false;
     if (config.Has("seed")) {
         auto seed = config.Get("seed").As<Napi::Number>().Uint32Value();
         if (seed != seedSampler_seed || seedSampler == nullptr) {
+            seedChanged = true;
             seedSampler_seed = seed;
             freeChain();
 
@@ -395,14 +404,16 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         }
     } else if (seedSampler == nullptr) {
         freeChain();
-        seedSampler = llama_sampler_init_dist(time(NULL));
+        seedChanged = true;
+        seedSampler_seed = static_cast<uint32_t>(time(NULL));
+        seedSampler = llama_sampler_init_dist(seedSampler_seed);
     }
 
     if (config.Has("xtcProbability") && config.Has("xtcThreshold")) {
         auto xtcProbability = config.Get("xtcProbability").As<Napi::Number>().FloatValue();
         auto xtcThreshold = config.Get("xtcThreshold").As<Napi::Number>().FloatValue();
 
-        if (xtcProbability != xtcSampler_probability || xtcThreshold != xtcSampler_threshold || xtcSampler == nullptr) {
+        if (xtcProbability != xtcSampler_probability || xtcThreshold != xtcSampler_threshold || xtcSampler == nullptr || seedChanged) {
             xtcSampler_probability = xtcProbability;
             xtcSampler_threshold = xtcThreshold;
             freeChain();
@@ -442,7 +453,8 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             ? config.Get("repeatPenaltyFrequencyPenalty").As<Napi::Number>().FloatValue()
             : 0;
 
-        auto repeatPenaltyEnabled = repeatPenalty != 1 && repeatPenaltyMaxTokens > 0;
+        auto repeatPenaltyEnabled = repeatPenaltyMaxTokens > 0 &&
+            (repeatPenalty != 1.0f || repeatPenaltyPresencePenalty != 0.0f || repeatPenaltyFrequencyPenalty != 0.0f);
         bool shouldCreateSampler = false;
 
         if (!repeatPenaltyEnabled) {
@@ -462,25 +474,27 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             existingSamplerMatchesConfig &= repeatPenalty_frequencyPenalty == repeatPenaltyFrequencyPenalty;
 
             if (existingSamplerMatchesConfig) {
-                if (repeatPenaltyTokensLength > 0) {
-                    const auto firstToken = static_cast<llama_token>(repeatPenaltyTokens[0]);
-                    if (repeatPenalty_lastTokens.rat(0) != firstToken &&
-                        repeatPenalty_lastTokens.size() == repeatPenalty_maxTokens &&
-                        repeatPenaltyTokensLength == static_cast<size_t>(repeatPenalty_maxTokens)
-                    ) {
+                const size_t historyLength = std::min(repeatPenaltyTokensLength, static_cast<size_t>(repeatPenalty_maxTokens));
+                const size_t historyOffset = repeatPenaltyTokensLength - historyLength;
+                existingSamplerMatchesConfig = historyLength == repeatPenalty_lastTokens.size();
+                for (size_t i = 0; i < historyLength && existingSamplerMatchesConfig; i++) {
+                    const auto token = static_cast<llama_token>(repeatPenaltyTokens[historyOffset + i]);
+                    existingSamplerMatchesConfig = repeatPenalty_lastTokens.rat(historyLength - i - 1) == token;
+                }
+
+                if (!existingSamplerMatchesConfig && historyLength > 0 &&
+                    historyLength == std::min(repeatPenalty_lastTokens.size() + 1, static_cast<size_t>(repeatPenalty_maxTokens))
+                ) {
+                    existingSamplerMatchesConfig = true;
+                    for (size_t i = 0; i + 1 < historyLength && existingSamplerMatchesConfig; i++) {
+                        const auto token = static_cast<llama_token>(repeatPenaltyTokens[historyOffset + i]);
+                        existingSamplerMatchesConfig = repeatPenalty_lastTokens.rat(historyLength - i - 2) == token;
+                    }
+
+                    if (existingSamplerMatchesConfig) {
                         const auto lastToken = static_cast<llama_token>(repeatPenaltyTokens[repeatPenaltyTokensLength - 1]);
                         llama_sampler_accept(repeatPenaltySampler, lastToken);
                         repeatPenalty_lastTokens.push_back(lastToken);
-                    }
-                }
-                for (size_t i = 0; i < repeatPenaltyTokensLength && existingSamplerMatchesConfig; i++) {
-                    auto token = static_cast<llama_token>(repeatPenaltyTokens[i]);
-
-                    if (i < repeatPenalty_lastTokens.size()) {
-                        existingSamplerMatchesConfig &= repeatPenalty_lastTokens.rat(i) == token;
-                    } else {
-                        llama_sampler_accept(repeatPenaltySampler, token);
-                        repeatPenalty_lastTokens.push_back(token);
                     }
                 }
             }
@@ -524,7 +538,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
         float strength = config.Get("dryRepeatPenaltyStrength").As<Napi::Number>().FloatValue();
         float base = config.Has("dryRepeatPenaltyBase")
             ? config.Get("dryRepeatPenaltyBase").As<Napi::Number>().FloatValue()
-            : 0;
+            : 1.75f;
         int32_t allowedLength = config.Has("dryRepeatPenaltyAllowedLength")
             ? config.Get("dryRepeatPenaltyAllowedLength").As<Napi::Number>().Int32Value()
             : 2;
@@ -555,7 +569,7 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             }
         }
 
-        auto enabled = base != 0 && lastTokens != 0;
+        auto enabled = strength > 0 && base != 0 && lastTokens != 0;
         bool shouldCreateSampler = false;
 
         if (!enabled) {
@@ -641,8 +655,9 @@ Napi::Value AddonSampler::ApplyConfig(const Napi::CallbackInfo& info) {
             }
 
             if (!existingSamplerMatchesConfig) {
+                freeChain();
+
                 if (tokenBiasSampler != nullptr) {
-                    freeChain();
                     llama_sampler_free(tokenBiasSampler);
                     tokenBiasSampler = nullptr;
                 }

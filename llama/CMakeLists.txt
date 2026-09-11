@@ -116,47 +116,21 @@ include_directories("./llama.cpp/common")
 # This is needed to use methods in "llama-grammar.h" and "unicode.h"
 target_include_directories(llama PUBLIC "./llama.cpp/src")
 
-unset(GPU_INFO_HEADERS)
-unset(GPU_INFO_SOURCES)
-unset(GPU_INFO_EXTRA_LIBS)
-
-if (GGML_VULKAN OR GGML_KOMPUTE)
-    find_package(Vulkan)
-    if (Vulkan_FOUND)
-        if (GGML_VULKAN)
-            message(STATUS "Using Vulkan for GPU info")
-        elseif (GGML_KOMPUTE)
-            message(STATUS "Using Vulkan for GPU info because Kompute is enabled")
-        endif()
-
-        list(APPEND GPU_INFO_HEADERS gpuInfo/vulkan-gpu-info.h)
-        list(APPEND GPU_INFO_SOURCES gpuInfo/vulkan-gpu-info.cpp)
-
-        add_compile_definitions(GPU_INFO_USE_VULKAN)
-
-        list(APPEND GPU_INFO_EXTRA_LIBS Vulkan::Vulkan)
-    else()
-        message(FATAL_ERROR "Vulkan was not found")
-    endif()
-endif()
-
-list(REMOVE_DUPLICATES GPU_INFO_HEADERS)
-list(REMOVE_DUPLICATES GPU_INFO_SOURCES)
-list(REMOVE_DUPLICATES GPU_INFO_EXTRA_LIBS)
-
 addVariantSuffix(llama "${NLC_VARIANT}")
 addVariantSuffix(ggml "${NLC_VARIANT}")
 
-file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp" ${GPU_INFO_SOURCES})
+file(GLOB SOURCE_FILES "addon/*.cpp" "addon/**/*.cpp")
 
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} ${GPU_INFO_HEADERS})
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 target_link_libraries(${PROJECT_NAME} "llama")
 target_link_libraries(${PROJECT_NAME} "llama-common")
 
-if (DEFINED GPU_INFO_EXTRA_LIBS)
-    target_link_libraries(${PROJECT_NAME} ${GPU_INFO_EXTRA_LIBS})
+if (GGML_VULKAN)
+    find_package(Vulkan REQUIRED)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GPU_INFO_USE_VULKAN)
+    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
 endif()
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)

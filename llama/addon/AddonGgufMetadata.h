@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 
 #include "ggml-cpp.h"
 #include "napi.h"
@@ -34,7 +35,7 @@ struct AddonGgufMetadataSource {
 
 class AddonGgufMetadata : public Napi::ObjectWrap<AddonGgufMetadata> {
     public:
-        gguf_context_ptr ggufMetadata;
+        std::shared_ptr<gguf_context> ggufMetadata;
         bool disposed = false;
 
         AddonGgufMetadata(const Napi::CallbackInfo& info);

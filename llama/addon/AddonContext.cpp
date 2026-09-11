@@ -574,17 +574,21 @@ Napi::Value AddonContext::InitBatch(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
+    int32_t n_tokens = info[0].As<Napi::Number>().Int32Value();
+    if (n_tokens <= 0 || static_cast<uint32_t>(n_tokens) > context_params.n_batch) {
+        Napi::RangeError::New(info.Env(), "Invalid batch size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
     if (has_batch) {
         llama_batch_free(batch);
     }
-
-    int32_t n_tokens = info[0].As<Napi::Number>().Int32Value();
 
     batch = llama_batch_init(n_tokens, 0, 1);
     has_batch = true;
     batch_n_tokens = n_tokens;
 
-    uint64_t newBatchMemorySize = calculateBatchMemorySize(n_tokens, llama_model_n_embd(model->model), context_params.n_batch);
+    uint64_t newBatchMemorySize = calculateBatchMemorySize(n_tokens, 0, 1);
     if (newBatchMemorySize > batchMemorySize) {
         adjustNapiExternalMemoryAdd(Env(), newBatchMemorySize - batchMemorySize);
         batchMemorySize = newBatchMemorySize;
@@ -618,12 +622,15 @@ Napi::Value AddonContext::AddToBatch(const Napi::CallbackInfo& info) {
 
     auto tokensLength = tokens.ElementLength();
     auto tokenLogitIndexesLength = tokenLogitIndexes.ElementLength();
-    GGML_ASSERT(batch.n_tokens + tokensLength <= batch_n_tokens);
+    if (tokensLength > static_cast<size_t>(batch_n_tokens - batch.n_tokens)) {
+        Napi::RangeError::New(info.Env(), "Tokens exceed the initialized batch size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
 
     Napi::Uint32Array resLogitIndexes = Napi::Uint32Array::New(info.Env(), tokenLogitIndexesLength);
 
     for (size_t i = 0, l = 0; i < tokensLength; i++) {
-        if (l < tokenLogitIndexesLength && l < tokenLogitIndexesLength && tokenLogitIndexes[l] == i) {
+        if (l < tokenLogitIndexesLength && tokenLogitIndexes[l] == i) {
             common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, true);
             resLogitIndexes[l] = batch.n_tokens - 1;
             l++;
@@ -1072,10 +1079,10 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
     public:
         AddonContext* context;
         AddonContextSequenceCheckpoint* checkpoint;
-        std::size_t maxPosIndex;
+        llama_pos maxPosIndex;
         bool restoreSuccess = false;
 
-        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, std::size_t maxPosIndex)
+        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, llama_pos maxPosIndex)
             : Napi::AsyncWorker(info.Env(), "RestoreCheckpointWorker"),
               context(context),
               checkpoint(checkpoint),
@@ -1098,7 +1105,22 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                std::lock_guard<std::mutex> lock(checkpoint->dataMutex);
+                std::shared_lock<std::shared_mutex> lock(checkpoint->dataMutex);
+
+                if (checkpoint->disposed) {
+                    SetError("Checkpoint is disposed");
+                    return;
+                }
+
+                if (!checkpoint->initialized) {
+                    return;
+                }
+
+                if (checkpoint->maxPos < 0) {
+                    restoreSuccess = maxPosIndex == -1 &&
+                        llama_memory_seq_rm(llama_get_memory(context->ctx), checkpoint->sequenceId, 0, -1);
+                    return;
+                }
 
                 std::size_t dataSize = checkpoint->data.size();
                 std::size_t restoreSize = llama_state_seq_set_data_ext(context->ctx, checkpoint->data.data(), dataSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
@@ -1123,8 +1145,12 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
 };
 
 Napi::Value AddonContext::RestoreCheckpoint(const Napi::CallbackInfo& info) {
+    if (disposed || !contextLoaded) {
+        throw Napi::Error::New(info.Env(), "Context is disposed or not loaded");
+    }
+
     AddonContextSequenceCheckpoint* checkpoint = Napi::ObjectWrap<AddonContextSequenceCheckpoint>::Unwrap(info[0].As<Napi::Object>());
-    std::size_t maxPosIndex = info[1].As<Napi::Number>().Int32Value();
+    const llama_pos maxPosIndex = static_cast<llama_pos>(info[1].As<Napi::Number>().Int32Value());
 
     RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint, maxPosIndex);
     worker->Queue();
@@ -1175,13 +1201,18 @@ AddonContextSequenceCheckpoint::~AddonContextSequenceCheckpoint() {
 
 class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
     public:
-    AddonContextSequenceCheckpoint* checkpoint;
+        AddonContextSequenceCheckpoint* checkpoint;
         AddonContext* context;
+        const llama_seq_id sequenceId;
+        llama_pos minPos = -1;
+        llama_pos maxPos = -1;
+        std::vector<uint8_t> data;
 
-        AddonContextSequenceCheckpointInitWorker(const Napi::CallbackInfo& info, AddonContextSequenceCheckpoint* checkpoint, AddonContext* context)
+        AddonContextSequenceCheckpointInitWorker(const Napi::CallbackInfo& info, AddonContextSequenceCheckpoint* checkpoint, AddonContext* context, llama_seq_id sequenceId)
             : Napi::AsyncWorker(info.Env(), "AddonContextSequenceCheckpointInitWorker"),
-            checkpoint(checkpoint),
+              checkpoint(checkpoint),
               context(context),
+              sequenceId(sequenceId),
               deferred(Napi::Promise::Deferred::New(info.Env())) {
             checkpoint->Ref();
             context->Ref();
@@ -1200,12 +1231,16 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                checkpoint->minPos = llama_memory_seq_pos_min(llama_get_memory(context->ctx), checkpoint->sequenceId);
-                checkpoint->maxPos = llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId);
-                const size_t checkpointSize = llama_state_seq_get_size_ext(context->ctx, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                minPos = llama_memory_seq_pos_min(llama_get_memory(context->ctx), sequenceId);
+                maxPos = llama_memory_seq_pos_max(llama_get_memory(context->ctx), sequenceId);
+                if (maxPos >= 0) {
+                    const size_t checkpointSize = llama_state_seq_get_size_ext(context->ctx, sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
 
-                checkpoint->data.resize(checkpointSize, 0);
-                llama_state_seq_get_data_ext(context->ctx, checkpoint->data.data(), checkpointSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                    data.resize(checkpointSize, 0);
+                    if (checkpointSize == 0 || llama_state_seq_get_data_ext(context->ctx, data.data(), checkpointSize, sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) != checkpointSize) {
+                        throw std::runtime_error("Failed to capture the complete checkpoint");
+                    }
+                }
             } catch (const std::exception& e) {
                 SetError(e.what());
             } catch(...) {
@@ -1213,6 +1248,21 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
+            if (checkpoint->disposed) {
+                deferred.Reject(Napi::Error::New(Env(), "Checkpoint is disposed").Value());
+                return;
+            }
+
+            {
+                std::unique_lock<std::shared_mutex> lock(checkpoint->dataMutex);
+                checkpoint->data.swap(data);
+                checkpoint->sequenceId = sequenceId;
+                checkpoint->minPos = minPos;
+                checkpoint->maxPos = maxPos;
+                checkpoint->initialized = true;
+            }
+            adjustNapiExternalMemorySubtract(Env(), data.size());
+            adjustNapiExternalMemoryAdd(Env(), checkpoint->data.size());
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
@@ -1222,9 +1272,12 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
 
 Napi::Value AddonContextSequenceCheckpoint::Init(const Napi::CallbackInfo& info) {
     AddonContext * context = Napi::ObjectWrap<AddonContext>::Unwrap(info[0].As<Napi::Object>());
-    sequenceId = info[1].As<Napi::Number>().Int32Value();
+    if (disposed || context->disposed || !context->contextLoaded) {
+        throw Napi::Error::New(info.Env(), "Checkpoint or context is disposed or not loaded");
+    }
+    const llama_seq_id requestedSequenceId = info[1].As<Napi::Number>().Int32Value();
 
-    AddonContextSequenceCheckpointInitWorker* worker = new AddonContextSequenceCheckpointInitWorker(info, this, context);
+    AddonContextSequenceCheckpointInitWorker* worker = new AddonContextSequenceCheckpointInitWorker(info, this, context, requestedSequenceId);
     worker->Queue();
     return worker->GetPromise();
 }
@@ -1235,9 +1288,12 @@ Napi::Value AddonContextSequenceCheckpoint::Dispose(const Napi::CallbackInfo& in
 }
 
 void AddonContextSequenceCheckpoint::dispose() {
-    std::lock_guard<std::mutex> lock(dataMutex);
-    data.clear();
-    data.resize(0);
+    std::unique_lock<std::shared_mutex> lock(dataMutex);
+    disposed = true;
+    adjustNapiExternalMemorySubtract(Env(), data.size());
+    std::vector<uint8_t>().swap(data);
+    minPos = -1;
+    maxPos = -1;
 }
 
 Napi::Value AddonContextSequenceCheckpoint::GetSize(const Napi::CallbackInfo& info) {

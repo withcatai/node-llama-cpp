@@ -28,7 +28,7 @@ void addonCallJsLogCallback(
 ) {
     bool called = false;
 
-    if (env != nullptr && callback != nullptr && addonJsLoggerCallbackSet) {
+    if (env != nullptr && callback != nullptr && data != nullptr && addonJsLoggerCallbackSet) {
         try {
             callback.Call({
                 Napi::Number::New(env, data->logLevelNumber),

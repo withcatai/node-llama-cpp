@@ -6,14 +6,8 @@
 #endif
 
 #ifdef GPU_INFO_USE_VULKAN
-#  include "../../gpuInfo/vulkan-gpu-info.h"
-#endif
-
-
-#ifdef GPU_INFO_USE_VULKAN
-void logVulkanWarning(const char* message) {
-    addonLlamaCppLogCallback(GGML_LOG_LEVEL_WARN, (std::string("Vulkan warning: ") + std::string(message)).c_str(), nullptr);
-}
+#  include <stdexcept>
+#  include <vulkan/vulkan.hpp>
 #endif
 
 Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
@@ -34,38 +28,22 @@ Napi::Value getGpuVramInfo(const Napi::CallbackInfo& info) {
             ggml_backend_dev_memory(device, &deviceFree, &deviceTotal);
 
             total += deviceTotal;
-            used += deviceTotal - deviceFree;
+            used += deviceFree <= deviceTotal ? deviceTotal - deviceFree : deviceTotal;
+
+            if (deviceType == GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                unifiedVramSize += deviceTotal;
+            }
 
 #if defined(__arm64__) || defined(__aarch64__)
             ggml_backend_reg_t backend = ggml_backend_dev_backend_reg(device);
             const auto backendName = std::string(backend == nullptr ? "" : ggml_backend_reg_name(backend));
 
-            if (backendName == "MTL" || backendName == "Metal") {
+            if (deviceType != GGML_BACKEND_DEVICE_TYPE_IGPU && (backendName == "MTL" || backendName == "Metal")) {
                 unifiedVramSize += deviceTotal;
             }
 #endif
         }
     }
-
-#ifdef GPU_INFO_USE_VULKAN
-    uint64_t vulkanDeviceTotal = 0;
-    uint64_t vulkanDeviceUsed = 0;
-    uint64_t vulkanDeviceUnifiedVramSize = 0;
-    const bool vulkanDeviceSupportsMemoryBudgetExtension = gpuInfoGetTotalVulkanDevicesInfo(&vulkanDeviceTotal, &vulkanDeviceUsed, &vulkanDeviceUnifiedVramSize, logVulkanWarning);
-
-    if (vulkanDeviceSupportsMemoryBudgetExtension) {
-        if (vulkanDeviceUnifiedVramSize > total) {
-            // this means that we counted memory from devices that aren't used by llama.cpp
-            vulkanDeviceUnifiedVramSize = 0;
-        }
-
-        unifiedVramSize += vulkanDeviceUnifiedVramSize;
-    }
-
-    if (used == 0 && vulkanDeviceUsed != 0) {
-        used = vulkanDeviceUsed;
-    }
-#endif
 
     Napi::Object result = Napi::Object::New(info.Env());
     result.Set("total", Napi::Number::From(info.Env(), total));
@@ -155,7 +133,21 @@ Napi::Value getGpuType(const Napi::CallbackInfo& info) {
 
 Napi::Value ensureGpuDeviceIsSupported(const Napi::CallbackInfo& info) {
 #ifdef GPU_INFO_USE_VULKAN
-    if (!checkIsVulkanEnvSupported(logVulkanWarning)) {
+    try {
+        static vk::Instance instance = []() {
+            if (vk::enumerateInstanceVersion() < VK_API_VERSION_1_2) {
+                throw std::runtime_error("Vulkan 1.2 is not supported by the current system. Please update your Vulkan driver");
+            }
+
+            vk::ApplicationInfo appInfo("node-llama-cpp GPU info", 1, "llama.cpp", 1, VK_API_VERSION_1_2);
+            vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlags(), &appInfo, {}, {});
+            return vk::createInstance(createInfo);
+        }();
+
+        static_cast<void>(instance.enumeratePhysicalDevices());
+    } catch (const std::exception& err) {
+        const std::string message = std::string("Vulkan warning: Failed to check Vulkan support: ") + err.what();
+        addonLlamaCppLogCallback(GGML_LOG_LEVEL_WARN, message.c_str(), nullptr);
         Napi::Error::New(info.Env(), "Vulkan device is not supported").ThrowAsJavaScriptException();
         return info.Env().Undefined();
     }

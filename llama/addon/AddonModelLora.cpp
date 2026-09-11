@@ -46,6 +46,8 @@ AddonModelLora::AddonModelLora(const Napi::CallbackInfo& info) : Napi::ObjectWra
     model = Napi::ObjectWrap<AddonModel>::Unwrap(info[0].As<Napi::Object>());
     loraFilePath = info[1].As<Napi::String>().Utf8Value();
     lora_adapter = nullptr;
+    model->Ref();
+    hasModelRef = true;
 }
 
 AddonModelLora::~AddonModelLora() {

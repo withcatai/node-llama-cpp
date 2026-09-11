@@ -78,7 +78,7 @@ Napi::Value addonGetMathCores(const Napi::CallbackInfo& info) {
 Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
     const int ggmlType = info[0].As<Napi::Number>().Int32Value();
 
-    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+    if (ggmlType < 0 || ggmlType >= GGML_TYPE_COUNT) {
         return info.Env().Undefined();
     }
 
@@ -90,7 +90,7 @@ Napi::Value addonGetBlockSizeForGgmlType(const Napi::CallbackInfo& info) {
 Napi::Value addonGetTypeSizeForGgmlType(const Napi::CallbackInfo& info) {
     const int ggmlType = info[0].As<Napi::Number>().Int32Value();
 
-    if (ggmlType < 0 || ggmlType > GGML_TYPE_COUNT) {
+    if (ggmlType < 0 || ggmlType >= GGML_TYPE_COUNT) {
         return info.Env().Undefined();
     }
 

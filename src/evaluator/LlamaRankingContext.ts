@@ -210,7 +210,7 @@ export class LlamaRankingContext {
             .sort((a, b) => b.score - a.score);
     }
 
-    /** Calculate the input length for a given query and document so you can determine whether it fits in the context size */
+    /** Calculate the evaluation tokens length for a given query and document so you can determine whether it fits in the context size */
     public calculateInputLength(query: Token[] | string | LlamaText, document: Token[] | string | LlamaText) {
         const resolvedQuery = tokenizeInput(query, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);
         const resolvedDocument = tokenizeInput(document, this._llamaContext.model.tokenizer, "trimLeadingSpace", false);

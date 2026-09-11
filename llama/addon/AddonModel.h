@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -16,17 +17,17 @@ class AddonModel : public Napi::ObjectWrap<AddonModel> {
     public:
         llama_model_params model_params;
         std::vector<llama_model_kv_override> kv_overrides;
-        llama_model* model;
-        const llama_vocab* vocab;
+        llama_model* model = nullptr;
+        const llama_vocab* vocab = nullptr;
         uint64_t loadedModelSize = 0;
         Napi::Reference<Napi::Object> addonExportsRef;
         bool hasAddonExportsRef = false;
-        AddonModelData* data;
+        AddonModelData* data = nullptr;
         std::mutex disposeMutex;
 
         std::string modelPath;
         bool modelLoaded = false;
-        bool abortModelLoad = false;
+        std::atomic_bool abortModelLoad{false};
         bool model_load_stopped = false;
         float rawModelLoadPercentage = 0;
         unsigned modelLoadPercentage = 0;

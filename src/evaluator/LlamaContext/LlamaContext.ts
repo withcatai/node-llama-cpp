@@ -2580,7 +2580,7 @@ export class LlamaContextSequence {
             dryRepeatPenaltyStrength: (dryRepeatPenalty?.strength == null || dryRepeatPenalty?.strength === 0)
                 ? undefined
                 : Math.max(0, dryRepeatPenalty?.strength),
-            dryRepeatPenaltyBase: dryRepeatPenalty?.base,
+            dryRepeatPenaltyBase: dryRepeatPenalty?.base ?? 1.75,
             dryRepeatPenaltyAllowedLength: Math.max(1, dryRepeatPenalty?.allowedLength ?? 2),
             dryRepeatPenaltyLastTokens: dryRepeatPenalty?.lastTokens == null
                 ? -1
@@ -2630,7 +2630,7 @@ export class LlamaContextSequence {
             }
 
             const tokensToDecode = tokensLeftToDecode.splice(0, freeSpace);
-            const tokensLogits = tokenLogitsLeftToDecode.slice(0, tokensToDecode.length);
+            const tokensLogits = tokenLogitsLeftToDecode.splice(0, tokensToDecode.length);
 
             const generatedLogits = await this._context._decodeTokens({
                 sequenceId: this._sequenceId,

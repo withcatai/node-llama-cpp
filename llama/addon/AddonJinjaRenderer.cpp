@@ -21,7 +21,10 @@ namespace {
     struct InputConverter {
         std::string errorPath;
 
-        jinja::value convert(const Napi::Value& value) {
+        jinja::value convert(const Napi::Value& value, size_t depth = 0) {
+            if (depth > 256) {
+                throw std::invalid_argument("Template input is too deeply nested or contains a cycle");
+            }
             if (value.IsUndefined()) {
                 return jinja::mk_val<jinja::value_undefined>();
             } else if (value.IsNull()) {
@@ -55,7 +58,7 @@ namespace {
                 for (uint32_t i = 0; i < length; i++) {
                     Napi::HandleScope scope(value.Env());
                     try {
-                        converted->push_back(convert(array.Get(i)));
+                        converted->push_back(convert(array.Get(i), depth + 1));
                     } catch (...) {
                         errorPath.insert(0, "[" + std::to_string(i) + "]");
                         throw;
@@ -74,7 +77,7 @@ namespace {
                     const auto key = keys.Get(i).As<Napi::String>();
                     const auto name = key.Utf8Value();
                     try {
-                        converted->insert(name, convert(object.Get(key)));
+                        converted->insert(name, convert(object.Get(key), depth + 1));
                     } catch (...) {
                         errorPath.insert(0, "[\"" + name + "\"]");
                         throw;
