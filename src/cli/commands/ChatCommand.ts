@@ -85,6 +85,7 @@ type ChatCommand = {
     timing: boolean,
     mmap?: boolean,
     useDirectIo: boolean,
+    lazyMode?: "auto" | boolean,
     printTimings: boolean
 };
 
@@ -404,6 +405,24 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 default: false,
                 description: "Use Direct I/O usage when available"
             })
+            .option("lazyMode", {
+                type: "string",
+                alias: ["lazy"],
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: ["auto", true, false] as const as string[],
+                coerce: (value) => {
+                    if (value === "false")
+                        return false;
+                    else if (value === "true")
+                        return true;
+                    else if (value === "auto")
+                        return "auto";
+
+                    return value;
+                },
+                description: "Lazily read tensors from the file on demand when they are needed, rather than loading all tensors upfront. Only works when using mmap"
+            })
             .option("printTimings", {
                 alias: "pt",
                 type: "boolean",
@@ -419,7 +438,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
         repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
         dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory,
         environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo,
-        printTimings
+        lazyMode, printTimings
     }) {
         try {
             await RunChat({
@@ -429,7 +448,7 @@ export const ChatCommand: CommandModule<object, ChatCommand> = {
                 gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine, repeatFrequencyPenalty, repeatPresencePenalty,
                 dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength, dryRepeatPenaltyLastTokens,
                 maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel, tokenPredictionModelContextSize,
-                debug, numa, meter, timing, mmap, useDirectIo, printTimings
+                debug, numa, meter, timing, mmap, useDirectIo, lazyMode, printTimings
             });
         } catch (err) {
             await new Promise((accept) => setTimeout(accept, 0)); // wait for logs to finish printing
@@ -447,7 +466,7 @@ async function RunChat({
     threads, temperature, minP, topK, topP, seed, xtc, gpuLayers, lastTokensRepeatPenalty, repeatPenalty, penalizeRepeatingNewLine,
     repeatFrequencyPenalty, repeatPresencePenalty, dryRepeatPenaltyStrength, dryRepeatPenaltyBase, dryRepeatPenaltyAllowedLength,
     dryRepeatPenaltyLastTokens, maxTokens, reasoningBudget, noHistory, environmentFunctions, tokenPredictionDraftModel,
-    tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, printTimings
+    tokenPredictionModelContextSize, debug, numa, meter, timing, mmap, useDirectIo, lazyMode, printTimings
 }: ChatCommand) {
     if (contextSize === -1) contextSize = undefined;
     if (gpuLayers === -1) gpuLayers = undefined;
@@ -548,6 +567,7 @@ async function RunChat({
                 defaultContextSwaFullCache: swaFullCache,
                 useMmap,
                 useDirectIo,
+                lazyMode,
                 ignoreMemorySafetyChecks: gpuLayers != null,
                 onLoadProgress(loadProgress: number) {
                     progressUpdater.setProgress(loadProgress);
@@ -585,6 +605,7 @@ async function RunChat({
                     defaultContextSwaFullCache: swaFullCache,
                     useMmap,
                     useDirectIo,
+                    lazyMode,
                     onLoadProgress(loadProgress: number) {
                         progressUpdater.setProgress(loadProgress);
                     },
@@ -691,6 +712,7 @@ async function RunChat({
         draftContext,
         useMmap,
         useDirectIo,
+        lazyMode,
         printBos: true,
         printEos: true,
         logBatchSize,

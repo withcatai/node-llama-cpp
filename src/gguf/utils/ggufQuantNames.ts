@@ -44,6 +44,7 @@ export const ggufQuantNames = new Map<string, GgufFileType>([
 ]);
 export const ggufFileQuantNamesSet = new Set([
     ...ggufQuantNames.keys(),
+    "MXFP4",
     "Q2_K_XL",
     "Q3_K_XL",
     "Q4_K_XL",

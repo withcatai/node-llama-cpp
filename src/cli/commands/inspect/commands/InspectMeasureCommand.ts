@@ -48,6 +48,7 @@ type InspectMeasureCommand = {
     memory: "vram" | "ram" | "all",
     mmap?: boolean,
     useDirectIo: boolean,
+    lazyMode?: "auto" | boolean,
     printHeaderBeforeEachLayer?: boolean,
     evaluateText?: string,
     repeatEvaluateText?: number
@@ -186,6 +187,24 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
                 default: false,
                 description: "Use Direct I/O usage when available"
             })
+            .option("lazyMode", {
+                type: "string",
+                alias: ["lazy"],
+
+                // yargs types don't support passing `false` as a choice, although it is supported by yargs
+                choices: ["auto", true, false] as const as string[],
+                coerce: (value) => {
+                    if (value === "false")
+                        return false;
+                    else if (value === "true")
+                        return true;
+                    else if (value === "auto")
+                        return "auto";
+
+                    return value;
+                },
+                description: "Lazily read tensors from the file on demand when they are needed, rather than loading all tensors upfront. Only works when using mmap"
+            })
             .option("printHeaderBeforeEachLayer", {
                 alias: "ph",
                 type: "boolean",
@@ -207,8 +226,8 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
     async handler({
         modelPath: ggufPath, header: headerArg, gpu, minLayers, maxLayers, minContextSize, maxContextSize, flashAttention, embedding,
         kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram,
-        batchSize, measures = 10, memory: measureMemoryType, mmap, useDirectIo, printHeaderBeforeEachLayer = true, evaluateText,
-        repeatEvaluateText
+        batchSize, measures = 10, memory: measureMemoryType, mmap, useDirectIo, lazyMode, printHeaderBeforeEachLayer = true,
+        evaluateText, repeatEvaluateText
     }: InspectMeasureCommand) {
         if (maxLayers === -1) maxLayers = undefined;
         if (maxContextSize === -1) maxContextSize = undefined;
@@ -316,6 +335,7 @@ export const InspectMeasureCommand: CommandModule<object, InspectMeasureCommand>
             const done = await measureModel({
                 modelPath: resolvedGgufPath,
                 useMmap,
+                lazyMode,
                 useDirectIo,
                 gpu: gpu == null
                     ? undefined
@@ -630,13 +650,14 @@ const detectedFileName = path.basename(__filename);
 const expectedFileName = "InspectMeasureCommand";
 
 async function measureModel({
-    modelPath, useMmap, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers, minGpuLayers,
-    flashAttention, embedding, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, batchSize, evaluateText,
+    modelPath, useMmap, lazyMode, useDirectIo, gpu, tests, initialMaxContextSize, maxContextSize, minContextSize, maxGpuLayers,
+    minGpuLayers, flashAttention, embedding, kvCacheKeyType, kvCacheValueType, swaFullCache, maxRam, maxVram, batchSize, evaluateText,
     exitAfterMeasurement = false,
     onInfo
 }: {
     modelPath: string,
     useMmap?: "auto" | boolean,
+    lazyMode?: "auto" | boolean,
     useDirectIo?: boolean,
     gpu?: BuildGpu | "auto",
     tests: number,
@@ -670,6 +691,7 @@ async function measureModel({
             modelRamUsage: number,
             contextSize?: number,
             useMmap: boolean,
+            lazyMode: "auto" | boolean,
             contextVramUsage?: number,
             contextRamUsage?: number,
             contextStateSize?: number,
@@ -754,6 +776,7 @@ async function measureModel({
                         type: "start",
                         modelPath,
                         useMmap,
+                        lazyMode,
                         useDirectIo,
                         tests,
                         initialMaxContextSize,
@@ -806,6 +829,7 @@ async function measureModel({
                             modelRamUsage: message.modelRamUsage,
                             contextSize: message.contextSize,
                             useMmap: message.useMmap,
+                            lazyMode: message.lazyMode,
                             contextVramUsage: message.contextVramUsage,
                             contextRamUsage: message.contextRamUsage,
                             contextStateSize: message.contextStateSize,
@@ -945,6 +969,7 @@ async function runTestWorkerLogic() {
                         ? context.contextSize
                         : context._llamaContext.contextSize,
                     useMmap: model.useMmap,
+                    lazyMode: model.lazyMode,
                     contextVramUsage: postContextVramUsage - preContextVramUsage,
                     contextRamUsage: postContextRamUsage - preContextRamUsage,
                     contextStateSize: context instanceof LlamaContext
@@ -984,10 +1009,11 @@ async function runTestWorkerLogic() {
     }
 
     async function testWithGpuLayers({
-        modelPath, useMmap, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention, embedding,
-        kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, isFirstLoad
+        modelPath, useMmap, lazyMode, useDirectIo, gpuLayers, tests, startContextSize, maxContextSize, minContextSize, flashAttention,
+        embedding, kvCacheKeyType, kvCacheValueType, swaFullCache, batchSize, evaluateText, exitAfterMeasurement = false, isFirstLoad
     }: {
-        modelPath: string, useMmap?: "auto" | boolean, useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
+        modelPath: string, useMmap?: "auto" | boolean, lazyMode?: "auto" | boolean,
+        useDirectIo?: boolean, gpuLayers: number, tests: number, startContextSize?: number,
         maxContextSize?: number, minContextSize?: number, flashAttention?: boolean, embedding?: boolean,
         kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType, swaFullCache?: boolean, batchSize?: number,
         evaluateText?: string, exitAfterMeasurement?: boolean,
@@ -1003,6 +1029,7 @@ async function runTestWorkerLogic() {
                     model = await llama.loadModel({
                         modelPath,
                         useMmap,
+                        lazyMode,
                         useDirectIo,
                         gpuLayers,
                         defaultContextFlashAttention: flashAttention,
@@ -1030,6 +1057,7 @@ async function runTestWorkerLogic() {
                 type: "stats",
                 gpuLayers: model.gpuLayers,
                 useMmap: model.useMmap,
+                lazyMode: model.lazyMode,
                 modelVramUsage: postModelVramUsage - preModelVramUsage,
                 modelRamUsage: postModelRamUsage - preModelRamUsage,
                 totalVramUsage: postModelVramUsage,
@@ -1092,6 +1120,7 @@ async function runTestWorkerLogic() {
                 const measurementsDone = await testWithGpuLayers({
                     modelPath: message.modelPath,
                     useMmap: message.useMmap,
+                    lazyMode: message.lazyMode,
                     useDirectIo: message.useDirectIo,
                     gpuLayers,
                     tests: message.tests,
@@ -1194,6 +1223,7 @@ type ParentToChildMessage = {
     type: "start",
     modelPath: string,
     useMmap?: "auto" | boolean,
+    lazyMode?: "auto" | boolean,
     useDirectIo?: boolean,
     tests: number,
     maxGpuLayers: number,
@@ -1224,6 +1254,7 @@ type ChildToParentMessage = {
     modelRamUsage: number,
     contextSize?: number,
     useMmap: boolean,
+    lazyMode: "auto" | boolean,
     contextVramUsage?: number,
     contextRamUsage?: number,
     contextStateSize?: number,

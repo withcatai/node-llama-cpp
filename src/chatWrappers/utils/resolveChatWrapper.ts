@@ -8,7 +8,7 @@ import {FunctionaryChatWrapper} from "../FunctionaryChatWrapper.js";
 import {AlpacaChatWrapper} from "../AlpacaChatWrapper.js";
 import {GemmaChatWrapper} from "../GemmaChatWrapper.js";
 import {Gemma4ChatWrapper} from "../Gemma4ChatWrapper.js";
-import {JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../generic/JinjaTemplateChatWrapper.js";
+import {CachedJinjaEngine, JinjaTemplateChatWrapper, JinjaTemplateChatWrapperOptions} from "../generic/JinjaTemplateChatWrapper.js";
 import {TemplateChatWrapper} from "../generic/TemplateChatWrapper.js";
 import {getConsoleLogPrefix} from "../../utils/getConsoleLogPrefix.js";
 import {Llama3_1ChatWrapper} from "../Llama3_1ChatWrapper.js";
@@ -26,6 +26,7 @@ import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {isJinjaTemplateEquivalentToSpecializedChatWrapper} from "./isJinjaTemplateEquivalentToSpecializedChatWrapper.js";
 import {getModelLinageNames} from "./getModelLinageNames.js";
 import type {GgufFileInfo} from "../../gguf/types/GgufFileInfoTypes.js";
+import type {Llama} from "../../bindings/Llama.js";
 
 
 export const specializedChatWrapperTypeNames = Object.freeze([
@@ -115,7 +116,10 @@ export type ResolveChatWrapperOptions = {
      *
      * Defaults to `false`.
      */
-    noJinja?: boolean
+    noJinja?: boolean,
+
+    /** Optional Llama instance to optimize some internal operations */
+    llama?: Llama
 };
 
 export type ResolveChatWrapperWithModelOptions = {
@@ -208,7 +212,8 @@ export function resolveChatWrapper(
             architecture: options.fileInfo?.metadata?.general?.architecture,
             filename: options.filename,
             fileInfo: options.fileInfo,
-            tokenizer: options.tokenizer
+            tokenizer: options.tokenizer,
+            llama: options._llama
         }) ?? new GeneralChatWrapper();
 
     const {
@@ -221,7 +226,8 @@ export function resolveChatWrapper(
         customWrapperSettings,
         warningLogs = true,
         fallbackToOtherWrappersOnJinjaError = true,
-        noJinja = false
+        noJinja = false,
+        llama
     } = options;
 
     const architecture = archOption ?? fileInfo?.metadata?.general?.architecture;
@@ -287,10 +293,15 @@ export function resolveChatWrapper(
     const modelJinjaTemplate = customWrapperSettings?.jinjaTemplate?.template ?? fileInfo?.metadata?.tokenizer?.chat_template;
 
     if (modelJinjaTemplate != null && modelJinjaTemplate.trim() !== "") {
+        const cachedJinjaEngine = CachedJinjaEngine._create(llama);
         const jinjaTemplateChatWrapperOptions: JinjaTemplateChatWrapperOptions = {
             tokenizer,
             ...(customWrapperSettings?.jinjaTemplate ?? {}),
-            template: modelJinjaTemplate
+            template: modelJinjaTemplate,
+            _cachedJinjaEngine: cachedJinjaEngine,
+            _templateCacheKeys: tokenizer == null
+                ? [options]
+                : [tokenizer, options]
         };
 
         const chatWrapperNamesToCheck = orderChatWrapperNamesByAssumedCompatibilityWithModel(

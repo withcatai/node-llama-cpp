@@ -36,9 +36,9 @@ Napi::Value getSwapInfo(const Napi::CallbackInfo& info) {
     struct sysinfo sysInfo;
 
     if (sysinfo(&sysInfo) == 0) {
-        totalSwap = sysInfo.totalswap;
-        freeSwap = sysInfo.freeswap;
-        maxSize = sysInfo.totalswap;
+        totalSwap = uint64_t(sysInfo.totalswap) * sysInfo.mem_unit;
+        freeSwap = uint64_t(sysInfo.freeswap) * sysInfo.mem_unit;
+        maxSize = totalSwap;
     } else {
         addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, std::string("Failed to get swap info").c_str(), nullptr);
     }
@@ -52,7 +52,7 @@ Napi::Value getSwapInfo(const Napi::CallbackInfo& info) {
         if (GetPerformanceInfo(&perfInfo, sizeof(perfInfo))) {
             totalSwap = memInfo.ullTotalPageFile;
             freeSwap = memInfo.ullAvailPageFile;
-            maxSize = perfInfo.CommitLimit * perfInfo.PageSize;
+            maxSize = uint64_t(perfInfo.CommitLimit) * perfInfo.PageSize;
         } else {
             addonLlamaCppLogCallback(GGML_LOG_LEVEL_ERROR, std::string("Failed to get max pagefile size").c_str(), nullptr);
         }

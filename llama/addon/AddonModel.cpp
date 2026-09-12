@@ -1,4 +1,6 @@
 #include <sstream>
+#include <cmath>
+#include <limits>
 #include "addonGlobals.h"
 #include "globals/addonLog.h"
 #include "globals/addonProgress.h"
@@ -69,7 +71,7 @@ static bool llamaModelParamsProgressCallback(float progress, void * user_data) {
         }
     }
 
-    return !(addonModel->abortModelLoad);
+    return !addonModel->abortModelLoad.load(std::memory_order_relaxed);
 }
 
 struct ModelEstimatorTensorAccessState {
@@ -87,11 +89,13 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
     public:
         AddonModel* model;
         AddonGgufMetadata* ggufMetadata = nullptr;
+        std::shared_ptr<gguf_context> sourceMetadata;
 
         AddonModelLoadModelWorker(const Napi::Env& env, AddonModel* model, AddonGgufMetadata* ggufMetadata)
             : Napi::AsyncWorker(env, "AddonModelLoadModelWorker"),
               model(model),
               ggufMetadata(ggufMetadata),
+              sourceMetadata(ggufMetadata == nullptr ? nullptr : ggufMetadata->ggufMetadata),
               deferred(Napi::Promise::Deferred::New(env)) {
             model->Ref();
             if (ggufMetadata != nullptr) {
@@ -119,13 +123,13 @@ class AddonModelLoadModelWorker : public Napi::AsyncWorker {
                 } else {
                     if (!model->model_params.no_alloc) {
                         throw std::runtime_error("Loading a model from source buffers requires no_alloc=true");
-                    } else if (ggufMetadata->disposed || ggufMetadata->ggufMetadata.get() == nullptr) {
+                    } else if (sourceMetadata == nullptr) {
                         throw std::runtime_error("GGUF metadata is disposed");
                     }
 
                     ModelEstimatorTensorAccessState tensorAccessState;
                     model->model = llama_model_init_from_user(
-                        ggufMetadata->ggufMetadata.get(),
+                        sourceMetadata.get(),
                         markUnexpectedTensorDataAccess,
                         &tensorAccessState,
                         model->model_params
@@ -217,6 +221,7 @@ class AddonModelUnloadModelWorker : public Napi::AsyncWorker {
 class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
     public:
         AddonModelLora* modelLora;
+        llama_adapter_lora* loraAdapter = nullptr;
 
         AddonModelLoadLoraWorker(
             const Napi::Env& env,
@@ -229,6 +234,9 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
             modelLora->Ref();
         }
         ~AddonModelLoadLoraWorker() {
+            if (loraAdapter != nullptr) {
+                llama_adapter_lora_free(loraAdapter);
+            }
             modelLora->model->Unref();
             modelLora->Unref();
         }
@@ -242,7 +250,7 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                const auto loraAdapter = llama_adapter_lora_init(modelLora->model->model, modelLora->loraFilePath.c_str());
+                loraAdapter = llama_adapter_lora_init(modelLora->model->model, modelLora->loraFilePath.c_str());
 
                 if (loraAdapter == nullptr) {
                     SetError(
@@ -253,8 +261,6 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
                     return;
                 }
 
-                modelLora->lora_adapter = loraAdapter;
-
                 bool hasModelData = false;
                 {
                     std::lock_guard<std::mutex> modelLock(modelLora->model->disposeMutex);
@@ -264,8 +270,6 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
                 }
 
                 if (!hasModelData) {
-                    llama_adapter_lora_free(modelLora->lora_adapter);
-                    modelLora->lora_adapter = nullptr;
                     SetError("Model data is not initialized");
                 }
             } catch (const std::exception& e) {
@@ -282,13 +286,14 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
                 std::lock_guard<std::mutex> loraLock(modelLora->disposeMutex);
 
                 shouldReject = modelLora->disposed
+                    || modelLora->memoryDisposed
                     || modelLora->model->disposed
                     || modelLora->model->memoryDisposed
                     || modelLora->model->data == nullptr;
 
                 if (!shouldReject) {
-                    modelLora->model->Ref();
-                    modelLora->hasModelRef = true;
+                    modelLora->lora_adapter = loraAdapter;
+                    loraAdapter = nullptr;
                     modelLora->Ref();
                     modelLora->hasSelfRef = true;
                     modelLora->model->data->addLora(modelLora);
@@ -296,7 +301,7 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
             }
 
             if (shouldReject) {
-                modelLora->disposeMemory();
+                modelLora->disposeMT();
                 deferred.Reject(Napi::Error::New(Env(), "Model or LoRA was disposed before LoRA load completed").Value());
                 return;
             }
@@ -304,6 +309,7 @@ class AddonModelLoadLoraWorker : public Napi::AsyncWorker {
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {
+            modelLora->disposeMT();
             deferred.Reject(err.Value());
         }
 };
@@ -312,6 +318,7 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
     Napi::ObjectWrap<AddonModel>(info) {
     data = new AddonModelData();
     model_params = llama_model_default_params();
+    model_params.lazy_mode = LLAMA_LAZY_MODE_OFF;
 
     modelPath = info[0].As<Napi::String>().Utf8Value();
 
@@ -349,6 +356,94 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
             model_params.no_alloc = options.Get("noAlloc").As<Napi::Boolean>().Value();
         }
 
+        if (options.Has("lazyMode")) {
+            auto lazyMode = options.Get("lazyMode");
+
+            if (lazyMode.IsString() && (lazyMode.As<Napi::String>().Utf8Value() == "auto")) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_AUTO;
+            } else if (lazyMode.IsBoolean() && lazyMode.As<Napi::Boolean>().Value()) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_ON;
+            } else if (lazyMode.IsBoolean() && !lazyMode.As<Napi::Boolean>().Value()) {
+                model_params.lazy_mode = LLAMA_LAZY_MODE_OFF;
+            }
+        }
+
+        if (options.Has("hasLoadAbortSignal")) {
+            hasLoadAbortSignal = options.Get("hasLoadAbortSignal").As<Napi::Boolean>().Value();
+        }
+
+        if (options.Has("overridesList")) {
+            Napi::Array overridesList = options.Get("overridesList").As<Napi::Array>();
+            kv_overrides.reserve(overridesList.Length());
+
+            for (uint32_t i = 0; i < overridesList.Length(); i++) {
+                Napi::Array overrideItem = overridesList.Get(i).As<Napi::Array>();
+                auto key = overrideItem.Get((uint32_t)0).As<Napi::String>().Utf8Value();
+                auto value = overrideItem.Get((uint32_t)1);
+
+                if (key.length() > 127) {
+                    continue;
+                }
+
+                llama_model_kv_override kvo{};
+                std::strncpy(kvo.key, key.c_str(), key.length());
+                kvo.key[key.length()] = 0;
+
+                if (value.IsString()) {
+                    auto valueString = value.As<Napi::String>().Utf8Value();
+                    if (valueString.length() > 127) {
+                        continue;
+                    }
+
+                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_STR;
+                    std::strncpy(kvo.val_str, valueString.c_str(), valueString.length());
+                    kvo.val_str[valueString.length()] = 0;
+
+                    fputs(std::string("Override: " + key + " = " + valueString + "\n").c_str(), stdout);
+                    fflush(stdout);
+                } else if (value.IsBigInt()) {
+                    bool lossless;
+                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_INT;
+                    kvo.val_i64 = value.As<Napi::BigInt>().Int64Value(&lossless);
+                    if (!lossless) {
+                        throw Napi::RangeError::New(info.Env(), "Metadata integer override is outside the int64 range");
+                    }
+                } else if (value.IsNumber()) {
+                    auto numberType = overrideItem.Get((uint32_t)2).As<Napi::Number>().Int32Value();
+                    const double number = value.As<Napi::Number>().DoubleValue();
+                    if (!std::isfinite(number)) {
+                        throw Napi::RangeError::New(info.Env(), "Metadata numeric override must be finite");
+                    }
+                    if (numberType == 0) {
+                        constexpr double minInteger = static_cast<double>(std::numeric_limits<int64_t>::min());
+                        constexpr double maxIntegerExclusive = -minInteger;
+                        if (std::floor(number) != number || number < minInteger || number >= maxIntegerExclusive) {
+                            throw Napi::RangeError::New(info.Env(), "Metadata integer override is outside the int64 range or is not an integer");
+                        }
+                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_INT;
+                        kvo.val_i64 = static_cast<int64_t>(number);
+                    } else {
+                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_FLOAT;
+                        kvo.val_f64 = number;
+                    }
+                } else if (value.IsBoolean()) {
+                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_BOOL;
+                    kvo.val_bool = value.As<Napi::Boolean>().Value();
+                } else {
+                    throw Napi::TypeError::New(info.Env(), "Unsupported metadata override value");
+                }
+
+                kv_overrides.emplace_back(std::move(kvo));
+            }
+
+            if (!kv_overrides.empty()) {
+                kv_overrides.emplace_back();
+                kv_overrides.back().key[0] = 0;
+            }
+
+            model_params.kv_overrides = kv_overrides.data();
+        }
+
         if (options.Has("onLoadProgress")) {
             auto onLoadProgressJSCallback = options.Get("onLoadProgress").As<Napi::Function>();
             if (onLoadProgressJSCallback.IsFunction()) {
@@ -371,68 +466,8 @@ AddonModel::AddonModel(const Napi::CallbackInfo& info) :
             }
         }
 
-        if (options.Has("hasLoadAbortSignal")) {
-            hasLoadAbortSignal = options.Get("hasLoadAbortSignal").As<Napi::Boolean>().Value();
-        }
-
-        if (options.Has("overridesList")) {
-            Napi::Array overridesList = options.Get("overridesList").As<Napi::Array>();
-            kv_overrides.reserve(overridesList.Length());
-
-            for (uint32_t i = 0; i < overridesList.Length(); i++) {
-                Napi::Array overrideItem = overridesList.Get(i).As<Napi::Array>();
-                auto key = overrideItem.Get((uint32_t)0).As<Napi::String>().Utf8Value();
-                auto value = overrideItem.Get((uint32_t)1);
-
-                if (key.length() > 127) {
-                    continue;
-                }
-
-                llama_model_kv_override kvo;
-                std::strncpy(kvo.key, key.c_str(), key.length());
-                kvo.key[key.length()] = 0;
-
-                if (value.IsString()) {
-                    auto valueString = value.As<Napi::String>().Utf8Value();
-                    if (valueString.length() > 127) {
-                        continue;
-                    }
-
-                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_STR;
-                    std::strncpy(kvo.val_str, valueString.c_str(), valueString.length());
-                    kvo.val_str[valueString.length()] = 0;
-
-                    fputs(std::string("Override: " + key + " = " + valueString + "\n").c_str(), stdout);
-                    fflush(stdout);
-                } else if (value.IsNumber() || value.IsBigInt()) {
-                    auto numberType = overrideItem.Get((uint32_t)2).As<Napi::Number>().Int32Value();
-                    if (numberType == 0) {
-                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_INT;
-                        kvo.val_i64 = value.As<Napi::Number>().Int64Value();
-                    } else {
-                        kvo.tag = LLAMA_KV_OVERRIDE_TYPE_FLOAT;
-                        kvo.val_f64 = value.As<Napi::Number>().DoubleValue();
-                    }
-
-                    continue;
-                } else if (value.IsBoolean()) {
-                    kvo.tag = LLAMA_KV_OVERRIDE_TYPE_BOOL;
-                    kvo.val_bool = value.As<Napi::Boolean>().Value();
-                }
-
-                kv_overrides.emplace_back(std::move(kvo));
-            }
-
-            if (!kv_overrides.empty()) {
-                kv_overrides.emplace_back();
-                kv_overrides.back().key[0] = 0;
-            }
-
-            model_params.kv_overrides = kv_overrides.data();
-        }
-
         if (onLoadProgressEventCallbackSet || hasLoadAbortSignal) {
-            model_params.progress_callback_user_data = &(*this);
+            model_params.progress_callback_user_data = this;
             model_params.progress_callback = llamaModelParamsProgressCallback;
         }
     }
@@ -554,18 +589,21 @@ Napi::Value AddonModel::Init(const Napi::CallbackInfo& info) {
     return worker->GetPromise();
 }
 Napi::Value AddonModel::LoadLora(const Napi::CallbackInfo& info) {
-    if (disposed) {
-        Napi::Error::New(info.Env(), "Model is disposed").ThrowAsJavaScriptException();
+    if (disposed || !modelLoaded) {
+        Napi::Error::New(info.Env(), "Model is disposed or not loaded").ThrowAsJavaScriptException();
         return info.Env().Undefined();
     }
 
     AddonModelLora* modelLora = Napi::ObjectWrap<AddonModelLora>::Unwrap(info[0].As<Napi::Object>());
+    if (modelLora->model != this || modelLora->disposed || modelLora->lora_adapter != nullptr) {
+        throw Napi::Error::New(info.Env(), "LoRA belongs to another model, is disposed, or is already loaded");
+    }
     AddonModelLoadLoraWorker* worker = new AddonModelLoadLoraWorker(this->Env(), modelLora);
     worker->Queue();
     return worker->GetPromise();
 }
 Napi::Value AddonModel::AbortActiveModelLoad(const Napi::CallbackInfo& info) {
-    abortModelLoad = true;
+    abortModelLoad.store(true, std::memory_order_relaxed);
     return info.Env().Undefined();
 }
 Napi::Value AddonModel::Tokenize(const Napi::CallbackInfo& info) {
@@ -593,7 +631,7 @@ Napi::Value AddonModel::Detokenize(const Napi::CallbackInfo& info) {
     }
 
     Napi::Uint32Array tokens = info[0].As<Napi::Uint32Array>();
-    bool decodeSpecialTokens = info.Length() > 0
+    bool decodeSpecialTokens = info.Length() > 1 && !info[1].IsUndefined()
         ? info[1].As<Napi::Boolean>().Value()
         : false;
 
@@ -627,7 +665,7 @@ Napi::Value AddonModel::GetEmbeddingVectorSize(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    return Napi::Number::From(info.Env(), llama_model_n_embd(model));
+    return Napi::Number::From(info.Env(), llama_model_n_embd_out(model));
 }
 
 Napi::Value AddonModel::GetTotalSize(const Napi::CallbackInfo& info) {
@@ -654,10 +692,20 @@ Napi::Value AddonModel::GetModelDescription(const Napi::CallbackInfo& info) {
         return info.Env().Undefined();
     }
 
-    char model_desc[128];
-    int actual_length = llama_model_desc(model, model_desc, sizeof(model_desc));
+    std::vector<char> description(128);
+    const int32_t length = llama_model_desc(model, description.data(), description.size());
+    if (length < 0) {
+        throw Napi::Error::New(info.Env(), "Failed to get model description");
+    }
 
-    return Napi::String::New(info.Env(), model_desc, actual_length);
+    if (static_cast<size_t>(length) >= description.size()) {
+        description.resize(static_cast<size_t>(length) + 1);
+        if (llama_model_desc(model, description.data(), description.size()) != length) {
+            throw Napi::Error::New(info.Env(), "Failed to get complete model description");
+        }
+    }
+
+    return Napi::String::New(info.Env(), description.data(), length);
 }
 
 Napi::Value AddonModel::GetMemoryBreakdown(const Napi::CallbackInfo& info) {
@@ -825,17 +873,29 @@ Napi::Value AddonModel::GetVocabularyType(const Napi::CallbackInfo& info) {
     return Napi::Number::From(info.Env(), int32_t(vocabularyType));
 }
 Napi::Value AddonModel::ShouldPrependBosToken(const Napi::CallbackInfo& info) {
+    if (disposed || !modelLoaded) {
+        throw Napi::Error::New(info.Env(), "Model is disposed or not loaded");
+    }
+
     const bool addBos = llama_vocab_get_add_bos(vocab);
 
     return Napi::Boolean::New(info.Env(), addBos);
 }
 Napi::Value AddonModel::ShouldAppendEosToken(const Napi::CallbackInfo& info) {
+    if (disposed || !modelLoaded) {
+        throw Napi::Error::New(info.Env(), "Model is disposed or not loaded");
+    }
+
     const bool addEos = llama_vocab_get_add_eos(vocab);
 
     return Napi::Boolean::New(info.Env(), addEos);
 }
 
 Napi::Value AddonModel::GetModelSize(const Napi::CallbackInfo& info) {
+    if (disposed || !modelLoaded) {
+        throw Napi::Error::New(info.Env(), "Model is disposed or not loaded");
+    }
+
     return Napi::Number::From(info.Env(), llama_model_size(model));
 }
 

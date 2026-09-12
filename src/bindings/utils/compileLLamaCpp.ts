@@ -117,7 +117,7 @@ export async function compileLlamaCpp(buildOptions: BuildOptions, compileOptions
                 )
                     cmakeToolchainOptions.set("GGML_VULKAN_SHADERS_GEN_TOOLCHAIN", toolchainFile);
 
-                if (buildOptions.gpu === "metal" && process.platform === "darwin" && !cmakeCustomOptions.has("GGML_METAL"))
+                if (buildOptions.gpu === "metal" && platform === "mac" && !cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "1");
                 else if (!cmakeCustomOptions.has("GGML_METAL"))
                     cmakeCustomOptions.set("GGML_METAL", "OFF");

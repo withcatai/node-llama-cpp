@@ -291,7 +291,7 @@ static AddonSystemMemoryInfo retrieveSystemMemoryInfo() {
     {
         struct sysinfo linuxSystemInfo;
         if (sysinfo(&linuxSystemInfo) == 0) {
-            if (systemMemoryInfo.total.has_value()) {
+            if (!systemMemoryInfo.total.has_value()) {
                 systemMemoryInfo.total = multiplyUint64(uint64_t(linuxSystemInfo.totalram), uint64_t(linuxSystemInfo.mem_unit));
             }
 

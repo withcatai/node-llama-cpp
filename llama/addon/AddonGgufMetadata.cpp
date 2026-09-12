@@ -43,7 +43,7 @@ static std::string getSplitPath(const std::string& splitPrefix, const uint16_t s
 
 AddonGgufMetadata::AddonGgufMetadata(const Napi::CallbackInfo& info)
     : Napi::ObjectWrap<AddonGgufMetadata>(info),
-      ggufMetadata(gguf_init_empty()) {
+      ggufMetadata(gguf_init_empty(), gguf_free) {
     if (ggufMetadata.get() == nullptr) {
         throw std::runtime_error("Failed to create an empty GGUF context");
     }
@@ -71,6 +71,7 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
         AddonGgufMetadata* addonGgufMetadata;
         std::vector<AddonGgufMetadataSource> sources;
         std::vector<Napi::Reference<Napi::Buffer<uint8_t>>> bufferRefs;
+        gguf_context_ptr ggufMetadata{gguf_init_empty()};
 
         AddonGgufMetadataInitWorker(const Napi::Env& env, AddonGgufMetadata* addonGgufMetadata)
             : Napi::AsyncWorker(env, "AddonGgufMetadataInitWorker"),
@@ -91,8 +92,6 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
-                gguf_context_ptr& ggufMetadata = addonGgufMetadata->ggufMetadata;
-
                 auto loadMetadataSource = [](const AddonGgufMetadataSource& itemSource, ggml_context_ptr& tensorContextGuard) {
                     struct ggml_context* tensorContext = nullptr;
                     struct gguf_init_params ggufParams = {
@@ -214,6 +213,11 @@ class AddonGgufMetadataInitWorker : public Napi::AsyncWorker {
             }
         }
         void OnOK() {
+            if (addonGgufMetadata->disposed) {
+                deferred.Reject(Napi::Error::New(Env(), "Metadata was disposed during initialization").Value());
+                return;
+            }
+            addonGgufMetadata->ggufMetadata = std::move(ggufMetadata);
             deferred.Resolve(Env().Undefined());
         }
         void OnError(const Napi::Error& err) {

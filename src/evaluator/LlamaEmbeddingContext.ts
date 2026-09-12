@@ -78,23 +78,18 @@ export class LlamaEmbeddingContext {
     public async getEmbeddingFor(input: Token[] | string | LlamaText) {
         const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenizer, undefined, true);
 
-        if (resolvedInput.length > this._llamaContext.contextSize)
-            throw new Error(
-                "Input is longer than the context size. " +
-                "Try to increase the context size or use another model that supports longer contexts."
-            );
-        else if (resolvedInput.length === 0)
+        if (resolvedInput.length === 0)
             return new LlamaEmbedding({
                 vector: []
             });
 
-        const beginningToken = resolveBeginningTokenToPrepend(this.model.vocabularyType, this.model.tokens);
-        if (beginningToken != null && resolvedInput[0] !== beginningToken)
-            resolvedInput.unshift(beginningToken);
+        this._prepareInput(resolvedInput);
 
-        const endToken = resolveEndTokenToAppend(this.model.vocabularyType, this.model.tokens);
-        if (endToken != null && resolvedInput.at(-1) !== endToken)
-            resolvedInput.push(endToken);
+        if (resolvedInput.length >= this._llamaContext.contextSize)
+            throw new Error(
+                "Input is longer than the usable context size. " +
+                "Try to increase the context size or use another model that supports longer contexts."
+            );
 
         return await withLock([this as LlamaEmbeddingContext, "evaluate"], async () => {
             await this._sequence.eraseContextTokenRanges([{
@@ -117,6 +112,14 @@ export class LlamaEmbeddingContext {
         });
     }
 
+    /** Calculate the evaluation tokens length for a given input so you can determine whether it fits in the context size */
+    public calculateInputLength(input: Token[] | string | LlamaText) {
+        const resolvedInput = tokenizeInput(input, this._llamaContext.model.tokenizer, undefined, true);
+        this._prepareInput(resolvedInput);
+
+        return resolvedInput.length;
+    }
+
     public async dispose() {
         await this._disposeAggregator.dispose();
     }
@@ -132,6 +135,17 @@ export class LlamaEmbeddingContext {
 
     public get model() {
         return this._llamaContext.model;
+    }
+
+    /** @internal */
+    private _prepareInput(resolvedInput: Token[]): void {
+        const beginningToken = resolveBeginningTokenToPrepend(this.model.vocabularyType, this.model.tokens);
+        if (beginningToken != null && resolvedInput[0] !== beginningToken)
+            resolvedInput.unshift(beginningToken);
+
+        const endToken = resolveEndTokenToAppend(this.model.vocabularyType, this.model.tokens);
+        if (endToken != null && resolvedInput.at(-1) !== endToken)
+            resolvedInput.push(endToken);
     }
 
     /** @internal */

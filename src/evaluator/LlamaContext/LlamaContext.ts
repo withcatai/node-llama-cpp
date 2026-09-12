@@ -293,6 +293,17 @@ export class LlamaContext {
         return this._totalSequences - this._nextGeneratedSequenceId + this._unusedSequenceIds.length;
     }
 
+    /** Assumed memory footprint of the context in bytes */
+    public get memoryUsage(): {
+        ram: number,
+        vram: number
+    } {
+        return {
+            ram: this._ramConsumptionMarking?.size ?? 0,
+            vram: this._vramConsumptionMarking?.size ?? 0
+        };
+    }
+
     /**
      * Before calling this method, make sure to call `sequencesLeft` to check if there are any sequences left.
      * When there are no sequences left, this method will throw an error.
@@ -2569,7 +2580,7 @@ export class LlamaContextSequence {
             dryRepeatPenaltyStrength: (dryRepeatPenalty?.strength == null || dryRepeatPenalty?.strength === 0)
                 ? undefined
                 : Math.max(0, dryRepeatPenalty?.strength),
-            dryRepeatPenaltyBase: dryRepeatPenalty?.base,
+            dryRepeatPenaltyBase: dryRepeatPenalty?.base ?? 1.75,
             dryRepeatPenaltyAllowedLength: Math.max(1, dryRepeatPenalty?.allowedLength ?? 2),
             dryRepeatPenaltyLastTokens: dryRepeatPenalty?.lastTokens == null
                 ? -1
@@ -2619,7 +2630,7 @@ export class LlamaContextSequence {
             }
 
             const tokensToDecode = tokensLeftToDecode.splice(0, freeSpace);
-            const tokensLogits = tokenLogitsLeftToDecode.slice(0, tokensToDecode.length);
+            const tokensLogits = tokenLogitsLeftToDecode.splice(0, tokensToDecode.length);
 
             const generatedLogits = await this._context._decodeTokens({
                 sequenceId: this._sequenceId,

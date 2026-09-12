@@ -399,6 +399,7 @@ export type GgufMetadataDefaultArchitectureType = {
     readonly pooling_type?: GgufMetadataArchitecturePoolingType,
     readonly logit_scale?: number,
     readonly token_shift_count?: number,
+    readonly nextn_predict_layers?: number,
 
     readonly attention?: {
         readonly head_count?: number,
