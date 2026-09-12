@@ -62,14 +62,14 @@ export type GbnfJsonBasicStringSchema = {
 
     /**
      * When using `minLength` and/or `maxLength`,
-     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
+     * ensure to inform the model as part of the prompt or `description` what your expectations are regarding the length of the string.
      * Not doing this may lead to hallucinations.
      */
     readonly minLength?: number,
 
     /**
      * When using `minLength` and/or `maxLength`,
-     * ensure to inform the model as part of the prompt what your expectations are regarding the length of the string.
+     * ensure to inform the model as part of the prompt or `description` what your expectations are regarding the length of the string.
      * Not doing this may lead to hallucinations.
      */
     readonly maxLength?: number,
@@ -108,7 +108,8 @@ export type GbnfJsonObjectSchema<
      * Make sure you define `additionalProperties` for this to have any effect.
      *
      * When using `minProperties` and/or `maxProperties`,
-     * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
+     * ensure to inform the model as part of the prompt or `description`
+     * what your expectations are regarding the number of keys in the object.
      * Not doing this may lead to hallucinations.
      */
     readonly minProperties?: number,
@@ -117,7 +118,8 @@ export type GbnfJsonObjectSchema<
      * Make sure you define `additionalProperties` for this to have any effect.
      *
      * When using `minProperties` and/or `maxProperties`,
-     * ensure to inform the model as part of the prompt what your expectations are regarding the number of keys in the object.
+     * ensure to inform the model as part of the prompt or `description`
+     * what your expectations are regarding the number of keys in the object.
      * Not doing this may lead to hallucinations.
      */
     readonly maxProperties?: number,
