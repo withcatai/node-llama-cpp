@@ -740,7 +740,7 @@ jobs:
       - release
     steps:
       - name: Approve documentation website deployment
-        uses: activescott/automate-environment-deployment-approval@v1.0.6
+        uses: activescott/automate-environment-deployment-approval@v2.1.0
         with:
           github_token: ${{ secrets.AUTO_APPROVAL_GITHUB_TOKEN }}
           environment_allow_list: "Documentation website"
@@ -791,6 +791,8 @@ jobs:
           NODE_LLAMA_CPP_SKIP_DOWNLOAD: true
         run: |
           npx --no vite-node ./scripts/scaffoldElectronExampleForCiBuild.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --packageFolderPath ./electron-app-example
+          npx --no vite-node ./scripts/waitForNpmRegistryToHaveModuleVersion.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --additionalWait 60 --timeoutMinutes 10
+
           cd electron-app-example
           npm install
 
