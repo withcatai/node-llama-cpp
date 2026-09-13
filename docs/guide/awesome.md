@@ -27,6 +27,9 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
 
 * [Manzoni](https://manzoni.app/) ([GitHub](https://github.com/gems-platforms/manzoni-app)) - a text editor running local LLMs
 
+* [Milo](https://milo.seemplifyai.com) ([GitHub](https://github.com/michaelegbo/milo)) - a speaking Three.js avatar with an optional local Node.js edition using node-llama-cpp for Qwen replies, alongside Kokoro speech and Whisper transcription
+  <br /><DataBadge title="Source available" content="PolyForm Noncommercial 1.0.0" href="https://github.com/michaelegbo/milo/blob/main/LICENSE"/>
+
 
 
 <br />
