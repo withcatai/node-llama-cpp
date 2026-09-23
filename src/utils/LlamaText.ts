@@ -570,10 +570,11 @@ export class SpecialToken {
     }
 
     public static getTokenToValueMap(tokenizer: Tokenizer): ReadonlyMap<Token | undefined, BuiltinSpecialTokenValue> {
+        // intentionally not offer NL token anymore as it shouldn't be considered a special token
         const supportedValues = [
-            "BOS", "EOS", "NL", "EOT", "SEP"
-        ] as const satisfies BuiltinSpecialTokenValue[];
-        void (0 as any as BuiltinSpecialTokenValue satisfies typeof supportedValues[number]);
+            "BOS", "EOS", "EOT", "SEP"
+        ] as const satisfies Exclude<BuiltinSpecialTokenValue, "NL">[];
+        void (0 as any as Exclude<BuiltinSpecialTokenValue, "NL"> satisfies typeof supportedValues[number]);
 
         const res = new Map<Token | undefined, BuiltinSpecialTokenValue>(
             supportedValues.map(
