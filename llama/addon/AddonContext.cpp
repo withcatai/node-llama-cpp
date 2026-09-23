@@ -344,7 +344,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             }
 
             if (returnLogits.enabled == ReturnLogits::WithFilter && returnLogits.includeSelected && new_token_id != LLAMA_TOKEN_NULL &&
-                std::find(returnLogits.filter.begin(), returnLogits.filter.end(), new_token_id) != returnLogits.filter.end()
+                std::find(returnLogits.filter.begin(), returnLogits.filter.end(), new_token_id) == returnLogits.filter.end()
             ) {
                 returnLogits.filter.emplace_back(new_token_id);
             }

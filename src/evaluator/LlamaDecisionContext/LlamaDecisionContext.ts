@@ -337,8 +337,8 @@ export class LlamaDecisionContext {
                 seqsToPreload.length = 0;
             });
 
-            if (seqsToPreload.length > 0)
-                await Promise.allSettled(
+            if (seqsToPreload.length > 0) {
+                const preloadResults = await Promise.allSettled(
                     seqsToPreload.map(async (seq) => {
                         const initialMeterSnapshot = seq.tokenMeter.getState();
                         using updateTokenUsageExitHandle = scopeExit(() => {
@@ -357,10 +357,17 @@ export class LlamaDecisionContext {
                         localSeqs.add(seq);
                     })
                 );
+                signal?.throwIfAborted();
+
+                for (const result of preloadResults) {
+                    if (result.status === "rejected")
+                        throw result.reason;
+                }
+            }
         }
 
         mainSeqLease.dispose();
-        await Promise.all(
+        const allSettledResults = await Promise.allSettled(
             entries.map(async ([questionId, input]) => {
                 using seqLease = await localQueue.acquire(signal);
                 const seq = seqLease.item;
@@ -427,6 +434,11 @@ export class LlamaDecisionContext {
                 decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
             })
         );
+
+        for (const result of allSettledResults) {
+            if (result.status === "rejected")
+                throw result.reason;
+        }
 
         // order the decisions according to the original entries
         const resultDecisions: {[key: string]: LlamaDecision<any>} = {};
