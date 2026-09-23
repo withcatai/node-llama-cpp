@@ -1,0 +1,476 @@
+import {
+    AbortablePromise, AsyncDisposeAggregator, AsyncQueue, DisposeAggregator, DisposedError, EventRelay, Retainer, scopeExit
+} from "lifecycle-utils";
+import {internalCheckpoints, LlamaContext, LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
+import {ControlledEvaluateInputItem, EvaluationPriority} from "../LlamaContext/types.js";
+import {prepareDecisionContextWindow} from "../LlamaChat/utils/prepareDecisionContextWindow.js";
+import {defaultContextShiftOptions} from "../LlamaChat/LlamaChat.js";
+import {ChatWrapper} from "../../ChatWrapper.js";
+import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
+import {TokenMeter} from "../TokenMeter.js";
+import {createQuestionInputs} from "./utils/createQuestionInputs.js";
+import {LlamaDecision, LlamaDecisions, LlamaQuestions} from "./types.js";
+import {createDecision} from "./utils/createDecision.js";
+import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
+import type {Token} from "../../types.js";
+
+export type LlamaDecisionContextOptions = {
+    /** `"auto"` is used by default */
+    chatWrapper?: "auto" | ChatWrapper,
+
+    /**
+     * The number of tokens the model can see at once.
+     * - **`"auto"`** - adapt to the current VRAM state and attempt to set the context size as high as possible up to the size
+     * the model was trained on.
+     * - **`number`** - set the context size to a specific number of tokens.
+     * If there's not enough VRAM, an error will be thrown.
+     * Use with caution.
+     * - **`{min?: number, max?: number}`** - adapt to the current VRAM state and attempt to set the context size as high as possible
+     * up to the size the model was trained on, but at least `min` and at most `max`.
+     *
+     * Defaults to `{max: 4096}`.
+     */
+    contextSize?: "auto" | number | {
+        min?: number,
+        max?: number
+    },
+
+    /** prompt processing batch size */
+    batchSize?: number,
+
+    /**
+     * The number of questions to support evaluating in parallel.
+     *
+     * Defaults to `4`.
+     */
+    parallelQuestions?: number,
+
+    /**
+     * number of threads to use to evaluate tokens.
+     * set to 0 to use the maximum threads supported by the current machine hardware
+     */
+    threads?: number,
+
+    /** An abort signal to abort the context creation */
+    createSignal?: AbortSignal,
+
+    /**
+     * Ignore insufficient memory errors and continue with the context creation.
+     * Can cause the process to crash if there's not enough VRAM for the new context.
+     *
+     * Defaults to `false`.
+     */
+    ignoreMemorySafetyChecks?: boolean
+};
+
+export type LlamaDecisionContextDecideOptions = {
+    signal?: AbortSignal,
+
+    /**
+     * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
+     */
+    evaluationPriority?: EvaluationPriority
+};
+
+export type LlamaDecisionContextDecideResponse<Questions extends LlamaQuestions> = {
+    decisions: LlamaDecisions<Questions>,
+    tokenUsage: {
+        input: number,
+        output: number
+    }
+};
+
+export class LlamaDecisionContext {
+    /** @internal */ private readonly _llamaContext: LlamaContext;
+    /** @internal */ private readonly _chatWrapper: ChatWrapper;
+    /** @internal */ private readonly _disposeAggregator = new AsyncDisposeAggregator();
+    /** @internal */ private readonly _seqQueue = new AsyncQueue<LlamaContextSequence>();
+    /** @internal */ private readonly _retainer = new Retainer();
+    /** @internal */ private _disposed: boolean = false;
+
+    public readonly onDispose = new EventRelay<void>();
+
+    private constructor({
+        _llamaContext,
+        _chatWrapper
+    }: {
+        _llamaContext: LlamaContext,
+        _chatWrapper: ChatWrapper
+    }) {
+        this._llamaContext = _llamaContext;
+        this._chatWrapper = _chatWrapper;
+
+        this._disposeAggregator.add(() => {
+            this._disposed = true;
+        });
+        this._disposeAggregator.add(
+            this._llamaContext.onDispose.createListener(() => {
+                void this._disposeAggregator.dispose();
+            })
+        );
+        this._disposeAggregator.add(this.onDispose.dispatchEvent);
+        this._disposeAggregator.add(async () => {
+            await this._retainer.acquireDrain();
+            await this._llamaContext.dispose();
+        });
+
+        while (_llamaContext.sequencesLeft > 0)
+            this._seqQueue.push(_llamaContext.getSequence());
+    }
+
+    public async dispose() {
+        if (this._disposed)
+            return;
+
+        this._disposed = true;
+
+        await this._disposeAggregator.dispose();
+    }
+
+    /** @hidden */
+    public [Symbol.asyncDispose]() {
+        return this.dispose();
+    }
+
+    public get disposed() {
+        return this._disposed;
+    }
+
+    public get model() {
+        return this._llamaContext.model;
+    }
+
+    public get contextSize(): number {
+        return this._llamaContext.contextSize;
+    }
+
+    public get batchSize(): number {
+        return this._llamaContext.batchSize;
+    }
+
+    public get flashAttention() {
+        return this._llamaContext.flashAttention;
+    }
+
+    /** Assumed memory footprint of the context in bytes */
+    public get memoryUsage() {
+        return this._llamaContext.memoryUsage;
+    }
+
+    public async decide<const Questions extends LlamaQuestions>(
+        document: string,
+        questions: Questions,
+        options: LlamaDecisionContextDecideOptions = {}
+    ): Promise<LlamaDecisions<Questions>> {
+        return (await this.decideWithMeta(document, questions, options)).decisions;
+    }
+
+    public async decideWithMeta<const Questions extends LlamaQuestions>(
+        document: string,
+        questions: Questions,
+        options: LlamaDecisionContextDecideOptions = {}
+    ): Promise<LlamaDecisionContextDecideResponse<Questions>> {
+        using retain = this._retainer.tryRetain(() => new DisposedError());
+        using disposeAggregator = new DisposeAggregator();
+
+        const {signal, evaluationPriority} = options;
+        if (signal != null) {
+            signal.addEventListener("abort", disposeAggregator.dispose);
+            disposeAggregator.add(() => signal.removeEventListener("abort", disposeAggregator.dispose));
+        }
+
+        const inputs = createQuestionInputs(questions, this.model);
+        const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
+        if (maxInputLength > this.contextSize)
+            throw new Error(
+                "The context size is too small to fit the provided questions and/or criteria. " +
+                "Increase the context size or reduce the length of the longest questions or criteria"
+            );
+        else if (maxInputLength === 0)
+            return {
+                decisions: {} as LlamaDecisions<Questions>,
+                tokenUsage: {
+                    input: 0,
+                    output: 0
+                }
+            };
+
+        const localQueue = new AsyncQueue([], {parent: this._seqQueue});
+        const localSeqs = new Set<LlamaContextSequence>();
+        using localQueueScopeHandle = scopeExit(() => {
+            localQueue.forwardPushesToParent = true;
+            localQueue.drainToParent();
+        });
+
+        using mainSeqLease = await localQueue.acquire(signal);
+        const preparedContextWindow = await prepareDecisionContextWindow({
+            fullHistory: [{
+                type: "user",
+                text: document
+            }],
+            resolvedContextShift: {
+                ...defaultContextShiftOptions
+            },
+            fitInContextSize: this.contextSize - maxInputLength - 1,
+            chatWrapper: this._chatWrapper,
+            sequence: mainSeqLease.item
+        });
+
+        const decisions: {[key: string]: LlamaDecision<any>} = {} as LlamaDecisions<Questions>;
+        const prefixTokens = preparedContextWindow.prefix.tokenize(this.model.tokenizer, "trimLeadingSpace");
+        const afterQuestionTokens = preparedContextWindow.afterQuestion.tokenize(this.model.tokenizer, "trimLeadingSpace");
+
+        const mainSeqMeterInitialSnapshot = mainSeqLease.item.tokenMeter.getState();
+
+        const entries = Object.entries(inputs);
+        if (entries.length === 1) {
+            const [questionId, input] = entries[0]!;
+            const fullInput = [...prefixTokens, ...input.input, ...afterQuestionTokens];
+            const lastToken = fullInput.pop();
+            if (lastToken == null)
+                throw new Error("Not enough tokens to generate a response");
+
+            await mainSeqLease.item.adaptStateToTokens(fullInput, false);
+            await mainSeqLease.item.evaluateWithoutGeneratingNewTokens(fullInput.slice(mainSeqLease.item.nextTokenIndex));
+            signal?.throwIfAborted();
+
+            const controlledEvaluateInput: ControlledEvaluateInputItem[] = [[lastToken, {
+                generateNext: {
+                    logits: {
+                        filter: {
+                            tokens: input.tokens
+                        }
+                    }
+                }
+            }]];
+            const res = await mainSeqLease.item.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+            const lastTokenResult = res[res.length - 1];
+            if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                throw new Error("Failed to generate decisions");
+
+            decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+            const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
+            return {
+                decisions: decisions as LlamaDecisions<Questions>,
+                tokenUsage: {
+                    input: tokenUsageDiff.usedInputTokens,
+                    output: tokenUsageDiff.usedOutputTokens
+                }
+            };
+        }
+
+        await mainSeqLease.item.adaptStateToTokens(prefixTokens, false);
+        await mainSeqLease.item.evaluateWithoutGeneratingNewTokens(prefixTokens.slice(mainSeqLease.item.nextTokenIndex));
+        signal?.throwIfAborted();
+
+        await mainSeqLease.item._takeNamedCheckpoint(
+            internalCheckpoints.decisions.name,
+            internalCheckpoints.decisions.maxCheckpoints
+        );
+
+        const mainSeqLeaseTokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
+        let inputTokens: number = mainSeqLeaseTokenUsageDiff.usedInputTokens;
+        let outputTokens: number = mainSeqLeaseTokenUsageDiff.usedOutputTokens;
+
+        localSeqs.add(mainSeqLease.item);
+
+        const needPrefixSeqs = new Map<LlamaContextSequence, [accept: (value?: Promise<void>) => void, reject: (reason?: any) => void]>();
+        disposeAggregator.add(() => {
+            for (const [, [, reject]] of needPrefixSeqs) {
+                reject(new Error("Disposed"));
+            }
+            needPrefixSeqs.clear();
+        });
+
+        async function fixPendingSeqs(seq: LlamaContextSequence) {
+            if (needPrefixSeqs.size === 0)
+                return;
+
+            const entriesNeedFixing = [...needPrefixSeqs.entries()];
+            needPrefixSeqs.clear();
+            await Promise.all(
+                entriesNeedFixing
+                    .map(async ([otherSeq, [accept, reject]]) => {
+                        try {
+                            const copied = await otherSeq._copyStateFromOtherSequence(seq, prefixTokens.length);
+                            if (!copied)
+                                accept(
+                                    otherSeq.adaptStateToTokens(prefixTokens, false)
+                                        .then(() => (
+                                            otherSeq.evaluateWithoutGeneratingNewTokens(prefixTokens.slice(otherSeq.nextTokenIndex))
+                                        ))
+                                        .then(() => void 0)
+                                );
+                            else
+                                accept();
+                        } catch (err) {
+                            reject(err);
+                        }
+                    })
+            );
+        }
+
+        {
+            const seqsToPreload: LlamaContextSequence[] = [];
+            for (let i = entries.length - 1; i >= 0; i--) {
+                let seq: LlamaContextSequence | undefined;
+                if (!localQueue.isEmpty)
+                    seq = localQueue.tryShift();
+                else if (localQueue.parent?.isEmpty === false) {
+                    seq = localQueue.parent.last;
+                    if (seq != null && localQueue.parent.delete(-1) === 0)
+                        seq = undefined;
+                }
+
+                if (seq == null)
+                    seq = localQueue.tryShift();
+
+                if (seq == null)
+                    break;
+
+                seqsToPreload.push(seq);
+            }
+            using putBackInQueueHandle = scopeExit(() => {
+                for (const seq of seqsToPreload)
+                    localQueue.push(seq);
+
+                seqsToPreload.length = 0;
+            });
+
+            if (seqsToPreload.length > 0)
+                await Promise.allSettled(
+                    seqsToPreload.map(async (seq) => {
+                        const initialMeterSnapshot = seq.tokenMeter.getState();
+                        using updateTokenUsageExitHandle = scopeExit(() => {
+                            const diff = TokenMeter.diff(seq.tokenMeter.getState(), initialMeterSnapshot);
+                            inputTokens += diff.usedInputTokens;
+                            outputTokens += diff.usedOutputTokens;
+                        });
+
+                        const copied = await seq._copyStateFromOtherSequence(mainSeqLease.item, prefixTokens.length);
+                        if (!copied) {
+                            signal?.throwIfAborted();
+                            await seq.adaptStateToTokens(prefixTokens, false);
+                            await seq.evaluateWithoutGeneratingNewTokens(prefixTokens.slice(seq.nextTokenIndex));
+                        }
+
+                        localSeqs.add(seq);
+                    })
+                );
+        }
+
+        mainSeqLease.dispose();
+        await Promise.all(
+            entries.map(async ([questionId, input]) => {
+                using seqLease = await localQueue.acquire(signal);
+                const seq = seqLease.item;
+
+                const initialMeterSnapshot = seq.tokenMeter.getState();
+                using updateTokenUsageExitHandle = scopeExit(() => {
+                    const diff = TokenMeter.diff(seq.tokenMeter.getState(), initialMeterSnapshot);
+                    inputTokens += diff.usedInputTokens;
+                    outputTokens += diff.usedOutputTokens;
+                });
+
+                if (!localSeqs.has(seq)) {
+                    await new AbortablePromise<void>(signal, (accept, reject) => {
+                        needPrefixSeqs.set(seq, [accept, reject]);
+
+                        return () => {
+                            needPrefixSeqs.delete(seq);
+                        };
+                    });
+                    localSeqs.add(seq);
+                }
+
+                await using exitHandle = scopeExit(() => fixPendingSeqs(seq));
+                if (needPrefixSeqs.size != 0) {
+                    await fixPendingSeqs(seq);
+                    signal?.throwIfAborted();
+                }
+
+                let evaluateInput: Token[] = [...input.input, ...afterQuestionTokens];
+                if (evaluateInput.length === 0)
+                    throw new Error("Evaluate input is empty");
+
+                if (seq.nextTokenIndex > prefixTokens.length) {
+                    evaluateInput = [...prefixTokens, ...evaluateInput];
+                    const lastToken = evaluateInput.pop();
+
+                    await seq.adaptStateToTokens(evaluateInput, false);
+                    evaluateInput = evaluateInput.slice(seq.nextTokenIndex);
+
+                    if (lastToken != null)
+                        evaluateInput.push(lastToken);
+
+                    signal?.throwIfAborted();
+                }
+
+                const controlledEvaluateInput: ControlledEvaluateInputItem[] = evaluateInput;
+                controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
+                    controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
+                    {
+                        generateNext: {
+                            logits: {
+                                filter: {
+                                    tokens: input.tokens
+                                }
+                            }
+                        }
+                    }
+                ];
+                const res = await seq.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+                const lastTokenResult = res[res.length - 1];
+                if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                    throw new Error("Failed to generate decisions");
+
+                decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+            })
+        );
+
+        // order the decisions according to the original entries
+        const resultDecisions: {[key: string]: LlamaDecision<any>} = {};
+        for (const [questionId] of entries)
+            resultDecisions[questionId] = decisions[questionId] as LlamaDecision<any>;
+
+        return {
+            decisions: resultDecisions as LlamaDecisions<Questions>,
+            tokenUsage: {
+                input: inputTokens,
+                output: outputTokens
+            }
+        };
+    }
+
+    /** @internal */
+    public static async _create({
+        _model
+    }: {
+        _model: LlamaModel
+    }, {
+        chatWrapper = "auto",
+        contextSize = {max: 4096},
+        batchSize,
+        parallelQuestions = 4,
+        threads,
+        createSignal,
+        ignoreMemorySafetyChecks
+    }: LlamaDecisionContextOptions) {
+        const llamaContext = await _model.createContext({
+            contextSize,
+            batchSize,
+            threads,
+            createSignal,
+            sequences: parallelQuestions,
+            ignoreMemorySafetyChecks
+        });
+        const resolvedChatWrapper = chatWrapper === "auto"
+            ? resolveChatWrapper(_model)
+            : chatWrapper;
+
+        return new LlamaDecisionContext({
+            _llamaContext: llamaContext,
+            _chatWrapper: resolvedChatWrapper
+        });
+    }
+}

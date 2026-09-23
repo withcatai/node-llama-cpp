@@ -150,7 +150,10 @@ export type ChatWrapperSettings = {
 
         /** Chain of Thought text segment */
         readonly thought?: {
-            readonly prefix: string | LlamaText | {type: "openedOnStart"},
+            readonly prefix: string | LlamaText | {
+                type: "openedOnStart",
+                afterFunctionCalls?: boolean
+            },
             readonly suffix?: string | LlamaText,
             openOnResponseStart?: boolean,
             reopenAfterFunctionCalls?: boolean

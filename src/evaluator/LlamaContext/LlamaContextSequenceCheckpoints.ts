@@ -1,9 +1,11 @@
 import {AddonContextSequenceCheckpoint} from "../../bindings/AddonTypes.js";
 
+const checkpointRefCount = new WeakMap<AddonContextSequenceCheckpoint, number>();
 export class LlamaContextSequenceCheckpoints {
     private _checkpoints: Array<[name: string | undefined, checkpoint: AddonContextSequenceCheckpoint]> = [];
     private _namedCheckpoints = new Map<string | undefined, number>();
     private _memoryUsage = 0;
+    private readonly _checkpointRefCount = new WeakMap<AddonContextSequenceCheckpoint, number>();
 
     public storeCheckpoint({
         name,
@@ -26,6 +28,7 @@ export class LlamaContextSequenceCheckpoints {
         this._checkpoints.push([name, checkpoint]);
         this._resizeCheckpointsCount(name, 1);
         this._memoryUsage += checkpoint.size;
+        this._addCheckpointRef(checkpoint);
     }
 
     public hasCheckpoint(name: string | undefined, maxPos: number) {
@@ -58,7 +61,7 @@ export class LlamaContextSequenceCheckpoints {
 
     public clearAllCheckpoints() {
         for (const [, checkpoint] of this._checkpoints)
-            checkpoint.dispose();
+            this._releaseCheckpointRef(checkpoint);
 
         this._checkpoints.length = 0;
         this._namedCheckpoints.clear();
@@ -100,8 +103,10 @@ export class LlamaContextSequenceCheckpoints {
             if (firstCheckpoint == null)
                 break;
 
-            this._memoryUsage -= firstCheckpoint.size;
-            firstCheckpoint.dispose();
+            const checkpointSize = firstCheckpoint.size;
+            if (this._releaseCheckpointRef(firstCheckpoint))
+                this._memoryUsage -= checkpointSize;
+
             this._resizeCheckpointsCount(name, -1);
         }
     }
@@ -112,8 +117,10 @@ export class LlamaContextSequenceCheckpoints {
             if (checkpoint == null)
                 break;
 
-            this._memoryUsage -= checkpoint.size;
-            checkpoint.dispose();
+            const checkpointSize = checkpoint.size;
+            if (this._releaseCheckpointRef(checkpoint))
+                this._memoryUsage -= checkpointSize;
+
             this._resizeCheckpointsCount(checkpointName, -1);
         }
     }
@@ -127,11 +134,25 @@ export class LlamaContextSequenceCheckpoints {
             if (checkpoint == null || checkpoint.maxPos <= minMaxPos)
                 break;
 
-            this._memoryUsage -= checkpoint.size;
-            checkpoint.dispose();
+            const checkpointSize = checkpoint.size;
+            if (this._releaseCheckpointRef(checkpoint))
+                this._memoryUsage -= checkpointSize;
+
             this._resizeCheckpointsCount(name, -1);
             this._checkpoints.pop();
         }
+    }
+
+    public cloneCheckpointsStateFrom(other: LlamaContextSequenceCheckpoints) {
+        for (const [, checkpoint] of other._checkpoints)
+            this._addCheckpointRef(checkpoint);
+
+        for (const [, checkpoint] of this._checkpoints)
+            this._releaseCheckpointRef(checkpoint);
+
+        this._checkpoints = other._checkpoints.slice();
+        this._namedCheckpoints = new Map(other._namedCheckpoints);
+        this._memoryUsage = other._memoryUsage;
     }
 
     private _getCheckpointsCount(name: string | undefined) {
@@ -160,12 +181,47 @@ export class LlamaContextSequenceCheckpoints {
             if (checkpointName !== name)
                 continue;
 
-            this._memoryUsage -= checkpoint.size;
-            checkpoint.dispose();
+            const checkpointSize = checkpoint.size;
+            if (this._releaseCheckpointRef(checkpoint))
+                this._memoryUsage -= checkpointSize;
+
             this._checkpoints.splice(i, 1);
             this._resizeCheckpointsCount(name, -1);
             i--;
             pruneCount--;
         }
     }
+
+    private _addCheckpointRef(checkpoint: AddonContextSequenceCheckpoint) {
+        const currentCount = this._checkpointRefCount.get(checkpoint) ?? 0;
+        this._checkpointRefCount.set(checkpoint, currentCount + 1);
+        addCheckpointRef(checkpoint);
+    }
+
+    private _releaseCheckpointRef(checkpoint: AddonContextSequenceCheckpoint) {
+        releaseCheckpointRef(checkpoint);
+
+        const currentCount = this._checkpointRefCount.get(checkpoint) ?? 0;
+        if (currentCount <= 1) {
+            this._checkpointRefCount.delete(checkpoint);
+            return true;
+        } else {
+            this._checkpointRefCount.set(checkpoint, currentCount - 1);
+            return false;
+        }
+    }
+}
+
+function addCheckpointRef(checkpoint: AddonContextSequenceCheckpoint) {
+    const currentCount = checkpointRefCount.get(checkpoint) ?? 0;
+    checkpointRefCount.set(checkpoint, currentCount + 1);
+}
+
+function releaseCheckpointRef(checkpoint: AddonContextSequenceCheckpoint) {
+    const currentCount = checkpointRefCount.get(checkpoint) ?? 0;
+    if (currentCount <= 1) {
+        checkpointRefCount.delete(checkpoint);
+        checkpoint.dispose();
+    } else
+        checkpointRefCount.set(checkpoint, currentCount - 1);
 }

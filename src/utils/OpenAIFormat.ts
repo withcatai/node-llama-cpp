@@ -194,6 +194,16 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
             const segmentStack: ChatModelSegmentType[] = [];
             let canUseLastAssistantMessage = squashModelTextResponses;
 
+            const thoughtSegmentPrefixSettings = chatWrapperSettings.segments?.thought?.prefix;
+            const thoughtPrefixObjectSetting = (
+                typeof thoughtSegmentPrefixSettings === "object" &&
+                !LlamaText.isLlamaText(thoughtSegmentPrefixSettings)
+            )
+                ? thoughtSegmentPrefixSettings
+                : undefined;
+            if (thoughtPrefixObjectSetting?.type === "openedOnStart")
+                segmentStack.push("thought");
+
             const addResponseText = (text: LlamaText | string) => {
                 const lastResItem = canUseLastAssistantMessage
                     ? messages.at(-1)
@@ -296,6 +306,9 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                             }
                         )
                     });
+
+                    if (thoughtPrefixObjectSetting?.type === "openedOnStart" && thoughtPrefixObjectSetting.afterFunctionCalls)
+                        segmentStack.push("thought");
                 }
             }
 

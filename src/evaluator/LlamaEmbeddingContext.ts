@@ -156,7 +156,7 @@ export class LlamaEmbeddingContext {
     }, {
         contextSize,
         batchSize,
-        threads = 6,
+        threads,
         createSignal,
         ignoreMemorySafetyChecks
     }: LlamaEmbeddingContextOptions) {

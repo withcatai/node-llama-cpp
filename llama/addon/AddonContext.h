@@ -22,6 +22,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         uint64_t loadedContextMemorySize = 0;
         bool contextLoaded = false;
         std::mutex disposeMutex;
+        std::mutex samplingMutex;
 
         bool disposed = false;
         bool memoryDisposed = false;
@@ -63,6 +64,7 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
 
         Napi::Value SetLoras(const Napi::CallbackInfo& info);
         Napi::Value RestoreCheckpoint(const Napi::CallbackInfo& info);
+        Napi::Value CopySequenceStateFromOtherSequence(const Napi::CallbackInfo& info);
 
         static void init(Napi::Object exports);
 };
@@ -71,7 +73,6 @@ class AddonContextSequenceCheckpoint : public Napi::ObjectWrap<AddonContextSeque
     public:
         std::shared_mutex dataMutex;
         std::vector<uint8_t> data;
-        llama_seq_id sequenceId = 0;
         llama_pos minPos = -1;
         llama_pos maxPos = -1;
         bool initialized = false;

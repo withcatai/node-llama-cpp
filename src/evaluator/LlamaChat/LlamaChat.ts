@@ -13,7 +13,7 @@ import {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import {LlamaText, LlamaTextJSON, SpecialToken} from "../../utils/LlamaText.js";
 import {StopGenerationDetector} from "../../utils/StopGenerationDetector.js";
 import {QueuedTokenRelease, QueuedTokenReleaseLock, TokenStreamRegulator} from "../../utils/TokenStreamRegulator.js";
-import {EvaluationPriority} from "../LlamaContext/types.js";
+import {ControlledEvaluateInputItem, EvaluationPriority} from "../LlamaContext/types.js";
 import {maxRecentDetokenizerTokens, UNKNOWN_UNICODE_CHAR} from "../../consts.js";
 import {getQueuedTokensBeforeStopTrigger} from "../../utils/getQueuedTokensBeforeStopTrigger.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
@@ -28,11 +28,15 @@ import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
 import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
-import {
-    eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy
-} from "./utils/contextShiftStrategies/eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy.js";
+import {LlamaDecision, LlamaDecisions, LlamaQuestions} from "../LlamaDecisionContext/types.js";
+import {createQuestionInputs} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
+import {createEmptyInvalidDecision, createDecision} from "../LlamaDecisionContext/utils/createDecision.js";
+import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
+import {TokenMeter} from "../TokenMeter.js";
 import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
 import {FunctionCallParamsGrammar} from "./utils/FunctionCallParamsGrammar.js";
+import {compressHistoryToFitContextSize} from "./utils/compressHistoryToFitContextSize.js";
+import {prepareDecisionContextWindow} from "./utils/prepareDecisionContextWindow.js";
 
 export type LlamaChatOptions = {
     contextSequence: LlamaContextSequence,
@@ -468,6 +472,44 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
     documentFunctionParams?: boolean
 };
 
+export type LlamaChatGenerateDecisionsOptions = {
+    signal?: AbortSignal,
+
+    /**
+     * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
+     */
+    evaluationPriority?: EvaluationPriority,
+
+    contextShift?: LLamaChatContextShiftOptions,
+
+    /**
+     * The evaluation context window returned from the last evaluation.
+     * This is an optimization to utilize existing context sequence state better when possible.
+     */
+    lastEvaluationContextWindow?: {
+        /** The history of the last evaluation. */
+        history?: ChatHistoryItem[]
+    },
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same functions that were used for the previous prompt here.
+     */
+    functions?: ChatModelFunctions,
+
+    /**
+     * Functions are not used by the model here,
+     * but are used for keeping the instructions given to the model about the functions in the current context state,
+     * to avoid context shifts.
+     *
+     * It's best to provide the same value that was used for the previous prompt here.
+     */
+    documentFunctionParams?: boolean
+};
+
 export type LLamaChatContextShiftOptions = {
     /**
      * The number of tokens to delete from the context window to make space for new ones.
@@ -510,7 +552,7 @@ export type LLamaChatContextShiftOptions = {
     lastEvaluationMetadata?: object | undefined | null
 };
 
-const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
+export const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
     size: (sequence) => Math.max(1, Math.floor(sequence.context.contextSize / 10)),
     strategy: "eraseFirstResponseAndKeepFirstSystem",
     lastEvaluationMetadata: null
@@ -778,8 +820,13 @@ export class LlamaChat {
 
                             generateResponseState.detectAndHandleFunctionStartSyntax();
                             if (generateResponseState.functionEvaluationMode !== false) {
+                                generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
+                                generateResponseState.removeFoundStartIgnoreTextsFromPendingTokens();
+                                generateResponseState.spliceIgnoreStartTextDetectedTokens();
+                                generateResponseState.moveFreePendingTokensToRes();
+
                                 generateResponseState.canAvoidReloadingHistory = false;
-                                generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart();
+                                generateResponseState.releasePartiallyFreeTokensBeforeFunctionCallStart(true);
                                 const functionsCallsRes = await generateResponseState.enterFunctionCallingLoop(
                                     loadContextWindowForFunctionCallingLoop
                                 );
@@ -1106,6 +1153,139 @@ export class LlamaChat {
             }
         });
     }
+
+    public async generateDecisions<const Questions extends LlamaQuestions>(
+        history: ChatHistoryItem[],
+        questions: Questions,
+        options: LlamaChatGenerateDecisionsOptions = {}
+    ): Promise<LlamaChatGenerateDecisionsResponse<Questions>> {
+        const {
+            evaluationPriority = defaultEvaluationPriority,
+            contextShift = defaultContextShiftOptions,
+            functions,
+            documentFunctionParams,
+            signal,
+            lastEvaluationContextWindow: {
+                history: lastEvaluationContextWindowHistory
+            } = {}
+        } = options;
+
+        return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatGenerateDecisionsResponse<Questions>> => {
+            const inputs = createQuestionInputs(questions, this.model);
+            const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
+            if (maxInputLength > this.sequence.contextSize)
+                throw new Error(
+                    "The context size is too small to fit the provided questions and/or criteria. " +
+                    "Increase the context size or reduce the length of the longest questions or criteria"
+                );
+            else if (maxInputLength === 0)
+                return {
+                    decisions: {} as LlamaDecisions<Questions>,
+                    lastEvaluation: {
+                        contextWindow: lastEvaluationContextWindowHistory ?? history,
+                        contextShiftMetadata: contextShift.lastEvaluationMetadata
+                    },
+                    tokenUsage: {
+                        input: 0,
+                        output: 0
+                    }
+                };
+
+            const preparedContextWindow = await prepareDecisionContextWindow({
+                fullHistory: history,
+                lastEvaluationContextWindowHistory,
+                resolvedContextShift: {
+                    ...defaultContextShiftOptions,
+                    ...removeNullFields(contextShift)
+                },
+                fitInContextSize: this.sequence.contextSize - maxInputLength - 1,
+                chatWrapper: this._chatWrapper,
+                sequence: this.sequence,
+                functions,
+                documentFunctionParams
+            });
+
+            const decisions: {[key: string]: LlamaDecision<any>} = {} as LlamaDecisions<Questions>;
+            const prefixTokens = preparedContextWindow.prefix.tokenize(this.model.tokenizer, "trimLeadingSpace");
+            const afterQuestionTokens = preparedContextWindow.afterQuestion.tokenize(this.model.tokenizer, "trimLeadingSpace");
+            const tokenMeterInitialSnapshot = this.sequence.tokenMeter.getState();
+
+            const entries = Object.entries(inputs);
+            let isFirstEvaluation = true;
+            for (const [questionId, input] of entries) {
+                signal?.throwIfAborted();
+
+                if (input.tokens.length === 0) {
+                    decisions[questionId] = createEmptyInvalidDecision(input);
+                    continue;
+                }
+
+                let controlledEvaluateInput: ControlledEvaluateInputItem[];
+                if (this.sequence.needsCheckpoints && isFirstEvaluation) {
+                    await this.sequence.adaptStateToTokens(prefixTokens, false);
+                    await this.sequence.evaluateWithoutGeneratingNewTokens(prefixTokens.slice(this.sequence.nextTokenIndex));
+                    await this.sequence._takeNamedCheckpoint(
+                        internalCheckpoints.decisions.name,
+                        internalCheckpoints.decisions.maxCheckpoints
+                    );
+                    controlledEvaluateInput = [...input.input, ...afterQuestionTokens];
+                } else if (this.sequence.needsCheckpoints) {
+                    await this.sequence.eraseContextTokenRanges([{
+                        start: prefixTokens.length,
+                        end: this.sequence.nextTokenIndex
+                    }]);
+                    controlledEvaluateInput = [...input.input, ...afterQuestionTokens];
+                } else {
+                    const fullInput = [...prefixTokens, ...input.input, ...afterQuestionTokens];
+                    const lastToken = fullInput.pop();
+                    if (lastToken == null)
+                        throw new Error("Not enough tokens to generate a response");
+
+                    await this.sequence.adaptStateToTokens(fullInput, false);
+                    await this.sequence.evaluateWithoutGeneratingNewTokens(fullInput.slice(this.sequence.nextTokenIndex));
+                    controlledEvaluateInput = [lastToken];
+                }
+
+                signal?.throwIfAborted();
+                if (controlledEvaluateInput.length === 0)
+                    throw new Error("Evaluate input is empty");
+
+                controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
+                    controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
+                    {
+                        generateNext: {
+                            logits: {
+                                filter: {
+                                    tokens: input.tokens
+                                }
+                            }
+                        }
+                    }
+                ];
+                const res = await this.sequence.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+                const lastTokenResult = res[res.length - 1];
+                if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                    throw new Error("Failed to generate decisions");
+
+                decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+
+                isFirstEvaluation = false;
+            }
+            const tokenUsageDiff = TokenMeter.diff(this.sequence.tokenMeter.getState(), tokenMeterInitialSnapshot);
+
+            return {
+                decisions: decisions as LlamaDecisions<Questions>,
+                lastEvaluation: {
+                    contextWindow: preparedContextWindow.newContextWindow,
+                    contextShiftMetadata: preparedContextWindow.lastHistoryCompressionMetadata
+                },
+                tokenUsage: {
+                    input: tokenUsageDiff.usedInputTokens,
+                    output: tokenUsageDiff.usedOutputTokens
+                }
+            };
+        });
+    }
 }
 
 export type LlamaChatResponse<Functions extends ChatModelFunctions | undefined = undefined> = {
@@ -1178,6 +1358,24 @@ export type LlamaChatLoadAndCompleteUserResponse = {
     }
 };
 
+export type LlamaChatGenerateDecisionsResponse<Questions extends LlamaQuestions> = {
+    decisions: LlamaDecisions<Questions>,
+
+    lastEvaluation: {
+        /**
+         * The content of the decision making process is not added to the context window result,
+         * but is loaded to the current context sequence state as tokens.
+         */
+        contextWindow: ChatHistoryItem[],
+        contextShiftMetadata: any
+    },
+
+    tokenUsage: {
+        input: number,
+        output: number
+    }
+};
+
 function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Item): Item {
     if (historyItem.type === "model") {
         const newHistoryItem: ChatModelResponse = {...historyItem};
@@ -1203,105 +1401,6 @@ function removeRawFromHistoryItem<Item extends ChatHistoryItem>(historyItem: Ite
     }
 
     return historyItem;
-}
-
-async function compressHistoryToFitContextSize({
-    history,
-    contextShiftSize,
-    contextShiftStrategy,
-    contextShiftLastEvaluationMetadata,
-    contextSize,
-    tokenizer,
-    chatWrapper,
-    functions,
-    documentFunctionParams
-}: {
-    history: ChatHistoryItem[],
-    contextShiftSize: number,
-    contextShiftStrategy: LLamaChatContextShiftOptions["strategy"],
-    contextShiftLastEvaluationMetadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"],
-    contextSize: number,
-    tokenizer: Tokenizer,
-    chatWrapper: ChatWrapper,
-    functions?: ChatModelFunctions,
-    documentFunctionParams?: boolean
-}): Promise<{
-    compressedHistory: ChatHistoryItem[],
-    metadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"]
-}> {
-    function checkIfHistoryFitsContext(history: ChatHistoryItem[]) {
-        const {contextText} = chatWrapper.generateContextState({
-            chatHistory: history,
-            availableFunctions: functions,
-            documentFunctionParams
-        });
-        const tokens = contextText.tokenize(tokenizer);
-
-        return tokens.length <= contextSize - contextShiftSize;
-    }
-
-    if (contextSize - contextShiftSize <= 0)
-        throw new Error(
-            `The context size (${contextSize}) is too small to fit the context shift size (${contextShiftSize})`
-        );
-
-    if (checkIfHistoryFitsContext(history))
-        return {
-            compressedHistory: history,
-            metadata: null
-        };
-
-    if (contextShiftStrategy instanceof Function) {
-        try {
-            const {chatHistory, metadata} = await contextShiftStrategy({
-                chatHistory: history,
-                maxTokensCount: contextSize - contextShiftSize,
-                tokenizer,
-                chatWrapper,
-                lastShiftMetadata: contextShiftLastEvaluationMetadata
-            });
-
-            if (checkIfHistoryFitsContext(chatHistory))
-                return {
-                    compressedHistory: chatHistory,
-                    metadata
-                };
-
-            console.warn(
-                "The provided context shift strategy did not return a history that fits the context size. " +
-                "Using the default strategy instead."
-            );
-        } catch (err) {
-            console.error(
-                "The provided context shift strategy threw an error. " +
-                "Using the default strategy instead.",
-                err
-            );
-        }
-    } else if (contextShiftStrategy !== "eraseFirstResponseAndKeepFirstSystem")
-        console.warn(
-            `Unknown context shift strategy "${contextShiftStrategy}". ` +
-            "Using the default strategy instead."
-        );
-
-    const {chatHistory, metadata} = await eraseFirstResponseAndKeepFirstSystemChatContextShiftStrategy({
-        chatHistory: history,
-        maxTokensCount: contextSize - contextShiftSize,
-        tokenizer,
-        chatWrapper,
-        lastShiftMetadata: contextShiftLastEvaluationMetadata
-    });
-
-    if (!checkIfHistoryFitsContext(chatHistory))
-        throw new Error(
-            "The default context shift strategy did not return a history that fits the context size. " +
-            "This may happen due to the system prompt being too long"
-        );
-
-    return {
-        compressedHistory: chatHistory,
-        metadata
-    };
 }
 
 function getLastModelMessageFullResponseFromChatHistory(chatHistory: ChatHistoryItem[]) {
@@ -3178,7 +3277,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         return undefined;
     }
 
-    public releasePartiallyFreeTokensBeforeFunctionCallStart() {
+    public releasePartiallyFreeTokensBeforeFunctionCallStart(processStopTriggerTokensInSegmentHandlerAsSyntax: boolean = false) {
         if (this.releasedPartiallyFreeTokensBeforeFunctionCallStartSyntax)
             return;
 
@@ -3193,11 +3292,22 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             partiallyFreeTokens,
             this.llamaChat.model.tokenizer
         );
-        pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
+
+        if (!processStopTriggerTokensInSegmentHandlerAsSyntax)
+            pushAll(this.pendingTokens, queuedTokensBeforeStopTrigger);
 
         this.removeFoundStartIgnoreTextsFromPendingTokens(true);
-
         this.pushPendingTokensAndCallOnToken();
+
+        if (processStopTriggerTokensInSegmentHandlerAsSyntax && triggeredStops[0] != null) {
+            const stopTriggerTokens = triggeredStops[0].stopTrigger.flatMap((item) => {
+                if (typeof item === "string")
+                    return this.llamaChat.model.tokenize(item, false, "trimLeadingSpace");
+
+                return item;
+            });
+            this.segmentHandler.processSyntaxOnlyTokens(stopTriggerTokens, true);
+        }
 
         this.streamRegulator.clearQueue();
 
@@ -3518,7 +3628,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public popStreamRegulatorFreeTokens() {
-        pushAll(this.pendingTokens, this.streamRegulator.popFreeChunkTokens());
+        const freeTokens = this.streamRegulator.popFreeChunkTokens();
+        pushAll(this.pendingTokens, freeTokens);
+        return freeTokens.length !== 0;
     }
 
     public handleStopGenerationTrigger(lastHistoryItemType: "user" | "model", forceStopReason?: "eogToken") {
@@ -3810,7 +3922,8 @@ type RawSegment<S extends ChatModelSegmentType = ChatModelSegmentType> = Token[]
     start: boolean,
     ended: boolean,
     startTime?: number,
-    endTime?: number
+    endTime?: number,
+    rawSuffix?: LlamaText
 };
 type ChatSegments = Array<string | LlamaChatResponseSegment>;
 class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType> {
@@ -3894,7 +4007,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         }
     }
 
-    public processTokens(tokens: Token[]) {
+    public processTokens(tokens: Token[], syntaxOnly: boolean = false) {
         if (tokens.length === 0)
             return;
 
@@ -3908,10 +4021,24 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
 
             pushAll(this._tokensTrail, pendingTokens);
 
-            this._processTokens(pendingTokens, currentText);
+            this._processTokens(pendingTokens, currentText, syntaxOnly);
 
             pendingTokens = [];
         }
+    }
+
+    public processSyntaxOnlyTokens(tokens: Token[], clearDetectors: boolean = true) {
+        if (tokens.length === 0)
+            return;
+
+        this.processTokens(tokens, true);
+
+        if (clearDetectors)
+            this._clearDetectors();
+
+        const pendingTokens = this._streamRegulator.popFreeChunkTokens();
+        if (pendingTokens.length > 0)
+            this._pushCurrentTokens(pendingTokens);
     }
 
     public onFinishedGeneration() {
@@ -3984,11 +4111,13 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         return this._segmentsStack.slice(this._ownedSegmentsStackLength);
     }
 
-    private _processTokens(tokens: Token[], text: string) {
-        const queuedTokenRelease = this._streamRegulator.addChunk({
-            tokens,
-            text
-        });
+    private _processTokens(tokens: Token[], text: string, syntaxOnly: boolean) {
+        const queuedTokenRelease = syntaxOnly
+            ? undefined
+            : this._streamRegulator.addChunk({
+                tokens,
+                text
+            });
 
         const currentType = this._segmentsStack.at(-1);
 
@@ -3999,14 +4128,15 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             stopDetector.recordGeneration({
                 text,
                 tokens,
-                queuedTokenRelease
+                queuedTokenRelease,
+                startNewChecks: !syntaxOnly
             });
 
             if (stopDetector.hasTriggeredStops) {
-                const [leftTokens, leftText] = this._handleTriggeredStopDetector(stopDetector);
+                const [leftTokens, leftText, stopSuffixText] = this._handleTriggeredStopDetector(stopDetector, syntaxOnly);
 
                 if (action === "pop")
-                    this._closeSegment(type);
+                    this._closeSegment(type, stopSuffixText);
                 else if (action === "push") {
                     this.openSegment(type);
                 } else if (action === "reset") {
@@ -4054,7 +4184,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                 }
 
                 if (leftTokens.length > 0)
-                    this._processTokens(leftTokens, leftText);
+                    this._processTokens(leftTokens, leftText, syntaxOnly);
 
                 return true;
             }
@@ -4089,7 +4219,11 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         this._pushCurrentTokens(this._streamRegulator.popFreeChunkTokens());
     }
 
-    private _handleTriggeredStopDetector(stopDetector: StopGenerationDetector): [remainingTokens: Token[], reamingText: string] {
+    private _handleTriggeredStopDetector(stopDetector: StopGenerationDetector, syntaxOnly: boolean): [
+        remainingTokens: Token[],
+        remainingText: string,
+        stopSuffixText?: LlamaText
+    ] {
         this._clearDetectors(stopDetector);
         stopDetector.clearInProgressStops();
         const triggeredStops = stopDetector.getTriggeredStops();
@@ -4100,6 +4234,13 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             partiallyFreeTokens,
             this.model.tokenizer
         );
+
+        const stopSuffixText = syntaxOnly
+            ? trimCommonLlamaTextPrefix(
+                LlamaText.fromTokens(this.model.tokenizer, this._streamRegulator.getAllQueuedChunkTokens()),
+                LlamaText.fromTokens(this.model.tokenizer, queuedTokensBeforeStopTrigger)
+            )
+            : undefined;
 
         const {firstRemainingGenerationAfterStop} = StopGenerationDetector.getFirstRemainingGenerationAfterStop(triggeredStops);
         const remainingTokens = typeof firstRemainingGenerationAfterStop === "string"
@@ -4122,10 +4263,10 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
         stopDetector.clearTriggeredStops();
         this._streamRegulator.reset();
 
-        return [remainingTokens, remainingText];
+        return [remainingTokens, remainingText, stopSuffixText];
     }
 
-    private _closeSegment(type?: S) {
+    private _closeSegment(type?: S, rawSuffixText?: LlamaText) {
         if (type == null)
             return;
 
@@ -4135,6 +4276,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             if (lastSegment.ended !== true) {
                 lastSegment.ended = true;
                 lastSegment.endTime = now;
+                lastSegment.rawSuffix = rawSuffixText;
 
                 this.onResponseChunk?.({
                     type: "segment",
@@ -4153,9 +4295,10 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                 if (lastContextWindowSegment.ended !== true) {
                     lastContextWindowSegment.ended = true;
                     lastContextWindowSegment.endTime = now;
+                    lastContextWindowSegment.rawSuffix = rawSuffixText;
                 }
             } else
-                this._contextWindowSegments.push({type, tokens: [], ended: true, start: false, endTime: now});
+                this._contextWindowSegments.push({type, tokens: [], ended: true, start: false, endTime: now, rawSuffix: rawSuffixText});
 
             this._segmentsStackSet.delete(this._segmentsStack.pop()!);
 
@@ -4182,8 +4325,13 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
             if (this._segmentsStack.length < this._contextWindowOwnedSegmentsStackLength)
                 this._contextWindowOwnedSegmentsStackLength = this._segmentsStack.length;
 
-            this._segments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
-            this._contextWindowSegments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now});
+            const rawSuffix = rawSuffixText == null
+                ? undefined
+                : segmentType === type
+                    ? rawSuffixText
+                    : undefined;
+            this._segments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now, rawSuffix});
+            this._contextWindowSegments.push({type: segmentType, tokens: [], ended: true, start: false, endTime: now, rawSuffix});
 
             this.onResponseChunk?.({
                 type: "segment",
@@ -4406,7 +4554,7 @@ class SegmentHandler<const S extends ChatModelSegmentType = ChatModelSegmentType
                             : "",
                         text,
                         rawSegment.ended
-                            ? (segmentDefinition.suffix ?? "")
+                            ? (rawSegment.rawSuffix ?? segmentDefinition.suffix ?? "")
                             : ""
                     ]).toJSON(),
                 startTime: rawSegment.startTime != null
