@@ -23,9 +23,9 @@ import {
     type LlamaDecisionContextDecideResponse
 } from "./evaluator/LlamaDecisionContext/LlamaDecisionContext.js";
 import {
-    type LlamaQuestion, type LlamaNoulQuestion, type LlamaChoiceQuestion, type LlamaScoreQuestion,
-    type LlamaDecision, type LlamaNoulDecision, type LlamaChoiceDecision, type LlamaScoreDecision,
-    type LlamaQuestions, type LlamaDecisions
+    type DecisionQuestion, type DecisionNoulQuestion, type DecisionChoiceQuestion, type DecisionScoreQuestion,
+    type DecisionAnswer, type DecisionNoulAnswer, type DecisionChoiceAnswer, type DecisionScoreAnswer,
+    type DecisionQuestions, type DecisionAnswers
 } from "./evaluator/LlamaDecisionContext/types.js";
 import {
     type LlamaContextOptions, type SequenceEvaluateOptions, type BatchingOptions, type LlamaContextSequenceRepeatPenalty,
@@ -196,16 +196,16 @@ export {
     type LlamaDecisionContextOptions,
     type LlamaDecisionContextDecideOptions,
     type LlamaDecisionContextDecideResponse,
-    type LlamaQuestion,
-    type LlamaNoulQuestion,
-    type LlamaChoiceQuestion,
-    type LlamaScoreQuestion,
-    type LlamaDecision,
-    type LlamaNoulDecision,
-    type LlamaChoiceDecision,
-    type LlamaScoreDecision,
-    type LlamaQuestions,
-    type LlamaDecisions,
+    type DecisionQuestion,
+    type DecisionNoulQuestion,
+    type DecisionChoiceQuestion,
+    type DecisionScoreQuestion,
+    type DecisionAnswer,
+    type DecisionNoulAnswer,
+    type DecisionChoiceAnswer,
+    type DecisionScoreAnswer,
+    type DecisionQuestions,
+    type DecisionAnswers,
     LlamaChatSession,
     defineChatSessionFunction,
     type LlamaChatSessionOptions,

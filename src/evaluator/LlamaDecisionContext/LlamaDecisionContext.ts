@@ -9,8 +9,8 @@ import {ChatWrapper} from "../../ChatWrapper.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {createQuestionInputs} from "./utils/createQuestionInputs.js";
-import {LlamaDecision, LlamaDecisions, LlamaQuestions} from "./types.js";
-import {createDecision} from "./utils/createDecision.js";
+import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
+import {createDecisionAnswer} from "./utils/createDecisionAnswer.js";
 import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import type {Token} from "../../types.js";
 
@@ -72,8 +72,8 @@ export type LlamaDecisionContextDecideOptions = {
     evaluationPriority?: EvaluationPriority
 };
 
-export type LlamaDecisionContextDecideResponse<Questions extends LlamaQuestions> = {
-    decisions: LlamaDecisions<Questions>,
+export type LlamaDecisionContextDecideResponse<Questions extends DecisionQuestions> = {
+    answers: DecisionAnswers<Questions>,
     tokenUsage: {
         input: number,
         output: number
@@ -157,15 +157,15 @@ export class LlamaDecisionContext {
         return this._llamaContext.memoryUsage;
     }
 
-    public async decide<const Questions extends LlamaQuestions>(
+    public async decide<const Questions extends DecisionQuestions>(
         document: string,
         questions: Questions,
         options: LlamaDecisionContextDecideOptions = {}
-    ): Promise<LlamaDecisions<Questions>> {
-        return (await this.decideWithMeta(document, questions, options)).decisions;
+    ): Promise<DecisionAnswers<Questions>> {
+        return (await this.decideWithMeta(document, questions, options)).answers;
     }
 
-    public async decideWithMeta<const Questions extends LlamaQuestions>(
+    public async decideWithMeta<const Questions extends DecisionQuestions>(
         document: string,
         questions: Questions,
         options: LlamaDecisionContextDecideOptions = {}
@@ -188,7 +188,7 @@ export class LlamaDecisionContext {
             );
         else if (maxInputLength === 0)
             return {
-                decisions: {} as LlamaDecisions<Questions>,
+                answers: {} as DecisionAnswers<Questions>,
                 tokenUsage: {
                     input: 0,
                     output: 0
@@ -216,7 +216,7 @@ export class LlamaDecisionContext {
             sequence: mainSeqLease.item
         });
 
-        const decisions: {[key: string]: LlamaDecision<any>} = {} as LlamaDecisions<Questions>;
+        const answers: {[key: string]: DecisionAnswer<any>} = {} as DecisionAnswers<Questions>;
         const prefixTokens = preparedContextWindow.prefix.tokenize(this.model.tokenizer, "trimLeadingSpace");
         const afterQuestionTokens = preparedContextWindow.afterQuestion.tokenize(this.model.tokenizer, "trimLeadingSpace");
 
@@ -248,10 +248,10 @@ export class LlamaDecisionContext {
             if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                 throw new Error("Failed to generate decisions");
 
-            decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+            answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
             const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
             return {
-                decisions: decisions as LlamaDecisions<Questions>,
+                answers: answers as DecisionAnswers<Questions>,
                 tokenUsage: {
                     input: tokenUsageDiff.usedInputTokens,
                     output: tokenUsageDiff.usedOutputTokens
@@ -431,7 +431,7 @@ export class LlamaDecisionContext {
                 if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                     throw new Error("Failed to generate decisions");
 
-                decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
             })
         );
 
@@ -440,13 +440,13 @@ export class LlamaDecisionContext {
                 throw result.reason;
         }
 
-        // order the decisions according to the original entries
-        const resultDecisions: {[key: string]: LlamaDecision<any>} = {};
+        // order the answers according to the original entries
+        const resultAnswers: {[key: string]: DecisionAnswer<any>} = {};
         for (const [questionId] of entries)
-            resultDecisions[questionId] = decisions[questionId] as LlamaDecision<any>;
+            resultAnswers[questionId] = answers[questionId] as DecisionAnswer<any>;
 
         return {
-            decisions: resultDecisions as LlamaDecisions<Questions>,
+            answers: resultAnswers as DecisionAnswers<Questions>,
             tokenUsage: {
                 input: inputTokens,
                 output: outputTokens

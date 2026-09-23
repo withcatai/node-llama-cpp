@@ -1,9 +1,9 @@
 import type {LlamaText} from "../../utils/LlamaText.js";
 
-export type LlamaQuestion = LlamaNoulQuestion | LlamaChoiceQuestion | LlamaScoreQuestion;
-export type LlamaQuestions = {readonly [key: string]: LlamaQuestion};
+export type DecisionQuestion = DecisionNoulQuestion | DecisionChoiceQuestion | DecisionScoreQuestion;
+export type DecisionQuestions = {readonly [key: string]: DecisionQuestion};
 
-export type LlamaNoulQuestion = {
+export type DecisionNoulQuestion = {
     type: "noul",
     instruction: string | LlamaText,
     criteria?: {
@@ -11,39 +11,39 @@ export type LlamaNoulQuestion = {
         false: string
     }
 };
-export type LlamaChoiceQuestion = {
+export type DecisionChoiceQuestion = {
     type: "choice",
     instruction: string | LlamaText,
     criteria: {
         [key: string]: string | LlamaText
     }
 };
-export type LlamaScoreQuestion = {
+export type DecisionScoreQuestion = {
     type: "score",
     instruction: string | LlamaText,
     criteria: readonly (string | LlamaText)[]
 };
 
 
-export type LlamaDecision<Question extends LlamaQuestion> =
-    Question extends LlamaNoulQuestion
-        ? LlamaNoulDecision
-        : Question extends LlamaChoiceQuestion
-            ? LlamaChoiceDecision<Question>
-            : Question extends LlamaScoreQuestion
-                ? LlamaScoreDecision<Question>
+export type DecisionAnswer<Question extends DecisionQuestion> =
+    Question extends DecisionNoulQuestion
+        ? DecisionNoulAnswer
+        : Question extends DecisionChoiceQuestion
+            ? DecisionChoiceAnswer<Question>
+            : Question extends DecisionScoreQuestion
+                ? DecisionScoreAnswer<Question>
                 : never;
-export type LlamaDecisions<Questions extends LlamaQuestions> = {readonly [Key in keyof Questions]: LlamaDecision<Questions[Key]>};
+export type DecisionAnswers<Questions extends DecisionQuestions> = {readonly [Key in keyof Questions]: DecisionAnswer<Questions[Key]>};
 
-export type LlamaNoulDecision = {
+export type DecisionNoulAnswer = {
     value: number
 };
-export type LlamaChoiceDecision<Question extends LlamaChoiceQuestion> = {
+export type DecisionChoiceAnswer<Question extends DecisionChoiceQuestion> = {
     choice: Extract<keyof Question["criteria"], string>,
     confidence: number,
     probabilities: Record<Extract<keyof Question["criteria"], string>, number>
 };
-export type LlamaScoreDecision<Question extends LlamaScoreQuestion> = {
+export type DecisionScoreAnswer<Question extends DecisionScoreQuestion> = {
     score: number,
     confidence: number,
     probabilities: ToProbabilities<Question["criteria"]>

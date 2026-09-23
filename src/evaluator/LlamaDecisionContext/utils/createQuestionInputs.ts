@@ -3,9 +3,9 @@ import {pushAll} from "../../../utils/pushAll.js";
 import {findSingleToken, generateCriteriaChoiceOptionTokens} from "./generateCriteriaChoiceOptionTokens.js";
 import type {LlamaModel} from "../../../index.js";
 import type {Token} from "../../../types.js";
-import type {LlamaQuestions} from "../types.js";
+import type {DecisionQuestions} from "../types.js";
 
-export function createQuestionInputs(questions: LlamaQuestions, model: LlamaModel) {
+export function createQuestionInputs(questions: DecisionQuestions, model: LlamaModel) {
     return Object.fromEntries(
         Object.entries(questions)
             .map(([key, question]) => [key, createQuestionInput(key, question, model)])
@@ -13,7 +13,7 @@ export function createQuestionInputs(questions: LlamaQuestions, model: LlamaMode
 }
 export type QuestionInput = ReturnType<typeof createQuestionInput>;
 
-function createQuestionInput(keyName: string, question: LlamaQuestions[number], model: LlamaModel) {
+function createQuestionInput(keyName: string, question: DecisionQuestions[number], model: LlamaModel) {
     const tokenizer = model.tokenizer;
 
     if (

@@ -17,7 +17,7 @@ import {LlamaText, LlamaTextJSON} from "../../utils/LlamaText.js";
 import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
-import {LlamaDecisions, LlamaQuestions} from "../LlamaDecisionContext/types.js";
+import {DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
 import {
     LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
 } from "./utils/LlamaChatSessionPromptCompletionEngine.js";
@@ -1258,18 +1258,18 @@ export class LlamaChatSession {
         }
     }
 
-    public async decide<const Questions extends LlamaQuestions>(
+    public async decide<const Questions extends DecisionQuestions>(
         questions: Questions,
         options: LlamaChatSessionDecideOptions = {}
-    ): Promise<LlamaDecisions<Questions>> {
-        return (await this.decideWithMeta(questions, options)).decisions;
+    ): Promise<DecisionAnswers<Questions>> {
+        return (await this.decideWithMeta(questions, options)).answers;
     }
 
-    public async decideWithMeta<const Questions extends LlamaQuestions>(
+    public async decideWithMeta<const Questions extends DecisionQuestions>(
         questions: Questions,
         options: LlamaChatSessionDecideOptions = {}
     ): Promise<{
-        decisions: LlamaDecisions<Questions>,
+        answers: DecisionAnswers<Questions>,
         tokenUsage: {
             input: number,
             output: number
@@ -1285,7 +1285,7 @@ export class LlamaChatSession {
 
         this._stopAllPreloadAndPromptCompletions();
         return await withLock([this._chatLock, "evaluation"], signal, async (): Promise<{
-            decisions: LlamaDecisions<Questions>,
+            answers: DecisionAnswers<Questions>,
             tokenUsage: {
                 input: number,
                 output: number
@@ -1303,7 +1303,7 @@ export class LlamaChatSession {
 
             const {
                 lastEvaluation: currentLastEvaluation,
-                decisions,
+                answers,
                 tokenUsage
             } = await this._chat.generateDecisions(this._chatHistory, questions, {
                 signal,
@@ -1327,7 +1327,7 @@ export class LlamaChatSession {
             this._canUseContextWindowForCompletion = true;
 
             return {
-                decisions,
+                answers,
                 tokenUsage
             };
         });

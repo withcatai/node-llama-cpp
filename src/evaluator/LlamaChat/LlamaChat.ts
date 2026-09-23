@@ -28,9 +28,9 @@ import {jsonDumps} from "../../chatWrappers/utils/jsonDumps.js";
 import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessionPromptCompletionEngine.js";
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
-import {LlamaDecision, LlamaDecisions, LlamaQuestions} from "../LlamaDecisionContext/types.js";
+import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
 import {createQuestionInputs} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
-import {createEmptyInvalidDecision, createDecision} from "../LlamaDecisionContext/utils/createDecision.js";
+import {createEmptyInvalidDecisionAnswer, createDecisionAnswer} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
 import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
@@ -1154,7 +1154,7 @@ export class LlamaChat {
         });
     }
 
-    public async generateDecisions<const Questions extends LlamaQuestions>(
+    public async generateDecisions<const Questions extends DecisionQuestions>(
         history: ChatHistoryItem[],
         questions: Questions,
         options: LlamaChatGenerateDecisionsOptions = {}
@@ -1180,7 +1180,7 @@ export class LlamaChat {
                 );
             else if (maxInputLength === 0)
                 return {
-                    decisions: {} as LlamaDecisions<Questions>,
+                    answers: {} as DecisionAnswers<Questions>,
                     lastEvaluation: {
                         contextWindow: lastEvaluationContextWindowHistory ?? history,
                         contextShiftMetadata: contextShift.lastEvaluationMetadata
@@ -1205,7 +1205,7 @@ export class LlamaChat {
                 documentFunctionParams
             });
 
-            const decisions: {[key: string]: LlamaDecision<any>} = {} as LlamaDecisions<Questions>;
+            const answers: {[key: string]: DecisionAnswer<any>} = {} as DecisionAnswers<Questions>;
             const prefixTokens = preparedContextWindow.prefix.tokenize(this.model.tokenizer, "trimLeadingSpace");
             const afterQuestionTokens = preparedContextWindow.afterQuestion.tokenize(this.model.tokenizer, "trimLeadingSpace");
             const tokenMeterInitialSnapshot = this.sequence.tokenMeter.getState();
@@ -1216,7 +1216,7 @@ export class LlamaChat {
                 signal?.throwIfAborted();
 
                 if (input.tokens.length === 0) {
-                    decisions[questionId] = createEmptyInvalidDecision(input);
+                    answers[questionId] = createEmptyInvalidDecisionAnswer(input);
                     continue;
                 }
 
@@ -1267,14 +1267,14 @@ export class LlamaChat {
                 if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                     throw new Error("Failed to generate decisions");
 
-                decisions[questionId] = createDecision(input, lastTokenResult.next.logits);
+                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
 
                 isFirstEvaluation = false;
             }
             const tokenUsageDiff = TokenMeter.diff(this.sequence.tokenMeter.getState(), tokenMeterInitialSnapshot);
 
             return {
-                decisions: decisions as LlamaDecisions<Questions>,
+                answers: answers as DecisionAnswers<Questions>,
                 lastEvaluation: {
                     contextWindow: preparedContextWindow.newContextWindow,
                     contextShiftMetadata: preparedContextWindow.lastHistoryCompressionMetadata
@@ -1358,8 +1358,8 @@ export type LlamaChatLoadAndCompleteUserResponse = {
     }
 };
 
-export type LlamaChatGenerateDecisionsResponse<Questions extends LlamaQuestions> = {
-    decisions: LlamaDecisions<Questions>,
+export type LlamaChatGenerateDecisionsResponse<Questions extends DecisionQuestions> = {
+    answers: DecisionAnswers<Questions>,
 
     lastEvaluation: {
         /**

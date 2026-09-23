@@ -1,8 +1,8 @@
 import type {Token} from "../../../types.js";
-import type {LlamaDecision, LlamaChoiceDecision, LlamaNoulDecision, LlamaScoreDecision} from "../types.js";
+import type {DecisionAnswer, DecisionChoiceAnswer, DecisionNoulAnswer, DecisionScoreAnswer} from "../types.js";
 import type {QuestionInput} from "./createQuestionInputs.js";
 
-export function createDecision(input: QuestionInput, logits: Map<Token, number>): LlamaDecision<any> {
+export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, number>): DecisionAnswer<any> {
     if (input.type === "noul") {
         const [yesToken, noToken] = input.tokens;
         const yesLogit = logits.get(yesToken);
@@ -15,12 +15,12 @@ export function createDecision(input: QuestionInput, logits: Map<Token, number>)
         if (diff >= 0)
             return {
                 value: 1 / (1 + Math.exp(-diff))
-            } satisfies LlamaNoulDecision;
+            } satisfies DecisionNoulAnswer;
 
         const weight = Math.exp(diff);
         return {
             value: weight / (1 + weight)
-        } satisfies LlamaNoulDecision;
+        } satisfies DecisionNoulAnswer;
     } else if (input.type === "choice") {
         let maxLogit: number | null = null;
         let maxToken: Token | null = null;
@@ -62,7 +62,7 @@ export function createDecision(input: QuestionInput, logits: Map<Token, number>)
             choice,
             confidence: -Math.expm1((secondMaxLogit ?? 0) - (maxLogit ?? 0)) / totalWeight,
             probabilities
-        } satisfies LlamaChoiceDecision<any>;
+        } satisfies DecisionChoiceAnswer<any>;
     } else if (input.type === "score") {
         const additionalChoices = 1;
         const levels = input.tokens.length - additionalChoices;
@@ -109,30 +109,30 @@ export function createDecision(input: QuestionInput, logits: Map<Token, number>)
             score,
             confidence: 1 - noneProbability,
             probabilities
-        } satisfies LlamaScoreDecision<any>;
+        } satisfies DecisionScoreAnswer<any>;
     } else
         void (input satisfies never);
 
     throw new Error(`Unsupported input type: ${(input as any).type}`);
 }
 
-export function createEmptyInvalidDecision(input: QuestionInput): LlamaDecision<any> {
+export function createEmptyInvalidDecisionAnswer(input: QuestionInput): DecisionAnswer<any> {
     if (input.type === "noul")
         return {
             value: 0
-        } satisfies LlamaNoulDecision;
+        } satisfies DecisionNoulAnswer;
     else if (input.type === "choice")
         return {
             choice: "",
             confidence: 0,
             probabilities: {}
-        } satisfies LlamaChoiceDecision<any>;
+        } satisfies DecisionChoiceAnswer<any>;
     else if (input.type === "score")
         return {
             score: 0,
             confidence: 0,
             probabilities: []
-        } satisfies LlamaScoreDecision<any>;
+        } satisfies DecisionScoreAnswer<any>;
     else
         void (input satisfies never);
 
