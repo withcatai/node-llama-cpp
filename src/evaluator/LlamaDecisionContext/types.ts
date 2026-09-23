@@ -15,7 +15,7 @@ export type DecisionChoiceQuestion = {
     type: "choice",
     instruction: string | LlamaText,
     criteria: {
-        [key: string]: string | LlamaText
+        [key: string]: string | LlamaText | null
     }
 };
 export type DecisionScoreQuestion = {
@@ -36,14 +36,17 @@ export type DecisionAnswer<Question extends DecisionQuestion> =
 export type DecisionAnswers<Questions extends DecisionQuestions> = {readonly [Key in keyof Questions]: DecisionAnswer<Questions[Key]>};
 
 export type DecisionNoulAnswer = {
+    type: "noul",
     value: number
 };
 export type DecisionChoiceAnswer<Question extends DecisionChoiceQuestion> = {
+    type: "choice",
     choice: Extract<keyof Question["criteria"], string>,
     confidence: number,
     probabilities: Record<Extract<keyof Question["criteria"], string>, number>
 };
 export type DecisionScoreAnswer<Question extends DecisionScoreQuestion> = {
+    type: "score",
     score: number,
     confidence: number,
     probabilities: ToProbabilities<Question["criteria"]>

@@ -14,11 +14,13 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
         const diff = yesLogit - noLogit;
         if (diff >= 0)
             return {
+                type: "noul",
                 value: 1 / (1 + Math.exp(-diff))
             } satisfies DecisionNoulAnswer;
 
         const weight = Math.exp(diff);
         return {
+            type: "noul",
             value: weight / (1 + weight)
         } satisfies DecisionNoulAnswer;
     } else if (input.type === "choice") {
@@ -36,6 +38,9 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
         }
 
         const probabilities: Record<string, number> = {};
+        for (const key of input.keys)
+            probabilities[key] = 0;
+
         let totalWeight = 0;
         let choice: string | null = null;
         for (let i = 0; i < input.tokens.length; i++) {
@@ -59,6 +64,7 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
             throw new Error("Unable to determine choice");
 
         return {
+            type: "choice",
             choice,
             confidence: -Math.expm1((secondMaxLogit ?? 0) - (maxLogit ?? 0)) / totalWeight,
             probabilities
@@ -106,6 +112,7 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
             : noneWeight / (1 + noneWeight);
 
         return {
+            type: "score",
             score,
             confidence: 1 - noneProbability,
             probabilities
@@ -119,16 +126,19 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
 export function createEmptyInvalidDecisionAnswer(input: QuestionInput): DecisionAnswer<any> {
     if (input.type === "noul")
         return {
+            type: "noul",
             value: 0
         } satisfies DecisionNoulAnswer;
     else if (input.type === "choice")
         return {
+            type: "choice",
             choice: "",
             confidence: 0,
             probabilities: {}
         } satisfies DecisionChoiceAnswer<any>;
     else if (input.type === "score")
         return {
+            type: "score",
             score: 0,
             confidence: 0,
             probabilities: []

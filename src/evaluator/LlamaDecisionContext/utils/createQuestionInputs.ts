@@ -88,8 +88,10 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
 
         for (let i = 0; i < choiceOptions.length; i++) {
             input.push(choiceOptions[i]!);
+            const criteriaKey = keys[i]!;
+
             pushAll(input, LlamaText([
-                ": ", question.criteria[keys[i]!]!,
+                ": ", question.criteria[criteriaKey] ?? criteriaKey,
                 i === choiceOptions.length - 1
                     ? ""
                     : "\n"
