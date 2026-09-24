@@ -200,10 +200,15 @@ function addQuestionMarkerToContextWindow(chatWrapper: ChatWrapper, contextWindo
     return {
         questionMarker,
         decisionMarker: decisionMarker,
-        contextWindow: [...contextWindow, {
-            type: "user",
-            text: questionMarker
-        }, modelMessage]
+        contextWindow: lastItem?.type === "user"
+            ? [...contextWindow.slice(0, -1), {
+                ...lastItem,
+                text: lastItem.text + "\n\n" + questionMarker
+            }, modelMessage]
+            : [...contextWindow, {
+                type: "user",
+                text: questionMarker
+            }, modelMessage]
     };
 }
 

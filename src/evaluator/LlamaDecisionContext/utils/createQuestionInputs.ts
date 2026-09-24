@@ -1,6 +1,6 @@
 import {LlamaText} from "../../../utils/LlamaText.js";
 import {pushAll} from "../../../utils/pushAll.js";
-import {findSingleToken, generateCriteriaChoiceOptionTokens} from "./generateCriteriaChoiceOptionTokens.js";
+import {generateCriteriaChoiceOptionTokens} from "./generateCriteriaChoiceOptionTokens.js";
 import type {LlamaModel} from "../../../index.js";
 import type {Token} from "../../../types.js";
 import type {DecisionQuestions} from "../types.js";
@@ -24,52 +24,48 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
         throw new Error(`Question instruction for key "${keyName}" is empty`);
 
     if (question.type === "noul") {
-        const yesToken = findBestToken(["Yes", "True", "Y", "1"], model);
-        const noToken = findBestToken(["No", "False", "N", "0"], model);
+        const [yesToken, noToken] = generateCriteriaChoiceOptionTokens(2, model);
 
-        if (question.criteria == null)
-            return {
-                type: "noul" as const,
-                tokens: [yesToken, noToken] as const,
-                input: [
-                    ...LlamaText([
-                        "For the following:",
-                        question.instruction,
-                        "",
-                        ""
-                    ]).tokenize(tokenizer, "trimLeadingSpace"),
+        if (yesToken == null || noToken == null)
+            throw new Error("Failed to generate yes/no choice option tokens");
 
-                    ...LlamaText("Reply in ").tokenize(tokenizer, "trimLeadingSpace"),
-                    yesToken,
-                    ...LlamaText(" or ").tokenize(tokenizer, "trimLeadingSpace"),
-                    noToken
-                ]
-            };
+        let yesLabel: string = (question.criteria == null || question.criteria.true == null || question.criteria.true.trim() === "")
+            ? ""
+            : question.criteria.true ?? "";
+        let noLabel: string = (question.criteria == null || question.criteria.false == null || question.criteria.false.trim() === "")
+            ? ""
+            : question.criteria.false ?? "";
 
-        else
-            return {
-                type: "noul" as const,
-                tokens: [yesToken, noToken] as const,
-                input: [
-                    ...LlamaText([
-                        "For the following:",
-                        question.instruction,
-                        "",
-                        ""
-                    ]).tokenize(tokenizer, "trimLeadingSpace"),
+        if (yesLabel === "") {
+            yesLabel = "Yes";
 
-                    ...LlamaText("Reply in ").tokenize(tokenizer, "trimLeadingSpace"),
-                    yesToken,
-                    ...LlamaText(" or ").tokenize(tokenizer, "trimLeadingSpace"),
-                    noToken,
-                    ...LlamaText(":\n").tokenize(tokenizer, "trimLeadingSpace"),
+            if (noLabel === "")
+                noLabel = "No";
+            else
+                noLabel = "No. " + noLabel;
+        } else if (noLabel === "") {
+            noLabel = "No";
+            yesLabel = "Yes. " + yesLabel;
+        }
 
-                    yesToken,
-                    ...LlamaText([" criteria: ", question.criteria.true]).tokenize(tokenizer, "trimLeadingSpace"),
-                    noToken,
-                    ...LlamaText([" criteria: ", question.criteria.false]).tokenize(tokenizer, "trimLeadingSpace")
-                ]
-            };
+        const input: Token[] = [
+            ...LlamaText.joinValues("\n", [
+                ["Question: ", question.instruction],
+                "",
+                "Reply the letter of the best answer:",
+                ""
+            ]).tokenize(tokenizer, "trimLeadingSpace"),
+            yesToken,
+            ...LlamaText([": ", yesLabel, "\n"]).tokenize(tokenizer, "trimLeadingSpace"),
+            noToken,
+            ...LlamaText([": ", noLabel]).tokenize(tokenizer, "trimLeadingSpace")
+        ];
+
+        return {
+            type: "noul" as const,
+            tokens: [yesToken, noToken] as const,
+            input
+        };
     } else if (question.type === "choice") {
         const keys = Object.keys(question.criteria);
         const choiceOptions = generateCriteriaChoiceOptionTokens(keys.length, model);
@@ -78,10 +74,9 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
 
         const input: Token[] = [
             ...LlamaText.joinValues("\n", [
-                "For the following:",
-                question.instruction,
+                ["Question: ", question.instruction],
                 "",
-                "Respond in a single character from:",
+                "Reply the letter of the best answer:",
                 ""
             ]).tokenize(tokenizer, "trimLeadingSpace")
         ];
@@ -112,10 +107,9 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
 
         const input: Token[] = [
             ...LlamaText.joinValues("\n", [
-                "For the following:",
-                question.instruction,
+                ["Question: ", question.instruction],
                 "",
-                "Respond in a single character from:",
+                "Reply the letter of the best answer:",
                 ""
             ]).tokenize(tokenizer, "trimLeadingSpace")
         ];
@@ -143,26 +137,6 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
         void (question satisfies never);
 
     throw new Error(`Unsupported question type: ${(question as any).type}`);
-}
-
-function findBestToken(texts: string[], model: LlamaModel, fallbackIndex: number = -1) {
-    for (const text of texts) {
-        const token = findSingleToken(text, model);
-        if (token != null)
-            return token;
-    }
-
-    if (fallbackIndex !== -1) {
-        try {
-            const token = generateCriteriaChoiceOptionTokens(fallbackIndex, model)?.[fallbackIndex];
-            if (token != null)
-                return token;
-        } catch (error) {
-            // do nothing
-        }
-    }
-
-    throw new Error("Unable to find a token for: " + texts[0]);
 }
 
 function getAdditionalChoiceOption(index: number) {

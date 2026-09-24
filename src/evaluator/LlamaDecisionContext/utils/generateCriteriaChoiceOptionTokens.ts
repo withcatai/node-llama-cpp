@@ -148,7 +148,7 @@ export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaMo
     return [...res];
 }
 
-export function findSingleToken(text: string, model: LlamaModel) {
+function findSingleToken(text: string, model: LlamaModel) {
     const tokens = model.tokenize(text, false, "trimLeadingSpace");
     for (const token of tokens) {
         if (model.detokenize([token], false).trim() === text && model._model.getTokenString(token) === text)
