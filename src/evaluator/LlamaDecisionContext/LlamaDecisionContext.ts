@@ -108,6 +108,9 @@ export type LlamaDecisionContextDecideResponse<Questions extends DecisionQuestio
     }
 };
 
+/**
+ * @see [Using Structured Decisions](https://node-llama-cpp.withcat.ai/guide/structured-decisions) tutorial
+ */
 export class LlamaDecisionContext {
     /** @internal */ private readonly _llamaContext: LlamaContext;
     /** @internal */ private readonly _chatWrapper: ChatWrapper;
@@ -183,6 +186,25 @@ export class LlamaDecisionContext {
     /** Assumed memory footprint of the context in bytes */
     public get memoryUsage() {
         return this._llamaContext.memoryUsage;
+    }
+
+    /** Warmup the model, so that the next evaluation is faster */
+    public async warmup({}: {signal?: AbortSignal} = {}) {
+        using retain = this._retainer.tryRetain(() => new DisposedError());
+        using seq = await this._seqQueue.acquire(signal);
+
+        const preparedContextWindow = await prepareDecisionContextWindow({
+            fullHistory: [{
+                type: "user",
+                text: ""
+            }],
+            resolvedContextShift: false,
+            fitInContextSize: this.contextSize,
+            chatWrapper: this._chatWrapper,
+            sequence: seq.item
+        });
+        const prefixTokens = preparedContextWindow.prefix.tokenize(this.model.tokenizer, "trimLeadingSpace");
+        await seq.item.evaluateWithoutGeneratingNewTokens(prefixTokens);
     }
 
     public async decide<const Questions extends DecisionQuestions>(

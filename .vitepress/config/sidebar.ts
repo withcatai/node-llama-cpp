@@ -16,6 +16,7 @@ export function getVitepressSidebar(blog?: DefaultTheme.SidebarItem[]): DefaultT
                 {text: "Grammar", link: "/grammar"},
                 {text: "Function Calling", link: "/function-calling"},
                 {text: "Embedding", link: "/embedding"},
+                {text: "Structured Decisions", link: "/structured-decisions"},
                 {text: "Text Completion", link: "/text-completion"},
                 {text: "Choosing a Model", link: "/choosing-a-model"},
                 {text: "Downloading Models", link: "/downloading-models"}

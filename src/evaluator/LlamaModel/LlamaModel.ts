@@ -701,6 +701,9 @@ export class LlamaModel {
         return await LlamaRankingContext._create({_model: this}, options);
     }
 
+    /**
+     * @see [Using Structured Decisions](https://node-llama-cpp.withcat.ai/guide/structured-decisions) tutorial
+     */
     public async createDecisionContext(options: LlamaDecisionContextOptions = {}) {
         if (this._vocabOnly)
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
