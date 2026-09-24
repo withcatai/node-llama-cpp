@@ -178,7 +178,13 @@ export type AddonContext = {
         sampler: AddonSampler,
         probabilities: boolean,
         confidence?: boolean,
-        logits?: boolean | [tokens: readonly Token[], includeMax: boolean, includeMin: boolean, includeSelected: boolean],
+        logits?: boolean | [
+            tokens: readonly Token[],
+            includeMax: boolean,
+            includeMin: boolean,
+            includeSelected: boolean,
+            includeTop: number
+        ],
         totalLogitWeight?: boolean
     ): Promise<[
         token: Token | -1,

@@ -573,7 +573,14 @@ export type ControlledEvaluateInputItem = Token | [token: Token, options: {
                  *
                  * Defaults to `false`.
                  */
-                includeSelected?: boolean
+                includeSelected?: boolean,
+
+                /**
+                 * Always include the top N logit tokens.
+                 *
+                 * Defaults to `0`, meaning no top tokens are included.
+                 */
+                includeTop?: number
             }
         },
 

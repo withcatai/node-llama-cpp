@@ -22,7 +22,7 @@ describe("gemma4 e2b", () => {
                 const res = await context.decide(document, {
                     isUrgent: {
                         type: "noul",
-                        instruction: "Is it urgent?"
+                        instruction: "Does it require immediate urgent attention?"
                     }
                 });
 
@@ -36,11 +36,11 @@ describe("gemma4 e2b", () => {
                 `);
             });
 
-            test("multiple decisions", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            test("multiple decisions", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
                 const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
-                if (llama.gpu !== false)
+                if (llama.gpu === false)
                     test.skip("Logits are a bit different on different backends to cause test flakiness");
 
                 const model = await llama.loadModel({
@@ -72,7 +72,7 @@ describe("gemma4 e2b", () => {
                     },
                     isUrgent: {
                         type: "noul",
-                        instruction: "Is it urgent?",
+                        instruction: "Does it require immediate urgent attention?",
                         criteria: {
                             true: "This should be handled immediately",
                             false: "We can address this later"
@@ -332,7 +332,7 @@ describe("gemma4 e2b", () => {
                 const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
-                if (llama.gpu !== false)
+                if (llama.gpu === false)
                     test.skip("Logits are a bit different on different backends to cause test flakiness");
 
                 const model = await llama.loadModel({

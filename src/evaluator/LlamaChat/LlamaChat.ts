@@ -30,7 +30,7 @@ import {LlamaLogLevel} from "../../bindings/types.js";
 import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
 import {createQuestionInputs} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
-import {createEmptyInvalidDecisionAnswer, createDecisionAnswer} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
+import {createEmptyInvalidDecisionAnswer, createDecisionAnswer, decisionAnswerMinimumTopLogits} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
 import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
@@ -1256,7 +1256,8 @@ export class LlamaChat {
                         generateNext: {
                             logits: {
                                 filter: {
-                                    tokens: input.tokens
+                                    tokens: input.tokens,
+                                    includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
                                 }
                             }
                         }
@@ -1267,7 +1268,7 @@ export class LlamaChat {
                 if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                     throw new Error("Failed to generate decisions");
 
-                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
+                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, this.sequence.model.tokenizer);
 
                 isFirstEvaluation = false;
             }

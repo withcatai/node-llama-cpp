@@ -1766,7 +1766,8 @@ export class LlamaContextSequence {
                             generateNext.logits.filter?.includeMax ||
                             generateNext.logits.filter?.includeMin ||
                             generateNext.logits.filter?.includeSelected ||
-                            (generateNext.logits.filter?.tokens?.length ?? 0) > 0
+                            (generateNext.logits.filter?.tokens?.length ?? 0) > 0 ||
+                            (generateNext.logits.filter?.includeTop ?? 0) > 0
                         )
                     )
                 )
@@ -1803,7 +1804,8 @@ export class LlamaContextSequence {
                                 generateNext.logits.filter?.includeMax !== true &&
                                 generateNext.logits.filter?.includeMin !== true &&
                                 generateNext.logits.filter?.includeSelected !== true &&
-                                (generateNext.logits.filter?.tokens?.length ?? 0) === 0
+                                (generateNext.logits.filter?.tokens?.length ?? 0) === 0 &&
+                                (generateNext.logits.filter?.includeTop ?? 0) === 0
                             )
                         ))
                     ))
@@ -1840,7 +1842,8 @@ export class LlamaContextSequence {
                                         generateNext.logits.filter.tokens ?? [],
                                         generateNext.logits.filter.includeMax ?? false,
                                         generateNext.logits.filter.includeMin ?? false,
-                                        generateNext.logits.filter.includeSelected ?? false
+                                        generateNext.logits.filter.includeSelected ?? false,
+                                        Math.max(0, generateNext.logits.filter.includeTop ?? 0)
                                     ],
                             !!generateNext.totalLogitWeight
                         );

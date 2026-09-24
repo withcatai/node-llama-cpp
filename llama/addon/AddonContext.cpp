@@ -205,6 +205,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             bool includeHighest = false;
             bool includeLowest = false;
             bool includeSelected = false;
+            size_t includeTop = 0;
         } returnLogits;
         struct LogitsMap {
             bool isSet = false;
@@ -236,11 +237,12 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                 } else if (option.IsArray()) {
                     const auto arr = option.As<Napi::Array>();
 
-                    if (arr.Length() == 4) {
+                    if (arr.Length() == 5) {
                         const auto tokensOption = arr.Get(static_cast<uint32_t>(0));
                         const auto includeHighestOption = arr.Get(static_cast<uint32_t>(1));
                         const auto includeLowestOption = arr.Get(static_cast<uint32_t>(2));
                         const auto includeSelectedOption = arr.Get(static_cast<uint32_t>(3));
+                        const auto includeTopOption = arr.Get(static_cast<uint32_t>(4));
 
                         size_t logitsReserveSize = 0;
                         if (includeHighestOption.IsBoolean()) {
@@ -256,6 +258,11 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                         if (includeSelectedOption.IsBoolean()) {
                             returnLogits.includeSelected = includeSelectedOption.As<Napi::Boolean>().Value();
                             logitsReserveSize++;
+                        }
+
+                        if (includeTopOption.IsNumber()) {
+                            returnLogits.includeTop = includeTopOption.As<Napi::Number>().Uint32Value();
+                            logitsReserveSize += returnLogits.includeTop;
                         }
 
                         if (tokensOption.IsArray()) {
@@ -327,7 +334,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             auto new_token_id = cur_p.data[cur_p.selected].id;
 
-            if (returnProbabilities || returnConfidence || returnLogits.enabled == ReturnLogits::Enabled) {
+            if (returnProbabilities || returnConfidence || returnLogits.enabled == ReturnLogits::Enabled || returnLogits.includeTop != 0) {
                 if (!cur_p.sorted) {
                     std::sort(cur_p.data, cur_p.data + cur_p.size, [](const llama_token_data & a, const llama_token_data & b) {
                         return a.logit > b.logit;
@@ -340,6 +347,13 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                             break;
                         }
                     }
+                }
+            }
+
+            if (returnLogits.includeTop != 0) {
+                const auto topCount = std::min(returnLogits.includeTop, cur_p.size);
+                for (int32_t i = 0; i < topCount; i++) {
+                    this->logits.logits.emplace_back(cur_p.data[i].id, cur_p.data[i].logit);
                 }
             }
 

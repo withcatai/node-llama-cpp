@@ -1,8 +1,11 @@
-import type {Token} from "../../../types.js";
+import type {Token, Tokenizer} from "../../../types.js";
 import type {DecisionAnswer, DecisionChoiceAnswer, DecisionNoulAnswer, DecisionScoreAnswer} from "../types.js";
 import type {QuestionInput} from "./createQuestionInputs.js";
 
-export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, number>): DecisionAnswer<any> {
+export const decisionAnswerMinimumTopLogits = 20;
+export function createDecisionAnswer(input: QuestionInput, rawLogits: Map<Token, number>, tokenizer: Tokenizer): DecisionAnswer<any> {
+    const logits = getNormalizedInputTokenLogits(input, rawLogits, tokenizer);
+
     if (input.type === "noul") {
         const [yesToken, noToken] = input.tokens;
         const yesLogit = logits.get(yesToken);
@@ -28,7 +31,9 @@ export function createDecisionAnswer(input: QuestionInput, logits: Map<Token, nu
         let maxToken: Token | null = null;
         let secondMaxLogit: number | null = null;
 
-        for (const [token, logit] of logits.entries()) {
+        for (const token of input.tokens) {
+            const logit = logits.get(token) ?? 0;
+
             if (maxLogit === null || logit > maxLogit) {
                 secondMaxLogit = maxLogit;
                 maxLogit = logit;
@@ -147,4 +152,32 @@ export function createEmptyInvalidDecisionAnswer(input: QuestionInput): Decision
         void (input satisfies never);
 
     throw new Error(`Unsupported input type: ${(input as any).type}`);
+}
+
+function getNormalizedInputTokenLogits(input: QuestionInput, logits: Map<Token, number>, tokenizer: Tokenizer) {
+    const res = new Map<Token, number>();
+    const textToLogit = new Map<string, number>();
+
+    for (const [token, logit] of logits.entries()) {
+        const text = tokenizer.detokenize([token], false).trim();
+        if (text.length !== 1)
+            continue;
+
+        textToLogit.set(text, logit);
+    }
+
+    for (const token of input.tokens) {
+        const logit = logits.get(token) ?? 0;
+        res.set(token, logit);
+
+        const text = tokenizer.detokenize([token], false).trim();
+        if (text.length !== 1)
+            continue;
+
+        const destinationLogit = textToLogit.get(text);
+        if (destinationLogit != null && destinationLogit > logit)
+            res.set(token, destinationLogit);
+    }
+
+    return res;
 }

@@ -8,7 +8,7 @@ import {ChatWrapper} from "../../ChatWrapper.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {createQuestionInputs} from "./utils/createQuestionInputs.js";
-import {createDecisionAnswer} from "./utils/createDecisionAnswer.js";
+import {createDecisionAnswer, decisionAnswerMinimumTopLogits} from "./utils/createDecisionAnswer.js";
 import type {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
 import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import type {ChatHistoryItem, Token, Tokenizer} from "../../types.js";
@@ -362,7 +362,8 @@ export class LlamaDecisionContext {
                 generateNext: {
                     logits: {
                         filter: {
-                            tokens: input.tokens
+                            tokens: input.tokens,
+                            includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
                         }
                     }
                 }
@@ -372,7 +373,7 @@ export class LlamaDecisionContext {
             if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                 throw new Error("Failed to generate decisions");
 
-            answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
+            answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, mainSeqLease.item.model.tokenizer);
             const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
             return {
                 answers: answers as DecisionAnswers<Questions>,
@@ -554,7 +555,8 @@ export class LlamaDecisionContext {
                         generateNext: {
                             logits: {
                                 filter: {
-                                    tokens: input.tokens
+                                    tokens: input.tokens,
+                                    includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
                                 }
                             }
                         }
@@ -565,7 +567,7 @@ export class LlamaDecisionContext {
                 if (lastTokenResult == null || lastTokenResult.next?.logits == null)
                     throw new Error("Failed to generate decisions");
 
-                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits);
+                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, seq.model.tokenizer);
             })
         );
 
