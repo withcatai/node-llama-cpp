@@ -9,12 +9,12 @@ import type {LLamaChatContextShiftOptions} from "../LlamaChat.js";
 
 export async function prepareDecisionContextWindow({
     fullHistory, lastEvaluationContextWindowHistory,
-    resolvedContextShift,
+    resolvedContextShift, fallbackToDefaultContextShiftStrategy = true,
     fitInContextSize, chatWrapper, sequence,
     functions, documentFunctionParams, minFreeContextTokens = 1
 }: {
     fullHistory: ChatHistoryItem[], lastEvaluationContextWindowHistory?: ChatHistoryItem[],
-    resolvedContextShift: Required<LLamaChatContextShiftOptions>,
+    resolvedContextShift: false | Required<LLamaChatContextShiftOptions>, fallbackToDefaultContextShiftStrategy?: boolean,
     fitInContextSize: number, chatWrapper: ChatWrapper, sequence: LlamaContextSequence,
     functions?: ChatModelFunctions, documentFunctionParams?: boolean, minFreeContextTokens?: number
 }): Promise<{
@@ -56,9 +56,14 @@ export async function prepareDecisionContextWindow({
         return questionContextTokensCount;
     }
 
-    const responseForInitialContextWindow = (lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory)
-        ? generateResponseForChatHistory(lastEvaluationContextWindowHistory, resolvedContextShift.lastEvaluationMetadata)
-        : generateResponseForChatHistory(fullHistory, resolvedContextShift.lastEvaluationMetadata);
+    const responseForInitialContextWindow = generateResponseForChatHistory(
+        (lastEvaluationContextWindowHistory != null && sequence.isLoadedToMemory)
+            ? lastEvaluationContextWindowHistory
+            : fullHistory,
+        typeof resolvedContextShift !== "boolean"
+            ? resolvedContextShift.lastEvaluationMetadata
+            : undefined
+    );
     if (typeof responseForInitialContextWindow !== "number")
         return responseForInitialContextWindow;
 
@@ -80,6 +85,12 @@ export async function prepareDecisionContextWindow({
             "Increase the context size or reduce the length of the longest questions or criteria"
         );
 
+    if (resolvedContextShift === false)
+        throw new Error(
+            "The context size is too small to fit the provided context and the given questions and/or criteria. " +
+            "Increase the context size or reduce the length of the longest questions or criteria"
+        );
+
     if (resolvedContextShift.lastEvaluationMetadata != null) {
         const contextShiftSize = resolvedContextShift.size instanceof Function
             ? await resolvedContextShift.size(sequence)
@@ -89,8 +100,7 @@ export async function prepareDecisionContextWindow({
             history: fullHistory,
             contextShiftSize: Math.max(
                 minFreeContextTokens,
-                contextShiftSize,
-                context.contextSize - fitRegularContextWindowUnderTokenCount
+                Math.min(contextShiftSize, context.contextSize - fitRegularContextWindowUnderTokenCount)
             ),
             contextShiftStrategy: resolvedContextShift.strategy,
             contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
@@ -98,7 +108,8 @@ export async function prepareDecisionContextWindow({
             tokenizer: model.tokenizer,
             chatWrapper: chatWrapper,
             functions,
-            documentFunctionParams
+            documentFunctionParams,
+            fallbackToDefaultStrategy: fallbackToDefaultContextShiftStrategy
         });
         const responseForCompressedHistory = generateResponseForChatHistory(compressedHistory, metadata);
         if (typeof responseForCompressedHistory !== "number")
@@ -126,14 +137,18 @@ export async function prepareDecisionContextWindow({
 
     const {compressedHistory, metadata} = await compressHistoryToFitContextSize({
         history: fullHistory,
-        contextShiftSize: Math.max(minFreeContextTokens, contextShiftSize, context.contextSize - fitRegularContextWindowUnderTokenCount),
+        contextShiftSize: Math.max(
+            minFreeContextTokens,
+            Math.min(contextShiftSize, context.contextSize - fitRegularContextWindowUnderTokenCount)
+        ),
         contextShiftStrategy: resolvedContextShift.strategy,
         contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
         contextSize: context.contextSize,
         tokenizer: model.tokenizer,
         chatWrapper: chatWrapper,
         functions,
-        documentFunctionParams
+        documentFunctionParams,
+        fallbackToDefaultStrategy: fallbackToDefaultContextShiftStrategy
     });
     const responseForCompressedHistory = generateResponseForChatHistory(compressedHistory, metadata);
     if (typeof responseForCompressedHistory !== "number")

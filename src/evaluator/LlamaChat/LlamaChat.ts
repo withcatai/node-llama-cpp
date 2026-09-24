@@ -552,7 +552,7 @@ export type LLamaChatContextShiftOptions = {
     lastEvaluationMetadata?: object | undefined | null
 };
 
-export const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
+const defaultContextShiftOptions: Required<LLamaChatContextShiftOptions> = {
     size: (sequence) => Math.max(1, Math.floor(sequence.context.contextSize / 10)),
     strategy: "eraseFirstResponseAndKeepFirstSystem",
     lastEvaluationMetadata: null

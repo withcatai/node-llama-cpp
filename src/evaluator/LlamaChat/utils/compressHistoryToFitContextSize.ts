@@ -13,7 +13,8 @@ export async function compressHistoryToFitContextSize({
     tokenizer,
     chatWrapper,
     functions,
-    documentFunctionParams
+    documentFunctionParams,
+    fallbackToDefaultStrategy = true
 }: {
     history: ChatHistoryItem[],
     contextShiftSize: number,
@@ -23,7 +24,8 @@ export async function compressHistoryToFitContextSize({
     tokenizer: Tokenizer,
     chatWrapper: ChatWrapper,
     functions?: ChatModelFunctions,
-    documentFunctionParams?: boolean
+    documentFunctionParams?: boolean,
+    fallbackToDefaultStrategy?: boolean
 }): Promise<{
     compressedHistory: ChatHistoryItem[],
     metadata: LLamaChatContextShiftOptions["lastEvaluationMetadata"]
@@ -71,6 +73,9 @@ export async function compressHistoryToFitContextSize({
                 "Using the default strategy instead."
             );
         } catch (err) {
+            if (!fallbackToDefaultStrategy)
+                throw err;
+
             console.error(
                 "The provided context shift strategy threw an error. " +
                 "Using the default strategy instead.",

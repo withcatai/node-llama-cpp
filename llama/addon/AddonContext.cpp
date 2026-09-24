@@ -237,10 +237,10 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                     const auto arr = option.As<Napi::Array>();
 
                     if (arr.Length() == 4) {
-                        const auto tokensOption = arr.Get(static_cast<size_t>(0));
-                        const auto includeHighestOption = arr.Get(static_cast<size_t>(1));
-                        const auto includeLowestOption = arr.Get(static_cast<size_t>(2));
-                        const auto includeSelectedOption = arr.Get(static_cast<size_t>(3));
+                        const auto tokensOption = arr.Get(static_cast<uint32_t>(0));
+                        const auto includeHighestOption = arr.Get(static_cast<uint32_t>(1));
+                        const auto includeLowestOption = arr.Get(static_cast<uint32_t>(2));
+                        const auto includeSelectedOption = arr.Get(static_cast<uint32_t>(3));
 
                         size_t logitsReserveSize = 0;
                         if (includeHighestOption.IsBoolean()) {

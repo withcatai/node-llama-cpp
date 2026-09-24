@@ -15,7 +15,7 @@ describe("gemma4 e2b", () => {
                     modelPath
                 });
                 const context = await model.createDecisionContext({
-                    contextSize: 4096
+                    contextSize: 1024
                 });
 
                 const document = "The API is down but the servers are running";
@@ -29,16 +29,6 @@ describe("gemma4 e2b", () => {
                 expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
                   {
                     "isUrgent": {
-                      "_logit": [
-                        [
-                          "A",
-                          5.901250839233398,
-                        ],
-                        [
-                          "B",
-                          -1.1891591548919678,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.999,
                     },
@@ -54,7 +44,7 @@ describe("gemma4 e2b", () => {
                     modelPath
                 });
                 const context = await model.createDecisionContext({
-                    contextSize: 4096
+                    contextSize: 1024
                 });
 
                 const document = "The API is down";
@@ -101,20 +91,6 @@ describe("gemma4 e2b", () => {
                 expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
                   {
                     "component": {
-                      "_logit": [
-                        [
-                          "A",
-                          -3.610677480697632,
-                        ],
-                        [
-                          "B",
-                          -14.260517120361328,
-                        ],
-                        [
-                          "C",
-                          -15.707091331481934,
-                        ],
-                      ],
                       "choice": "API",
                       "confidence": 1,
                       "probabilities": {
@@ -125,38 +101,10 @@ describe("gemma4 e2b", () => {
                       "type": "choice",
                     },
                     "isUrgent": {
-                      "_logit": [
-                        [
-                          "A",
-                          0.2260155975818634,
-                        ],
-                        [
-                          "B",
-                          -9.297619819641113,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
                     "level": {
-                      "_logit": [
-                        [
-                          "C",
-                          -13.569588661193848,
-                        ],
-                        [
-                          "D",
-                          -20.93646812438965,
-                        ],
-                        [
-                          "B",
-                          -22.085330963134766,
-                        ],
-                        [
-                          "A",
-                          -22.802064895629883,
-                        ],
-                      ],
                       "confidence": 0.999,
                       "probabilities": [
                         0.0000978,
@@ -167,20 +115,6 @@ describe("gemma4 e2b", () => {
                       "type": "score",
                     },
                     "team": {
-                      "_logit": [
-                        [
-                          "A",
-                          -0.46570438146591187,
-                        ],
-                        [
-                          "B",
-                          -8.915700912475586,
-                        ],
-                        [
-                          "C",
-                          -10.698335647583008,
-                        ],
-                      ],
                       "choice": "engineering",
                       "confidence": 1,
                       "probabilities": {
@@ -192,6 +126,114 @@ describe("gemma4 e2b", () => {
                     },
                   }
                 `);
+            });
+
+            describe("onOverflow", () => {
+                const longText = "I spent the morning clearing a cupboard that had become difficult to close. First I carried the boxes into the living room and laid an old sheet over the carpet. The largest box contained tangled cables, spare buttons, and instruction booklets for appliances I no longer owned. I checked each cable, wound the useful ones neatly, and put them in a small basket. The buttons went into a glass jar beside my sewing kit. Under the box I found a wooden frame with a loose corner, so I cleaned the joints and applied a little glue. While it dried, I sorted a pile of notebooks into used and unused pages. Some contained shopping lists, others had sketches of furniture I once planned to build. I kept the sketches and placed the blank paper in a drawer for future notes. A tin of pencils needed sharpening, and several pens had dried out completely. By lunchtime the floor was covered with small groups of objects, each waiting for a proper place. I made a sandwich and ate it at the kitchen table before returning to the work. In the afternoon I lined the cupboard shelves with clean paper and measured the space available for baskets. The lighter boxes went on the upper shelf, with tools and household supplies below. I wrote labels on pieces of card and attached them with string so that everything would be easier to find. Finally, I vacuumed the carpet and folded the sheet away. Only a forgotten quiz book remained on the sofa. I sat down to read it and discovered the answer to one of its questions.";
+
+                test("throw", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                    const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                    const llama = await getTestLlama();
+
+                    const model = await llama.loadModel({
+                        modelPath
+                    });
+                    const context = await model.createDecisionContext({
+                        parallelQuestions: 1,
+                        contextSize: 256
+                    });
+                    try {
+                        await context.decide(longText, {
+                            cables: {
+                                type: "noul",
+                                instruction: "Did the user mention cables?"
+                            }
+                        });
+                        expect.unreachable("Should have thrown an error");
+                    } catch (err) {
+                        expect(err).toMatchInlineSnapshot("[Error: The context size is too small to fit the provided context and the given questions and/or criteria. Increase the context size or reduce the length of the longest questions or criteria]");
+                    }
+                });
+
+                test("truncateDocument", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                    const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                    const llama = await getTestLlama();
+
+                    const model = await llama.loadModel({
+                        modelPath
+                    });
+                    const context = await model.createDecisionContext({
+                        parallelQuestions: 1,
+                        contextSize: 256
+                    });
+                    const res = await context.decide(longText, {
+                        cables: {
+                            type: "noul",
+                            instruction: "Did the user mention cables?"
+                        }
+                    }, {
+                        onOverflow: "truncateDocument"
+                    });
+                    expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
+                      {
+                        "cables": {
+                          "type": "noul",
+                          "value": 1,
+                        },
+                      }
+                    `);
+
+                    // @ts-expect-error
+                    using internalSeqHandle = await context._seqQueue.acquire();
+                    const contextText = model.detokenize(internalSeqHandle.item.contextTokens, true);
+                    expect(internalSeqHandle.item.nextTokenIndex).toMatchInlineSnapshot("254");
+                    expect(contextText).to.include(longText.slice(0, 64));
+                    expect(contextText).to.not.include(longText.slice(-64));
+                });
+
+                test("compressDocument", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                    const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                    const llama = await getTestLlama();
+
+                    const model = await llama.loadModel({
+                        modelPath
+                    });
+                    const context = await model.createDecisionContext({
+                        parallelQuestions: 1,
+                        contextSize: 256
+                    });
+                    const res = await context.decide(longText, {
+                        cables: {
+                            type: "noul",
+                            instruction: "Did the user mention cables?"
+                        }
+                    }, {
+                        onOverflow: {
+                            type: "compressDocument",
+                            compressDocument({document, maxTokensCount, tokenizer}) {
+                                const tokenizedDocument = tokenizer("Starting here." + document, false, "trimLeadingSpace");
+                                const slicedTokens = tokenizedDocument.slice(0, maxTokensCount);
+                                return tokenizer.detokenize(slicedTokens, false);
+                            }
+                        }
+                    });
+                    expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
+                      {
+                        "cables": {
+                          "type": "noul",
+                          "value": 1,
+                        },
+                      }
+                    `);
+
+                    // @ts-expect-error
+                    using internalSeqHandle = await context._seqQueue.acquire();
+                    const contextText = model.detokenize(internalSeqHandle.item.contextTokens, true);
+                    expect(internalSeqHandle.item.nextTokenIndex).toMatchInlineSnapshot("254");
+                    expect(contextText).to.include("Starting here.");
+                    expect(contextText).to.include(longText.slice(0, 64));
+                    expect(contextText).to.not.include(longText.slice(-64));
+                });
             });
         });
 
@@ -260,72 +302,22 @@ describe("gemma4 e2b", () => {
                 expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
                   {
                     "animal": {
-                      "_logit": [
-                        [
-                          "A",
-                          -2.642641544342041,
-                        ],
-                        [
-                          "B",
-                          -12.527066230773926,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
                     "animalOrigins": {
-                      "_logit": [
-                        [
-                          "A",
-                          -3.976987838745117,
-                        ],
-                        [
-                          "B",
-                          -13.54588794708252,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
                     "educational": {
-                      "_logit": [
-                        [
-                          "A",
-                          -10.256660461425781,
-                        ],
-                        [
-                          "B",
-                          -18.809179306030273,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
                     "realWorldAnimals": {
-                      "_logit": [
-                        [
-                          "A",
-                          -8.123294830322266,
-                        ],
-                        [
-                          "B",
-                          -19.406797409057617,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
                     "relatedAnimals": {
-                      "_logit": [
-                        [
-                          "A",
-                          0.865481436252594,
-                        ],
-                        [
-                          "B",
-                          -8.339290618896484,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },
@@ -414,94 +406,26 @@ describe("gemma4 e2b", () => {
                 expect(simplifyTestDecisionAnswers(res)).toMatchInlineSnapshot(`
                   {
                     "animal": {
-                      "_logit": [
-                        [
-                          "B",
-                          4.962754726409912,
-                        ],
-                        [
-                          "A",
-                          -1.0743200778961182,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.00238,
                     },
                     "cookingRecipe": {
-                      "_logit": [
-                        [
-                          "B",
-                          -4.915587425231934,
-                        ],
-                        [
-                          "A",
-                          -15.6191987991333,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.0000225,
                     },
                     "fictionalStory": {
-                      "_logit": [
-                        [
-                          "B",
-                          -13.099068641662598,
-                        ],
-                        [
-                          "A",
-                          -24.286401748657227,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.0000138,
                     },
                     "mineralOrigin": {
-                      "_logit": [
-                        [
-                          "B",
-                          -14.025619506835938,
-                        ],
-                        [
-                          "A",
-                          -24.29061508178711,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.0000348,
                     },
                     "spaceTravel": {
-                      "_logit": [
-                        [
-                          "B",
-                          -1.817817211151123,
-                        ],
-                        [
-                          "A",
-                          -13.12438678741455,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 0.0000123,
                     },
                     "subject": {
-                      "_logit": [
-                        [
-                          "A",
-                          -1.7829921245574951,
-                        ],
-                        [
-                          "D",
-                          -12.703435897827148,
-                        ],
-                        [
-                          "B",
-                          -13.707768440246582,
-                        ],
-                        [
-                          "C",
-                          -14.45690631866455,
-                        ],
-                      ],
                       "choice": "materials",
                       "confidence": 1,
                       "probabilities": {
@@ -513,16 +437,6 @@ describe("gemma4 e2b", () => {
                       "type": "choice",
                     },
                     "wood": {
-                      "_logit": [
-                        [
-                          "A",
-                          -2.336394786834717,
-                        ],
-                        [
-                          "B",
-                          -13.21182632446289,
-                        ],
-                      ],
                       "type": "noul",
                       "value": 1,
                     },

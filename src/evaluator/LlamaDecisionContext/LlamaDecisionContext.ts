@@ -4,15 +4,14 @@ import {
 import {internalCheckpoints, LlamaContext, LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {ControlledEvaluateInputItem, EvaluationPriority} from "../LlamaContext/types.js";
 import {prepareDecisionContextWindow} from "../LlamaChat/utils/prepareDecisionContextWindow.js";
-import {defaultContextShiftOptions} from "../LlamaChat/LlamaChat.js";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {TokenMeter} from "../TokenMeter.js";
 import {createQuestionInputs} from "./utils/createQuestionInputs.js";
-import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
 import {createDecisionAnswer} from "./utils/createDecisionAnswer.js";
+import type {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
 import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
-import type {Token} from "../../types.js";
+import type {ChatHistoryItem, Token, Tokenizer} from "../../types.js";
 
 export type LlamaDecisionContextOptions = {
     /** `"auto"` is used by default */
@@ -69,7 +68,36 @@ export type LlamaDecisionContextDecideOptions = {
     /**
      * See the parameter `evaluationPriority` on the `LlamaContextSequence.evaluate()` function for more information.
      */
-    evaluationPriority?: EvaluationPriority
+    evaluationPriority?: EvaluationPriority,
+
+    /**
+     * What to do when the room left for the document with the provided questions is insufficient in the context window.
+     *
+     * - **`"throw"`** - throw an error when there is not enough room for the document.
+     * - **`"truncateDocument"`** - truncate the end of the document to fit within the available context window.
+     * - **`{type: "compressDocument", compressDocument: ...}`** - compress the document using the provided compression function.
+     *
+     * Defaults to `"throw"`.
+     */
+    onOverflow?: "throw" | "truncateDocument" | {
+        type: "compressDocument",
+
+        /**
+         * Compress the document to fit within the given `maxTokensCount`.
+         *
+         * You can use the provided `tokenizer` to determine the token count of the document before returning it.
+         */
+        compressDocument(options: {
+            /** The document to compress */
+            document: string,
+
+            /** Maximum number of tokens that the document should fit under when tokenized */
+            maxTokensCount: number,
+
+            /** Tokenizer used to tokenize the document */
+            tokenizer: Tokenizer
+        }): string | Promise<string>
+    }
 };
 
 export type LlamaDecisionContextDecideResponse<Questions extends DecisionQuestions> = {
@@ -173,7 +201,7 @@ export class LlamaDecisionContext {
         using retain = this._retainer.tryRetain(() => new DisposedError());
         using disposeAggregator = new DisposeAggregator();
 
-        const {signal, evaluationPriority} = options;
+        const {signal, evaluationPriority, onOverflow} = options;
         if (signal != null) {
             signal.addEventListener("abort", disposeAggregator.dispose);
             disposeAggregator.add(() => signal.removeEventListener("abort", disposeAggregator.dispose));
@@ -208,9 +236,83 @@ export class LlamaDecisionContext {
                 type: "user",
                 text: document
             }],
-            resolvedContextShift: {
-                ...defaultContextShiftOptions
-            },
+            fallbackToDefaultContextShiftStrategy: false,
+            resolvedContextShift: (onOverflow == null || onOverflow === "throw")
+                ? false
+                : onOverflow === "truncateDocument"
+                    ? {
+                        lastEvaluationMetadata: null,
+                        size: (sequence) => sequence.contextSize - 1,
+                        strategy({maxTokensCount, tokenizer, chatWrapper}) {
+                            const fullDocumentTokenLength = tokenizer(document, false, "trimLeadingSpace").length;
+                            const testTokenLength = chatWrapper.generateContextState({
+                                chatHistory: [{
+                                    type: "user",
+                                    text: document
+                                }]
+                            }).contextText.tokenize(tokenizer, "trimLeadingSpace").length;
+
+                            const maxDocumentTokenCount = Math.max(0, fullDocumentTokenLength - (testTokenLength - maxTokensCount) - 1);
+                            if (maxDocumentTokenCount <= 1)
+                                throw new Error(
+                                    "The given questions and/or criteria don't leave enough room in the context for the document. " +
+                                    "Increase the context size or reduce the length of the longest questions or criteria"
+                                );
+
+                            const tokens = tokenizer(document, false, "trimLeadingSpace");
+                            const slicedTokens = tokens.slice(0, maxDocumentTokenCount);
+
+                            return {
+                                chatHistory: [{
+                                    type: "user",
+                                    text: tokenizer.detokenize(slicedTokens, false)
+                                }]
+                            };
+                        }
+                    }
+                    : onOverflow?.type === "compressDocument"
+                        ? {
+                            lastEvaluationMetadata: null,
+                            size: (sequence) => sequence.contextSize - 1,
+                            strategy({maxTokensCount, tokenizer, chatWrapper}) {
+                                const fullDocumentTokenLength = tokenizer(document, false, "trimLeadingSpace").length;
+                                const testTokenLength = chatWrapper.generateContextState({
+                                    chatHistory: [{
+                                        type: "user",
+                                        text: document
+                                    }]
+                                }).contextText.tokenize(tokenizer, "trimLeadingSpace").length;
+
+                                const maxDocumentTokenCount = Math.max(0, fullDocumentTokenLength - (testTokenLength - maxTokensCount) - 1);
+                                if (maxDocumentTokenCount === 0)
+                                    throw new Error(
+                                        "The given questions and/or criteria don't leave enough room in the context for the document. " +
+                                        "Increase the context size or reduce the length of the longest questions or criteria"
+                                    );
+
+                                const compressAttempt = onOverflow.compressDocument({
+                                    document,
+                                    maxTokensCount: maxDocumentTokenCount,
+                                    tokenizer
+                                });
+                                if (compressAttempt instanceof Promise)
+                                    return compressAttempt
+                                        .then((compressed) => ({
+                                            chatHistory: [{
+                                                type: "user",
+                                                text: compressed
+                                            }] as ChatHistoryItem[]
+                                        }));
+
+                                return {
+                                    chatHistory: [{
+                                        type: "user",
+                                        text: compressAttempt
+                                    }]
+                                };
+                            }
+                        }
+                        : false,
             fitInContextSize: this.contextSize - maxInputLength - 1,
             chatWrapper: this._chatWrapper,
             sequence: mainSeqLease.item
@@ -367,10 +469,20 @@ export class LlamaDecisionContext {
         }
 
         mainSeqLease.dispose();
+        let evaluationsLeft = entries.length;
         const allSettledResults = await Promise.allSettled(
             entries.map(async ([questionId, input]) => {
                 using seqLease = await localQueue.acquire(signal);
                 const seq = seqLease.item;
+
+                evaluationsLeft--;
+                using drainToParentOnFinishHandle = scopeExit(() => {
+                    if (evaluationsLeft > 0)
+                        return;
+
+                    localQueue.forwardPushesToParent = true;
+                    localQueue.drainToParent();
+                });
 
                 const initialMeterSnapshot = seq.tokenMeter.getState();
                 using updateTokenUsageExitHandle = scopeExit(() => {
