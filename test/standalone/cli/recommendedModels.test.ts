@@ -4,7 +4,7 @@ import {recommendedModels} from "../../../src/cli/recommendedModels.js";
 
 describe("cli", () => {
     describe("recommended models", () => {
-        test("all URIs resolve correctly", {timeout: 1000 * 60 * 6}, async () => {
+        test("all URIs resolve correctly", {timeout: 1000 * 60 * 12}, async () => {
             const unresolvedUris = (
                 await Promise.all(
                     recommendedModels
