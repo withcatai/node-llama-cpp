@@ -189,7 +189,7 @@ export class LlamaDecisionContext {
     }
 
     /** Warmup the model, so that the next evaluation is faster */
-    public async warmup({}: {signal?: AbortSignal} = {}) {
+    public async warmup({signal}: {signal?: AbortSignal} = {}) {
         using retain = this._retainer.tryRetain(() => new DisposedError());
         using seq = await this._seqQueue.acquire(signal);
 
