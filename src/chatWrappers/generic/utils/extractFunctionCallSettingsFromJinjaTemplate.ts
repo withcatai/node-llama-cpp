@@ -7,7 +7,7 @@ import {getFirstValidResult} from "./getFirstValidResult.js";
 export type ExtractFunctionCallSettingsRenderTemplate = (options: {
     chatHistory: ChatHistoryItem[], functions: ChatModelFunctions, additionalParams: Record<string, unknown>,
     stringifyFunctionParams: boolean, stringifyFunctionResults: boolean, combineModelMessageAndToolCalls: boolean,
-    squashModelTextResponses?: boolean, setFunctionNameInResponse?: string | true
+    squashModelTextResponses?: boolean, setFunctionNameInResponse?: string | boolean | {type: "fallback", value: string | true}
 }) => string;
 
 export function extractFunctionCallSettingsFromJinjaTemplate({
@@ -202,7 +202,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls,
-            setFunctionNameInResponse: funcResponseNameId
+            setFunctionNameInResponse: {type: "fallback", value: funcResponseNameId}
         });
         stringifyParams = (
             !paramsObjectTest.includes(`"${func1StringifyParam}":`) &&
@@ -233,7 +233,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             stringifyFunctionParams: false,
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls,
-            setFunctionNameInResponse: funcResponseNameId
+            setFunctionNameInResponse: {type: "fallback", value: funcResponseNameId}
         });
         stringifyResult = (
             !resultObjectTest.includes(`"${func1StringifyResult}":`) &&
@@ -250,7 +250,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         stringifyFunctionParams: stringifyParams,
         stringifyFunctionResults: stringifyResult,
         combineModelMessageAndToolCalls,
-        setFunctionNameInResponse: funcResponseNameId
+        setFunctionNameInResponse: {type: "fallback", value: funcResponseNameId}
     }).includes(modelMessage1);
 
     let textBetween2TextualModelResponses: LlamaText = LlamaText();
@@ -270,7 +270,7 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                 stringifyFunctionResults: false,
                 combineModelMessageAndToolCalls,
                 squashModelTextResponses: false,
-                setFunctionNameInResponse: funcResponseNameId
+                setFunctionNameInResponse: {type: "fallback", value: funcResponseNameId}
             });
             const textDiff = getTextBetweenIds(
                 betweenModelTextualResponsesTest, modelMessage1, modelMessage2
@@ -281,6 +281,32 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         }
     }
 
+    let usesFunctionNameInResult = false;
+    try {
+        const rendered1Call = renderTemplate({
+            chatHistory: chatHistory1Call,
+            functions: functions1,
+            additionalParams,
+            stringifyFunctionParams: stringifyParams,
+            stringifyFunctionResults: stringifyResult,
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: false
+        });
+        const rendered1CallWithName = renderTemplate({
+            chatHistory: chatHistory1Call,
+            functions: functions1,
+            additionalParams,
+            stringifyFunctionParams: stringifyParams,
+            stringifyFunctionResults: stringifyResult,
+            combineModelMessageAndToolCalls,
+            setFunctionNameInResponse: funcResponseNameId
+        });
+        if (rendered1CallWithName.replaceAll(funcResponseNameId, "") === rendered1Call)
+            usesFunctionNameInResult = true;
+    } catch (err) {
+        // do nothing
+    }
+
     let usedNewChunkFor2Calls = false;
     const rendered1Call = renderTemplate({
         chatHistory: chatHistory1Call,
@@ -289,7 +315,9 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
         stringifyFunctionParams: stringifyParams,
         stringifyFunctionResults: stringifyResult,
         combineModelMessageAndToolCalls,
-        setFunctionNameInResponse: funcResponseNameId
+        setFunctionNameInResponse: usesFunctionNameInResult
+            ? funcResponseNameId
+            : {type: "fallback", value: funcResponseNameId}
     });
     const renderedOnlyCall = getFirstValidResult([
         () => renderTemplate({
@@ -299,7 +327,9 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             stringifyFunctionParams: stringifyParams,
             stringifyFunctionResults: stringifyResult,
             combineModelMessageAndToolCalls,
-            setFunctionNameInResponse: funcResponseNameId
+            setFunctionNameInResponse: usesFunctionNameInResult
+                ? funcResponseNameId
+                : {type: "fallback", value: funcResponseNameId}
         }),
         () => undefined
     ]);
@@ -311,7 +341,9 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             stringifyFunctionParams: stringifyParams,
             stringifyFunctionResults: stringifyResult,
             combineModelMessageAndToolCalls,
-            setFunctionNameInResponse: funcResponseNameId
+            setFunctionNameInResponse: usesFunctionNameInResult
+                ? funcResponseNameId
+                : {type: "fallback", value: funcResponseNameId}
         }),
         () => {
             usedNewChunkFor2Calls = true;
@@ -322,7 +354,9 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
                 stringifyFunctionParams: stringifyParams,
                 stringifyFunctionResults: stringifyResult,
                 combineModelMessageAndToolCalls,
-                setFunctionNameInResponse: funcResponseNameId
+                setFunctionNameInResponse: usesFunctionNameInResult
+                    ? funcResponseNameId
+                    : {type: "fallback", value: funcResponseNameId}
             });
         }
     ]);
@@ -541,8 +575,22 @@ export function extractFunctionCallSettingsFromJinjaTemplate({
             call: {
                 optionalPrefixSpace: true,
                 prefix: cleanRevivedCallPrefix,
-                paramsPrefix: reviveSeparatorText(callParamsPrefixText, idToStaticContent, contentIds),
-                suffix: reviveSeparatorText(callSuffixText, idToStaticContent, contentIds),
+                paramsPrefix: reviveSeparatorText(
+                    callParamsPrefixText,
+                    new Map([
+                        ...idToStaticContent.entries(),
+                        [func1name, LlamaText("{{functionName}}")]
+                    ]),
+                    contentIds
+                ),
+                suffix: reviveSeparatorText(
+                    callSuffixText,
+                    new Map([
+                        ...idToStaticContent.entries(),
+                        [func1name, LlamaText("{{functionName}}")]
+                    ]),
+                    contentIds
+                ),
                 emptyCallParamsPlaceholder: {}
             },
             result: {
@@ -691,7 +739,7 @@ export function detectNeedToWrapFunctionArgumentsWithMap({
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls: false,
             squashModelTextResponses: true,
-            setFunctionNameInResponse: true
+            setFunctionNameInResponse: {type: "fallback", value: true}
         });
         if (rendered.includes(paramsValue))
             return undefined;
@@ -708,7 +756,7 @@ export function detectNeedToWrapFunctionArgumentsWithMap({
             stringifyFunctionResults: false,
             combineModelMessageAndToolCalls: false,
             squashModelTextResponses: true,
-            setFunctionNameInResponse: true
+            setFunctionNameInResponse: {type: "fallback", value: true}
         });
         if (renderedWithParamsMap.includes(paramsValue))
             return paramsMapKey;

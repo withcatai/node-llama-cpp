@@ -315,7 +315,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
 
                 const messages = fromIntermediateToCompleteOpenAiMessages(intermediateMessages)
                     .map((item) => {
-                        if (!wipeFunctionCallIds)
+                        if (wipeFunctionCallIds === false)
                             return item;
 
                         if (item.role === "assistant" && item["tool_calls"] != null && item["tool_calls"].length > 0) {
@@ -386,7 +386,11 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                 wipeFunctionCallIds: [true, "align", false],
                 setFunctionNameInResponse: setFunctionNameInResponse == null
                     ? [false]
-                    : [false, setFunctionNameInResponse]
+                    : (typeof setFunctionNameInResponse === "string" || typeof setFunctionNameInResponse === "boolean")
+                        ? [setFunctionNameInResponse]
+                        : setFunctionNameInResponse.type === "fallback"
+                            ? [false, setFunctionNameInResponse.value]
+                            : [false]
             }, ({convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse}) => {
                 return render(convertSystemMessagesToUserMessagesFormat, wipeFunctionCallIds, setFunctionNameInResponse);
             });
@@ -410,6 +414,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                     this._usingJinjaFunctionCallTemplate = true;
                     this._stringifyFunctionParams = extractedSettings.stringifyParams;
                     this._stringifyFunctionResult = extractedSettings.stringifyResult;
+                    this._combineJinjaModelMessageAndToolCalls = extractedSettings.combineModelMessageAndToolCalls;
                 }
             } catch (err) {
                 // do nothing
@@ -490,7 +495,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
         return LlamaText([
             this.settings.functions.call.prefix,
             name,
-            this.settings.functions.call.paramsPrefix,
+            replaceRegularTextInLlamaText(this.settings.functions.call.paramsPrefix, "{{functionName}}", name),
             (
                 params === undefined
                     ? (emptyCallParamsPlaceholder === undefined || emptyCallParamsPlaceholder === "")
