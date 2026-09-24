@@ -112,7 +112,7 @@ export abstract class ChatWrapper {
         return LlamaText([
             this.settings.functions.call.prefix,
             name,
-            this.settings.functions.call.paramsPrefix,
+            replaceRegularTextInLlamaText(this.settings.functions.call.paramsPrefix, "{{functionName}}", name),
             (
                 params === undefined
                     ? (emptyCallParamsPlaceholder === undefined || emptyCallParamsPlaceholder === "")

@@ -57,6 +57,7 @@ describe("JinjaTemplateChatWrapper", () => {
                 "thought": {
                   "openOnResponseStart": true,
                   "prefix": {
+                    "afterFunctionCalls": true,
                     "type": "openedOnStart",
                   },
                   "reopenAfterFunctionCalls": true,
@@ -80,6 +81,7 @@ describe("JinjaTemplateChatWrapper", () => {
                 "thought": {
                   "openOnResponseStart": true,
                   "prefix": {
+                    "afterFunctionCalls": true,
                     "type": "openedOnStart",
                   },
                   "reopenAfterFunctionCalls": true,

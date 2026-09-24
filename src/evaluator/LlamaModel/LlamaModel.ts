@@ -21,6 +21,7 @@ import {maxRecentDetokenizerTokens} from "../../consts.js";
 import {LlamaRankingContext, LlamaRankingContextOptions} from "../LlamaRankingContext.js";
 import {GgmlType, resolveGgmlTypeOption} from "../../gguf/types/GgufTensorInfoTypes.js";
 import {MemoryMarking} from "../../bindings/utils/MemoryOrchestrator.js";
+import {LlamaDecisionContext, LlamaDecisionContextOptions} from "../LlamaDecisionContext/LlamaDecisionContext.js";
 import {TokenAttribute, TokenAttributes} from "./utils/TokenAttributes.js";
 import type {Llama} from "../../bindings/Llama.js";
 import type {BuiltinSpecialTokenValue} from "../../utils/LlamaText.js";
@@ -698,6 +699,16 @@ export class LlamaModel {
             throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
 
         return await LlamaRankingContext._create({_model: this}, options);
+    }
+
+    /**
+     * @see [Using Structured Decisions](https://node-llama-cpp.withcat.ai/guide/structured-decisions) tutorial
+     */
+    public async createDecisionContext(options: LlamaDecisionContextOptions = {}) {
+        if (this._vocabOnly)
+            throw new Error("Model is loaded in vocabOnly mode, so no context can be created");
+
+        return await LlamaDecisionContext._create({_model: this}, options);
     }
 
     /**

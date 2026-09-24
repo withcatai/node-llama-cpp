@@ -52,9 +52,8 @@ describe("llama 3.2", () => {
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
-              Cutting Knowledge Date: December 2023",
-                new SpecialToken("NL"),
-                "Today Date: 1 Jan 2025
+              Cutting Knowledge Date: December 2023
+              Today Date: 1 Jan 2025
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",
@@ -80,9 +79,8 @@ describe("llama 3.2", () => {
                 new SpecialTokensText("<|end_header_id|>"),
                 "
 
-              Cutting Knowledge Date: December 2023",
-                new SpecialToken("NL"),
-                "Today Date: 1 Jan 2025
+              Cutting Knowledge Date: December 2023
+              Today Date: 1 Jan 2025
 
               You are a helpful, respectful and honest assistant. Always answer as helpfully as possible.
               If a question does not make any sense, or is not factually coherent, explain why instead of answering something incorrectly. If you don't know the answer to a question, don't share false information.",

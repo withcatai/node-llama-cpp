@@ -86,6 +86,26 @@ getElectronExampleAppDownloadLink()
                 </div>
             </div>
         </div>
+        <div class="container">
+            <div class="panels vp-doc">
+                <div class="panel">
+                    <h2>Generate Structured Decisions</h2>
+                    <p>Classify text using a predefined set of options blazingly fast</p>
+                    <div class="code">
+                        <slot name="structured-decisions" />
+                        <p><a class="learn-more" :href="withBase('/guide/structured-decisions#decision-context')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                    </div>
+                </div>
+                <div class="panel">
+                    <h2>Classify a Complete Chat</h2>
+                    <p>Classify an entire chat in place almost instantly</p>
+                    <div class="code">
+                        <slot name="classify-chat" />
+                        <p><a class="learn-more" :href="withBase('/guide/structured-decisions#chat-session')">Learn more <span class="vpi-arrow-right"></span></a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 </template>
 

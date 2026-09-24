@@ -72,6 +72,7 @@ npx -y node-llama-cpp inspect gpu
 * [Grammar](./guide/grammar.md)
 * [JSON schema grammar](./guide/index.md#chatbot-with-json-schema)
 * [Function calling](./guide/index.md#chatbot-with-json-schema)
+* [Structured decisions](./guide/structured-decisions.md)
 * [CUDA support](./guide/CUDA.md)
 * [Metal support](./guide/Metal.md)
 * [Vulkan support](./guide/Vulkan.md)
@@ -210,7 +211,7 @@ const parsedRes = grammar.parse(res);
 
 console.log("User name:", parsedRes.nameOfUser);
 console.log(
-    "Positive words in user message:", 
+    "Positive words in user message:",
     parsedRes.positiveWordsInUserMessage
 );
 console.log(
@@ -278,6 +279,134 @@ console.log("User: " + q1);
 
 const a1 = await session.prompt(q1, {functions});
 console.log("AI: " + a1);
+```
+
+</template>
+<template v-slot:structured-decisions>
+
+```TypeScript
+import {getLlama, resolveModelFile} from "node-llama-cpp";
+
+const modelUri = "hf:giladgd/gemma-4-E2B-it-GGUF:Q8_0";
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: await resolveModelFile(modelUri)
+});
+const context = await model.createDecisionContext();
+
+await context.warmup(); // optional
+const startTime = Date.now();
+
+const ticket =
+    "I can't sign in after resetting my password. " +
+    "My whole team is locked out.";
+const answers = await context.decide(ticket, {
+    troubleshooted: {
+        type: "noul",
+        instruction:
+            "Has the customer tried fixing the issue?"
+    },
+    team: {
+        type: "choice",
+        instruction:
+            "Which support team should handle this?",
+        criteria: {
+            accounts: "Signing in, account access",
+            billing: "Invoices, payments, refunds",
+            technical: "Problems after signing in"
+        }
+    },
+    impact: {
+        type: "score",
+        instruction:
+            "How much is the issue " +
+            "affecting the customer's work?",
+        criteria: [
+            "No interruption to work",
+            "Some tasks are slower or harder",
+            "The customer cannot continue their work"
+        ]
+    }
+});
+
+console.log({
+    queue: answers.team.confidence >= 0.7
+        ? answers.team.choice
+        : "triage",
+    priority: answers.impact.score >= 1.5
+        ? "high"
+        : "normal",
+    nextStep: answers.troubleshooted.value >= 0.8
+        ? "review previous attempts"
+        : "suggest initial troubleshooting"
+});
+const duration = Date.now() - startTime;
+console.log("Duration: " + duration + "ms"); // 170ms
+```
+
+</template>
+<template v-slot:classify-chat>
+
+```TypeScript
+import {
+    getLlama,
+    resolveModelFile,
+    LlamaChatSession
+} from "node-llama-cpp";
+
+const modelUri = "hf:giladgd/gemma-4-E2B-it-GGUF:Q8_0";
+
+const llama = await getLlama();
+const model = await llama.loadModel({
+    modelPath: await resolveModelFile(modelUri)
+});
+const context = await model.createContext();
+const session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    systemPrompt:
+        "You help customers resolve account access issues"
+});
+
+await session.prompt(
+    "I can't sign in after resetting my password.",
+    {maxTokens: 150}
+);
+await session.prompt(
+    "That fixed it, thanks!",
+    {maxTokens: 100}
+);
+
+const startTime = Date.now();
+const answers = await session.decide({
+    resolved: {
+        type: "noul",
+        instruction:
+            "Has the customer confirmed " +
+            "that their issue is resolved?"
+    },
+    needsHuman: {
+        type: "noul",
+        instruction:
+            "Has the customer asked to speak to a person?"
+    }
+});
+
+
+
+
+
+
+
+if (answers.needsHuman.value >= 0.8)
+    console.log("Hand off to a support agent");
+else if (answers.resolved.value >= 0.8)
+    console.log("Mark the ticket as resolved");
+else
+    console.log("Continue the conversation");
+
+const duration = Date.now() - startTime;
+console.log("Duration: " + duration + "ms"); // 123ms
 ```
 
 </template>

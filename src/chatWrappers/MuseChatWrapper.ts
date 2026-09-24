@@ -38,7 +38,7 @@ export class MuseChatWrapper extends ChatWrapper {
                 call: {
                     sectionPrefix: "",
                     betweenCalls: LlamaText(new SpecialTokensText("<|eom|><|start|>assistant")),
-                    sectionSuffix: LlamaText(new SpecialToken("EOT"))
+                    sectionSuffix: LlamaText(new SpecialTokensText("<|eot|>"))
                 },
                 result: {
                     sectionPrefix: ""
@@ -49,7 +49,7 @@ export class MuseChatWrapper extends ChatWrapper {
                     new SpecialTokensText("<|start|>tool "), "{{functionName}}",
                     new SpecialTokensText('<|message|><tool_output name="'), "{{functionName}}", new SpecialTokensText('">\n')
                 ]),
-                suffix: LlamaText([new SpecialTokensText("\n</tool_output>"), new SpecialToken("EOT")])
+                suffix: LlamaText([new SpecialTokensText("\n</tool_output>"), new SpecialTokensText("<|eot|>")])
             }
         },
         segments: {
@@ -274,7 +274,7 @@ export class MuseChatWrapper extends ChatWrapper {
                 ? ""
                 : jsonDumps(result),
             new SpecialTokensText("\n</tool_output>"),
-            new SpecialToken("EOT")
+            new SpecialTokensText("<|eot|>")
         ]);
     }
 

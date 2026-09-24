@@ -374,7 +374,7 @@ export class LlamaRankingContext {
     }, {
         contextSize,
         batchSize,
-        threads = 6,
+        threads,
         createSignal,
         template,
         ignoreMemorySafetyChecks

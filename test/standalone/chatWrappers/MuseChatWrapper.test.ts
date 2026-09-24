@@ -180,9 +180,7 @@ describe("MuseChatWrapper", () => {
             "{"city": "Tokyo", "includeForecast": false}",
             new SpecialTokensText("</atem:parameter>
           </atem:invoke>
-          </atem:function_calls>"),
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start|>tool "),
+          </atem:function_calls><|eot|><|start|>tool "),
             "get_weather",
             new SpecialTokensText("<|message|><tool_output name=""),
             "get_weather",
@@ -190,9 +188,7 @@ describe("MuseChatWrapper", () => {
           "),
             "{"temperature": 24}",
             new SpecialTokensText("
-          </tool_output>"),
-            new SpecialToken("EOT"),
-            new SpecialTokensText("<|start|>assistant to=user<|message|>"),
+          </tool_output><|eot|><|start|>assistant to=user<|message|>"),
             "It is 24 degrees in Tokyo.",
           ])
         `);

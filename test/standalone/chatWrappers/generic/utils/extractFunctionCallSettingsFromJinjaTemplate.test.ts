@@ -191,8 +191,7 @@ describe("JinjaTemplateChatWrapper", () => {
                       "sectionPrefix": LlamaText([]),
                       "sectionSuffix": LlamaText([
                         new SpecialTokensText("><|assistant|>
-              <think></think>
-              "),
+              <think>"),
                       ]),
                     },
                   },
@@ -212,6 +211,7 @@ describe("JinjaTemplateChatWrapper", () => {
                   "thought": {
                     "openOnResponseStart": true,
                     "prefix": {
+                      "afterFunctionCalls": true,
                       "type": "openedOnStart",
                     },
                     "reopenAfterFunctionCalls": true,

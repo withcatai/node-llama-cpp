@@ -50,7 +50,7 @@ export type LlamaContextOptions = {
 
     /**
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
-     * 
+     *
      * When set to `"auto"`, flash attention will automatically be used when supported by the model and hardware capabilities.
      *
      * This option will be ignored if flash attention is not supported by the model.
@@ -538,6 +538,60 @@ export type ControlledEvaluateInputItem = Token | [token: Token, options: {
         probabilities?: boolean,
 
         /**
+         * Get the raw logits of the tokens from the vocabulary to be the next token, after applying the given options.
+         *
+         * Only enable when needed, as it impacts the performance.
+         *
+         * Defaults to `false`.
+         */
+        logits?: boolean | {
+            /**
+             * Only return the logits for the given tokens
+             */
+            filter: {
+                /**
+                 * The list of tokens for which to return logits
+                 */
+                tokens: readonly Token[],
+
+                /**
+                 * Always include the max logit token.
+                 *
+                 * Defaults to `false`.
+                 */
+                includeMax?: boolean,
+
+                /**
+                 * Always include the min logit token.
+                 *
+                 * Defaults to `false`.
+                 */
+                includeMin?: boolean,
+
+                /**
+                 * Always include the selected token.
+                 *
+                 * Defaults to `false`.
+                 */
+                includeSelected?: boolean,
+
+                /**
+                 * Always include the top N logit tokens.
+                 *
+                 * Defaults to `0`, meaning no top tokens are included.
+                 */
+                includeTop?: number
+            }
+        },
+
+        /**
+         * Get the total logit weight of the tokens from the vocabulary to be the next token, after applying the given options.
+         *
+         * Equals to the sum of `exp(logit - maxLogit)`.
+         */
+        totalLogitWeight?: boolean,
+
+        /**
          * Get the confidence (probability) of the selected token.
          *
          * Same as `next.probabilities.get(next.token)` from the output.
@@ -645,7 +699,28 @@ export type ControlledEvaluateIndexOutput = {
          * Use `.entries().next().value` to get the top probability pair
          * ([learn more](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/entries)).
          */
-        probabilities?: Map<Token, number>
+        probabilities?: Map<Token, number>,
+
+        /**
+         * The raw logits of the tokens from the vocabulary to be the next token.
+         *
+         * A logit is a number representing the unnormalized score for a token.
+         *
+         * The logits might be slightly different when evaluated on different GPUs and configurations.
+         *
+         * The map is sorted by the logit of the tokens from the highest to the lowest,
+         * and is reflected in the order of the entries when iterating over the map.
+         * Use `.entries().next().value` to get the top logit pair
+         * ([learn more](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/entries)).
+         */
+        logits?: Map<Token, number>,
+
+        /**
+         * The total logit weight of the tokens from the vocabulary to be the next token, after applying the given options.
+         *
+         * Equals to the sum of `exp(logit - maxLogit)`.
+         */
+        totalLogitWeight?: number
     }
 };
 

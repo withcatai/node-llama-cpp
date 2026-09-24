@@ -177,8 +177,22 @@ export type AddonContext = {
         batchLogitIndex: BatchLogitIndex,
         sampler: AddonSampler,
         probabilities: boolean,
-        confidence?: boolean
-    ): Promise<[token: Token | -1, probabilities: (Token | number)[] | undefined, confidence: number | undefined]>,
+        confidence?: boolean,
+        logits?: boolean | [
+            tokens: readonly Token[],
+            includeMax: boolean,
+            includeMin: boolean,
+            includeSelected: boolean,
+            includeTop: number
+        ],
+        totalLogitWeight?: boolean
+    ): Promise<[
+        token: Token | -1,
+        probabilities: (Token | number)[] | undefined,
+        confidence: number | undefined,
+        logits: (Token | number)[] | undefined,
+        totalLogitWeight: number | undefined
+    ]>,
     disposeSequence(sequenceId: number): void,
 
     // startPos in inclusive, endPos is exclusive
@@ -203,7 +217,8 @@ export type AddonContext = {
     loadSequenceStateFromFile(filePath: string, sequenceId: number, maxContextSize: number): Promise<Uint32Array>,
     setLoras(loras: AddonModelLora[], scales: number[]): void,
 
-    restoreCheckpoint(checkpoint: AddonContextSequenceCheckpoint, maxPosIndex: number): Promise<boolean>
+    restoreCheckpoint(checkpoint: AddonContextSequenceCheckpoint, maxPosIndex: number, sequenceId: number): Promise<boolean>,
+    copySequenceStateFromOtherSequence(targetSequenceId: number, sourceSequenceId: number): Promise<number>
 };
 
 export type AddonContextSequenceCheckpoint = {

@@ -6,6 +6,7 @@ import {
 import {SpecialToken, LlamaText, SpecialTokensText} from "../utils/LlamaText.js";
 import {jsonDumps} from "./utils/jsonDumps.js";
 import {chunkChatItems} from "./utils/chunkChatItems.js";
+import type {JinjaTemplateChatWrapperOptions} from "./generic/JinjaTemplateChatWrapper.js";
 
 // source:
 // https://github.com/mistralai/platform-docs-public/blob/02c3f50e427ce5cf96bba9710501598f621babea/docs/guides/tokenization.mdx#v3-tokenizer
@@ -233,13 +234,25 @@ export class MistralChatWrapper extends ChatWrapper {
 
     /** @internal */
     public static override _getOptionConfigurationsToTestIfCanSupersedeJinjaTemplate(): ChatWrapperJinjaMatchConfiguration<typeof this> {
+        const jinjaTemplateOption: Omit<JinjaTemplateChatWrapperOptions, "template"> = {
+            functionCallMessageTemplate: "noJinja"
+        };
+
         return [
-            [{addSpaceBeforeEos: false, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true}, {addSpaceBeforeEos: false}],
-            [{addSpaceBeforeEos: true, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true}, {addSpaceBeforeEos: true}],
-            [{addSpaceBeforeEos: false, _noFunctionNameInResult: true}, {addSpaceBeforeEos: false}],
-            [{addSpaceBeforeEos: true, _noFunctionNameInResult: true}, {addSpaceBeforeEos: true}],
-            [{addSpaceBeforeEos: false}, {addSpaceBeforeEos: false}],
-            [{addSpaceBeforeEos: true}, {addSpaceBeforeEos: true}]
+            [
+                {addSpaceBeforeEos: false, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true},
+                {addSpaceBeforeEos: false},
+                jinjaTemplateOption
+            ],
+            [
+                {addSpaceBeforeEos: true, _noFunctionNameInResult: true, _stringifyFunctionCallResult: true},
+                {addSpaceBeforeEos: true},
+                jinjaTemplateOption
+            ],
+            [{addSpaceBeforeEos: false, _noFunctionNameInResult: true}, {addSpaceBeforeEos: false}, jinjaTemplateOption],
+            [{addSpaceBeforeEos: true, _noFunctionNameInResult: true}, {addSpaceBeforeEos: true}, jinjaTemplateOption],
+            [{addSpaceBeforeEos: false}, {addSpaceBeforeEos: false}, jinjaTemplateOption],
+            [{addSpaceBeforeEos: true}, {addSpaceBeforeEos: true}, jinjaTemplateOption]
         ];
     }
 }

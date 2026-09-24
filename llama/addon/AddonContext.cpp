@@ -1,6 +1,7 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 #include "common/common.h"
 #include "llama-context.h"
 #include "llama-vocab.h"
@@ -173,16 +174,49 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         AddonContext* ctx;
         AddonSampler* sampler;
         bool arrayResult = false;
-        bool returnProbabilities = false;
         bool returnConfidence = false;
         float tokenConfidence = -1;
-        bool has_probabilities = false;
-        size_t probabilities_size;
-        llama_token * probabilities_tokens;
-        float * probabilities_probs;
         int32_t batchLogitIndex;
         llama_token result;
         bool no_output = false;
+
+        struct TokenValuePair {
+            llama_token token = LLAMA_TOKEN_NULL;
+            float value = 0.00f;
+
+            TokenValuePair() = default;
+            TokenValuePair(llama_token token, float value)
+                : token(token), value(value) {}
+        };
+
+        bool returnProbabilities = false;
+        struct ProbabilitiesMap {
+            bool isSet = false;
+            std::vector<TokenValuePair> probs;
+        } probabilities;
+
+        struct ReturnLogits {
+            enum ReturnLogitsEnabled {
+                Disabled = 0,
+                Enabled = 1,
+                WithFilter = 2
+            } enabled = ReturnLogits::Disabled;
+            std::vector<llama_token> filter;
+            bool includeHighest = false;
+            bool includeLowest = false;
+            bool includeSelected = false;
+            size_t includeTop = 0;
+        } returnLogits;
+        struct LogitsMap {
+            bool isSet = false;
+            std::vector<TokenValuePair> logits;
+        } logits;
+
+        bool returnTotalLogitWeight = false;
+        struct TotalLogitWeight {
+            bool isSet = false;
+            float value = 0.0f;
+        } totalLogitWeight;
 
         AddonContextSampleTokenWorker(const Napi::CallbackInfo& info, AddonContext* ctx)
             : Napi::AsyncWorker(info.Env(), "AddonContextSampleTokenWorker"),
@@ -195,16 +229,72 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             arrayResult = info.Length() > 2 && info[2].IsBoolean();
             returnProbabilities = arrayResult ? info[2].As<Napi::Boolean>().Value() : false;
             returnConfidence = arrayResult && info.Length() > 3 && info[3].IsBoolean() ? info[3].As<Napi::Boolean>().Value() : false;
+
+            if (info.Length() > 4) {
+                const auto option = info[4];
+                if (option.IsBoolean()) {
+                    returnLogits.enabled = option.As<Napi::Boolean>().Value() ? ReturnLogits::Enabled : ReturnLogits::Disabled;
+                } else if (option.IsArray()) {
+                    const auto arr = option.As<Napi::Array>();
+
+                    if (arr.Length() == 5) {
+                        const auto tokensOption = arr.Get(static_cast<uint32_t>(0));
+                        const auto includeHighestOption = arr.Get(static_cast<uint32_t>(1));
+                        const auto includeLowestOption = arr.Get(static_cast<uint32_t>(2));
+                        const auto includeSelectedOption = arr.Get(static_cast<uint32_t>(3));
+                        const auto includeTopOption = arr.Get(static_cast<uint32_t>(4));
+
+                        size_t logitsReserveSize = 0;
+                        if (includeHighestOption.IsBoolean()) {
+                            returnLogits.includeHighest = includeHighestOption.As<Napi::Boolean>().Value();
+                            logitsReserveSize++;
+                        }
+
+                        if (includeLowestOption.IsBoolean()) {
+                            returnLogits.includeLowest = includeLowestOption.As<Napi::Boolean>().Value();
+                            logitsReserveSize++;
+                        }
+
+                        if (includeSelectedOption.IsBoolean()) {
+                            returnLogits.includeSelected = includeSelectedOption.As<Napi::Boolean>().Value();
+                            logitsReserveSize++;
+                        }
+
+                        if (includeTopOption.IsNumber()) {
+                            returnLogits.includeTop = includeTopOption.As<Napi::Number>().Uint32Value();
+                            logitsReserveSize += returnLogits.includeTop;
+                        }
+
+                        if (tokensOption.IsArray()) {
+                            returnLogits.enabled = ReturnLogits::WithFilter;
+
+                            const auto tokensArr = tokensOption.As<Napi::Array>();
+                            returnLogits.filter.clear();
+                            returnLogits.filter.reserve(tokensArr.Length() + (returnLogits.includeSelected ? 1 : 0));
+                            for (size_t i = 0; i < tokensArr.Length(); ++i) {
+                                const auto val = tokensArr.Get(i);
+                                if (!val.IsNumber()) {
+                                    continue;
+                                }
+
+                                returnLogits.filter.push_back(val.As<Napi::Number>().Int32Value());
+                            }
+
+                            logitsReserveSize = returnLogits.filter.size();
+                        }
+
+                        this->logits.logits.reserve(logitsReserveSize);
+                    }
+                }
+            }
+
+            returnTotalLogitWeight = info.Length() > 5 && info[5].As<Napi::Boolean>().Value();
+
             sampler->Ref();
         }
         ~AddonContextSampleTokenWorker() {
             ctx->Unref();
             sampler->Unref();
-
-            if (has_probabilities) {
-                delete[] probabilities_tokens;
-                delete[] probabilities_probs;
-            }
         }
 
         Napi::Promise GetPromise() {
@@ -225,6 +315,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         }
 
         void SampleToken() {
+            std::unique_lock<std::mutex> samplingLock(ctx->samplingMutex);
             if (llama_get_logits(ctx->ctx) == nullptr) {
                 SetError("This model does not support token generation");
                 return;
@@ -233,7 +324,8 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             sampler->rebuildChainIfNeeded();
 
             llama_token_data_array cur_p;
-            sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence);
+            sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence || returnLogits.enabled != ReturnLogits::Disabled);
+            samplingLock.unlock();
 
             if (cur_p.size == 0 || !(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;
@@ -242,7 +334,7 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
 
             auto new_token_id = cur_p.data[cur_p.selected].id;
 
-            if (returnProbabilities || returnConfidence) {
+            if (returnProbabilities || returnConfidence || returnLogits.enabled == ReturnLogits::Enabled || returnLogits.includeTop != 0) {
                 if (!cur_p.sorted) {
                     std::sort(cur_p.data, cur_p.data + cur_p.size, [](const llama_token_data & a, const llama_token_data & b) {
                         return a.logit > b.logit;
@@ -258,55 +350,139 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
                 }
             }
 
-            if (returnProbabilities) {
-                probabilities_size = cur_p.size;
-                probabilities_tokens = new llama_token[probabilities_size];
-                probabilities_probs = new float[probabilities_size];
-                float maxLogit = cur_p.size > 0 ? cur_p.data[0].logit : -INFINITY;
+            if (returnLogits.includeTop != 0) {
+                const auto topCount = std::min(returnLogits.includeTop, cur_p.size);
+                for (int32_t i = 0; i < topCount; i++) {
+                    this->logits.logits.emplace_back(cur_p.data[i].id, cur_p.data[i].logit);
+                }
+            }
+
+            if (returnLogits.enabled == ReturnLogits::WithFilter && returnLogits.includeSelected && new_token_id != LLAMA_TOKEN_NULL &&
+                std::find(returnLogits.filter.begin(), returnLogits.filter.end(), new_token_id) == returnLogits.filter.end()
+            ) {
+                returnLogits.filter.emplace_back(new_token_id);
+            }
+
+            float maxLogit = -INFINITY;
+            bool maxLogitSet = false;
+            if (returnProbabilities || returnLogits.enabled != ReturnLogits::Disabled) {
+                std::vector<TokenValuePair> logits;
+                logits.resize(cur_p.size);
+
+                maxLogit = cur_p.size > 0 ? cur_p.data[0].logit : -INFINITY;
+                llama_token maxLogitToken = cur_p.size > 0 ? cur_p.data[0].id : LLAMA_TOKEN_NULL;
+                maxLogitSet = true;
+
+                float minLogit = cur_p.size > 0 ? cur_p.data[0].logit : INFINITY;
+                llama_token minLogitToken = cur_p.size > 0 ? cur_p.data[0].id : LLAMA_TOKEN_NULL;
 
                 for (size_t i = 0; i < cur_p.size; i++) {
-                    auto logit = cur_p.data[i].logit;
+                    auto & logit = cur_p.data[i].logit;
+                    auto & token = cur_p.data[i].id;
 
-                    probabilities_tokens[i] = cur_p.data[i].id;
-                    probabilities_probs[i] = logit;
+                    logits[i].token = token;
+                    logits[i].value = logit;
 
                     if (logit > maxLogit) {
                         maxLogit = logit;
+                        maxLogitToken = token;
+                    }
+                    if (logit < minLogit) {
+                        minLogit = logit;
+                        minLogitToken = token;
+                    }
+
+                    if (returnLogits.enabled == ReturnLogits::WithFilter &&
+                        std::find(returnLogits.filter.begin(), returnLogits.filter.end(), token) != returnLogits.filter.end()) {
+                        this->logits.logits.emplace_back(token, logit);
                     }
                 }
 
-                if (probabilities_size > 0 && maxLogit != -INFINITY) {
-                    float sum = 0.0f;
-                    for (size_t i = 0; i < probabilities_size; i++) {
-                        float prob = expf(probabilities_probs[i] - maxLogit);
-                        probabilities_probs[i] = prob;
-                        sum += prob;
-                    }
-
-                    for (size_t i = 0; i < probabilities_size; i++) {
-                        probabilities_probs[i] /= sum;
-                    }
-                }
-
-                has_probabilities = true;
-            }
-
-            if (returnConfidence) {
-                if (has_probabilities && cur_p.selected < probabilities_size) {
-                    tokenConfidence = probabilities_probs[cur_p.selected];
-                } else {
-                    float maxLogit = cur_p.data[0].logit;
-                    float sum = 0.0f;
-                    for (size_t i = 0; i < cur_p.size; i++) {
-                        auto logit = cur_p.data[i].logit;
-
-                        if (logit > maxLogit) {
-                            maxLogit = logit;
+                if (returnLogits.enabled == ReturnLogits::WithFilter) {
+                    if (returnLogits.includeHighest && maxLogitToken != LLAMA_TOKEN_NULL &&
+                        std::any_of(
+                            this->logits.logits.begin(),
+                            this->logits.logits.end(),
+                            [maxLogitToken](const TokenValuePair& item) {
+                                return item.token == maxLogitToken;
+                            }
+                        )
+                    ) {
+                        if (cur_p.sorted) {
+                            this->logits.logits.emplace(this->logits.logits.begin(), maxLogitToken, maxLogit);
+                        } else {
+                            this->logits.logits.emplace_back(maxLogitToken, maxLogit);
                         }
                     }
 
+                    if (returnLogits.includeLowest && minLogitToken != LLAMA_TOKEN_NULL &&
+                        std::any_of(
+                            this->logits.logits.begin(),
+                            this->logits.logits.end(),
+                            [minLogitToken](const TokenValuePair& item) {
+                                return item.token == minLogitToken;
+                            }
+                        )
+                    ) {
+                        this->logits.logits.emplace_back(minLogitToken, minLogit);
+                    }
+
+                    this->logits.isSet = true;
+                    if (!cur_p.sorted) {
+                        std::sort(this->logits.logits.begin(), this->logits.logits.end(), [](const TokenValuePair& a, const TokenValuePair& b) {
+                            return a.value > b.value;
+                        });
+                    }
+                } else if (returnProbabilities && returnLogits.enabled == ReturnLogits::Enabled) {
+                    this->logits.logits = logits;
+                    this->logits.isSet = true;
+                } else if (!returnProbabilities && returnLogits.enabled == ReturnLogits::Enabled) {
+                    this->logits.logits.swap(logits);
+                    this->logits.isSet = true;
+                }
+
+                if (returnProbabilities && cur_p.size > 0 && maxLogit != -INFINITY) {
+                    float sum = 0.0f;
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        float prob = expf(logits[i].value - maxLogit);
+                        logits[i].value = prob;
+                        sum += prob;
+                    }
+
+                    for (size_t i = 0; i < cur_p.size; i++) {
+                        logits[i].value /= sum;
+                    }
+
+                    probabilities.probs.swap(logits);
+                    probabilities.isSet = true;
+                }
+            }
+
+            if (returnConfidence || returnTotalLogitWeight) {
+                if (!returnTotalLogitWeight && probabilities.isSet && cur_p.selected < probabilities.probs.size()) {
+                    tokenConfidence = probabilities.probs[cur_p.selected].value;
+                } else {
+                    if (!maxLogitSet) {
+                        maxLogit = cur_p.data[0].logit;
+                        maxLogitSet = true;
+
+                        for (size_t i = 0; i < cur_p.size; i++) {
+                            auto logit = cur_p.data[i].logit;
+
+                            if (logit > maxLogit) {
+                                maxLogit = logit;
+                            }
+                        }
+                    }
+
+                    float sum = 0.0f;
                     for (size_t i = 0; i < cur_p.size; i++) {
                         sum += expf(cur_p.data[i].logit - maxLogit);
+                    }
+
+                    if (returnTotalLogitWeight) {
+                        totalLogitWeight.value = sum;
+                        totalLogitWeight.isSet = true;
                     }
 
                     tokenConfidence = expf(cur_p.data[cur_p.selected].logit - maxLogit) / sum;
@@ -338,17 +514,34 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
             Napi::Array resultArray = Napi::Array::New(Env(), 2);
             resultArray.Set(Napi::Number::New(Env(), 0), resultToken);
 
-            if (has_probabilities) {
-                Napi::Array probabilities = Napi::Array::New(Env(), probabilities_size * 2);
-                for (size_t i = 0; i < probabilities_size; i++) {
-                    probabilities.Set(i * 2, Napi::Number::New(Env(), probabilities_tokens[i]));
-                    probabilities.Set(i * 2 + 1, Napi::Number::New(Env(), probabilities_probs[i]));
+            if (this->probabilities.isSet) {
+                const auto size = this->probabilities.probs.size();
+                Napi::Array probabilities = Napi::Array::New(Env(), size * 2);
+                for (size_t i = 0; i < size; i++) {
+                    auto & prob = this->probabilities.probs[i];
+                    probabilities.Set(i * 2, Napi::Number::New(Env(), prob.token));
+                    probabilities.Set(i * 2 + 1, Napi::Number::New(Env(), prob.value));
                 }
                 resultArray.Set(1, probabilities);
             }
 
             if (returnConfidence && tokenConfidence != -1) {
                 resultArray.Set(2, Napi::Number::New(Env(), tokenConfidence));
+            }
+
+            if (this->logits.isSet) {
+                const auto size = this->logits.logits.size();
+                Napi::Array logits = Napi::Array::New(Env(), size * 2);
+                for (size_t i = 0; i < size; i++) {
+                    auto& prob = this->logits.logits[i];
+                    logits.Set(i * 2, Napi::Number::New(Env(), prob.token));
+                    logits.Set(i * 2 + 1, Napi::Number::New(Env(), prob.value));
+                }
+                resultArray.Set(3, logits);
+            }
+
+            if (totalLogitWeight.isSet) {
+                resultArray.Set(4, Napi::Number::New(Env(), totalLogitWeight.value));
             }
 
             deferred.Resolve(resultArray);
@@ -368,8 +561,9 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.n_threads_batch = context_params.n_threads;
     context_params.no_perf = true;
     context_params.swa_full = false;
+    context_params.kv_unified = false;
 
-    if (info.Length() > 1 && info[1].IsObject()) {
+        if (info.Length() > 1 && info[1].IsObject()) {
         const auto options = info[1].As<Napi::Object>();
 
         if (options.Has("contextSize")) {
@@ -1080,13 +1274,15 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
         AddonContext* context;
         AddonContextSequenceCheckpoint* checkpoint;
         llama_pos maxPosIndex;
+        llama_seq_id sequenceId;
         bool restoreSuccess = false;
 
-        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, llama_pos maxPosIndex)
+        RestoreCheckpointWorker(const Napi::CallbackInfo& info, AddonContext* context, AddonContextSequenceCheckpoint* checkpoint, llama_pos maxPosIndex, llama_seq_id sequenceId)
             : Napi::AsyncWorker(info.Env(), "RestoreCheckpointWorker"),
               context(context),
               checkpoint(checkpoint),
               maxPosIndex(maxPosIndex),
+              sequenceId(sequenceId),
               deferred(Napi::Promise::Deferred::New(info.Env())) {
             context->Ref();
             checkpoint->Ref();
@@ -1118,16 +1314,16 @@ class RestoreCheckpointWorker : public Napi::AsyncWorker {
 
                 if (checkpoint->maxPos < 0) {
                     restoreSuccess = maxPosIndex == -1 &&
-                        llama_memory_seq_rm(llama_get_memory(context->ctx), checkpoint->sequenceId, 0, -1);
+                        llama_memory_seq_rm(llama_get_memory(context->ctx), sequenceId, 0, -1);
                     return;
                 }
 
                 std::size_t dataSize = checkpoint->data.size();
-                std::size_t restoreSize = llama_state_seq_set_data_ext(context->ctx, checkpoint->data.data(), dataSize, checkpoint->sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                std::size_t restoreSize = llama_state_seq_set_data_ext(context->ctx, checkpoint->data.data(), dataSize, sequenceId, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
                 if (restoreSize == dataSize) {
                     restoreSuccess = (
-                        llama_memory_seq_rm(llama_get_memory(context->ctx), checkpoint->sequenceId, maxPosIndex + 1, -1) &&
-                        llama_memory_seq_pos_max(llama_get_memory(context->ctx), checkpoint->sequenceId) == maxPosIndex
+                        llama_memory_seq_rm(llama_get_memory(context->ctx), sequenceId, maxPosIndex + 1, -1) &&
+                        llama_memory_seq_pos_max(llama_get_memory(context->ctx), sequenceId) == maxPosIndex
                     );
                 }
             } catch (const std::exception& e) {
@@ -1151,8 +1347,93 @@ Napi::Value AddonContext::RestoreCheckpoint(const Napi::CallbackInfo& info) {
 
     AddonContextSequenceCheckpoint* checkpoint = Napi::ObjectWrap<AddonContextSequenceCheckpoint>::Unwrap(info[0].As<Napi::Object>());
     const llama_pos maxPosIndex = static_cast<llama_pos>(info[1].As<Napi::Number>().Int32Value());
+    const llama_seq_id sequenceId = static_cast<llama_seq_id>(info[2].As<Napi::Number>().Int32Value());
 
-    RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint, maxPosIndex);
+    RestoreCheckpointWorker* worker = new RestoreCheckpointWorker(info, this, checkpoint, maxPosIndex, sequenceId);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
+class CloneSequenceStateWorker : public Napi::AsyncWorker {
+    public:
+        AddonContext* context;
+        llama_seq_id targetSequenceId;
+        llama_seq_id sourceSequenceId;
+        llama_pos copied = 0;
+
+        CloneSequenceStateWorker(
+            const Napi::CallbackInfo& info,
+            AddonContext* context,
+            llama_seq_id targetSequenceId,
+            llama_seq_id sourceSequenceId
+        )
+            : Napi::AsyncWorker(info.Env(), "CloneSequenceStateWorker"),
+              context(context),
+              targetSequenceId(targetSequenceId),
+              sourceSequenceId(sourceSequenceId),
+              deferred(Napi::Promise::Deferred::New(info.Env())) {
+            context->Ref();
+        }
+
+        ~CloneSequenceStateWorker() {
+            context->Unref();
+        }
+
+        Napi::Promise GetPromise() {
+            return deferred.Promise();
+        }
+
+    protected:
+        Napi::Promise::Deferred deferred;
+
+        void Execute() override {
+            try {
+                llama_memory_t mem = llama_get_memory(context->ctx);
+                llama_pos srcMax = llama_memory_seq_pos_max(mem, sourceSequenceId);
+
+                if (srcMax < 0) {
+                    if (!llama_memory_seq_rm(mem, targetSequenceId, -1, -1)) {
+                        throw std::runtime_error("Failed to clear destination sequence");
+                    }
+
+                    copied = 0;
+                    return;
+                }
+
+                llama_memory_seq_cp(llama_get_memory(context->ctx), sourceSequenceId, targetSequenceId, -1, -1);
+
+                if (context->context_params.kv_unified) {
+                    if (!llama_memory_seq_rm(mem, targetSequenceId, srcMax + 1, -1)) {
+                        throw std::runtime_error("Failed to remove destination sequence KV tail");
+                    }
+                }
+
+                copied = srcMax;
+            } catch (const std::exception& e) {
+                SetError(e.what());
+            } catch (...) {
+                SetError("Unknown error when calling \"llama_memory_seq_cp\"");
+            }
+        }
+
+        void OnOK() override {
+            deferred.Resolve(Napi::Number::New(Env(), copied));
+        }
+
+        void OnError(const Napi::Error& err) override {
+            deferred.Reject(err.Value());
+        }
+};
+
+Napi::Value AddonContext::CopySequenceStateFromOtherSequence(const Napi::CallbackInfo& info) {
+    if (disposed || !contextLoaded) {
+        throw Napi::Error::New(info.Env(), "Context is disposed or not loaded");
+    }
+
+    const llama_seq_id targetSequenceId = static_cast<llama_seq_id>(info[0].As<Napi::Number>().Int32Value());
+    const llama_seq_id sourceSequenceId = static_cast<llama_seq_id>(info[1].As<Napi::Number>().Int32Value());
+
+    CloneSequenceStateWorker* worker = new CloneSequenceStateWorker(info, this, targetSequenceId, sourceSequenceId);
     worker->Queue();
     return worker->GetPromise();
 }
@@ -1186,6 +1467,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("loadSequenceStateFromFile", &AddonContext::LoadSequenceStateFromFile),
                 InstanceMethod("setLoras", &AddonContext::SetLoras),
                 InstanceMethod("restoreCheckpoint", &AddonContext::RestoreCheckpoint),
+                InstanceMethod("copySequenceStateFromOtherSequence", &AddonContext::CopySequenceStateFromOtherSequence),
                 InstanceMethod("dispose", &AddonContext::Dispose),
             }
         )
@@ -1256,7 +1538,6 @@ class AddonContextSequenceCheckpointInitWorker : public Napi::AsyncWorker {
             {
                 std::unique_lock<std::shared_mutex> lock(checkpoint->dataMutex);
                 checkpoint->data.swap(data);
-                checkpoint->sequenceId = sequenceId;
                 checkpoint->minPos = minPos;
                 checkpoint->maxPos = maxPos;
                 checkpoint->initialized = true;
