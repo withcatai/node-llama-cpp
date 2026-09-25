@@ -229,7 +229,7 @@ export class LlamaDecisionContext {
             disposeAggregator.add(() => signal.removeEventListener("abort", disposeAggregator.dispose));
         }
 
-        const inputs = createQuestionInputs(questions, this.model);
+        const inputs = createQuestionInputs(questions, this.model.tokenizer);
         const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
         if (maxInputLength > this.contextSize)
             throw new Error(

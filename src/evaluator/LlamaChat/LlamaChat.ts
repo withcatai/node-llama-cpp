@@ -1183,7 +1183,7 @@ export class LlamaChat {
         } = options;
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatGenerateDecisionsResponse<Questions>> => {
-            const inputs = createQuestionInputs(questions, this.model);
+            const inputs = createQuestionInputs(questions, this.model.tokenizer);
             const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
             if (maxInputLength > this.sequence.contextSize)
                 throw new Error(

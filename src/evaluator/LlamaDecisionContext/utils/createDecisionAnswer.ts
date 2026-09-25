@@ -102,12 +102,12 @@ export function createDecisionAnswer(input: QuestionInput, rawLogits: Map<Token,
         let highestProbability: number | null = null;
         for (let i = 0; i < probabilities.length; i++) {
             const prob = probabilities[i]! / totalWeight;
-            probabilities[i]! = prob;
+            probabilities[i] = prob;
 
             if (highestProbability == null || prob > highestProbability)
                 highestProbability = prob;
 
-            score += probabilities[i]! * i;
+            score += prob * i;
         }
 
         const noneDiff = (logits.get(input.tokens[levels]!) ?? 0) - (maxLogit ?? 0) - Math.log(totalWeight);
@@ -174,9 +174,17 @@ function getNormalizedInputTokenLogits(input: QuestionInput, logits: Map<Token, 
         if (text.length !== 1)
             continue;
 
-        const destinationLogit = textToLogit.get(text);
-        if (destinationLogit != null && destinationLogit > logit)
-            res.set(token, destinationLogit);
+        let alignedLogit = textToLogit.get(text);
+        const lowercaseText = text.toLowerCase();
+
+        if (lowercaseText !== text) {
+            const alignedLogitFromAlignedText = textToLogit.get(lowercaseText);
+            if (alignedLogitFromAlignedText != null && (alignedLogit == null || alignedLogitFromAlignedText > alignedLogit))
+                alignedLogit = alignedLogitFromAlignedText;
+        }
+
+        if (alignedLogit != null && alignedLogit > logit)
+            res.set(token, alignedLogit);
     }
 
     return res;

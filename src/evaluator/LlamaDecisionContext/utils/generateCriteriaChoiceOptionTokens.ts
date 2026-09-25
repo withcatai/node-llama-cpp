@@ -1,23 +1,23 @@
-import type {Token} from "../../../types.js";
-import type {LlamaModel} from "../../LlamaModel/LlamaModel.js";
+import type {Token, Tokenizer} from "../../../types.js";
 
 const charCode0 = "0".charCodeAt(0);
 const charCodeA = "A".charCodeAt(0);
 const charCodeZ = "Z".charCodeAt(0);
 
-export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaModel) {
+export function generateCriteriaChoiceOptionTokens(count: number, tokenizer: Tokenizer) {
     if (count <= 0)
         return [];
 
     const res = new Set<Token>();
+    const cased = new Set<Token>();
 
     const ranges =
         "09" +
         "AZ" +
-        "\u03b1\u03c1\u03c3\u03c9" + // greek symbols
+        "\u0391\u03a1\u03a3\u03a9" + // greek symbols
         "\u0531\u0556" + // hy
         "\u05d0\u05d9\u05db\u05dc\u05de\u05de\u05e0\u05e2\u05e4\u05e4\u05e6\u05ea" + // he
-        "\u10d0\u10f0" + // ka
+        "\u1c90\u1cb0" + // ka
         "\u0915\u0928\u092a\u0930\u0932\u0932\u0935\u0939" + // hi
         "\u0a95\u0aa8\u0aaa\u0ab0\u0ab2\u0ab2\u0ab5\u0ab9\u0ab3\u0ab3" + // gu
         "\u0e01\u0e02\u0e04\u0e04\u0e07\u0e23\u0e25\u0e25\u0e27\u0e2e" + // th
@@ -65,9 +65,13 @@ export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaMo
         if (res.size >= count)
             return true;
 
-        const token = findSingleToken(char, model);
-        if (token != null)
-            res.add(token);
+        const token = findSingleToken(char, tokenizer);
+        if (token != null) {
+            if (isCasedCharacter(char))
+                cased.add(token);
+            else
+                res.add(token);
+        }
 
         return res.size >= count;
     }
@@ -130,13 +134,25 @@ export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaMo
         return false;
     }
 
+    function addPendingCharacters() {
+        for (const token of cased) {
+            if (res.size >= count)
+                break;
+
+            res.add(token);
+        }
+
+        return res.size >= count;
+    }
+
     const hasEnoughCharacters = addRanges(ranges) ||
         addDeltaSequence("\u3042", japaneseDeltas) || // Japanese Hiragana
         addDeltaSequence("\u30a2", japaneseDeltas) || // Japanese Katakana
         addDeltaSequence("\u3131", koreanConsonantDeltas) || // Korean consonant ordering
         addDeltaSequence("\uac00", koreanSyllableDeltas, hangulInitialStride) || // Korean syllable ordering
         addCharacters(cjkOrdinalCharacters) || // CJK Heavenly Stems and Earthly Branches
-        addRanges(languageDigitRanges);
+        addRanges(languageDigitRanges) ||
+        addPendingCharacters();
 
     if (!hasEnoughCharacters)
         throw new RangeError(
@@ -148,12 +164,16 @@ export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaMo
     return [...res];
 }
 
-function findSingleToken(text: string, model: LlamaModel) {
-    const tokens = model.tokenize(text, false, "trimLeadingSpace");
+function findSingleToken(text: string, tokenizer: Tokenizer) {
+    const tokens = tokenizer(text, false, "trimLeadingSpace");
     for (const token of tokens) {
-        if (model.detokenize([token], false).trim() === text && model._model.getTokenString(token) === text)
+        if (tokenizer.detokenize([token], false).trim() === text)
             return token;
     }
 
     return undefined;
+}
+
+function isCasedCharacter(text: string): boolean {
+    return text.toUpperCase() !== text || text.toLowerCase() !== text;
 }

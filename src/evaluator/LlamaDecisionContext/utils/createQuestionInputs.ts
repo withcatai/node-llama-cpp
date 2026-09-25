@@ -1,21 +1,18 @@
 import {LlamaText} from "../../../utils/LlamaText.js";
 import {pushAll} from "../../../utils/pushAll.js";
 import {generateCriteriaChoiceOptionTokens} from "./generateCriteriaChoiceOptionTokens.js";
-import type {LlamaModel} from "../../../index.js";
-import type {Token} from "../../../types.js";
+import type {Token, Tokenizer} from "../../../types.js";
 import type {DecisionQuestions} from "../types.js";
 
-export function createQuestionInputs(questions: DecisionQuestions, model: LlamaModel) {
+export function createQuestionInputs(questions: DecisionQuestions, tokenizer: Tokenizer) {
     return Object.fromEntries(
         Object.entries(questions)
-            .map(([key, question]) => [key, createQuestionInput(key, question, model)])
+            .map(([key, question]) => [key, createQuestionInput(key, question, tokenizer)])
     );
 }
 export type QuestionInput = ReturnType<typeof createQuestionInput>;
 
-function createQuestionInput(keyName: string, question: DecisionQuestions[number], model: LlamaModel) {
-    const tokenizer = model.tokenizer;
-
+function createQuestionInput(keyName: string, question: DecisionQuestions[number], tokenizer: Tokenizer) {
     if (
         (LlamaText.isLlamaText(question.instruction) && question.instruction.values.length === 0) ||
         (typeof question.instruction === "string" && question.instruction.length === 0) ||
@@ -24,7 +21,7 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
         throw new Error(`Question instruction for key "${keyName}" is empty`);
 
     if (question.type === "noul") {
-        const [yesToken, noToken] = generateCriteriaChoiceOptionTokens(2, model);
+        const [yesToken, noToken] = generateCriteriaChoiceOptionTokens(2, tokenizer);
 
         if (yesToken == null || noToken == null)
             throw new Error("Failed to generate yes/no choice option tokens");
@@ -68,7 +65,7 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
         };
     } else if (question.type === "choice") {
         const keys = Object.keys(question.criteria);
-        const choiceOptions = generateCriteriaChoiceOptionTokens(keys.length, model);
+        const choiceOptions = generateCriteriaChoiceOptionTokens(keys.length, tokenizer);
         if (choiceOptions.length < 2)
             throw new Error('Question with type "choice" must have at least 2 criteria');
 
@@ -101,7 +98,7 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
         };
     } else if (question.type === "score") {
         const additionalChoices = 1;
-        const scoreOptions = generateCriteriaChoiceOptionTokens(question.criteria.length + additionalChoices, model);
+        const scoreOptions = generateCriteriaChoiceOptionTokens(question.criteria.length + additionalChoices, tokenizer);
         if (scoreOptions.length - additionalChoices < 2)
             throw new Error('Question with type "score" must have at least 2 criteria');
 
