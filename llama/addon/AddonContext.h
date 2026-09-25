@@ -22,7 +22,12 @@ class AddonContext : public Napi::ObjectWrap<AddonContext> {
         uint64_t loadedContextMemorySize = 0;
         bool contextLoaded = false;
         std::mutex disposeMutex;
-        std::mutex samplingMutex;
+
+        struct SharedSamplerData {
+            std::mutex mutex;
+            bool gotLogit = false;
+            bool hasLogits = false;
+        } sharedSamplerData;
 
         bool disposed = false;
         bool memoryDisposed = false;
