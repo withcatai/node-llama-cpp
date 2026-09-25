@@ -473,6 +473,17 @@ export type LLamaChatLoadAndCompleteUserMessageOptions<Functions extends ChatMod
 };
 
 export type LlamaChatGenerateDecisionsOptions = {
+    /**
+     * An optional document to add to the context window before a question.
+     * Only added for generating decisions in this call; won't be appended to the
+     * actual context window chat history returned from this evaluation.
+     *
+     * Will be put in the same user message as the question, with `"\n\n"` in between the document and the question.
+     *
+     * Note that a long document can incur a context shift, so make sure to not use a too big document.
+     */
+    document?: string,
+
     signal?: AbortSignal,
 
     /**
@@ -1160,6 +1171,7 @@ export class LlamaChat {
         options: LlamaChatGenerateDecisionsOptions = {}
     ): Promise<LlamaChatGenerateDecisionsResponse<Questions>> {
         const {
+            document,
             evaluationPriority = defaultEvaluationPriority,
             contextShift = defaultContextShiftOptions,
             functions,
@@ -1202,7 +1214,8 @@ export class LlamaChat {
                 chatWrapper: this._chatWrapper,
                 sequence: this.sequence,
                 functions,
-                documentFunctionParams
+                documentFunctionParams,
+                injectedDocument: document
             });
 
             const answers: {[key: string]: DecisionAnswer<any>} = {} as DecisionAnswers<Questions>;

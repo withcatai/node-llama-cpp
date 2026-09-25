@@ -11,12 +11,14 @@ export async function prepareDecisionContextWindow({
     fullHistory, lastEvaluationContextWindowHistory,
     resolvedContextShift, fallbackToDefaultContextShiftStrategy = true,
     fitInContextSize, chatWrapper, sequence,
-    functions, documentFunctionParams, minFreeContextTokens = 1
+    functions, documentFunctionParams, minFreeContextTokens = 1,
+    injectedDocument
 }: {
     fullHistory: ChatHistoryItem[], lastEvaluationContextWindowHistory?: ChatHistoryItem[],
     resolvedContextShift: false | Required<LLamaChatContextShiftOptions>, fallbackToDefaultContextShiftStrategy?: boolean,
     fitInContextSize: number, chatWrapper: ChatWrapper, sequence: LlamaContextSequence,
-    functions?: ChatModelFunctions, documentFunctionParams?: boolean, minFreeContextTokens?: number
+    functions?: ChatModelFunctions, documentFunctionParams?: boolean, minFreeContextTokens?: number,
+    injectedDocument?: string
 }): Promise<{
     prefix: LlamaText,
     afterQuestion: LlamaText,
@@ -27,7 +29,7 @@ export async function prepareDecisionContextWindow({
     const context = sequence.context;
 
     function generateResponseForChatHistory(contextWindowChatHistory: ChatHistoryItem[], compressionMetadata: object | null | undefined) {
-        const questionContext = addQuestionMarkerToContextWindow(chatWrapper, contextWindowChatHistory);
+        const questionContext = addQuestionMarkerToContextWindow(chatWrapper, contextWindowChatHistory, injectedDocument);
         const questionContextState = chatWrapper.generateContextState({
             chatHistory: questionContext.contextWindow,
             availableFunctions: functions,
@@ -174,7 +176,7 @@ function getEvaluationTextParts(contextText: LlamaText, questionMarker: string, 
     };
 }
 
-function addQuestionMarkerToContextWindow(chatWrapper: ChatWrapper, contextWindow: ChatHistoryItem[]): {
+function addQuestionMarkerToContextWindow(chatWrapper: ChatWrapper, contextWindow: ChatHistoryItem[], injectedDocument?: string): {
     contextWindow: ChatHistoryItem[],
     questionMarker: string,
     decisionMarker: string
@@ -218,11 +220,11 @@ function addQuestionMarkerToContextWindow(chatWrapper: ChatWrapper, contextWindo
         contextWindow: lastItem?.type === "user"
             ? [...contextWindow.slice(0, -1), {
                 ...lastItem,
-                text: lastItem.text + "\n\n" + questionMarker
+                text: addDocumentToUserMessageText(injectedDocument, lastItem.text + "\n\n" + questionMarker)
             }, modelMessage]
             : [...contextWindow, {
                 type: "user",
-                text: questionMarker
+                text: addDocumentToUserMessageText(injectedDocument, questionMarker)
             }, modelMessage]
     };
 }
@@ -253,4 +255,13 @@ function splitLlamaTextByLastRegularTextMatch(llamaText: LlamaText, textToMatch:
     }
 
     return null;
+}
+
+function addDocumentToUserMessageText(document: string | undefined, userMessage: string) {
+    if (document == null || document.trim() === "")
+        return userMessage;
+    else if (userMessage.trim() === "")
+        return document ?? userMessage;
+
+    return document + "\n\n" + userMessage;
 }

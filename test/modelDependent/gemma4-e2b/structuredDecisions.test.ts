@@ -98,8 +98,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "API": 1,
-                        "codebase": 0.0000237,
-                        "database": 0.00000558,
+                        "codebase": 0.000028,
+                        "database": 9.01e-7,
                       },
                       "type": "choice",
                     },
@@ -108,10 +108,10 @@ describe("gemma4 e2b", () => {
                       "value": 1,
                     },
                     "level": {
-                      "confidence": 0.999,
+                      "confidence": 1,
                       "probabilities": [
-                        0.0000978,
-                        0.0002,
+                        7.93e-8,
+                        1.66e-7,
                         1,
                       ],
                       "score": 2,
@@ -122,8 +122,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "engineering": 1,
-                        "hr": 0.000214,
-                        "sales": 0.000036,
+                        "hr": 0.0000956,
+                        "sales": 0.0000154,
                       },
                       "type": "choice",
                     },
@@ -255,13 +255,12 @@ describe("gemma4 e2b", () => {
                     contextSequence: context.getSequence()
                 });
 
-                const chatResponse = await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
+                await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
                     maxTokens: 100,
                     budgets: {
                         thoughtTokens: 40
                     }
                 });
-                console.log(chatResponse);
 
                 const res = await chat.decide({
                     animal: {
@@ -306,7 +305,7 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 1,
+                      "value": 0.999,
                     },
                     "animalOrigins": {
                       "type": "noul",
@@ -322,7 +321,7 @@ describe("gemma4 e2b", () => {
                     },
                     "relatedAnimals": {
                       "type": "noul",
-                      "value": 1,
+                      "value": 0.998,
                     },
                   }
                 `);
@@ -348,13 +347,12 @@ describe("gemma4 e2b", () => {
                     contextSequence: sequence
                 });
 
-                const chatResponse = await chat.prompt("Where is wood coming from?", {
+                await chat.prompt("Where is wood coming from?", {
                     maxTokens: 100,
                     budgets: {
                         thoughtTokens: 40
                     }
                 });
-                console.log(chatResponse);
 
                 const res = await chat.decide({
                     animal: {
@@ -413,32 +411,32 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 0.00238,
+                      "value": 0.0000739,
                     },
                     "cookingRecipe": {
                       "type": "noul",
-                      "value": 0.0000225,
+                      "value": 0.000116,
                     },
                     "fictionalStory": {
                       "type": "noul",
-                      "value": 0.0000138,
+                      "value": 0.00000194,
                     },
                     "mineralOrigin": {
                       "type": "noul",
-                      "value": 0.0000348,
+                      "value": 0.0000033,
                     },
                     "spaceTravel": {
                       "type": "noul",
-                      "value": 0.0000123,
+                      "value": 0.0000856,
                     },
                     "subject": {
                       "choice": "materials",
                       "confidence": 1,
                       "probabilities": {
-                        "brushing": 0.00000313,
-                        "food": 0.00000662,
+                        "brushing": 0.0000072,
+                        "food": 0.000124,
                         "materials": 1,
-                        "other": 0.0000181,
+                        "other": 0.0000823,
                       },
                       "type": "choice",
                     },
@@ -448,6 +446,59 @@ describe("gemma4 e2b", () => {
                     },
                   }
                 `);
+            });
+
+            test("with document", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                const llama = await getTestLlama();
+
+                const model = await llama.loadModel({
+                    modelPath
+                });
+                const context = await model.createContext({
+                    contextSize: 4096
+                });
+                const chat = new LlamaChatSession({
+                    contextSequence: context.getSequence()
+                });
+
+                await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
+                    maxTokens: 100,
+                    budgets: {
+                        thoughtTokens: 40
+                    }
+                });
+
+                const res1 = await chat.decide({
+                    locks: {
+                        type: "choice",
+                        instruction: "What are locks?",
+                        criteria: {
+                            useful: "They are useful",
+                            notDoors: "Not doors",
+                            cats: "Not cats"
+                        }
+                    }
+                }, {
+                    document: "Locks are not doors"
+                });
+                const res2 = await chat.decide({
+                    locks: {
+                        type: "choice",
+                        instruction: "What are locks?",
+                        criteria: {
+                            useful: "They are useful",
+                            notDoors: "Not doors",
+                            cats: "Not cats"
+                        }
+                    }
+                });
+
+                expect(res1.locks.confidence).to.be.greaterThan(0.8);
+                expect(res1.locks.choice).to.equal("notDoors");
+
+                expect(res2.locks.confidence).to.be.greaterThan(0.8);
+                expect(res2.locks.choice).to.equal("useful");
             });
         });
     });

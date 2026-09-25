@@ -415,6 +415,16 @@ export type LLamaChatPreloadPromptOptions = {
 };
 
 export type LlamaChatSessionDecideOptions = {
+    /**
+     * An optional document to add to the context window before a question.
+     * Only added for generating decisions in this call; won't be appended to the actual chat history.
+     *
+     * Will be put in the same user message as the question, with `"\n\n"` in between the document and the question.
+     *
+     * Note that a long document can incur a context shift, so make sure to not use a too big document.
+     */
+    document?: string,
+
     signal?: LLamaChatCompletePromptOptions["signal"],
     evaluationPriority?: LLamaChatCompletePromptOptions["evaluationPriority"],
 
@@ -1276,6 +1286,7 @@ export class LlamaChatSession {
         }
     }> {
         const {
+            document,
             signal,
             evaluationPriority,
             functions,
@@ -1306,6 +1317,7 @@ export class LlamaChatSession {
                 answers,
                 tokenUsage
             } = await this._chat.generateDecisions(this._chatHistory, questions, {
+                document,
                 signal,
                 evaluationPriority,
                 functions,

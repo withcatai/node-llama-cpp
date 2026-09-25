@@ -92,7 +92,8 @@ There are two places where you can use the structured decisions API:
 
 
 ### On a Decision Context {#decision-context}
-When using a [`LlamaDecisionContext`](../api/classes/LlamaDecisionContext.md), the document you provide as context is only evaluated once,
+When using a [`LlamaDecisionContext`](../api/classes/LlamaDecisionContext.md) (via [`.decide()`](../api/classes/LlamaDecisionContext.md#decide)),
+the document you provide as context is only evaluated once,
 and then all questions are evaluated in parallel (up to the configured parallelism limit).
 
 It's recommended to configure the [`contextSize`](../api/type-aliases/LlamaDecisionContextOptions.md#contextsize) to limit its size if you only expect short documents.
@@ -122,7 +123,7 @@ const context = await model.createDecisionContext({
 await context.warmup(); // optional, makes timing the next decision more accurate
 const startTime = Date.now();
 
-const ticket = "I still can't sign in after resetting my password. My whole team is locked out.";
+const ticket = "I can't sign in after resetting my password. My whole team is locked out.";
 const answers = await context.decide(ticket, {
     troubleshootingAttempted: {
         type: "noul",

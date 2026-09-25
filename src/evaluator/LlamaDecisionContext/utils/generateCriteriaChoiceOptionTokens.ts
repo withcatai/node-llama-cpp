@@ -12,8 +12,8 @@ export function generateCriteriaChoiceOptionTokens(count: number, model: LlamaMo
     const res = new Set<Token>();
 
     const ranges =
-        "AZ" +
         "09" +
+        "AZ" +
         "\u03b1\u03c1\u03c3\u03c9" + // greek symbols
         "\u0531\u0556" + // hy
         "\u05d0\u05d9\u05db\u05dc\u05de\u05de\u05e0\u05e2\u05e4\u05e4\u05e6\u05ea" + // he
