@@ -60,6 +60,10 @@ export const internalCheckpoints = {
     decisions: {
         name: "decisions",
         maxCheckpoints: 1
+    },
+    choiceDecision: {
+        name: "choiceDecision",
+        maxCheckpoints: 1
     }
 };
 
@@ -1317,7 +1321,9 @@ export class LlamaContextSequence {
                 await this._eraseContextTokenRanges([{
                     start: firstDifferentIndex,
                     end: this._nextTokenIndex
-                }]);
+                }], {
+                    avoidEvaluation: true
+                });
 
             return;
         }
@@ -1352,7 +1358,9 @@ export class LlamaContextSequence {
             });
 
         if (eraseRanges.length > 0)
-            await this._eraseContextTokenRanges(eraseRanges);
+            await this._eraseContextTokenRanges(eraseRanges, {
+                avoidEvaluation: true
+            });
     }
 
     /**
@@ -1379,11 +1387,13 @@ export class LlamaContextSequence {
         {
             canResetTokenPredictor = true,
             canRemovePredictionTokens = true,
-            skipLock = false
+            skipLock = false,
+            avoidEvaluation = false
         }: {
             canResetTokenPredictor?: boolean,
             canRemovePredictionTokens?: boolean,
-            skipLock?: boolean
+            skipLock?: boolean,
+            avoidEvaluation?: boolean
         } = {}
     ) {
         this._ensureNotDisposed();
@@ -1509,7 +1519,7 @@ export class LlamaContextSequence {
                     this._nextTokenIndex = restoreCheckpointIndex + 1;
 
                     // wait for the evaluation outside the "context" lock to avoid deadlocks
-                    if (tokensToEvaluate.length > 0)
+                    if (!avoidEvaluation && tokensToEvaluate.length > 0)
                         awaitEvaluationPromise = this.evaluateWithoutGeneratingNewTokens(tokensToEvaluate, {_skipLock: skipLock});
                     return;
                 }
@@ -1521,7 +1531,7 @@ export class LlamaContextSequence {
             this._contextTokens = [];
 
             // wait for the evaluation outside the "context" lock to avoid deadlocks
-            if (newSequenceTokens.length > 0)
+            if (!avoidEvaluation && newSequenceTokens.length > 0)
                 awaitEvaluationPromise = this.evaluateWithoutGeneratingNewTokens(newSequenceTokens, {_skipLock: skipLock});
         });
 

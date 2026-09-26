@@ -1,4 +1,4 @@
-import {DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
+import {AsyncQueue, DisposeAggregator, DisposedError, EventRelay, withLock} from "lifecycle-utils";
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {internalCheckpoints, LlamaContextSequence} from "../LlamaContext/LlamaContext.js";
 import {
@@ -30,9 +30,10 @@ import {LlamaLogLevel} from "../../bindings/types.js";
 import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
 import {createQuestionInputs} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
-import {createEmptyInvalidDecisionAnswer, createDecisionAnswer, decisionAnswerMinimumTopLogits} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
+import {createEmptyInvalidDecisionAnswer, createDecisionAnswer} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
 import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
 import {TokenMeter} from "../TokenMeter.js";
+import {evaluateChoiceDecision} from "../LlamaDecisionContext/utils/evaluateChoiceDecision.js";
 import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
 import {FunctionCallParamsGrammar} from "./utils/FunctionCallParamsGrammar.js";
 import {compressHistoryToFitContextSize} from "./utils/compressHistoryToFitContextSize.js";
@@ -1228,7 +1229,7 @@ export class LlamaChat {
             for (const [questionId, input] of entries) {
                 signal?.throwIfAborted();
 
-                if (input.tokens.length === 0) {
+                if ((input.type === "choice" && input.keys.length === 0) || (input.type !== "choice" && input.tokens.length === 0)) {
                     answers[questionId] = createEmptyInvalidDecisionAnswer(input);
                     continue;
                 }
@@ -1255,33 +1256,44 @@ export class LlamaChat {
                         throw new Error("Not enough tokens to generate a response");
 
                     await this.sequence.adaptStateToTokens(fullInput, false);
-                    await this.sequence.evaluateWithoutGeneratingNewTokens(fullInput.slice(this.sequence.nextTokenIndex));
-                    controlledEvaluateInput = [lastToken];
+                    controlledEvaluateInput = [...fullInput.slice(this.sequence.nextTokenIndex), lastToken];
                 }
 
                 signal?.throwIfAborted();
                 if (controlledEvaluateInput.length === 0)
                     throw new Error("Evaluate input is empty");
 
-                controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
-                    controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
-                    {
-                        generateNext: {
-                            logits: {
-                                filter: {
-                                    tokens: input.tokens,
-                                    includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
+                if (input.type === "choice") {
+                    const choiceSeqQueue = new AsyncQueue<LlamaContextSequence>([]);
+                    choiceSeqQueue.push(this.sequence);
+                    const answerRes = await evaluateChoiceDecision({
+                        question: input,
+                        seqQueue: choiceSeqQueue,
+                        signal,
+                        evaluationPriority,
+                        baseSeqTokens: [...prefixTokens, ...input.input, ...afterQuestionTokens, ...input.answerPrefix]
+                    });
+                    answers[questionId] = answerRes.answer;
+                } else {
+                    controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
+                        controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
+                        {
+                            generateNext: {
+                                logits: {
+                                    filter: {
+                                        tokens: input.tokens
+                                    }
                                 }
                             }
                         }
-                    }
-                ];
-                const res = await this.sequence.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
-                const lastTokenResult = res[res.length - 1];
-                if (lastTokenResult == null || lastTokenResult.next?.logits == null)
-                    throw new Error("Failed to generate decisions");
+                    ];
+                    const res = await this.sequence.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+                    const lastTokenResult = res[res.length - 1];
+                    if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                        throw new Error("Failed to generate decisions");
 
-                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, this.sequence.model.tokenizer);
+                    answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, this.sequence.model.tokenizer);
+                }
 
                 isFirstEvaluation = false;
             }

@@ -59,6 +59,8 @@ export type DecisionChoiceQuestion = {
      *
      * Each key represents a choice, and the value is a description of that choice.
      * You can set `null` for a choice to reuse its key as the description.
+     *
+     * You can set up to 256 choices.
      * @example
      * ```ts
      * {
@@ -90,6 +92,8 @@ export type DecisionScoreQuestion = {
 
     /**
      * The criteria describing the possible levels for the score.
+     *
+     * You can set up to 10 criteria levels.
      * @example
      * ```ts
      * [

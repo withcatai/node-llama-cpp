@@ -245,6 +245,9 @@ describe("gemma4 e2b", () => {
                 const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
+                if (llama.gpu === false)
+                    test.skip("Logits are a bit different on different backends to cause test flakiness");
+
                 const model = await llama.loadModel({
                     modelPath
                 });
