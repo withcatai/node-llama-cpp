@@ -38,7 +38,6 @@ function simplifyFloat(value: number) {
     if (value === 0)
         return 0;
 
-    const hundredths = Math.round(value * 100);
-    return Math.round(hundredths / 4) * 4 / 100;
+    return Math.round(Math.round(value * 100) / 4) * 4 / 100;
 }
 
