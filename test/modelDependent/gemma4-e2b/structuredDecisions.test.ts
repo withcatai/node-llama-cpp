@@ -98,8 +98,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "API": 1,
-                        "codebase": 0.000028,
-                        "database": 9.01e-7,
+                        "codebase": 0.0000762,
+                        "database": 0.00000208,
                       },
                       "type": "choice",
                     },
@@ -110,8 +110,8 @@ describe("gemma4 e2b", () => {
                     "level": {
                       "confidence": 1,
                       "probabilities": [
-                        7.93e-8,
-                        1.66e-7,
+                        0.0000264,
+                        0.0000152,
                         1,
                       ],
                       "score": 2,
@@ -122,8 +122,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "engineering": 1,
-                        "hr": 0.0000956,
-                        "sales": 0.0000154,
+                        "hr": 0.000242,
+                        "sales": 0.0000568,
                       },
                       "type": "choice",
                     },
@@ -237,6 +237,128 @@ describe("gemma4 e2b", () => {
                     expect(contextText).to.include(longText.slice(0, 64));
                     expect(contextText).to.not.include(longText.slice(-64));
                 });
+
+                test("many choices", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                    const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                    const llama = await getTestLlama();
+
+                    const model = await llama.loadModel({
+                        modelPath
+                    });
+                    const context = await model.createDecisionContext({
+                        parallelQuestions: 1,
+                        contextSize: 1024
+                    });
+
+                    const ticket = "I can't sign in after resetting my password. My whole team is locked out.";
+                    const res = await context.decide(ticket, {
+                        category: {
+                            type: "choice",
+                            instruction: "Which category is related to this ticket?",
+                            criteria: {
+                                food: "Food",
+                                travel: "Travel",
+                                accommodation: "Accommodation",
+                                delivery: "Delivery",
+                                maintenance: "Maintenance",
+                                support: "Support",
+                                billing: "Billing",
+                                payments: "Payments",
+                                subscriptions: "Subscriptions",
+                                privacy: "Privacy",
+                                performance: "Performance",
+                                outage: "Outage",
+                                networking: "Networking",
+                                hardware: "Hardware",
+                                software: "Software",
+                                mobile: "Mobile",
+                                desktop: "Desktop",
+                                website: "Website",
+                                api: "API",
+                                integration: "Integration",
+                                database: "Database",
+                                storage: "Storage",
+                                backup: "Backup",
+                                migration: "Migration",
+                                installation: "Installation",
+                                configuration: "Configuration",
+                                permissions: "Permissions",
+                                notifications: "Notifications",
+                                email: "Email",
+                                messaging: "Messaging",
+                                communication: "Communication",
+                                documentation: "Documentation",
+                                training: "Training",
+                                onboarding: "Onboarding",
+                                cancellation: "Cancellation",
+                                renewal: "Renewal",
+                                pricing: "Pricing",
+                                discount: "Discount",
+                                promotion: "Promotion",
+                                order: "Order",
+                                returns: "Returns",
+                                shipping: "Shipping",
+                                inventory: "Inventory",
+                                product: "Product",
+                                availability: "Availability",
+                                quality: "Quality",
+                                warranty: "Warranty",
+                                repair: "Repair",
+                                replacement: "Replacement",
+                                booking: "Booking",
+                                reservation: "Reservation",
+                                scheduling: "Scheduling",
+                                transportation: "Transportation",
+                                parking: "Parking",
+                                restaurant: "Restaurant",
+                                entertainment: "Entertainment",
+                                events: "Events",
+                                healthcare: "Healthcare",
+                                insurance: "Insurance",
+                                legal: "Legal",
+                                finance: "Finance",
+                                taxes: "Taxes",
+                                employment: "Employment",
+                                payroll: "Payroll",
+                                humanResources: "Human Resources",
+                                education: "Education",
+                                childcare: "Childcare",
+                                pets: "Pets",
+                                utilities: "Utilities",
+                                electricity: "Electricity",
+                                water: "Water",
+                                internet: "Internet",
+                                password: "Password", // password: "Password",
+                                phone: "Phone",
+                                cleaning: "Cleaning",
+                                plumbing: "Plumbing",
+                                heating: "Heating",
+                                cooling: "Cooling",
+                                furniture: "Furniture",
+                                appliances: "Appliances",
+                                construction: "Construction",
+                                gardening: "Gardening",
+                                noise: "Noise",
+                                safety: "Safety",
+                                complaint: "Complaint",
+                                feedback: "Feedback",
+                                suggestion: "Suggestion",
+                                request: "Request",
+                                inquiry: "Inquiry",
+                                incident: "Incident",
+                                fraud: "Fraud",
+                                accessibility: "Accessibility",
+                                localization: "Localization",
+                                // password: "Password",
+                                compliance: "Compliance"
+                            }
+                        }
+                    });
+                    expect(Object.keys(res.category.probabilities).length).to.be.greaterThan(10);
+                    expect(Object.keys(res.category.probabilities).length).toMatchInlineSnapshot("94");
+                    expect(res.category.choice).to.be.eql("password");
+                    expect(res.category.confidence).to.be.greaterThanOrEqual(0.6);
+                });
             });
         });
 
@@ -324,7 +446,7 @@ describe("gemma4 e2b", () => {
                     },
                     "relatedAnimals": {
                       "type": "noul",
-                      "value": 0.998,
+                      "value": 0.999,
                     },
                   }
                 `);
@@ -414,32 +536,32 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 0.0000739,
+                      "value": 0.000187,
                     },
                     "cookingRecipe": {
                       "type": "noul",
-                      "value": 0.000116,
+                      "value": 0.000112,
                     },
                     "fictionalStory": {
                       "type": "noul",
-                      "value": 0.00000194,
+                      "value": 0.0000023,
                     },
                     "mineralOrigin": {
                       "type": "noul",
-                      "value": 0.0000033,
+                      "value": 0.0000034,
                     },
                     "spaceTravel": {
                       "type": "noul",
-                      "value": 0.0000856,
+                      "value": 0.0000368,
                     },
                     "subject": {
                       "choice": "materials",
-                      "confidence": 1,
+                      "confidence": 0.998,
                       "probabilities": {
-                        "brushing": 0.0000072,
-                        "food": 0.000124,
-                        "materials": 1,
-                        "other": 0.0000823,
+                        "brushing": 0.0000175,
+                        "food": 0.000779,
+                        "materials": 0.999,
+                        "other": 0.00018,
                       },
                       "type": "choice",
                     },

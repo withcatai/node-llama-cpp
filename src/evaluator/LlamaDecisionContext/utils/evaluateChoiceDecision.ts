@@ -366,7 +366,7 @@ export async function evaluateChoiceDecision({
         answer: {
             type: "choice",
             choice: maxScoreKey,
-            confidence: -Math.expm1((secondMaxScore ?? 0) - (maxScore ?? 0)) / totalScoreWeight,
+            confidence: Math.tanh(((maxScore ?? 0) - (secondMaxScore ?? 0)) / 2),
             probabilities
         } satisfies DecisionChoiceAnswer<any>,
         tokenUsage: {
