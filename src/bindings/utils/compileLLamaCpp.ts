@@ -726,6 +726,8 @@ function getParallelBuildThreadsToUse(platform: BinaryPlatform, gpu?: BuildGpu, 
 
     if (ciMode && platform === "win" && gpu === "cuda" && cpuCount === 4)
         return 3; // workaround for `compiler is out of heap space` error on GitHub Actions on Windows when building with CUDA
+    else if (ciMode && platform === "win" && gpu === "vulkan" && cpuCount === 4)
+        return 3; // workaround for `compiler is out of heap space` error on GitHub Actions on Windows when building with CUDA
 
     if (cpuCount <= 4)
         return cpuCount;
