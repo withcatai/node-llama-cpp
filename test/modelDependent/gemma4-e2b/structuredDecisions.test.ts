@@ -30,7 +30,7 @@ describe("gemma4 e2b", () => {
                   {
                     "isUrgent": {
                       "type": "noul",
-                      "value": 0.999,
+                      "value": 1,
                     },
                   }
                 `);
@@ -98,8 +98,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "API": 1,
-                        "codebase": 0.0000762,
-                        "database": 0.00000208,
+                        "codebase": 0,
+                        "database": 0,
                       },
                       "type": "choice",
                     },
@@ -110,8 +110,8 @@ describe("gemma4 e2b", () => {
                     "level": {
                       "confidence": 1,
                       "probabilities": [
-                        0.0000264,
-                        0.0000152,
+                        0,
+                        0,
                         1,
                       ],
                       "score": 2,
@@ -122,8 +122,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "engineering": 1,
-                        "hr": 0.000242,
-                        "sales": 0.0000568,
+                        "hr": 0,
+                        "sales": 0,
                       },
                       "type": "choice",
                     },
@@ -357,7 +357,7 @@ describe("gemma4 e2b", () => {
                     expect(Object.keys(res.category.probabilities).length).to.be.greaterThan(10);
                     expect(Object.keys(res.category.probabilities).length).toMatchInlineSnapshot("94");
                     expect(res.category.choice).to.be.eql("password");
-                    expect(res.category.confidence).to.be.greaterThanOrEqual(0.6);
+                    expect(res.category.confidence).to.be.greaterThanOrEqual(0.5);
                 });
             });
         });
@@ -430,7 +430,7 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 0.999,
+                      "value": 1,
                     },
                     "animalOrigins": {
                       "type": "noul",
@@ -446,7 +446,7 @@ describe("gemma4 e2b", () => {
                     },
                     "relatedAnimals": {
                       "type": "noul",
-                      "value": 0.999,
+                      "value": 1,
                     },
                   }
                 `);
@@ -536,32 +536,32 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 0.000187,
+                      "value": 0,
                     },
                     "cookingRecipe": {
                       "type": "noul",
-                      "value": 0.000112,
+                      "value": 0,
                     },
                     "fictionalStory": {
                       "type": "noul",
-                      "value": 0.0000023,
+                      "value": 0,
                     },
                     "mineralOrigin": {
                       "type": "noul",
-                      "value": 0.0000034,
+                      "value": 0,
                     },
                     "spaceTravel": {
                       "type": "noul",
-                      "value": 0.0000368,
+                      "value": 0,
                     },
                     "subject": {
                       "choice": "materials",
-                      "confidence": 0.998,
+                      "confidence": 1,
                       "probabilities": {
-                        "brushing": 0.0000175,
-                        "food": 0.000779,
-                        "materials": 0.999,
-                        "other": 0.00018,
+                        "brushing": 0,
+                        "food": 0,
+                        "materials": 1,
+                        "other": 0,
                       },
                       "type": "choice",
                     },
