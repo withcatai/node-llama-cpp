@@ -7,8 +7,9 @@ import {prepareDecisionContextWindow} from "../LlamaChat/utils/prepareDecisionCo
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {TokenMeter} from "../TokenMeter.js";
-import {createQuestionInputs} from "./utils/createQuestionInputs.js";
-import {createDecisionAnswer, decisionAnswerMinimumTopLogits} from "./utils/createDecisionAnswer.js";
+import {createQuestionInputs, getQuestionInputMaxTokenLength} from "./utils/createQuestionInputs.js";
+import {createDecisionAnswer} from "./utils/createDecisionAnswer.js";
+import {evaluateChoiceDecision} from "./utils/evaluateChoiceDecision.js";
 import type {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
 import type {LlamaModel} from "../LlamaModel/LlamaModel.js";
 import type {ChatHistoryItem, Token, Tokenizer} from "../../types.js";
@@ -229,8 +230,8 @@ export class LlamaDecisionContext {
             disposeAggregator.add(() => signal.removeEventListener("abort", disposeAggregator.dispose));
         }
 
-        const inputs = createQuestionInputs(questions, this.model);
-        const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
+        const inputs = createQuestionInputs(questions, this.model.tokenizer);
+        const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, getQuestionInputMaxTokenLength(item)), 0);
         if (maxInputLength > this.contextSize)
             throw new Error(
                 "The context size is too small to fit the provided questions and/or criteria. " +
@@ -264,7 +265,7 @@ export class LlamaDecisionContext {
                 : onOverflow === "truncateDocument"
                     ? {
                         lastEvaluationMetadata: null,
-                        size: (sequence) => sequence.contextSize - 1,
+                        size: 1,
                         strategy({maxTokensCount, tokenizer, chatWrapper}) {
                             const fullDocumentTokenLength = tokenizer(document, false, "trimLeadingSpace").length;
                             const testTokenLength = chatWrapper.generateContextState({
@@ -358,28 +359,54 @@ export class LlamaDecisionContext {
             await mainSeqLease.item.evaluateWithoutGeneratingNewTokens(fullInput.slice(mainSeqLease.item.nextTokenIndex));
             signal?.throwIfAborted();
 
-            const controlledEvaluateInput: ControlledEvaluateInputItem[] = [[lastToken, {
-                generateNext: {
-                    logits: {
-                        filter: {
-                            tokens: input.tokens,
-                            includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
+            let usedInputTokens = 0;
+            let usedOutputTokens = 0;
+            if (input.type === "choice") {
+                const choiceSeqQueue = new AsyncQueue([], {parent: localQueue});
+                choiceSeqQueue.push(mainSeqLease.item);
+
+                mainSeqLease.move();
+                const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
+                usedInputTokens = tokenUsageDiff.usedInputTokens;
+                usedOutputTokens = tokenUsageDiff.usedOutputTokens;
+
+                const answerRes = await evaluateChoiceDecision({
+                    question: input,
+                    seqQueue: choiceSeqQueue,
+                    signal,
+                    evaluationPriority,
+                    baseSeqTokens: [...prefixTokens, ...input.input, ...afterQuestionTokens, ...input.answerPrefix]
+                });
+                answers[questionId] = answerRes.answer;
+                usedInputTokens += answerRes.tokenUsage.input;
+                usedOutputTokens += answerRes.tokenUsage.output;
+            } else {
+                const controlledEvaluateInput: ControlledEvaluateInputItem[] = [[lastToken, {
+                    generateNext: {
+                        logits: {
+                            filter: {
+                                tokens: input.tokens
+                            }
                         }
                     }
-                }
-            }]];
-            const res = await mainSeqLease.item.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
-            const lastTokenResult = res[res.length - 1];
-            if (lastTokenResult == null || lastTokenResult.next?.logits == null)
-                throw new Error("Failed to generate decisions");
+                }]];
+                const res = await mainSeqLease.item.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+                const lastTokenResult = res[res.length - 1];
+                if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                    throw new Error("Failed to generate decisions");
 
-            answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, mainSeqLease.item.model.tokenizer);
-            const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
+                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, mainSeqLease.item.model.tokenizer);
+
+                const tokenUsageDiff = TokenMeter.diff(mainSeqLease.item.tokenMeter.getState(), mainSeqMeterInitialSnapshot);
+                usedInputTokens = tokenUsageDiff.usedInputTokens;
+                usedOutputTokens = tokenUsageDiff.usedOutputTokens;
+            }
+
             return {
                 answers: answers as DecisionAnswers<Questions>,
                 tokenUsage: {
-                    input: tokenUsageDiff.usedInputTokens,
-                    output: tokenUsageDiff.usedOutputTokens
+                    input: usedInputTokens,
+                    output: usedOutputTokens
                 }
             };
         }
@@ -498,8 +525,8 @@ export class LlamaDecisionContext {
                 using seqLease = await localQueue.acquire(signal);
                 const seq = seqLease.item;
 
-                evaluationsLeft--;
                 using drainToParentOnFinishHandle = scopeExit(() => {
+                    evaluationsLeft--;
                     if (evaluationsLeft > 0)
                         return;
 
@@ -548,26 +575,42 @@ export class LlamaDecisionContext {
                     signal?.throwIfAborted();
                 }
 
-                const controlledEvaluateInput: ControlledEvaluateInputItem[] = evaluateInput;
-                controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
-                    controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
-                    {
-                        generateNext: {
-                            logits: {
-                                filter: {
-                                    tokens: input.tokens,
-                                    includeTop: Math.max(input.tokens.length * 2, decisionAnswerMinimumTopLogits)
+                if (input.type === "choice") {
+                    const choiceSeqQueue = new AsyncQueue([], {parent: localQueue});
+                    choiceSeqQueue.push(seq);
+                    seqLease.move();
+                    updateTokenUsageExitHandle.call();
+                    const answerRes = await evaluateChoiceDecision({
+                        question: input,
+                        seqQueue: choiceSeqQueue,
+                        signal,
+                        evaluationPriority,
+                        baseSeqTokens: [...prefixTokens, ...input.input, ...afterQuestionTokens, ...input.answerPrefix]
+                    });
+                    answers[questionId] = answerRes.answer;
+                    inputTokens += answerRes.tokenUsage.input;
+                    outputTokens += answerRes.tokenUsage.output;
+                } else {
+                    const controlledEvaluateInput: ControlledEvaluateInputItem[] = [...evaluateInput];
+                    controlledEvaluateInput[controlledEvaluateInput.length - 1] = [
+                        controlledEvaluateInput[controlledEvaluateInput.length - 1] as Token,
+                        {
+                            generateNext: {
+                                logits: {
+                                    filter: {
+                                        tokens: input.tokens
+                                    }
                                 }
                             }
                         }
-                    }
-                ];
-                const res = await seq.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
-                const lastTokenResult = res[res.length - 1];
-                if (lastTokenResult == null || lastTokenResult.next?.logits == null)
-                    throw new Error("Failed to generate decisions");
+                    ];
+                    const res = await seq.controlledEvaluate(controlledEvaluateInput, {evaluationPriority});
+                    const lastTokenResult = res[res.length - 1];
+                    if (lastTokenResult == null || lastTokenResult.next?.logits == null)
+                        throw new Error("Failed to generate decisions");
 
-                answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, seq.model.tokenizer);
+                    answers[questionId] = createDecisionAnswer(input, lastTokenResult.next.logits, seq.model.tokenizer);
+                }
             })
         );
 

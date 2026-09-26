@@ -92,7 +92,8 @@ There are two places where you can use the structured decisions API:
 
 
 ### On a Decision Context {#decision-context}
-When using a [`LlamaDecisionContext`](../api/classes/LlamaDecisionContext.md), the document you provide as context is only evaluated once,
+When using a [`LlamaDecisionContext`](../api/classes/LlamaDecisionContext.md) (via [`.decide()`](../api/classes/LlamaDecisionContext.md#decide)),
+the document you provide as context is only evaluated once,
 and then all questions are evaluated in parallel (up to the configured parallelism limit).
 
 It's recommended to configure the [`contextSize`](../api/type-aliases/LlamaDecisionContextOptions.md#contextsize) to limit its size if you only expect short documents.
@@ -122,7 +123,7 @@ const context = await model.createDecisionContext({
 await context.warmup(); // optional, makes timing the next decision more accurate
 const startTime = Date.now();
 
-const ticket = "I still can't sign in after resetting my password. My whole team is locked out.";
+const ticket = "I can't sign in after resetting my password. My whole team is locked out.";
 const answers = await context.decide(ticket, {
     troubleshootingAttempted: {
         type: "noul",
@@ -189,6 +190,14 @@ look at the probabilities to check whether the model gets confused between two c
 
 In such a case you'll see that the probability of two or more items is pretty close.
 Try refining the criteria to make it more specific, or add an additional option in order to remove ambiguity.
+:::
+
+::: tip NOTE
+
+The specific values for `confidence` and the rest of the probabilities could slightly vary on each evaluation (depending on your machine and setup),
+but the general consensus should remain stable - the `choice` with the highest confidence stays the same, a `noul` stays as decisive as before,
+but the exact confidence and probability values may fluctuate.
+
 :::
 
 

@@ -56,6 +56,9 @@ class AddonContextDecodeBatchWorker : public Napi::AsyncWorker {
 
         void Execute() {
             try {
+                ctx->sharedSamplerData.gotLogit = false;
+                ctx->sharedSamplerData.hasLogits = false;
+
                 // Perform the evaluation using llama_decode.
                 int r = llama_decode(ctx->ctx, ctx->batch);
 
@@ -315,17 +318,21 @@ class AddonContextSampleTokenWorker : public Napi::AsyncWorker {
         }
 
         void SampleToken() {
-            std::unique_lock<std::mutex> samplingLock(ctx->samplingMutex);
-            if (llama_get_logits(ctx->ctx) == nullptr) {
+            sampler->rebuildChainIfNeeded();
+
+            std::unique_lock<std::mutex> samplingLock(ctx->sharedSamplerData.mutex);
+            if (!ctx->sharedSamplerData.gotLogit) {
+                ctx->sharedSamplerData.hasLogits = llama_get_logits(ctx->ctx) != nullptr;
+                ctx->sharedSamplerData.gotLogit = true;
+            }
+
+            if (!ctx->sharedSamplerData.hasLogits) {
                 SetError("This model does not support token generation");
                 return;
             }
 
-            sampler->rebuildChainIfNeeded();
-
             llama_token_data_array cur_p;
-            sampler->sample(ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence || returnLogits.enabled != ReturnLogits::Disabled);
-            samplingLock.unlock();
+            sampler->sampleAndReleaseLock(ctx->sharedSamplerData.mutex, samplingLock, ctx->ctx, batchLogitIndex, cur_p, returnProbabilities || returnConfidence || returnLogits.enabled != ReturnLogits::Disabled);
 
             if (cur_p.size == 0 || !(cur_p.selected >= 0 && cur_p.selected < (int32_t)cur_p.size)) {
                 no_output = true;

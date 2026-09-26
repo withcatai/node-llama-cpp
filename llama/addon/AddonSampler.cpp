@@ -1,4 +1,5 @@
 #include <cmath>
+#include <mutex>
 #include "common/common.h"
 #include "globals/addonLog.h"
 #include "ggml.h"
@@ -170,8 +171,9 @@ void AddonSampler::acceptToken(llama_token token) {
     }
 }
 
-void AddonSampler::sample(struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP, bool forceGrammar) {
+void AddonSampler::sampleAndReleaseLock(std::mutex & samplingMutex, std::unique_lock<std::mutex> & samplingLock, struct llama_context* llamaContext, int32_t batchLogitIndex, llama_token_data_array& curP, bool forceGrammar) {
     setTokenCandidates(llamaContext, batchLogitIndex, curP);
+    samplingLock.unlock();
 
     if (curP.size == 0) {
         return;
@@ -206,7 +208,10 @@ void AddonSampler::sample(struct llama_context* llamaContext, int32_t batchLogit
             return;
         }
 
-        setTokenCandidates(llamaContext, batchLogitIndex, curP);
+        {
+            std::unique_lock<std::mutex> samplingLock(samplingMutex);
+            setTokenCandidates(llamaContext, batchLogitIndex, curP);
+        }
 
         llama_sampler_apply(grammarEvaluationState->sampler, &curP);
         llama_sampler_apply(chain, &curP);

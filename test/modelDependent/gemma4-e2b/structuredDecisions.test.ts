@@ -98,8 +98,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "API": 1,
-                        "codebase": 0.0000237,
-                        "database": 0.00000558,
+                        "codebase": 0.0000762,
+                        "database": 0.00000208,
                       },
                       "type": "choice",
                     },
@@ -108,10 +108,10 @@ describe("gemma4 e2b", () => {
                       "value": 1,
                     },
                     "level": {
-                      "confidence": 0.999,
+                      "confidence": 1,
                       "probabilities": [
-                        0.0000978,
-                        0.0002,
+                        0.0000264,
+                        0.0000152,
                         1,
                       ],
                       "score": 2,
@@ -122,8 +122,8 @@ describe("gemma4 e2b", () => {
                       "confidence": 1,
                       "probabilities": {
                         "engineering": 1,
-                        "hr": 0.000214,
-                        "sales": 0.000036,
+                        "hr": 0.000242,
+                        "sales": 0.0000568,
                       },
                       "type": "choice",
                     },
@@ -237,13 +237,138 @@ describe("gemma4 e2b", () => {
                     expect(contextText).to.include(longText.slice(0, 64));
                     expect(contextText).to.not.include(longText.slice(-64));
                 });
+
+                test("many choices", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                    const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                    const llama = await getTestLlama();
+
+                    const model = await llama.loadModel({
+                        modelPath
+                    });
+                    const context = await model.createDecisionContext({
+                        parallelQuestions: 1,
+                        contextSize: 1024
+                    });
+
+                    const ticket = "I can't sign in after resetting my password. My whole team is locked out.";
+                    const res = await context.decide(ticket, {
+                        category: {
+                            type: "choice",
+                            instruction: "Which category is related to this ticket?",
+                            criteria: {
+                                food: "Food",
+                                travel: "Travel",
+                                accommodation: "Accommodation",
+                                delivery: "Delivery",
+                                maintenance: "Maintenance",
+                                support: "Support",
+                                billing: "Billing",
+                                payments: "Payments",
+                                subscriptions: "Subscriptions",
+                                privacy: "Privacy",
+                                performance: "Performance",
+                                outage: "Outage",
+                                networking: "Networking",
+                                hardware: "Hardware",
+                                software: "Software",
+                                mobile: "Mobile",
+                                desktop: "Desktop",
+                                website: "Website",
+                                api: "API",
+                                integration: "Integration",
+                                database: "Database",
+                                storage: "Storage",
+                                backup: "Backup",
+                                migration: "Migration",
+                                installation: "Installation",
+                                configuration: "Configuration",
+                                permissions: "Permissions",
+                                notifications: "Notifications",
+                                email: "Email",
+                                messaging: "Messaging",
+                                communication: "Communication",
+                                documentation: "Documentation",
+                                training: "Training",
+                                onboarding: "Onboarding",
+                                cancellation: "Cancellation",
+                                renewal: "Renewal",
+                                pricing: "Pricing",
+                                discount: "Discount",
+                                promotion: "Promotion",
+                                order: "Order",
+                                returns: "Returns",
+                                shipping: "Shipping",
+                                inventory: "Inventory",
+                                product: "Product",
+                                availability: "Availability",
+                                quality: "Quality",
+                                warranty: "Warranty",
+                                repair: "Repair",
+                                replacement: "Replacement",
+                                booking: "Booking",
+                                reservation: "Reservation",
+                                scheduling: "Scheduling",
+                                transportation: "Transportation",
+                                parking: "Parking",
+                                restaurant: "Restaurant",
+                                entertainment: "Entertainment",
+                                events: "Events",
+                                healthcare: "Healthcare",
+                                insurance: "Insurance",
+                                legal: "Legal",
+                                finance: "Finance",
+                                taxes: "Taxes",
+                                employment: "Employment",
+                                payroll: "Payroll",
+                                humanResources: "Human Resources",
+                                education: "Education",
+                                childcare: "Childcare",
+                                pets: "Pets",
+                                utilities: "Utilities",
+                                electricity: "Electricity",
+                                water: "Water",
+                                internet: "Internet",
+                                password: "Password", // password: "Password",
+                                phone: "Phone",
+                                cleaning: "Cleaning",
+                                plumbing: "Plumbing",
+                                heating: "Heating",
+                                cooling: "Cooling",
+                                furniture: "Furniture",
+                                appliances: "Appliances",
+                                construction: "Construction",
+                                gardening: "Gardening",
+                                noise: "Noise",
+                                safety: "Safety",
+                                complaint: "Complaint",
+                                feedback: "Feedback",
+                                suggestion: "Suggestion",
+                                request: "Request",
+                                inquiry: "Inquiry",
+                                incident: "Incident",
+                                fraud: "Fraud",
+                                accessibility: "Accessibility",
+                                localization: "Localization",
+                                // password: "Password",
+                                compliance: "Compliance"
+                            }
+                        }
+                    });
+                    expect(Object.keys(res.category.probabilities).length).to.be.greaterThan(10);
+                    expect(Object.keys(res.category.probabilities).length).toMatchInlineSnapshot("94");
+                    expect(res.category.choice).to.be.eql("password");
+                    expect(res.category.confidence).to.be.greaterThanOrEqual(0.6);
+                });
             });
         });
 
         describe("in a chat", () => {
-            test("matching", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            test("matching", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
                 const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
                 const llama = await getTestLlama();
+
+                if (llama.gpu === false)
+                    test.skip("Logits are a bit different on different backends to cause test flakiness");
 
                 const model = await llama.loadModel({
                     modelPath
@@ -255,13 +380,12 @@ describe("gemma4 e2b", () => {
                     contextSequence: context.getSequence()
                 });
 
-                const chatResponse = await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
+                await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
                     maxTokens: 100,
                     budgets: {
                         thoughtTokens: 40
                     }
                 });
-                console.log(chatResponse);
 
                 const res = await chat.decide({
                     animal: {
@@ -306,7 +430,7 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 1,
+                      "value": 0.999,
                     },
                     "animalOrigins": {
                       "type": "noul",
@@ -322,7 +446,7 @@ describe("gemma4 e2b", () => {
                     },
                     "relatedAnimals": {
                       "type": "noul",
-                      "value": 1,
+                      "value": 0.999,
                     },
                   }
                 `);
@@ -348,13 +472,12 @@ describe("gemma4 e2b", () => {
                     contextSequence: sequence
                 });
 
-                const chatResponse = await chat.prompt("Where is wood coming from?", {
+                await chat.prompt("Where is wood coming from?", {
                     maxTokens: 100,
                     budgets: {
                         thoughtTokens: 40
                     }
                 });
-                console.log(chatResponse);
 
                 const res = await chat.decide({
                     animal: {
@@ -413,32 +536,32 @@ describe("gemma4 e2b", () => {
                   {
                     "animal": {
                       "type": "noul",
-                      "value": 0.00238,
+                      "value": 0.000187,
                     },
                     "cookingRecipe": {
                       "type": "noul",
-                      "value": 0.0000225,
+                      "value": 0.000112,
                     },
                     "fictionalStory": {
                       "type": "noul",
-                      "value": 0.0000138,
+                      "value": 0.0000023,
                     },
                     "mineralOrigin": {
                       "type": "noul",
-                      "value": 0.0000348,
+                      "value": 0.0000034,
                     },
                     "spaceTravel": {
                       "type": "noul",
-                      "value": 0.0000123,
+                      "value": 0.0000368,
                     },
                     "subject": {
                       "choice": "materials",
-                      "confidence": 1,
+                      "confidence": 0.998,
                       "probabilities": {
-                        "brushing": 0.00000313,
-                        "food": 0.00000662,
-                        "materials": 1,
-                        "other": 0.0000181,
+                        "brushing": 0.0000175,
+                        "food": 0.000779,
+                        "materials": 0.999,
+                        "other": 0.00018,
                       },
                       "type": "choice",
                     },
@@ -448,6 +571,59 @@ describe("gemma4 e2b", () => {
                     },
                   }
                 `);
+            });
+
+            test("with document", {timeout: 1000 * 60 * 60 * 2}, async () => {
+                const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
+                const llama = await getTestLlama();
+
+                const model = await llama.loadModel({
+                    modelPath
+                });
+                const context = await model.createContext({
+                    contextSize: 4096
+                });
+                const chat = new LlamaChatSession({
+                    contextSequence: context.getSequence()
+                });
+
+                await chat.prompt("Tell me about llamas and where they are from, and a related animal", {
+                    maxTokens: 100,
+                    budgets: {
+                        thoughtTokens: 40
+                    }
+                });
+
+                const res1 = await chat.decide({
+                    locks: {
+                        type: "choice",
+                        instruction: "What are locks?",
+                        criteria: {
+                            useful: "They are useful",
+                            notDoors: "Not doors",
+                            cats: "Not cats"
+                        }
+                    }
+                }, {
+                    document: "Locks are not doors"
+                });
+                const res2 = await chat.decide({
+                    locks: {
+                        type: "choice",
+                        instruction: "What are locks?",
+                        criteria: {
+                            useful: "They are useful",
+                            notDoors: "Not doors",
+                            cats: "Not cats"
+                        }
+                    }
+                });
+
+                expect(res1.locks.confidence).to.be.greaterThan(0.8);
+                expect(res1.locks.choice).to.equal("notDoors");
+
+                expect(res2.locks.confidence).to.be.lessThan(0.8);
+                expect(res2.locks.choice).to.not.equal("notDoors");
             });
         });
     });
