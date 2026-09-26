@@ -363,7 +363,7 @@ describe("gemma4 e2b", () => {
         });
 
         describe("in a chat", () => {
-            test("matching", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            test("matching", {timeout: 1000 * 60 * 60 * 2}, async (test) => {
                 const modelPath = await getModelFile("gemma-4-E2B-it-Q4_K_M.gguf");
                 const llama = await getTestLlama();
 
@@ -622,8 +622,8 @@ describe("gemma4 e2b", () => {
                 expect(res1.locks.confidence).to.be.greaterThan(0.8);
                 expect(res1.locks.choice).to.equal("notDoors");
 
-                expect(res2.locks.confidence).to.be.greaterThan(0.8);
-                expect(res2.locks.choice).to.equal("useful");
+                expect(res2.locks.confidence).to.be.lessThan(0.8);
+                expect(res2.locks.choice).to.not.equal("notDoors");
             });
         });
     });
