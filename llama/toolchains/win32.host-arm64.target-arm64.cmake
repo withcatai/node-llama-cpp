@@ -1,6 +1,8 @@
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR arm64)
 
+set(CMAKE_CROSSCOMPILING FALSE) # event though we set `CMAKE_SYSTEM_NAME`, we don't actually cross-compile here
+
 set(target arm64-pc-windows-msvc)
 set(CMAKE_C_COMPILER_TARGET ${target})
 set(CMAKE_CXX_COMPILER_TARGET ${target})
