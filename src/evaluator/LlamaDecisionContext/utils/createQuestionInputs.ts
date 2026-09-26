@@ -118,7 +118,7 @@ function createQuestionInput(keyName: string, question: DecisionQuestions[number
                     input.push(token);
                     pushAll(input, LlamaText([
                         ". ", question.criteria[criteriaKey] ?? criteriaKey,
-                        keyIndex === choiceOptions.length - 1
+                        keyIndex === keys.length - 1
                             ? ""
                             : "\n"
                     ]).tokenize(tokenizer, "trimLeadingSpace"));

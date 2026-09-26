@@ -7,7 +7,7 @@ import {prepareDecisionContextWindow} from "../LlamaChat/utils/prepareDecisionCo
 import {ChatWrapper} from "../../ChatWrapper.js";
 import {resolveChatWrapper} from "../../chatWrappers/utils/resolveChatWrapper.js";
 import {TokenMeter} from "../TokenMeter.js";
-import {createQuestionInputs} from "./utils/createQuestionInputs.js";
+import {createQuestionInputs, getQuestionInputMaxTokenLength} from "./utils/createQuestionInputs.js";
 import {createDecisionAnswer} from "./utils/createDecisionAnswer.js";
 import {evaluateChoiceDecision} from "./utils/evaluateChoiceDecision.js";
 import type {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "./types.js";
@@ -231,7 +231,7 @@ export class LlamaDecisionContext {
         }
 
         const inputs = createQuestionInputs(questions, this.model.tokenizer);
-        const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
+        const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, getQuestionInputMaxTokenLength(item)), 0);
         if (maxInputLength > this.contextSize)
             throw new Error(
                 "The context size is too small to fit the provided questions and/or criteria. " +
@@ -525,8 +525,8 @@ export class LlamaDecisionContext {
                 using seqLease = await localQueue.acquire(signal);
                 const seq = seqLease.item;
 
-                evaluationsLeft--;
                 using drainToParentOnFinishHandle = scopeExit(() => {
+                    evaluationsLeft--;
                     if (evaluationsLeft > 0)
                         return;
 

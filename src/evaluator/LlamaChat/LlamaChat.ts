@@ -29,7 +29,7 @@ import {defaultMaxPreloadTokens} from "../LlamaChatSession/utils/LlamaChatSessio
 import {LlamaLogLevel} from "../../bindings/types.js";
 import {replaceRegularTextInLlamaText} from "../../chatWrappers/utils/replaceRegularTextInLlamaText.js";
 import {DecisionAnswer, DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
-import {createQuestionInputs} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
+import {createQuestionInputs, getQuestionInputMaxTokenLength} from "../LlamaDecisionContext/utils/createQuestionInputs.js";
 import {createEmptyInvalidDecisionAnswer, createDecisionAnswer} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
 import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
 import {TokenMeter} from "../TokenMeter.js";
@@ -1185,7 +1185,7 @@ export class LlamaChat {
 
         return await withLock([this._chatLock, "evaluate"], signal, async (): Promise<LlamaChatGenerateDecisionsResponse<Questions>> => {
             const inputs = createQuestionInputs(questions, this.model.tokenizer);
-            const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, item.input.length), 0);
+            const maxInputLength = Object.values(inputs).reduce((max, item) => Math.max(max, getQuestionInputMaxTokenLength(item)), 0);
             if (maxInputLength > this.sequence.contextSize)
                 throw new Error(
                     "The context size is too small to fit the provided questions and/or criteria. " +

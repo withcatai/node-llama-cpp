@@ -133,8 +133,8 @@ export async function evaluateChoiceDecision({
             using seqLease = await localQueue.acquire(signal);
             const seq = seqLease.item;
 
-            evaluationsLeft--;
             using drainToParentOnFinishHandle = scopeExit(() => {
+                evaluationsLeft--;
                 if (evaluationsLeft > 0 || localQueue.parent == null)
                     return;
 
@@ -158,12 +158,12 @@ export async function evaluateChoiceDecision({
                     };
                 });
                 localSeqs.add(seq);
+            }
 
-                await using exitHandle = scopeExit(() => fixPendingSeqs(seq));
-                if (needPrefixSeqs.size != 0) {
-                    await fixPendingSeqs(seq);
-                    signal?.throwIfAborted();
-                }
+            await using exitHandle = scopeExit(() => fixPendingSeqs(seq));
+            if (needPrefixSeqs.size != 0) {
+                await fixPendingSeqs(seq);
+                signal?.throwIfAborted();
             }
 
             if (evaluateInput.length === 0)
