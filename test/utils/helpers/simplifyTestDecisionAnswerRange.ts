@@ -38,7 +38,6 @@ function simplifyFloat(value: number) {
     if (value === 0)
         return 0;
 
-    const step = 10 ** (Math.floor(Math.log10(Math.abs(value))) - 2);
-    return Number.parseFloat((Math.round(value / step) * step).toPrecision(12));
+    return Math.round(Math.round(value * 100) / 4) * 4 / 100;
 }
 
