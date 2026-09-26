@@ -265,7 +265,7 @@ export class LlamaDecisionContext {
                 : onOverflow === "truncateDocument"
                     ? {
                         lastEvaluationMetadata: null,
-                        size: (sequence) => sequence.contextSize - 1,
+                        size: 1,
                         strategy({maxTokensCount, tokenizer, chatWrapper}) {
                             const fullDocumentTokenLength = tokenizer(document, false, "trimLeadingSpace").length;
                             const testTokenLength = chatWrapper.generateContextState({

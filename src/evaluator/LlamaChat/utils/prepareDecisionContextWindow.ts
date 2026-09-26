@@ -102,7 +102,8 @@ export async function prepareDecisionContextWindow({
             history: fullHistory,
             contextShiftSize: Math.max(
                 minFreeContextTokens,
-                Math.min(contextShiftSize, context.contextSize - fitRegularContextWindowUnderTokenCount)
+                contextShiftSize,
+                context.contextSize - fitRegularContextWindowUnderTokenCount
             ),
             contextShiftStrategy: resolvedContextShift.strategy,
             contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,
@@ -141,7 +142,8 @@ export async function prepareDecisionContextWindow({
         history: fullHistory,
         contextShiftSize: Math.max(
             minFreeContextTokens,
-            Math.min(contextShiftSize, context.contextSize - fitRegularContextWindowUnderTokenCount)
+            contextShiftSize,
+            context.contextSize - fitRegularContextWindowUnderTokenCount
         ),
         contextShiftStrategy: resolvedContextShift.strategy,
         contextShiftLastEvaluationMetadata: resolvedContextShift.lastEvaluationMetadata,

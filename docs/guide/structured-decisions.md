@@ -194,7 +194,7 @@ Try refining the criteria to make it more specific, or add an additional option 
 
 ::: tip NOTE
 
-The specific values that you get for `confidence` and the rest of the probabilities could slightly vary on each evaluation (depending on your machine and setup),
+The specific values for `confidence` and the rest of the probabilities could slightly vary on each evaluation (depending on your machine and setup),
 but the general consensus should remain stable - the `choice` with the highest confidence stays the same, a `noul` stays as decisive as before,
 but the exact confidence and probability values may fluctuate.
 
