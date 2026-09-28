@@ -35,14 +35,14 @@ export function generateCriteriaChoiceOptionTokens(min: number, max: number, tok
         return false;
     }
 
+    addRanges("09");
+
     if (additionalChars !== "") {
         for (const char of additionalChars) {
             if (pushCharacter(char))
                 break;
         }
     }
-
-    addRanges("09");
 
     if (res.size < min)
         throw new RangeError(
