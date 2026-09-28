@@ -334,7 +334,7 @@ console.log({
     queue: answers.team.confidence >= 0.7
         ? answers.team.choice
         : "triage",
-    priority: answers.impact.score >= 1.5
+    priority: answers.impact.score >= 1.5 // 0-2 range
         ? "high"
         : "normal",
     nextStep: answers.troubleshooted.value >= 0.8

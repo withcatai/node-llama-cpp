@@ -29,6 +29,7 @@ const classesOrder = [
     "LlamaEmbeddingContext",
     "LlamaEmbedding",
     "LlamaRankingContext",
+    "LlamaDecisionContext",
     "LlamaGrammar",
     "LlamaJsonSchemaGrammar",
     "LlamaText",
