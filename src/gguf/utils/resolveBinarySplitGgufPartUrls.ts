@@ -16,8 +16,11 @@ export function resolveBinarySplitGgufPartUrls(ggufUrl: string) {
         )
             return ggufUrl;
 
-        const ggufIndex = parsedGgufUrl.pathname.indexOf(".gguf");
-        const pathnameWithoutPart = parsedGgufUrl.pathname.slice(0, ggufIndex + ".gguf".length);
+        // The directory can contain ".gguf" too. Cut at this match, not the first one.
+        if (binaryPartsMatch.index == null)
+            return ggufUrl;
+
+        const pathnameWithoutPart = parsedGgufUrl.pathname.slice(0, binaryPartsMatch.index + ".gguf".length);
 
         const res: string[] = [];
         for (let i = 1; i <= parts; i++) {
@@ -38,9 +41,9 @@ export function getFilenameForBinarySplitGgufPartUrls(urls: string[]) {
 
     const firstParsedUrl = new URL(urls[0]!);
 
-    if (binarySplitGgufPartsRegex.test(firstParsedUrl.pathname)) {
-        const ggufIndex = firstParsedUrl.pathname.toLowerCase().indexOf(".gguf");
-        const urlWithoutPart = firstParsedUrl.pathname.slice(0, ggufIndex + ".gguf".length);
+    const binaryPartsMatch = firstParsedUrl.pathname.match(binarySplitGgufPartsRegex);
+    if (binaryPartsMatch?.index != null) {
+        const urlWithoutPart = firstParsedUrl.pathname.slice(0, binaryPartsMatch.index + ".gguf".length);
 
         const filename = decodeURIComponent(urlWithoutPart.split("/").pop()!);
         return filenamify(filename);
