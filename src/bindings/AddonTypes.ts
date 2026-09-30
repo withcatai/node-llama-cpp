@@ -203,7 +203,17 @@ export type AddonContext = {
 
     getSequenceKvCacheMinPosition(sequenceId: number): number,
     getSequenceKvCacheMaxPosition(sequenceId: number): number,
+    // inputTokensLength counts tokens from the END of the last decoded batch (1 = the last token).
+    // Note: this only reads from the end of the batch; to read many token states at once,
+    // see `getEmbeddings`.
     getEmbedding(inputTokensLength: number, maxVectorSize?: number): Float64Array,
+
+    // Get the hidden states of multiple tokens from the last decoded batch at once.
+    // Each entry in `positions` is an output index: the i-th entry among the tokens the last
+    // `addToBatch` marked with `tokenLogitIndexes`. Returns a flat Float64Array of shape
+    // [positions.length, n_embd] (or [positions.length, maxVectorSize] when given).
+    // Only supported on contexts created with pooling: "none".
+    getEmbeddings(positions: Uint32Array, maxVectorSize?: number): Float64Array,
     getStateSize(): number,
     getMemoryBreakdown(): {
         cpuRam: number,

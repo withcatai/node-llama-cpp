@@ -956,7 +956,14 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
 
     const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
-        embeddings = llama_get_embeddings_ith(ctx, -1);
+        // `inputTokensLength` counts tokens from the END of the last decoded batch
+        // (1 = the last token), matching how `LlamaEmbeddingContext` and
+        // `LlamaRankingContext` use this method. Indexing it directly as
+        // `inputTokensLength - 1` from the START of the batch is wrong for
+        // multi-sequence batches (a token of another sequence can sit there), and
+        // hard-coding `-1` (as #645 accidentally introduced) silently returns the
+        // same token for every call, so users could only ever read the last token.
+        embeddings = llama_get_embeddings_ith(ctx, -inputTokensLength);
     }
 
     if (embeddings == NULL) {
@@ -968,6 +975,80 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
     Napi::Float64Array result = Napi::Float64Array::New(info.Env(), resultSize);
     for (size_t i = 0; i < resultSize; i++) {
         result[i] = embeddings[i];
+    }
+
+    return result;
+}
+
+Napi::Value AddonContext::GetEmbeddings(const Napi::CallbackInfo& info) {
+    if (disposed) {
+        Napi::Error::New(info.Env(), "Context is disposed").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    // getEmbeddings(positions: Uint32Array, maxVectorSize?: number): Float64Array
+    // Returns a flat Float64Array of shape [positions.length, n_embd] (or
+    // [positions.length, maxVectorSize] when given) with the hidden state of each
+    // requested position from the last decoded batch.
+    //
+    // This is the multi-position companion to `getEmbedding`, which only reads the
+    // end of the batch. It exists so prefill-only consumers (hidden-state readouts
+    // for classification / reward heads / embedding probes) can decode a batch once
+    // and read many token states out of it, instead of re-decoding once per
+    // readout position.
+    //
+    // Each position is an output index: the i-th entry among the tokens the last
+    // `addToBatch` marked with `tokenLogitIndexes` (and so the order they appear in
+    // the decoded batch). `decodeBatch` must have been called since those tokens
+    // were added.
+    Napi::Uint32Array positions = info[0].As<Napi::Uint32Array>();
+    const double maxVectorSize = (info.Length() > 1 && info[1].IsNumber()) ? info[1].As<Napi::Number>().DoubleValue() : 0;
+
+    if (!std::isfinite(maxVectorSize) || maxVectorSize < 0 || std::floor(maxVectorSize) != maxVectorSize) {
+        Napi::Error::New(info.Env(), "Invalid maximum embedding vector size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const enum llama_pooling_type pooling_type = llama_pooling_type(ctx);
+    if (pooling_type != LLAMA_POOLING_TYPE_NONE) {
+        Napi::Error::New(info.Env(), "getEmbeddings is only supported on contexts created with pooling: \"none\"").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const int64_t n_embd = llama_model_n_embd_out(model->model);
+    if (n_embd <= 0) {
+        Napi::Error::New(info.Env(), "Invalid embedding vector size").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    if (positions.ElementLength() == 0) {
+        Napi::Error::New(info.Env(), "Invalid positions").ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+    }
+
+    const size_t resultSize = maxVectorSize == 0 ? n_embd : std::min<double>(n_embd, maxVectorSize);
+    Napi::Float64Array result = Napi::Float64Array::New(info.Env(), positions.ElementLength() * resultSize);
+
+    // Every requested position must have been part of the last decoded batch with
+    // logits enabled (`addToBatch` was given its index in `tokenLogitIndexes`);
+    // `llama_get_embeddings_ith` returns NULL for any other index.
+    size_t out = 0;
+    for (size_t i = 0; i < positions.ElementLength(); i++) {
+        const int32_t outputIndex = static_cast<int32_t>(positions[i]);
+        if (outputIndex < 0) {
+            Napi::Error::New(info.Env(), std::string("Invalid position ") + std::to_string(outputIndex)).ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        }
+
+        const auto* embeddings = llama_get_embeddings_ith(ctx, outputIndex);
+        if (embeddings == NULL) {
+            Napi::Error::New(info.Env(), std::string("Failed to get embeddings for position ") + std::to_string(outputIndex) + " (is it within the last decoded batch, and was it given to addToBatch in tokenLogitIndexes?)").ThrowAsJavaScriptException();
+            return info.Env().Undefined();
+        }
+
+        for (size_t j = 0; j < resultSize; j++) {
+            result[out++] = embeddings[j];
+        }
     }
 
     return result;
@@ -1464,6 +1545,7 @@ void AddonContext::init(Napi::Object exports) {
                 InstanceMethod("decodeBatch", &AddonContext::DecodeBatch),
                 InstanceMethod("sampleToken", &AddonContext::SampleToken),
                 InstanceMethod("getEmbedding", &AddonContext::GetEmbedding),
+                InstanceMethod("getEmbeddings", &AddonContext::GetEmbeddings),
                 InstanceMethod("getStateSize", &AddonContext::GetStateSize),
                 InstanceMethod("getMemoryBreakdown", &AddonContext::GetMemoryBreakdown),
                 InstanceMethod("getThreads", &AddonContext::GetThreads),
