@@ -5,8 +5,14 @@ export function getForkExecArgv(execArgv: readonly string[] = process.execArgv):
         const arg = execArgv[i]!;
 
         // Explicit execArgv also bypasses fork's removal of the parent eval arguments.
-        if (arg === "--input-type" || arg === "-e" || arg === "--eval" || arg === "-p" || arg === "--print" || arg === "-pe") {
+        if (arg === "--input-type" || arg === "-e" || arg === "--eval" || arg === "-pe") {
             i++;
+            continue;
+        }
+
+        if (arg === "-p" || arg === "--print") {
+            if (execArgv[i + 1] != null && !execArgv[i + 1]!.startsWith("-"))
+                i++;
             continue;
         }
 
