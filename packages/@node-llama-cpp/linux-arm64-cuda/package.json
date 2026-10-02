@@ -22,7 +22,7 @@
     "node": ">=20.0.0"
   },
   "os": ["linux"],
-  "cpu": ["arm64", "x64"],
+  "cpu": ["arm64"],
   "libc": ["glibc"],
   "scripts": {
     "prebuild": "rimraf ./dist ./tsconfig.tsbuildinfo",

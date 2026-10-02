@@ -230,12 +230,18 @@ jobs:
           cuda: '12.4.0'
           method: 'network'
 
-      - name: Install Cuda 13.1 on Ubuntu (arm64)
+      - name: Install CUDA on Ubuntu (arm64)
         if: matrix.config.name == 'Ubuntu (arm64)'
-        uses: Jimver/cuda-toolkit@v0.2.36
-        with:
-          cuda: '13.4.2'
-          method: 'network'
+        env:
+          CUDA_VERSION: '13.4.2'
+        run: |
+          curl -fsSL "https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/local_installers/cuda_${CUDA_VERSION}_linux_sbsa.run" -o "$RUNNER_TEMP/cuda.run"
+          sudo sh "$RUNNER_TEMP/cuda.run" --silent --toolkit
+          rm "$RUNNER_TEMP/cuda.run"
+          echo "CUDA_PATH=/usr/local/cuda-${CUDA_VERSION%.*}" >> "$GITHUB_ENV"
+          echo "/usr/local/cuda-${CUDA_VERSION%.*}/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-${CUDA_VERSION%.*}/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          "/usr/local/cuda-${CUDA_VERSION%.*}/bin/nvcc" --version
 
       - name: Install Vulkan SDK on Windows (1)
         if: matrix.config.name == 'Windows (1)'
