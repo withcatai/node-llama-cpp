@@ -230,6 +230,13 @@ jobs:
           cuda: '12.4.0'
           method: 'network'
 
+      - name: Install Cuda 13.1 on Ubuntu (arm64)
+        if: matrix.config.name == 'Ubuntu (arm64)'
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          cuda: '13.4.2'
+          method: 'network'
+
       - name: Install Vulkan SDK on Windows (1)
         if: matrix.config.name == 'Windows (1)'
         shell: powershell
@@ -347,6 +354,7 @@ jobs:
           } else if (process.env.ARTIFACT_NAME === "linux-arm64") {
             await buildBinary("arm64", ["--gpu", "false"]);
             await buildBinary("armv7l", ["--gpu", "false"]);
+            await buildBinary("arm64", ["--gpu", "cuda"]);
           } else if (process.env.ARTIFACT_NAME === "mac-x64") {
             await buildBinary("x64", ["--gpu", "false"]);
           } else if (process.env.ARTIFACT_NAME === "mac-arm64") {
@@ -382,6 +390,10 @@ jobs:
 
             if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-x64-cuda-2", "libggml-cuda.so")))) {
               throw new Error("libggml-cuda.so not found in linux-x64-cuda-2");
+            }
+          } else if (process.env.ARTIFACT_NAME === "linux-arm64") {
+            if (!(await fs.pathExists(path.join(llamaBinsDirectoryPath, "linux-arm64-cuda", "libggml-cuda.so")))) {
+              throw new Error("libggml-cuda.so not found in linux-arm64-cuda");
             }
           }
 
@@ -794,7 +806,8 @@ jobs:
           npx --no vite-node ./scripts/waitForNpmRegistryToHaveModuleVersion.ts --packageVersion "$DEPLOYED_PACKAGE_VERSION" --additionalWait 60 --timeoutMinutes 10
 
           cd electron-app-example
-          npm install
+          npm install --cpu=x64
+          npm install --cpu=arm64
 
       - name: Build electron app
         id: build
