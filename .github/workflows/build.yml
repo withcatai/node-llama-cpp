@@ -236,7 +236,7 @@ jobs:
           CUDA_VERSION: '13.4.2'
         run: |
           curl -fsSL "https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/local_installers/cuda_${CUDA_VERSION}_linux_sbsa.run" -o "$RUNNER_TEMP/cuda.run"
-          sudo sh "$RUNNER_TEMP/cuda.run" --silent --toolkit
+          sudo sh "$RUNNER_TEMP/cuda.run" --silent --toolkit --override
           rm "$RUNNER_TEMP/cuda.run"
           echo "CUDA_PATH=/usr/local/cuda-${CUDA_VERSION%.*}" >> "$GITHUB_ENV"
           echo "/usr/local/cuda-${CUDA_VERSION%.*}/bin" >> "$GITHUB_PATH"
