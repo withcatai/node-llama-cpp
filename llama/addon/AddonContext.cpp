@@ -956,14 +956,7 @@ Napi::Value AddonContext::GetEmbedding(const Napi::CallbackInfo& info) {
 
     const auto* embeddings = pooling_type == LLAMA_POOLING_TYPE_NONE ? NULL : llama_get_embeddings_seq(ctx, 0);
     if (embeddings == NULL) {
-        // `inputTokensLength` counts tokens from the END of the last decoded batch
-        // (1 = the last token), matching how `LlamaEmbeddingContext` and
-        // `LlamaRankingContext` use this method. Indexing it directly as
-        // `inputTokensLength - 1` from the START of the batch is wrong for
-        // multi-sequence batches (a token of another sequence can sit there), and
-        // hard-coding `-1` (as #645 accidentally introduced) silently returns the
-        // same token for every call, so users could only ever read the last token.
-        embeddings = llama_get_embeddings_ith(ctx, -inputTokensLength);
+        embeddings = llama_get_embeddings_ith(ctx, -1);
     }
 
     if (embeddings == NULL) {
@@ -997,10 +990,11 @@ Napi::Value AddonContext::GetEmbeddings(const Napi::CallbackInfo& info) {
     // and read many token states out of it, instead of re-decoding once per
     // readout position.
     //
-    // Each position is an output index: the i-th entry among the tokens the last
-    // `addToBatch` marked with `tokenLogitIndexes` (and so the order they appear in
-    // the decoded batch). `decodeBatch` must have been called since those tokens
-    // were added.
+    // Each position is a batch token position (an index into the last decoded
+    // batch) — exactly the values `addToBatch` returns in `resLogitIndexes`. A
+    // position that was not included in `tokenLogitIndexes` (and is not an output
+    // for another reason, e.g. embeddings are enabled for the context, which makes
+    // every token an output) errors out instead of returning data.
     Napi::Uint32Array positions = info[0].As<Napi::Uint32Array>();
     const double maxVectorSize = (info.Length() > 1 && info[1].IsNumber()) ? info[1].As<Napi::Number>().DoubleValue() : 0;
 
@@ -1042,7 +1036,7 @@ Napi::Value AddonContext::GetEmbeddings(const Napi::CallbackInfo& info) {
 
         const auto* embeddings = llama_get_embeddings_ith(ctx, outputIndex);
         if (embeddings == NULL) {
-            Napi::Error::New(info.Env(), std::string("Failed to get embeddings for position ") + std::to_string(outputIndex) + " (is it within the last decoded batch, and was it given to addToBatch in tokenLogitIndexes?)").ThrowAsJavaScriptException();
+            Napi::Error::New(info.Env(), std::string("Failed to get embeddings for position ") + std::to_string(outputIndex) + " (is it within the last decoded batch, and was it given to addToBatch in tokenLogitIndexes or covered by context embeddings?)").ThrowAsJavaScriptException();
             return info.Env().Undefined();
         }
 
