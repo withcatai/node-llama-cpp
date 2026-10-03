@@ -53,6 +53,7 @@ await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith
 
 await moveBinariesFallbackDirToStandaloneExtModule((folderName) => folderName.startsWith("linux-x64-cuda"), "@node-llama-cpp/linux-x64-cuda-ext");
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64-cuda"), "@node-llama-cpp/linux-x64-cuda");
+await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-arm64-cuda"), "@node-llama-cpp/linux-arm64-cuda");
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64-vulkan"), "@node-llama-cpp/linux-x64-vulkan");
 await moveBinariesFolderToStandaloneModule((folderName) => folderName.startsWith("linux-x64"), "@node-llama-cpp/linux-x64");
 
