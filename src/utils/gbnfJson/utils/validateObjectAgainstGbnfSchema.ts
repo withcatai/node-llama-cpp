@@ -243,17 +243,18 @@ function validateBasicString<T extends GbnfJsonBasicStringSchema>(object: any, s
     const maxLength = schema.maxLength == null
         ? undefined
         : Math.max(schema.maxLength, minLength);
+    const length = [...object].length;
 
-    if (object.length < minLength) {
+    if (length < minLength) {
         if (minLength === maxLength)
-            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${length}`);
 
-        throw new TechnicalValidationError(`Expected at least ${minLength} characters but got ${object.length}`);
-    } else if (maxLength != null && object.length > maxLength) {
+        throw new TechnicalValidationError(`Expected at least ${minLength} characters but got ${length}`);
+    } else if (maxLength != null && length > maxLength) {
         if (minLength === maxLength)
-            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${length}`);
 
-        throw new TechnicalValidationError(`Expected at most ${maxLength} characters but got ${object.length}`);
+        throw new TechnicalValidationError(`Expected at most ${maxLength} characters but got ${length}`);
     }
 
     return true;
