@@ -1665,6 +1665,74 @@ describe("grammar for JSON schema", () => {
     });
 
     describe("string options", () => {
+        test.each([
+            ["a", 1],
+            ["中", 1],
+            ["😀", 1],
+            ["e\u0301", 2],
+            ["👩\u200d💻", 3],
+            ["a😀", 2]
+        ] as const)("length counts Unicode code points for %s", async (value, length) => {
+            const llama = await getTestLlama();
+            const grammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "string",
+                minLength: length,
+                maxLength: length
+            });
+
+            expect(grammar.parse(JSON.stringify(value))).to.equal(value);
+            expect(testGrammar(grammar, value)).to.equal(true);
+
+            const minGrammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "string",
+                minLength: length + 1
+            });
+            expect(() => minGrammar.parse(JSON.stringify(value)))
+                .to.throw(`Expected at least ${length + 1} characters but got ${length}`);
+            expect(testGrammar(minGrammar, value)).to.equal(false);
+
+            const maxGrammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "string",
+                maxLength: length - 1
+            });
+            expect(() => maxGrammar.parse(JSON.stringify(value)))
+                .to.throw(length === 1
+                    ? "Expected exactly 0 characters but got 1"
+                    : `Expected at most ${length - 1} characters but got ${length}`);
+            expect(testGrammar(maxGrammar, value)).to.equal(false);
+        });
+
+        test("length counts decoded Unicode escape pairs", async () => {
+            const llama = await getTestLlama();
+            const grammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "string",
+                maxLength: 1
+            });
+
+            expect(grammar.parse('"\\ud83d\\ude00"')).to.equal("😀");
+            expect(() => grammar.parse('"\\ud83d\\ude00a"'))
+                .to.throw("Expected at most 1 characters but got 2");
+        });
+
+        test("length counts Unicode code points in object properties", async () => {
+            const llama = await getTestLlama();
+            const grammar = new LlamaJsonSchemaGrammar(llama, {
+                type: "object",
+                properties: {
+                    text: {
+                        type: "string",
+                        maxLength: 1
+                    }
+                }
+            });
+            const value = {text: "😀"};
+
+            expect(grammar.parse(JSON.stringify(value))).to.eql(value);
+            expect(testGrammar(grammar, value)).to.equal(true);
+            expect(() => grammar.parse(JSON.stringify({text: "😀a"})))
+                .to.throw("Expected at most 1 characters but got 2");
+        });
+
         test("minLength", async () => {
             const llama = await getTestLlama();
             const grammar = new LlamaJsonSchemaGrammar(llama, {
