@@ -644,10 +644,14 @@ function getPrebuiltBinariesPackageDirectoryForBuildOptions(buildOptions: {
             else if (buildOptions.gpu === false)
                 // @ts-ignore
                 return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-x64"));
-        } else if (buildOptions.arch === "arm64")
+        } else if (buildOptions.arch === "arm64") {
+            if (buildOptions.gpu === "cuda")
+                // @ts-ignore
+                return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-arm64-cuda"));
+
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-arm64"));
-        else if (buildOptions.arch === "arm")
+        } else if (buildOptions.arch === "arm")
             // @ts-ignore
             return getBinariesPathFromModules(() => import("@node-llama-cpp/linux-armv7l"));
         else if (buildOptions.arch === "riscv64")

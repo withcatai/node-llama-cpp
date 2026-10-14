@@ -82,6 +82,8 @@ async function detectCudaSupport({
             "/usr/lib64",
             "/usr/lib/x86_64-linux-gnu",
             "/usr/lib/aarch64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu/tegra",
+            "/usr/lib/aarch64-linux-gnu/nvidia",
             "/usr/lib/armv7l-linux-gnu",
             ...cudaLibraryPaths
         ];
