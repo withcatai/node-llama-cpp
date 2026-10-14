@@ -67,6 +67,15 @@ export function parseTextTemplate<const Parts extends readonly TextTemplatePart[
         if (typeof textPart === "string")
             continue;
 
+        const matchingPartIndex = parts.findIndex((part) => part.text === textPart.separator);
+        if (matchingPartIndex < partIndex) {
+            const matchingPart = parts[matchingPartIndex]!;
+            if (result[matchingPart.key as Parts[number]["key"]] != null)
+                throw new Error(`Template must contain exactly one "${matchingPart.text}"`);
+
+            throw new Error(`Template must contain "${matchingPart.text}" before "${parts[partIndex - 1]!.text}"`);
+        }
+
         for (; partIndex < parts.length; partIndex++) {
             const part = parts[partIndex]!;
 
