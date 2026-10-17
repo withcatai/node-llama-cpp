@@ -327,7 +327,7 @@ jobs:
           async function buildBinary(arch, flags = [], nodeTarget = nodeVersion) {
             console.log(`Building ${arch} for node ${nodeTarget} with flags`, flags);
 
-            await $`node ./dist/cli/cli.js source build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeVersion} ${flags}`;
+            await $`node ./dist/cli/cli.js source build --ciMode --noUsageExample --arch ${arch} --nodeTarget ${nodeTarget} ${flags}`;
           }
 
           // build binaries
