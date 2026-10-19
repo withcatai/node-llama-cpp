@@ -33,6 +33,18 @@ static uint64_t calculateBatchMemorySize(int32_t n_tokens_alloc, int32_t embd, i
     return totalSize;
 }
 
+static void addTokenToBatch(llama_batch& batch, llama_token token, llama_pos pos, llama_seq_id sequenceId, bool logits) {
+    GGML_ASSERT(batch.seq_id[batch.n_tokens] && "llama_batch size exceeded");
+
+    const int32_t batchIndex = batch.n_tokens;
+    batch.token[batchIndex] = token;
+    batch.pos[batchIndex] = pos;
+    batch.n_seq_id[batchIndex] = 1;
+    batch.seq_id[batchIndex][0] = sequenceId;
+    batch.logits[batchIndex] = logits;
+    batch.n_tokens++;
+}
+
 class AddonContextDecodeBatchWorker : public Napi::AsyncWorker {
     public:
         AddonContext* ctx;
@@ -832,11 +844,11 @@ Napi::Value AddonContext::AddToBatch(const Napi::CallbackInfo& info) {
 
     for (size_t i = 0, l = 0; i < tokensLength; i++) {
         if (l < tokenLogitIndexesLength && tokenLogitIndexes[l] == i) {
-            common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, true);
+            addTokenToBatch(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, sequenceId, true);
             resLogitIndexes[l] = batch.n_tokens - 1;
             l++;
         } else {
-            common_batch_add(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, { sequenceId }, false);
+            addTokenToBatch(batch, static_cast<llama_token>(tokens[i]), firstTokenContextIndex + i, sequenceId, false);
         }
     }
 
