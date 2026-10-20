@@ -244,16 +244,21 @@ function validateBasicString<T extends GbnfJsonBasicStringSchema>(object: any, s
         ? undefined
         : Math.max(schema.maxLength, minLength);
 
-    if (object.length < minLength) {
-        if (minLength === maxLength)
-            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+    // return early when the code points cannot possibly violate the length constraints
+    if (object.length >= minLength * 2 && (maxLength == null || object.length <= maxLength))
+        return true;
 
-        throw new TechnicalValidationError(`Expected at least ${minLength} characters but got ${object.length}`);
-    } else if (maxLength != null && object.length > maxLength) {
+    const length = getCodePointLength(object);
+    if (length < minLength) {
         if (minLength === maxLength)
-            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${object.length}`);
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${length}`);
 
-        throw new TechnicalValidationError(`Expected at most ${maxLength} characters but got ${object.length}`);
+        throw new TechnicalValidationError(`Expected at least ${minLength} characters but got ${length}`);
+    } else if (maxLength != null && length > maxLength) {
+        if (minLength === maxLength)
+            throw new TechnicalValidationError(`Expected exactly ${minLength} characters but got ${length}`);
+
+        throw new TechnicalValidationError(`Expected at most ${maxLength} characters but got ${length}`);
     }
 
     return true;
@@ -324,4 +329,24 @@ function validateImmutableType(value: any, type: GbnfJsonSchemaImmutableType) {
     }
 
     throw new TechnicalValidationError(`Unknown immutable type ${JSON.stringify(type)}`);
+}
+
+
+const highSurrogateRegex = /[\uD800-\uDBFF]/;
+function getCodePointLength(value: string): number {
+    const units = value.length;
+
+    if (!highSurrogateRegex.test(value))
+        return units;
+
+    let length = units;
+    for (let i = 0; i < units - 1; i++) {
+        if ((value.charCodeAt(i) & 0xFC00) !== 0xD800 || (value.charCodeAt(i + 1) & 0xFC00) !== 0xDC00)
+            continue;
+
+        length--;
+        i++;
+    }
+
+    return length;
 }
