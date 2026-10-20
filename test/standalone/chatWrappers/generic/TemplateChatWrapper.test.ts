@@ -4,6 +4,42 @@ import {defaultChatSystemPrompt} from "../../../../src/config.js";
 
 
 describe("TemplateChatWrapper", () => {
+    test.each([
+        {template: "{{history}}model: {{completion}} done {{completion}}", part: "{{completion}}"},
+        {template: "{{history}}model: {{completion}} done {{history}}", part: "{{history}}"}
+    ] as const)("rejects a trailing $part", ({template, part}) => {
+        expect(() => new TemplateChatWrapper({
+            template,
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
+        })).toThrow(`Template must contain exactly one "${part}"`);
+    });
+
+    test("rejects duplicate history message placeholders", () => {
+        expect(() => new TemplateChatWrapper({
+            template: "{{history}}model: {{completion}}\nuser: ",
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}} / {{message}}\n",
+                model: "model: {{message}}\n"
+            }
+        })).toThrow('Template must contain exactly one "{{message}}"');
+    });
+
+    test("rejects a system prompt after completion", () => {
+        expect(() => new TemplateChatWrapper({
+            template: "{{history}}model: {{completion}}\nuser: {{systemPrompt}}",
+            historyTemplate: {
+                system: "system: {{message}}\n",
+                user: "user: {{message}}\n",
+                model: "model: {{message}}\n"
+            }
+        })).toThrow('Template must contain "{{systemPrompt}}" before "{{completion}}"');
+    });
+
     const conversationHistory: ChatHistoryItem[] = [{
         type: "system",
         text: defaultChatSystemPrompt
