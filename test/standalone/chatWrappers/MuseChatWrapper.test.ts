@@ -36,9 +36,11 @@ describe("MuseChatWrapper", () => {
     });
 
     test("should generate the default system message", () => {
+        const todayDate = new Date("2026-08-11T00:00:00Z");
+        todayDate.setDate(11); // ensure the date is 11 regardless of timezone
         const chatWrapper = new MuseChatWrapper({
             reasoningStrength: "low",
-            todayDate: new Date("2026-08-11T00:00:00Z")
+            todayDate
         });
 
         const {contextText} = chatWrapper.generateContextState({
