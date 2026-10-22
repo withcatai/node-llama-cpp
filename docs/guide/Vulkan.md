@@ -60,6 +60,19 @@ If you see `Vulkan used VRAM` in the output, it means that Vulkan support is wor
   ([ ! -f "$HOME/.zshrc" ] || grep -qxF "source /opt/vulkan-sdk/setup-env.sh" "$HOME/.zshrc") || (echo "source /opt/vulkan-sdk/setup-env.sh" >> "$HOME/.zshrc")
   source /opt/vulkan-sdk/setup-env.sh
   ```
+  >
+  #### Other Linux distributions: system packages {#vulkan-sdk-linux-packages}
+  Instead of the LunarG SDK, you can install your distribution's Vulkan build packages. You need CMake, Ninja, a `glslc`/shaderc compiler, and the Vulkan headers, loader, and **SPIRV-Headers**.
+  >
+  Verified on Arch Linux (including Asahi Linux on Apple Silicon):
+  ```shell
+  sudo pacman -S --needed cmake ninja vulkan-headers vulkan-icd-loader \
+                          shaderc spirv-headers spirv-tools vulkan-tools
+  ```
+  >
+  > **Note:** `spirv-headers` is a separate package from `spirv-tools` and is easy to miss. Without it, the build fails at CMake configure time with `Could not find a package configuration file provided by "SPIRV-Headers"`. Other distributions ship the same components under similar names (e.g. `vulkan-headers`, `vulkan-loader`/`libvulkan-dev`, `glslc`/`shaderc`, `spirv-headers`).
+  >
+  > On Apple Silicon under Asahi Linux there is no Vulkan SDK to install — the Apple GPU is exposed to Vulkan through Mesa's Honeykrisp driver (shipped with `mesa`), and the system packages above are all that's needed to build the Vulkan backend.
 
 * :::details Windows only: enable long paths support
   Open cmd as Administrator and run this command:
