@@ -57,6 +57,24 @@ describe("nomic embed text", () => {
             expect(helloThereEmbedding2.vector).to.eql(helloThereEmbedding.vector);
         });
 
+        test("rejects non-causal inputs longer than the batch size", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            const model = await llama.loadModel({
+                modelPath
+            });
+            const embeddingContext = await model.createEmbeddingContext({
+                contextSize: 2048
+            });
+            const input = "word ".repeat(600);
+
+            expect(model.tokenize(input).length).toBeGreaterThan(embeddingContext._llamaContext.batchSize);
+            await expect(embeddingContext.getEmbeddingFor(input)).rejects.toThrow(
+                "Input is longer than the batch size for this non-causal embedding model."
+            );
+        });
+
         test("similarity search", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();
