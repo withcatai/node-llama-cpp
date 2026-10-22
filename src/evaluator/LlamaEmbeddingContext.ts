@@ -91,6 +91,15 @@ export class LlamaEmbeddingContext {
                 "Try to increase the context size or use another model that supports longer contexts."
             );
 
+        if (
+            this.model.fileInfo.architectureMetadata.attention?.causal === false &&
+            resolvedInput.length > this._llamaContext.batchSize
+        )
+            throw new Error(
+                "Input is longer than the batch size for this non-causal embedding model. " +
+                "Try to increase the batch size to at least the input length."
+            );
+
         return await withLock([this as LlamaEmbeddingContext, "evaluate"], async () => {
             await this._sequence.eraseContextTokenRanges([{
                 start: 0,
