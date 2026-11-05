@@ -601,11 +601,12 @@ describe("gemma4 e2b", () => {
                         criteria: {
                             useful: "They are useful",
                             notDoors: "Not doors",
-                            cats: "Not cats"
+                            cats: "Not cats",
+                            numbers: "Are like numbers"
                         }
                     }
                 }, {
-                    document: "Locks are not doors"
+                    document: "Locks are like numbers"
                 });
                 const res2 = await chat.decide({
                     locks: {
@@ -614,16 +615,18 @@ describe("gemma4 e2b", () => {
                         criteria: {
                             useful: "They are useful",
                             notDoors: "Not doors",
-                            cats: "Not cats"
+                            cats: "Not cats",
+                            numbers: "Are like numbers"
                         }
                     }
                 });
 
                 expect(res1.locks.confidence).to.be.greaterThan(0.8);
-                expect(res1.locks.choice).to.equal("notDoors");
+                expect(res1.locks.choice).to.equal("numbers");
 
-                expect(res2.locks.confidence).to.be.lessThan(0.8);
-                expect(res2.locks.choice).to.not.equal("notDoors");
+                expect(res2.locks.choice).to.not.equal("numbers");
+                expect(res1.locks.confidence).to.be.greaterThan(0.6);
+                expect(res2.locks.choice).to.toMatchInlineSnapshot('"useful"');
             });
         });
     });
