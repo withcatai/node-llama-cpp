@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: "22"
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - name: ESLint
         run: npx eslint
@@ -36,6 +38,8 @@ jobs:
         with:
           node-version: "22"
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - name: Build
         run: npm run build
