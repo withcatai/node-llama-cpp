@@ -19,6 +19,8 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - name: Build
         run: npm run build
@@ -467,6 +469,8 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - name: Download build artifact
         uses: actions/download-artifact@v8
@@ -533,6 +537,8 @@ jobs:
           sudo apt-get install ninja-build cmake
 
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
 
       - name: Build binary
@@ -578,6 +584,8 @@ jobs:
           alias make=cmake
 
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
 
       - name: Build binary
@@ -641,6 +649,8 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - uses: actions/download-artifact@v8
         with:
@@ -870,6 +880,8 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - uses: actions/download-artifact@v8
         with:
@@ -951,6 +963,8 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - name: Install modules
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci
       - uses: actions/download-artifact@v8
         with:
@@ -1014,6 +1028,8 @@ jobs:
 #          node-version: "22"
 #          package-manager-cache: false
 #      - name: Install modules
+#        env:
+#          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 #        run: npm ci
 #
 #      - name: Pull artifact from broken release
