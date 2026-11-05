@@ -90,6 +90,12 @@ There are two places where you can use the structured decisions API:
 * [On a decision context](#decision-context) with a given document as the context for the questions
 * [On a chat session](#chat-session) with the entire chat history as the context for the questions
 
+<div class="tip custom-block" style="padding-top: 8px">
+
+Play with structured decisions in [Semantic Golfer](https://semantic-golfer.giladgd.com)'s interactive playground
+
+</div>
+
 
 ### On a Decision Context {#decision-context}
 When using a [`LlamaDecisionContext`](../api/classes/LlamaDecisionContext.md) (via [`.decide()`](../api/classes/LlamaDecisionContext.md#decide)),
