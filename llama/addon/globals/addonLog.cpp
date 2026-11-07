@@ -6,6 +6,7 @@
 
 AddonThreadSafeLogCallbackFunction addonThreadSafeLoggerCallback;
 bool addonJsLoggerCallbackSet = false;
+AddonThreadSafeLogCallbackFunctionContext* addonCurrentLoggerContext = nullptr;
 std::atomic<int> addonLoggerLogLevel(5);
 std::atomic<std::optional<int>> addonLoggerLogLevelOverride(std::nullopt);
 std::atomic<int> addonLastLoggerLogLevel(6);
@@ -103,17 +104,26 @@ void addonLlamaCppLogCallback(ggml_log_level level, const char* text, void* user
 }
 
 Napi::Value setLogger(const Napi::CallbackInfo& info) {
-    if (addonJsLoggerCallbackSet) {
-        addonJsLoggerCallbackSet = false;
-        addonThreadSafeLoggerCallback.Release();
-    }
-
     if (info.Length() < 1 || !info[0].IsFunction()) {
+        if (addonJsLoggerCallbackSet) {
+            addonJsLoggerCallbackSet = false;
+            addonCurrentLoggerContext = nullptr;
+            addonThreadSafeLoggerCallback.Release();
+        }
+
         return info.Env().Undefined();
     }
 
     auto addonLoggerJSCallback = info[0].As<Napi::Function>();
     AddonThreadSafeLogCallbackFunctionContext* context = new Napi::Reference<Napi::Value>(Napi::Persistent(info.This()));
+
+    // install the new logger before releasing the previous one, so that the previous logger's
+    // deferred finalizer cannot disable the new logger (the finalizer only disables logging
+    // when its context is still the current one)
+    const bool hadPreviousLogger = addonJsLoggerCallbackSet;
+    auto previousLoggerCallback = addonThreadSafeLoggerCallback;
+
+    addonCurrentLoggerContext = context;
     addonThreadSafeLoggerCallback = AddonThreadSafeLogCallbackFunction::New(
         info.Env(),
         addonLoggerJSCallback,
@@ -122,7 +132,10 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
         1,
         context,
         [](Napi::Env, void*, AddonThreadSafeLogCallbackFunctionContext* ctx) {
-            addonJsLoggerCallbackSet = false;
+            if (addonCurrentLoggerContext == ctx) {
+                addonJsLoggerCallbackSet = false;
+                addonCurrentLoggerContext = nullptr;
+            }
 
             delete ctx;
         }
@@ -131,6 +144,9 @@ Napi::Value setLogger(const Napi::CallbackInfo& info) {
 
     // prevent blocking the main node process from exiting due to active resources
     addonThreadSafeLoggerCallback.Unref(info.Env());
+
+    if (hadPreviousLogger)
+        previousLoggerCallback.Release();
 
     return info.Env().Undefined();
 }
