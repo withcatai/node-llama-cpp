@@ -2,6 +2,14 @@ export type Writable<T> = {
     -readonly [P in keyof T]: T[P];
 };
 
+export type InternalType<T> = {
+    /**
+     * Resolves to `T` in source and `never` in built declaration files
+     * @internal
+     */
+    type: T
+} extends {type: infer Type} ? Type : never;
+
 /**
  * Omit all the keys from `Value` that are not present in `Options` and are `true`.
  *

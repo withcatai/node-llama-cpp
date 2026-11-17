@@ -1,4 +1,4 @@
-import type {PickOptions} from "../../utils/utilTypes.js";
+import type {InternalType, PickOptions} from "../../utils/utilTypes.js";
 import type {GgmlType} from "../../gguf/types/GgufTensorInfoTypes.js";
 import type {LlamaGrammarEvaluationState} from "../LlamaGrammarEvaluationState.js";
 import type {TokenBias} from "../TokenBias.js";
@@ -46,7 +46,7 @@ export type LlamaContextOptions = {
      *
      * Defaults to `512` or `contextSize` if `contextSize` is less than `512`.
      */
-    batchSize?: number,
+    batchSize?: number | InternalType<"_matchContext">,
 
     /**
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
