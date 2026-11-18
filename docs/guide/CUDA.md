@@ -142,8 +142,12 @@ To fix it, uninstall older CUDA versions and restart your machine (important).
 Run this command inside of your project:
 
 ::: code-group
-```shell [Linux]
+```shell [Linux x64]
 ldd ./node_modules/@node-llama-cpp/linux-x64-cuda/bins/linux-x64-cuda/libggml-cuda.so
+```
+
+```shell [Linux ARM64]
+ldd ./node_modules/@node-llama-cpp/linux-arm64-cuda/bins/linux-arm64-cuda/libggml-cuda.so
 ```
 
 ```cmd [Windows (cmd)]
