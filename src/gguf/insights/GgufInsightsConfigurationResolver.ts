@@ -208,6 +208,9 @@ export class GgufInsightsConfigurationResolver {
             : useMmap;
         let gpuLayersFitMemory = false;
         await using simulatorSession = this._ggufInsights._createSimulatorSession();
+        const batchSize = embeddingContext && this._ggufInsights.ggufFileInfo.architectureMetadata?.attention?.causal === false
+            ? "_matchContext"
+            : undefined;
 
         try {
             const layersResolution = await this.resolveModelGpuLayersV2(
@@ -266,6 +269,7 @@ export class GgufInsightsConfigurationResolver {
 
         try {
             resolvedContextSize = await this.resolveContextContextSize("auto", {
+                batchSize,
                 getVramState: async () => ({
                     total: vramState.total,
                     free: Math.max(0, vramState.free - estimatedModelResourceUsage.gpuVram),
@@ -321,6 +325,7 @@ export class GgufInsightsConfigurationResolver {
 
         const estimatedContextResourceUsage = await this._ggufInsights.estimateContextResourceRequirementsV2({
             contextSize: resolvedContextSize,
+            batchSize,
             isEmbeddingContext: embeddingContext,
             modelGpuLayers: resolvedGpuLayers,
             flashAttention,

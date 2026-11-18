@@ -3,12 +3,13 @@ import bytes from "bytes";
 import {Llama} from "../../bindings/Llama.js";
 import {doesLlamaBackendNeedAddonInitLock, LlamaLocks, LlamaLogLevel} from "../../bindings/types.js";
 import {getLlamaWithoutBackend} from "../../bindings/utils/getLlamaWithoutBackend.js";
-import {getDefaultContextBatchSize, getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
+import {getDefaultContextSequences} from "../../evaluator/LlamaContext/LlamaContext.js";
 import {GgufFileInfo} from "../types/GgufFileInfoTypes.js";
 import {GgmlType, GgufTensorInfo} from "../types/GgufTensorInfoTypes.js";
 import {GgufArchitectureType} from "../types/GgufMetadataTypes.js";
 import {getReadablePath} from "../../cli/utils/getReadablePath.js";
 import {padSafeContextSize} from "../../evaluator/LlamaContext/utils/padSafeContextSize.js";
+import {resolveContextBatchSizeOption} from "../../evaluator/LlamaContext/utils/resolveContextBatchSizeOption.js";
 import {removeNullFields, removeUndefinedFields} from "../../utils/removeNullFields.js";
 import {LruCache} from "../../utils/LruCache.js";
 import {DisposalPreventionHandle, DisposeGuard} from "../../utils/DisposeGuard.js";
@@ -371,12 +372,16 @@ export class GgufInsights {
         swaFullCache = false,
         kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16
     }: {
-        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        flashAttention?: boolean, includeGraphOverhead?: boolean, swaFullCache?: boolean,
+        contextSize: number, modelGpuLayers: number, batchSize?: LlamaContextOptions["batchSize"], sequences?: number,
+        isEmbeddingContext?: boolean, flashAttention?: boolean, includeGraphOverhead?: boolean, swaFullCache?: boolean,
         kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType
     }): GgufInsightsResourceRequirements {
         if (sequences == null) sequences = getDefaultContextSequences();
-        if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
+        batchSize = resolveContextBatchSizeOption({
+            batchSize,
+            contextSize,
+            sequences
+        });
 
         const llmData = this._ggufFileInfo.architectureMetadata;
         const tensorInfo = this._ggufFileInfo.fullTensorInfo ?? [];
@@ -715,8 +720,8 @@ export class GgufInsights {
     }
 
     public async estimateContextResourceRequirementsV2(options: {
-        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean,
+        contextSize: number, modelGpuLayers: number, batchSize?: LlamaContextOptions["batchSize"], sequences?: number,
+        isEmbeddingContext?: boolean, flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean,
         kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
         useMmap?: boolean,
 
@@ -780,13 +785,17 @@ export class GgufInsights {
         kvCacheKeyType = GgmlType.F16, kvCacheValueType = GgmlType.F16,
         simulatorSession = this._simulationSession
     }: {
-        contextSize: number, modelGpuLayers: number, batchSize?: number, sequences?: number, isEmbeddingContext?: boolean,
-        flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean, useMmap?: boolean,
+        contextSize: number, modelGpuLayers: number, batchSize?: LlamaContextOptions["batchSize"], sequences?: number,
+        isEmbeddingContext?: boolean, flashAttention?: LlamaContextOptions["flashAttention"], swaFullCache?: boolean, useMmap?: boolean,
         kvCacheKeyType?: GgmlType, kvCacheValueType?: GgmlType,
         simulatorSession?: GgufInsightsSimulatorSession
     }): Promise<GgufInsightsResourceRequirements | null> {
         if (sequences == null) sequences = getDefaultContextSequences();
-        if (batchSize == null) batchSize = getDefaultContextBatchSize({contextSize, sequences});
+        batchSize = resolveContextBatchSizeOption({
+            batchSize,
+            contextSize,
+            sequences
+        });
 
         const kvUnified = false;
 

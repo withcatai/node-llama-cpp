@@ -57,6 +57,28 @@ describe("nomic embed text", () => {
             expect(helloThereEmbedding2.vector).to.eql(helloThereEmbedding.vector);
         });
 
+        test("matches the batch size to contextSize 1024 and embeds 600 tokens", {timeout: 1000 * 60 * 60 * 2}, async () => {
+            const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
+            const llama = await getTestLlama();
+
+            await using model = await llama.loadModel({modelPath});
+            expect(model.fileInfo.architectureMetadata.attention?.causal).toBe(false);
+
+            await using context = await model.createEmbeddingContext({contextSize: 1024});
+            expect(context._llamaContext.getAllocatedContextSize()).toBe(1024);
+            expect(context._llamaContext.batchSize).toBe(1024);
+
+            const tokens = model.tokenize("word ".repeat(600));
+            const specialTokenCount = context.calculateInputLength(tokens) - tokens.length;
+            const input = tokens.slice(0, 600 - specialTokenCount);
+            expect(context.calculateInputLength(input)).toBe(600);
+
+            const embedding = await context.getEmbeddingFor(input);
+            expect(embedding.vector).toHaveLength(model.embeddingVectorSize);
+            expect(embedding.vector.every(Number.isFinite)).toBe(true);
+            expect(embedding.vector.some((value) => value !== 0)).toBe(true);
+        });
+
         test("similarity search", {timeout: 1000 * 60 * 60 * 2}, async () => {
             const modelPath = await getModelFile("nomic-embed-text-v1.5.Q4_K_M.gguf");
             const llama = await getTestLlama();

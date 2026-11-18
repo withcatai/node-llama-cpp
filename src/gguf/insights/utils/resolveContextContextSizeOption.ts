@@ -2,7 +2,7 @@ import {LlamaContextOptions} from "../../../evaluator/LlamaContext/types.js";
 import {GgufInsights, GgufInsightsSimulatorSession} from "../GgufInsights.js";
 import {BuildGpu} from "../../../bindings/types.js";
 import {minAllowedContextSizeInCalculations} from "../../../config.js";
-import {getDefaultContextBatchSize, getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
+import {getDefaultModelContextSize} from "../../../evaluator/LlamaContext/LlamaContext.js";
 import {InsufficientMemoryError} from "../../../utils/InsufficientMemoryError.js";
 import {getRamUsageFromUnifiedVram} from "./getRamUsageFromUnifiedVram.js";
 import type {GgmlType} from "../../types/GgufTensorInfoTypes.js";
@@ -37,7 +37,7 @@ export async function resolveContextContextSizeOption(options: {
         kvCacheKeyType, kvCacheValueType, swaFullCache, useMmap = modelFileInsights._llama.supportsMmap,
         getVramState, getRamState, getSwapState, ignoreMemorySafetyChecks = false, isEmbeddingContext = false,
         maxContextSizeSwapUse = defaultMaxContextSizeSwapUse,
-        
+
         simulatorSession: _simulatorSession,
         ramCapIsSet = false,
         vramCapIsSet = false
@@ -67,7 +67,7 @@ export async function resolveContextContextSizeOption(options: {
             ]);
             const contextResourceRequirements = await modelFileInsights.estimateContextResourceRequirementsV2({
                 contextSize: resolvedContextSize,
-                batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: resolvedContextSize, sequences}),
+                batchSize,
                 modelGpuLayers: modelGpuLayers,
                 sequences,
                 flashAttention,
@@ -118,7 +118,7 @@ export async function resolveContextContextSizeOption(options: {
             for (let testContextSize = maxContextSize; testContextSize >= minContextSize && testContextSize <= maxContextSize;) {
                 const contextResourceRequirements = await modelFileInsights.estimateContextResourceRequirementsV2({
                     contextSize: testContextSize,
-                    batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: testContextSize, sequences}),
+                    batchSize,
                     modelGpuLayers: modelGpuLayers,
                     sequences,
                     flashAttention,
@@ -175,7 +175,7 @@ export async function resolveContextContextSizeOption(options: {
 
             const minContextSizeResourceRequirements = await modelFileInsights.estimateContextResourceRequirementsV2({
                 contextSize: minContextSize,
-                batchSize: batchSize ?? getDefaultContextBatchSize({contextSize: minContextSize, sequences}),
+                batchSize,
                 modelGpuLayers: modelGpuLayers,
                 sequences,
                 flashAttention,

@@ -26,6 +26,7 @@ import {resolveBatchItemsPrioritizationStrategy} from "./utils/resolveBatchItems
 import {LlamaSampler} from "./LlamaSampler.js";
 import {TokenPredictor} from "./TokenPredictor.js";
 import {padSafeContextSize} from "./utils/padSafeContextSize.js";
+import {resolveContextBatchSizeOption} from "./utils/resolveContextBatchSizeOption.js";
 import {LlamaContextSequenceCheckpoints} from "./LlamaContextSequenceCheckpoints.js";
 import type {Llama} from "../../bindings/Llama.js";
 
@@ -973,7 +974,11 @@ export class LlamaContext {
             contextSize = paddedContextSize;
 
         async function createContext(contextSize: number) {
-            const batchSize = options.batchSize ?? getDefaultContextBatchSize({contextSize, sequences});
+            const batchSize = resolveContextBatchSizeOption({
+                batchSize: options.batchSize,
+                contextSize,
+                sequences
+            });
             const resourceRequirementsEstimation = await _model.fileInsights.estimateContextResourceRequirementsV2({
                 contextSize,
                 sequences,
