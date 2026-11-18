@@ -46,7 +46,8 @@ export type LlamaContextOptions = {
      *
      * Defaults to `512` or `contextSize` if `contextSize` is less than `512`.
      */
-    batchSize?: number | InternalType<"_matchContext">,
+    batchSize?: number |
+        /** @internal */ InternalType<"_matchContext">,
 
     /**
      * Flash attention is an optimization in the attention mechanism that makes inference faster, more efficient and uses less memory.
