@@ -581,6 +581,11 @@ AddonContext::AddonContext(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Ad
     context_params.no_perf = true;
     context_params.swa_full = false;
     context_params.kv_unified = false;
+    // enable recurrent state rollback snapshots (used by hybrid/recurrent models) so that
+    // removing recently-evaluated tokens (e.g. refuted token predictions) can roll back
+    // the recurrent state instead of failing the removal.
+    // llama.cpp clamps this to 0 for models that don't support recurrent partial rollback.
+    context_params.n_rs_seq = 16;
 
         if (info.Length() > 1 && info[1].IsObject()) {
         const auto options = info[1].As<Napi::Object>();
