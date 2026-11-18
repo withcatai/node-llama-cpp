@@ -14,7 +14,9 @@ export function resolveBeginningTokenToPrepend(vocabularyType: LlamaVocabularyTy
 
 
     if (vocabularyType === LlamaVocabularyType.ugm)
-        return null;
+        return tokens.shouldPrependBosToken
+            ? tokens.bos
+            : null;
 
     if (tokens.shouldPrependBosToken)
         return tokens.bos;
