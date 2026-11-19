@@ -8,6 +8,7 @@ import {BuildGpu} from "../types.js";
 import {LlamaLogLevelToAddonLogLevel} from "../Llama.js";
 import {defaultBindingTestLogLevel, newGithubIssueUrl} from "../../config.js";
 import {getPlatform} from "./getPlatform.js";
+import {getForkExecArgv} from "./getForkExecArgv.js";
 import type {BindingModule} from "../AddonTypes.js";
 
 const require = createRequire(import.meta.url);
@@ -127,6 +128,7 @@ export async function testBindingBinary(
 
         let pipeSet = false;
         const subProcess = forkFunction.fork(__filename, [], {
+            execArgv: getForkExecArgv(),
             detached: false,
             silent: true,
             stdio: pipeOutputOnNode
