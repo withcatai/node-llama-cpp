@@ -16,6 +16,9 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
   <br /><DataBadge title="License" content="MIT"/>
 
 * [Clippy](https://felixrieseberg.github.io/clippy/) ([GitHub](https://github.com/felixrieseberg/clippy)) - Clippy, resurrected from the 1990s, now with some AI
+
+
+* [BubbleFacts](https://bubblefacts.frolic.org) ([GitHub](https://github.com/frolicchris/bubblefacts)) - short facts about the song a musician or DJ is playing, shown as bubbles on their stream in OBS, written from Wikipedia by a local model
   <br /><DataBadge title="License" content="MIT"/>
 
 
