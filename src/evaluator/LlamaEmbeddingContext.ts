@@ -3,6 +3,7 @@ import {Token} from "../types.js";
 import {LlamaText} from "../utils/LlamaText.js";
 import {tokenizeInput} from "../utils/tokenizeInput.js";
 import {resolveBeginningTokenToPrepend, resolveEndTokenToAppend} from "../utils/tokenizerUtils.js";
+import {LlamaLogLevel} from "../bindings/types.js";
 import {LlamaEmbedding} from "./LlamaEmbedding.js";
 import type {LlamaModel} from "./LlamaModel/LlamaModel.js";
 import type {LlamaContext, LlamaContextSequence} from "./LlamaContext/LlamaContext.js";
@@ -25,7 +26,11 @@ export type LlamaEmbeddingContextOptions = {
         max?: number
     },
 
-    /** prompt processing batch size */
+    /**
+     * Prompt processing batch size.
+     *
+     * For non-causal models, always matches the resolved context size regardless of the specified batch size.
+     */
     batchSize?: number,
 
     /**
@@ -163,14 +168,23 @@ export class LlamaEmbeddingContext {
         if (_model.fileInsights.hasEncoder && _model.fileInsights.hasDecoder)
             throw new Error("Computing embeddings is not supported for encoder-decoder models.");
 
+        const isNonCausal = _model.fileInfo.architectureMetadata?.attention?.causal === false;
         const llamaContext = await _model.createContext({
             contextSize,
-            batchSize,
+            batchSize: isNonCausal
+                ? "_matchContext"
+                : batchSize,
             threads,
             createSignal,
             ignoreMemorySafetyChecks,
             _embeddings: true
         });
+
+        if (isNonCausal && batchSize != null && batchSize !== llamaContext.batchSize)
+            _model._llama._log(LlamaLogLevel.warn,
+                `Ignoring batchSize ${batchSize} because this non-causal embedding model requires the batch size to match ` +
+                `the resolved context size (${llamaContext.batchSize}).`
+            );
 
         return new LlamaEmbeddingContext({
             _llamaContext: llamaContext

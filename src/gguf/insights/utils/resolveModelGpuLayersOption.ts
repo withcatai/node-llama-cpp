@@ -408,7 +408,9 @@ async function getVramRequiredForGpuLayers({
     if (fitContext != null && fitContext.contextSize != null) {
         const contextVram = (await ggufInsights.estimateContextResourceRequirementsV2({
             contextSize: fitContext.contextSize,
-            batchSize: getDefaultContextBatchSize({contextSize: fitContext.contextSize, sequences: 1}),
+            batchSize: fitContext.embeddingContext && ggufInsights.ggufFileInfo.architectureMetadata?.attention?.causal === false
+                ? "_matchContext"
+                : getDefaultContextBatchSize({contextSize: fitContext.contextSize, sequences: 1}),
             modelGpuLayers: gpuLayers,
             sequences: 1,
             isEmbeddingContext: fitContext.embeddingContext ?? false,
@@ -476,7 +478,9 @@ async function findMaxPossibleContextSizeForVram({
         async test(contextSize) {
             const contextVram = (await ggufInsights.estimateContextResourceRequirementsV2({
                 contextSize,
-                batchSize: getDefaultContextBatchSize({contextSize, sequences: 1}),
+                batchSize: isEmbeddingContext && ggufInsights.ggufFileInfo.architectureMetadata?.attention?.causal === false
+                    ? "_matchContext"
+                    : getDefaultContextBatchSize({contextSize, sequences: 1}),
                 modelGpuLayers: gpuLayers,
                 sequences: 1,
                 isEmbeddingContext,
