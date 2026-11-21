@@ -13,7 +13,6 @@ const truncatePrefix = "...";
 export function truncateTextAndRoundToWords(
     text: string, truncateSize: number, maxRound: number = 6, truncateStart: boolean = false
 ): string {
-    // nothing to truncate. Note that `text.slice(0, -0)` is an empty string, so this has to be handled explicitly
     if (truncateSize <= 0)
         return text;
 
@@ -83,7 +82,6 @@ export function truncateLlamaTextAndRoundToWords(
             if (value == null)
                 continue;
 
-            // everything that had to be truncated was already truncated, so keep the rest as is
             if (truncateSize <= 0)
                 return LlamaText(llamaText.values.slice(i));
 
@@ -117,7 +115,6 @@ export function truncateLlamaTextAndRoundToWords(
             if (value == null)
                 continue;
 
-            // everything that had to be truncated was already truncated, so keep the rest as is
             if (truncateSize <= 0)
                 return LlamaText(llamaText.values.slice(0, i + 1));
 

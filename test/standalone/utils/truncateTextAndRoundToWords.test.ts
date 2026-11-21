@@ -48,14 +48,14 @@ describe("utils", () => {
             const text = LlamaText(["abc", new SpecialTokensText("<x>"), "def"]);
 
             expect(truncateLlamaTextAndRoundToWords(text, 3, undefined, false).values)
-                .to.eql([...LlamaText(["abc", new SpecialTokensText("<x>")]).values]);
+                .to.eql(LlamaText(["abc", new SpecialTokensText("<x>")]).values);
         });
 
         test("keeps the remaining items whole when the truncate size is consumed exactly at an item boundary (from start)", () => {
             const text = LlamaText(["abc", new SpecialTokensText("<x>"), "def"]);
 
             expect(truncateLlamaTextAndRoundToWords(text, 3, undefined, true).values)
-                .to.eql([...LlamaText([new SpecialTokensText("<x>"), "def"]).values]);
+                .to.eql(LlamaText([new SpecialTokensText("<x>"), "def"]).values);
         });
 
         test("keeps a special token that follows an exactly consumed string", () => {
@@ -63,9 +63,9 @@ describe("utils", () => {
             const text = LlamaText(["abc", token, "def"]);
 
             expect(truncateLlamaTextAndRoundToWords(text, 3, undefined, false).values)
-                .to.eql([...LlamaText(["abc", token]).values]);
+                .to.eql(LlamaText(["abc", token]).values);
             expect(truncateLlamaTextAndRoundToWords(text, 3, undefined, true).values)
-                .to.eql([...LlamaText([token, "def"]).values]);
+                .to.eql(LlamaText([token, "def"]).values);
         });
 
         test("still removes the items that fall within the truncate size", () => {
