@@ -13,6 +13,9 @@ const truncatePrefix = "...";
 export function truncateTextAndRoundToWords(
     text: string, truncateSize: number, maxRound: number = 6, truncateStart: boolean = false
 ): string {
+    if (truncateSize <= 0)
+        return text;
+
     if (truncateStart) {
         const res = text.slice(truncateSize);
 
@@ -79,6 +82,9 @@ export function truncateLlamaTextAndRoundToWords(
             if (value == null)
                 continue;
 
+            if (truncateSize <= 0)
+                return LlamaText(llamaText.values.slice(i));
+
             if (typeof value === "string") {
                 if (value.length > truncateSize) {
                     return LlamaText([
@@ -108,6 +114,9 @@ export function truncateLlamaTextAndRoundToWords(
 
             if (value == null)
                 continue;
+
+            if (truncateSize <= 0)
+                return LlamaText(llamaText.values.slice(0, i + 1));
 
             if (typeof value === "string") {
                 if (value.length > truncateSize) {
