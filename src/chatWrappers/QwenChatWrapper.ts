@@ -204,7 +204,10 @@ export class QwenChatWrapper extends ChatWrapper {
             } else if (item.type === "model") {
                 flush();
 
-                let transformedModelResponse = (this.thoughts === "discourage" && isLastItem)
+                const lastResponseItem = item.response.at(-1);
+                const hasFunctionCallPrefill = isLastItem && isChatModelResponseFunctionCall(lastResponseItem) &&
+                    lastResponseItem.ended !== undefined;
+                let transformedModelResponse = (this.thoughts === "discourage" && isLastItem && !hasFunctionCallPrefill)
                     ? discourageThoughtsInModelResponse(item.response)
                     : item.response;
 

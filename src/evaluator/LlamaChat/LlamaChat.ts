@@ -33,9 +33,12 @@ import {createQuestionInputs, getQuestionInputMaxTokenLength} from "../LlamaDeci
 import {createEmptyInvalidDecisionAnswer, createDecisionAnswer} from "../LlamaDecisionContext/utils/createDecisionAnswer.js";
 import {trimCommonLlamaTextPrefix} from "../../utils/llamaTextUtils.js";
 import {TokenMeter} from "../TokenMeter.js";
+import {getFunctionCallPrefill, PendingFunctionCall, withoutFunctionCallPrefill} from "../../utils/getFunctionCallPrefill.js";
+import {validateObjectAgainstGbnfSchema} from "../../utils/gbnfJson/utils/validateObjectAgainstGbnfSchema.js";
 import {evaluateChoiceDecision} from "../LlamaDecisionContext/utils/evaluateChoiceDecision.js";
 import {FunctionCallNameGrammar} from "./utils/FunctionCallNameGrammar.js";
 import {FunctionCallParamsGrammar} from "./utils/FunctionCallParamsGrammar.js";
+import {LlamaFunctionCallValidationError} from "./utils/LlamaFunctionCallValidationError.js";
 import {compressHistoryToFitContextSize} from "./utils/compressHistoryToFitContextSize.js";
 import {prepareDecisionContextWindow} from "./utils/prepareDecisionContextWindow.js";
 
@@ -746,6 +749,10 @@ export class LlamaChat {
                 let tookInitialCheckpoint = false;
 
                 generateResponseState.ensureLastHistoryItemIsModel();
+                if (generateResponseState.hasReadyFunctionCall) {
+                    generateResponseState.completeReadyFunctionCall();
+                    return generateResponseState.returnFunctionCallResults()!;
+                }
                 generateResponseState.ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded();
 
                 const loadContextWindow = async (avoidReloadingHistory: boolean = false) => {
@@ -761,7 +768,7 @@ export class LlamaChat {
                 while (true) {
                     generateResponseState.startTokenLoop();
                     generateResponseState.handleRerender();
-                    const shouldHandlePrefixTriggers = generateResponseState.isRerender;
+                    const shouldHandlePrefixTriggers = generateResponseState.isRerender && !generateResponseState.hasFunctionCallPrefill;
 
                     generateResponseState.canAvoidReloadingHistory = false;
                     await loadContextWindow();
@@ -791,7 +798,7 @@ export class LlamaChat {
                     if (generateResponseState.generatedTokens === 0) {
                         generateResponseState.addIgnoreStartTextTriggersFromChatWrapper();
 
-                        if (generateResponseState.functionsEnabled) {
+                        if (generateResponseState.functionsEnabled && !generateResponseState.hasFunctionCallPrefill) {
                             generateResponseState.initFunctions();
                         }
                     }
@@ -1911,6 +1918,8 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     public readonly pendingPartialTokens: Token[] = [];
 
     public functionEvaluationMode: false | "prefixOrDisengage" | "functionName" | "params" | "sectionSuffixOrBetweenCalls" = false;
+    private readonly functionCallPrefill?: PendingFunctionCall;
+    private functionCallPrefillParamsText: string = "";
     private currentFunctionCallPreviousText: LlamaText = LlamaText([]);
     private readonly currentFunctionCallCurrentPartTokens: Token[] = [];
     private functionEvaluationFunctionName: string = "";
@@ -2003,6 +2012,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.chatWrapper = chatWrapper;
 
         this.history = history;
+        this.functionCallPrefill = getFunctionCallPrefill(history);
         this.onTextChunk = safeEventCallback(onTextChunk);
         this.onToken = safeEventCallback(onToken);
         this.onResponseChunk = safeEventCallback(onResponseChunk);
@@ -2042,6 +2052,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.resolvedHistory = this.noRawInResolvedHistory
             ? this.history.map(removeRawFromHistoryItem)
             : this.history.slice();
+        this.resolvedHistory = withoutFunctionCallPrefill(this.resolvedHistory);
         this.resolvedContextShift = {
             ...defaultContextShiftOptions,
             ...removeNullFields(this.contextShift)
@@ -2063,7 +2074,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
         this.functionsGrammar = undefined;
         this.functionsEvaluationState = undefined;
 
-        this.lastContextWindowHistory = lastEvaluationContextWindowHistory ?? this.resolvedHistory;
+        this.lastContextWindowHistory = withoutFunctionCallPrefill(lastEvaluationContextWindowHistory ?? this.resolvedHistory);
         this.lastHistoryCompressionMetadata = this.resolvedContextShift.lastEvaluationMetadata;
 
         if (this.customStopTriggers != null)
@@ -2149,7 +2160,94 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
             }
         }
 
+        if (this.functionCallPrefill != null) {
+            if (this.abortOnNonText)
+                throw new Error("Cannot prefill a function call when abortOnNonText is enabled");
+            if (!this.functionsEnabled || !Object.hasOwn(this.functions!, this.functionCallPrefill.name))
+                throw new Error(`The prefilled function "${this.functionCallPrefill.name}" is not in the supplied functions`);
+
+            const functionDefinition = this.functions![this.functionCallPrefill.name];
+            if (this.functionCallPrefill.ended) {
+                if (functionDefinition?.params == null) {
+                    if (this.functionCallPrefill.params !== undefined)
+                        throw new Error(`Function "${this.functionCallPrefill.name}" does not accept parameters`);
+                } else if (!validateObjectAgainstGbnfSchema(this.functionCallPrefill.params, functionDefinition.params))
+                    throw new Error(`Prefilled parameters for "${this.functionCallPrefill.name}" do not match its schema`);
+            } else {
+                if (typeof this.functionCallPrefill.paramsText !== "string" && this.functionCallPrefill.paramsText != null)
+                    throw new Error("Prefilled function arguments must be a string");
+                if (functionDefinition?.params == null && this.functionCallPrefill.paramsText)
+                    throw new Error(`Function "${this.functionCallPrefill.name}" does not accept parameters`);
+
+                this.functionCallPrefillParamsText = this.functionCallPrefill.paramsText ?? "";
+                this.functionEvaluationFunctionName = this.functionCallPrefill.name;
+                this.functionEvaluationMode = "params";
+                this.currentFunctionCallPreviousText = this.chatWrapper.generateFunctionCallPrefix(
+                    this.functionCallPrefill.name, this.functionCallPrefillParamsText
+                );
+            }
+        }
+
         this.getPenaltyTokens = this.getPenaltyTokens.bind(this);
+    }
+
+    public get hasFunctionCallPrefill() {
+        return this.functionCallPrefill != null;
+    }
+
+    public get hasReadyFunctionCall() {
+        return this.functionCallPrefill?.ended === true;
+    }
+
+    /** A fully-specified function call is a dispatch request and does not require model inference. */
+    public completeReadyFunctionCall() {
+        const prefill = this.functionCallPrefill;
+        if (prefill?.ended !== true)
+            return;
+
+        const raw = this.chatWrapper.generateFunctionCall(prefill.name, prefill.params);
+        this.recordFunctionCall(prefill.name, prefill.params, raw);
+    }
+
+    private recordFunctionCall(functionName: string, params: any, raw: LlamaText) {
+        this.resFunctionCalls.push({functionName, params, raw});
+        this.onFunctionCall?.({
+            functionName,
+            params: structuredClone(params),
+            raw: raw.toJSON()
+        });
+    }
+
+    private getInterruptedFunctionCall() {
+        if (this.functionEvaluationMode !== "params" || this.functionEvaluationFunctionName === "")
+            return undefined;
+
+        const previousParamsTokens = this.llamaChat.model.tokenize(
+            this.functionCallPrefillParamsText, false, "trimLeadingSpace"
+        );
+        return {
+            type: "functionCall" as const,
+            name: this.functionEvaluationFunctionName,
+            ended: false as const,
+            paramsText: this.functionCallPrefillParamsText + this.llamaChat.model.detokenize(
+                this.currentFunctionCallCurrentPartTokens, false, previousParamsTokens
+            )
+        };
+    }
+
+    private mergeResponseWithHistory(
+        lastHistoryItemType: "model" | "user", history: ChatHistoryItem[], responseSegments: ChatSegments | string[]
+    ) {
+        const mergedHistory = mergeGeneratedResultWithChatHistory(lastHistoryItemType, history, responseSegments);
+        const interruptedCall = this.getInterruptedFunctionCall();
+        const lastMessage = mergedHistory.at(-1);
+        if (interruptedCall != null && lastMessage?.type === "model")
+            return [
+                ...mergedHistory.slice(0, -1),
+                {...lastMessage, response: [...lastMessage.response, interruptedCall]}
+            ];
+
+        return mergedHistory;
     }
 
     public async dispose() {
@@ -2177,6 +2275,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public onModelResponseStartShouldOpenThoughtSegment() {
+        if (this.functionCallPrefill != null)
+            return false;
+
         const lastModelResponseItem = this.resolvedHistory.at(-1);
         if (lastModelResponseItem == null || lastModelResponseItem.type !== "model")
             return false;
@@ -2223,6 +2324,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
     }
 
     public ensureReopenedThoughtSegmentAfterFunctionCallsIfNeeded() {
+        if (this.functionCallPrefill != null)
+            return;
+
         if (this.chatWrapper.settings.segments?.thought?.reopenAfterFunctionCalls !== true)
             return;
 
@@ -3064,10 +3168,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         this.chatWrapper.settings.functions.call.paramsPrefix,
                         "{{functionName}}",
                         this.functionEvaluationFunctionName
-                    )
+                    ),
+                    this.functionCallPrefillParamsText
                 ]);
                 const lastPartTokens = resolveLastTokens([this.currentFunctionCallCurrentPartTokens]);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
+                const prefillTokens = this.llamaChat.model.tokenize(this.functionCallPrefillParamsText, false, "trimLeadingSpace");
 
                 let params: any = undefined;
                 let paramsText: string = "";
@@ -3100,6 +3206,27 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         model: this.llamaChat.model,
                         grammar: this.functionsGrammar
                     });
+
+                    // The supplied JSON prefix is already in the context. Consume it in the
+                    // grammar as well, so the grammar constrains only the missing suffix.
+                    if (this.functionCallPrefillParamsText !== "") {
+                        if (this.llamaChat.model.detokenize(prefillTokens) !== this.functionCallPrefillParamsText)
+                            throw new Error("The model tokenizer cannot represent the function argument prefix exactly");
+
+                        for (const token of prefillTokens) {
+                            if (!LlamaSampler._canBeNextTokenForGrammarEvaluationState(
+                                this.llamaChat.model._llama, this.functionsEvaluationState, token
+                            ))
+                                throw new LlamaFunctionCallValidationError(
+                                    `The supplied argument prefix for "${this.functionEvaluationFunctionName}" violates its grammar`,
+                                    this.functions as NonNullable<Functions>, this.chatWrapper, this.functionCallPrefillParamsText
+                                );
+
+                            LlamaSampler._acceptTokenOnGrammarEvaluationState(
+                                this.llamaChat.model._llama, this.functionsEvaluationState, token
+                            );
+                        }
+                    }
 
                     StopGenerationDetector.resolveStopTriggers(this.functionsGrammar.stopGenerationTriggers, this.llamaChat.model.tokenizer)
                         .map((stopTrigger) => functionParamsGenerationDoneDetector.addStopTrigger(stopTrigger));
@@ -3167,7 +3294,9 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         return stopRes;
 
                     const functionCallParamsText =
-                        this.llamaChat.model.detokenize(this.currentFunctionCallCurrentPartTokens, false, lastPartTokens);
+                        this.functionCallPrefillParamsText + this.llamaChat.model.detokenize(
+                            this.currentFunctionCallCurrentPartTokens, false, resolveLastTokens([lastPartTokens, prefillTokens])
+                        );
                     const parsedFunctionParams = functionParamsGrammar.parseParams(functionCallParamsText);
                     params = parsedFunctionParams.params;
                     paramsText = parsedFunctionParams.raw;
@@ -3188,19 +3317,11 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                         this.functionEvaluationFunctionName
                     )
                 ]);
-                this.resFunctionCalls.push({
-                    functionName: this.functionEvaluationFunctionName,
-                    params,
-                    raw: functionCallText
-                });
-                this.onFunctionCall?.({
-                    functionName: this.functionEvaluationFunctionName,
-                    params: structuredClone(params),
-                    raw: functionCallText.toJSON()
-                });
+                this.recordFunctionCall(this.functionEvaluationFunctionName, params, functionCallText);
                 this.currentFunctionCallPreviousText = LlamaText([]);
                 this.currentFunctionCallCurrentPartTokens.length = 0;
                 this.functionEvaluationFunctionName = "";
+                this.functionCallPrefillParamsText = "";
 
                 if (this.chatWrapper.settings.functions.parallelism == null || (
                     this.maxParallelFunctionCalls != null && this.maxParallelFunctionCalls <= this.resFunctionCalls.length
@@ -3780,12 +3901,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     .join(""),
                 fullResponse: responseSegments,
                 lastEvaluation: {
-                    contextWindow: mergeGeneratedResultWithChatHistory(
+                    contextWindow: this.mergeResponseWithHistory(
                         lastHistoryItemType,
                         this.lastContextWindowHistory,
                         this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                     ),
-                    cleanHistory: mergeGeneratedResultWithChatHistory(
+                    cleanHistory: this.mergeResponseWithHistory(
                         lastHistoryItemType,
                         this.resolvedHistory,
                         responseSegments
@@ -3874,7 +3995,7 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
 
     public handleAbortTrigger(lastHistoryItemType: "user" | "model") {
         if (this.shouldAbort && this.signal?.aborted && this.stopOnAbortSignal) {
-            if (this.res.length === 0)
+            if (this.res.length === 0 && this.getInterruptedFunctionCall() == null)
                 throw this.signal.reason;
 
             this.segmentHandler.onFinishedGeneration();
@@ -3887,12 +4008,12 @@ class GenerateResponseState<const Functions extends ChatModelFunctions | undefin
                     .join(""),
                 fullResponse: responseSegments,
                 lastEvaluation: {
-                    contextWindow: mergeGeneratedResultWithChatHistory(
+                    contextWindow: this.mergeResponseWithHistory(
                         lastHistoryItemType,
                         this.lastContextWindowHistory,
                         this.segmentHandler.getContextWindowModelResponseSegments(trimWhitespaceSuffix)
                     ),
-                    cleanHistory: mergeGeneratedResultWithChatHistory(
+                    cleanHistory: this.mergeResponseWithHistory(
                         lastHistoryItemType,
                         this.resolvedHistory,
                         responseSegments

@@ -453,10 +453,14 @@ export class MuseChatWrapper extends ChatWrapper {
                 else
                     void (response.segmentType satisfies never);
             } else if (response.type === "functionCall") {
-                if (response.startsNewChunk)
+                if (response.startsNewChunk || response.ended !== undefined)
                     addPendingFunctions();
 
                 pendingFunctionCalls.push(response);
+                if (response.ended !== undefined) {
+                    addPendingFunctions();
+                    canEnableTriggers = false;
+                }
             } else
                 void (response satisfies never);
         }

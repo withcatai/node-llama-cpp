@@ -69,6 +69,18 @@ export abstract class ChatWrapper {
             return LlamaText([]);
 
         for (const functionCall of functionCalls) {
+            if (functionCall.ended !== undefined) {
+                if (functionCalls.length !== 1)
+                    throw new Error("A pending function call must start a new function-calling chunk");
+
+                return LlamaText([
+                    this.settings.functions.parallelism?.call.sectionPrefix ?? "",
+                    functionCall.ended
+                        ? this.generateFunctionCall(functionCall.name, functionCall.params)
+                        : this.generateFunctionCallPrefix(functionCall.name, functionCall.paramsText)
+                ]);
+            }
+
             if (useRawCall && functionCall.rawCall != null)
                 calls.push(LlamaText.fromJSON(functionCall.rawCall));
             else
@@ -110,17 +122,24 @@ export abstract class ChatWrapper {
     public generateFunctionCall(name: string, params: any): LlamaText {
         const emptyCallParamsPlaceholder = this.settings.functions.call.emptyCallParamsPlaceholder;
         return LlamaText([
-            this.settings.functions.call.prefix,
-            name,
-            replaceRegularTextInLlamaText(this.settings.functions.call.paramsPrefix, "{{functionName}}", name),
-            (
+            this.generateFunctionCallPrefix(name, (
                 params === undefined
                     ? (emptyCallParamsPlaceholder === undefined || emptyCallParamsPlaceholder === "")
                         ? ""
                         : jsonDumps(emptyCallParamsPlaceholder)
                     : jsonDumps(params)
-            ),
+            )),
             replaceRegularTextInLlamaText(this.settings.functions.call.suffix, "{{functionName}}", name)
+        ]);
+    }
+
+    /** Render the start of a function call, stopping inside the argument text without closing the call. */
+    public generateFunctionCallPrefix(name: string, paramsText: string = ""): LlamaText {
+        return LlamaText([
+            this.settings.functions.call.prefix,
+            name,
+            replaceRegularTextInLlamaText(this.settings.functions.call.paramsPrefix, "{{functionName}}", name),
+            paramsText
         ]);
     }
 
@@ -228,10 +247,13 @@ export abstract class ChatWrapper {
                 continue;
             }
 
-            if (response.startsNewChunk)
+            if (response.startsNewChunk || response.ended !== undefined)
                 addFunctionCalls();
 
             pendingFunctionCalls.push(response);
+
+            if (response.ended !== undefined)
+                addFunctionCalls();
         }
 
         addFunctionCalls();

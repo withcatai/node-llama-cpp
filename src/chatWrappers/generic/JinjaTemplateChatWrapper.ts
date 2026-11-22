@@ -16,6 +16,7 @@ import {tryMatrix} from "../../utils/optionsMatrix.js";
 import {getStandardizedChatWrapperSegmentDefinition} from "../../utils/getStandardizedChatWrapperSegmentDefinition.js";
 import {replaceRegularTextInLlamaText} from "../utils/replaceRegularTextInLlamaText.js";
 import {LruCache} from "../../utils/LruCache.js";
+import {getFunctionCallPrefill, withoutFunctionCallPrefill} from "../../utils/getFunctionCallPrefill.js";
 import {ChatHistoryFunctionCallMessageTemplate, parseFunctionCallMessageTemplate} from "./utils/chatHistoryFunctionCallMessageTemplate.js";
 import {
     templateSegmentOptionsToChatWrapperSettings, TemplateChatWrapperSegmentsOptions
@@ -285,7 +286,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                         return {
                             ...item,
                             response: item.response.map((response) => {
-                                if (typeof response === "string" || response.type !== "functionCall")
+                                if (typeof response === "string" || response.type !== "functionCall" || response.ended === false)
                                     return response;
 
                                 return {
@@ -466,6 +467,20 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState & {
         transformedSystemMessagesToUserMessages: boolean
     } {
+        const prefill = getFunctionCallPrefill(chatHistory);
+        if (prefill != null) {
+            // Render the ordinary assistant generation prefix through the model's Jinja
+            // template, then append the same function syntax used during inference.
+            // Rendering an incomplete tool_calls JSON value through Jinja would close it.
+            const state = this.generateContextState({
+                chatHistory: withoutFunctionCallPrefill(chatHistory), availableFunctions, documentFunctionParams
+            });
+            return {
+                ...state,
+                contextText: LlamaText([state.contextText, this.generateFunctionCallsAndResults([prefill])])
+            };
+        }
+
         const {
             contextText, stopGenerationTriggers, ignoreStartText, functionCall, transformedSystemMessagesToUserMessages
         } = this._generateContextState({
@@ -714,7 +729,7 @@ export class JinjaTemplateChatWrapper extends ChatWrapper {
                     return {
                         ...item,
                         response: item.response.map((response) => {
-                            if (typeof response === "string" || response.type !== "functionCall")
+                            if (typeof response === "string" || response.type !== "functionCall" || response.ended === false)
                                 return response;
 
                             return {

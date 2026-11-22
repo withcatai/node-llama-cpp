@@ -111,7 +111,8 @@ import {experimentalChunkDocument} from "./evaluator/utils/chunkDocument.js";
 import {ggufFileQuantNames} from "./gguf/utils/ggufQuantNames.js";
 
 import {
-    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelSegmentType, type ChatModelSegment, type ChatModelFunctions,
+    type ChatHistoryItem, type ChatModelFunctionCall, type ChatModelFunctionCallResult, type ChatModelFunctionCallPrefill,
+    type ChatModelFunctionCallReady, type ChatModelSegmentType, type ChatModelSegment, type ChatModelFunctions,
     type ChatModelResponse, type ChatSessionModelFunction, type ChatSessionModelFunctions, type ChatSystemMessage, type ChatUserMessage,
     type Token, type Tokenizer, type Detokenizer, isChatModelResponseFunctionCall, isChatModelResponseSegment,
     type LLamaContextualRepeatPenalty, type ChatWrapperSettings, type ChatWrapperSettingsSegment,
@@ -309,6 +310,9 @@ export {
     getModuleVersion,
     type ChatHistoryItem,
     type ChatModelFunctionCall,
+    type ChatModelFunctionCallResult,
+    type ChatModelFunctionCallPrefill,
+    type ChatModelFunctionCallReady,
     type ChatModelSegmentType,
     type ChatModelSegment,
     type ChatModelFunctions,

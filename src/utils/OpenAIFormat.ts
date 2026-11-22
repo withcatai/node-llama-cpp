@@ -283,29 +283,32 @@ export function fromChatHistoryToIntermediateOpenAiMessages<Functions extends Ch
                         type: "function",
                         function: {
                             name: response.name,
-                            arguments: stringifyFunctionParams
-                                ? response.params === undefined
-                                    ? ""
-                                    : jsonDumps(response.params)
-                                : response.params
+                            arguments: response.ended === false
+                                ? (response.paramsText ?? "")
+                                : stringifyFunctionParams
+                                    ? response.params === undefined
+                                        ? ""
+                                        : jsonDumps(response.params)
+                                    : response.params
                         }
                     });
-                    messages.push({
-                        role: "tool",
-                        "tool_call_id": toolCallId,
-                        content: stringifyFunctionResults
-                            ? response.result === undefined
-                                ? ""
-                                : jsonDumps(response.result)
-                            : response.result,
-                        ...(
-                            setFunctionNameInResponse == false ? {} : {
-                                name: typeof setFunctionNameInResponse === "string"
-                                    ? setFunctionNameInResponse
-                                    : response.name
-                            }
-                        )
-                    });
+                    if (response.ended === undefined)
+                        messages.push({
+                            role: "tool",
+                            "tool_call_id": toolCallId,
+                            content: stringifyFunctionResults
+                                ? response.result === undefined
+                                    ? ""
+                                    : jsonDumps(response.result)
+                                : response.result,
+                            ...(
+                                setFunctionNameInResponse == false ? {} : {
+                                    name: typeof setFunctionNameInResponse === "string"
+                                        ? setFunctionNameInResponse
+                                        : response.name
+                                }
+                            )
+                        });
 
                     if (thoughtPrefixObjectSetting?.type === "openedOnStart" && thoughtPrefixObjectSetting.afterFunctionCalls)
                         segmentStack.push("thought");
