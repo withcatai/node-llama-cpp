@@ -1449,9 +1449,18 @@ export class LlamaContextSequence {
             const minKvCachePosition = (this._contextTokens.length === 0 && this._loadedTokenPredictions.length === 0)
                 ? 0
                 : Math.max(0, this._context._ctx.getSequenceKvCacheMinPosition(this._sequenceId));
-            if (resolvedRanges[0] != null && resolvedRanges[0].start <= minKvCachePosition)
-                // we have to drop the cache and reevaluate the sequence due to missing KV cache
+            if (resolvedRanges[0] != null && resolvedRanges[0].start <= minKvCachePosition &&
+                !(this.model.fileInsights.isHybrid || this.model.fileInsights.isRecurrent)
+            ) {
+                // we have to drop the cache and reevaluate the sequence due to missing KV cache.
+                // hybrid and recurrent models are excluded from this check, since their minimal KV cache position
+                // always points at the latest token (the recurrent state is only kept for the current position),
+                // so every tail erase would be considered unrecoverable here.
+                // instead, we let the native `seq_rm` call decide whether the removal is possible -
+                // it can roll back the recurrent state using the `n_rs_seq` snapshots,
+                // and it fails atomically when it can't, so the fallback below still handles that case.
                 deletionSuccessful = false;
+            }
 
             const tokenPredictionsToRemove = (resolvedRanges.length > 0 && canRemovePredictionTokens)
                 ? this._loadedTokenPredictions.length
