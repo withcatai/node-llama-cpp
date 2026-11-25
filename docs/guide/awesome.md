@@ -18,6 +18,9 @@ import DataBadge from "../../.vitepress/components/DataBadge/DataBadge.vue";
 * [Clippy](https://felixrieseberg.github.io/clippy/) ([GitHub](https://github.com/felixrieseberg/clippy)) - Clippy, resurrected from the 1990s, now with some AI
   <br /><DataBadge title="License" content="MIT"/>
 
+* [Semantic Golfer](https://semantic-golfer.giladgd.com) ([GitHub](https://github.com/giladgd/semantic-golfer)) - How little can you write and still get everything right? Play text golfing with `node-llama-cpp`'s structured decisions
+  <br /><DataBadge title="License" content="MIT"/>
+
 
 ## Proprietary
 * [BashBuddy](https://bashbuddy.run) ([GitHub](https://github.com/wosherco/bashbuddy)) - write bash commands with natural language
