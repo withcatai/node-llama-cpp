@@ -89,7 +89,7 @@ if (NLC_CI_MODE AND GGML_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT N
     find_package(CUDAToolkit)
     if (CUDAToolkit_VERSION VERSION_LESS "13")
         list(APPEND CMAKE_CUDA_ARCHITECTURES 50-virtual 61-virtual 70-virtual)
-        list(APPEND CMAKE_CUDA_ARCHITECTURES 75-virtual 80-virtual 86-real)
+        list(APPEND CMAKE_CUDA_ARCHITECTURES 75-virtual 80-virtual)
 
         if (CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.8")
             list(APPEND CMAKE_CUDA_ARCHITECTURES 89-real 90-virtual)
@@ -105,6 +105,7 @@ if (NLC_CI_MODE AND GGML_CUDA AND NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT N
         # Remove these architectures due to low usage in CUDA 12 and because it inflates the binary size too much
         list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES 89-real)
         list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES 90-virtual)
+        list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES 86-real) # Already supported in the Cuda 13 build, and covered by 80-virtual in CUDA 12
         message(STATUS "CUDAToolkit version: ${CUDAToolkit_VERSION}, setting CMAKE_CUDA_ARCHITECTURES to ${CMAKE_CUDA_ARCHITECTURES}")
     endif()
 endif()
