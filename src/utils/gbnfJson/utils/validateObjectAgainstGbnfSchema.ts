@@ -160,8 +160,10 @@ function validateObject<T extends GbnfJsonObjectSchema>(
     defs: Record<string, GbnfJsonSchema> = {},
     defScopeDefs: DefScopeDefs = new DefScopeDefs()
 ): object is GbnfJsonSchemaToType<T> {
-    if (typeof object !== "object" || object === null)
-        throw new TechnicalValidationError(`Expected an object but got "${typeof object}"`);
+    if (typeof object !== "object" || object === null || Array.isArray(object))
+        throw new TechnicalValidationError(
+            `Expected an object but got "${object === null ? "null" : Array.isArray(object) ? "array" : typeof object}"`
+        );
 
     let res = true;
 
@@ -265,9 +267,9 @@ function validateBasicString<T extends GbnfJsonBasicStringSchema>(object: any, s
 }
 
 const dateRegex = /^\d{4}-(0[1-9]|1[012])-(0[1-9]|[12]\d|3[01])$/;
-const timeRegex = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3])?:[0-5][0-9])$/;
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$/;
 const datetimeRegex =
-    /^\d{4}-(0[1-9]|1[012])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3])?:[0-5][0-9])$/;
+    /^\d{4}-(0[1-9]|1[012])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$/;
 
 function validateFormatString<T extends GbnfJsonFormatStringSchema>(object: any, schema: T): object is GbnfJsonSchemaToType<T> {
     if (typeof object !== "string")
