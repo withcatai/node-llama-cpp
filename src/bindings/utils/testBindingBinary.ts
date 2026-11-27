@@ -129,9 +129,7 @@ export async function testBindingBinary(
         const subProcess = forkFunction.fork(__filename, [], {
             detached: false,
             silent: true,
-            stdio: pipeOutputOnNode
-                ? ["ignore", "pipe", "pipe", "ipc"]
-                : ["ignore", "ignore", "ignore", "ipc"],
+            stdio: ["ignore", "pipe", "pipe", "ipc"],
             env: {
                 ...process.env,
                 TEST_BINDING_CP: "true"
@@ -161,24 +159,22 @@ export async function testBindingBinary(
             onExit(subProcess.exitCode ?? -1);
         }
 
-        function onStdout(data: string) {
-            if (!pipeSet)
+        function onStdout(data: string | Buffer) {
+            if (!pipeOutputOnNode || !pipeSet)
                 return;
 
             process.stdout.write(data);
         }
 
-        function onStderr(data: string) {
-            if (!pipeSet)
+        function onStderr(data: string | Buffer) {
+            if (!pipeOutputOnNode || !pipeSet)
                 return;
 
             process.stderr.write(data);
         }
 
-        if (pipeOutputOnNode) {
-            subProcess.stdout?.on("data", onStdout);
-            subProcess.stderr?.on("data", onStderr);
-        }
+        subProcess.stdout?.on("data", onStdout);
+        subProcess.stderr?.on("data", onStderr);
 
         function pipeMessages() {
             if (!pipeOutputOnNode || pipeSet)
