@@ -59,7 +59,7 @@ export class GgufNetworkFetchFileReader extends GgufFileReader {
         if (endOffset > this._buffer.length)
             return this._fetchToExpandBufferUpToOffset(endOffset)
                 .then(() => {
-                    if (endOffset >= this._buffer.length)
+                    if (endOffset > this._buffer.length)
                         throw new Error("Expected buffer to be long enough for the requested byte range");
                 });
 
