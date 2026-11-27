@@ -32,6 +32,27 @@ describe("utils", () => {
             expect(truncateTextAndRoundToWords("hello world", 6, undefined, false)).toBe("hello");
             expect(truncateTextAndRoundToWords("hello world", 6, undefined, true)).toBe("world");
         });
+
+        test("truncating from the end rounds to the last whole word and keeps the start of the text", () => {
+            const text = "the quick brown fox jumps over the lazy dog";
+
+            expect(truncateTextAndRoundToWords(text, 1, undefined, false)).toBe("the quick brown fox jumps over the lazy");
+            expect(truncateTextAndRoundToWords(text, 5, undefined, false)).toBe("the quick brown fox jumps over the");
+            expect(truncateTextAndRoundToWords(text, 30, undefined, false)).toBe("the quick");
+        });
+
+        test("truncating from the end of a long word replaces its end with an ellipsis", () => {
+            expect(truncateTextAndRoundToWords("a supercalifragilistic", 2, undefined, false)).toBe("a supercalifragil...");
+            expect(truncateTextAndRoundToWords("supercalifragilistic", 2, undefined, false)).toBe("supercalifragil...");
+        });
+
+        test("truncating from the start rounds to the next whole word and keeps the end of the text", () => {
+            const text = "the quick brown fox jumps over the lazy dog";
+
+            expect(truncateTextAndRoundToWords(text, 1, undefined, true)).toBe("quick brown fox jumps over the lazy dog");
+            expect(truncateTextAndRoundToWords(text, 30, undefined, true)).toBe("the lazy dog");
+            expect(truncateTextAndRoundToWords("supercalifragilistic a", 2, undefined, true)).toBe("...califragilistic a");
+        });
     });
 
     describe("truncateLlamaTextAndRoundToWords", () => {

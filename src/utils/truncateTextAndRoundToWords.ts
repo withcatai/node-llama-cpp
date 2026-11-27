@@ -50,22 +50,22 @@ export function truncateTextAndRoundToWords(
         if (truncateSize === 0 || (text.length === res.length || text[res.length] === " "))
             return res;
 
-        const nextSpaceIndex = res.lastIndexOf(" ");
+        const lastSpaceIndex = res.lastIndexOf(" ");
 
-        if (nextSpaceIndex < 0) {
+        if (lastSpaceIndex < 0) {
             if (res.length <= maxRound || res.length < truncatePrefix.length)
                 return "";
 
-            return res.slice(truncatePrefix.length) + truncatePrefix;
+            return res.slice(0, -truncatePrefix.length) + truncatePrefix;
         }
 
-        if (nextSpaceIndex <= maxRound)
-            return res.slice(0, nextSpaceIndex);
+        if (res.length - lastSpaceIndex - 1 <= maxRound)
+            return res.slice(0, lastSpaceIndex);
 
         if (res.length < truncatePrefix.length)
             return "";
 
-        return res.slice(truncatePrefix.length) + truncatePrefix;
+        return res.slice(0, -truncatePrefix.length) + truncatePrefix;
     }
 }
 
