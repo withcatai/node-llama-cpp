@@ -91,6 +91,138 @@ This may not be necessary for the model you use, but can be helpful in some case
 When we encounter an error, like an unrecognized fruit, we have to communicate it to the model in a way that it can understand,
 so we return a text response explaining what went wrong. Throwing an error will just abort the generation, so avoid doing that if you want the generation to continue.
 
+## Prefilling and Resuming Function Calls
+
+You can supply an unfinished function call as the final item of a model message and continue generating its arguments.
+This lets you select which function is called while leaving the argument values for the model to choose.
+The same mechanism also accepts a complete call whose arguments you supply yourself.
+
+The following examples assume `chat` is a [`LlamaChat`](../api/classes/LlamaChat.md) instance and `functions`
+contains a `getFruitPrice` function with a parameter schema:
+
+```typescript
+import {type LlamaChat, type ChatHistoryItem, type ChatModelFunctions} from "node-llama-cpp";
+
+declare const chat: LlamaChat;
+
+const functions: ChatModelFunctions = {
+    getFruitPrice: {
+        params: {
+            type: "object",
+            properties: {
+                name: {
+                    type: "string"
+                }
+            }
+        }
+    }
+};
+const history: ChatHistoryItem[] = [{
+    type: "user",
+    text: "Check the price of an apple."
+}, {
+    type: "model",
+    response: [{
+        type: "functionCall",
+        name: "getFruitPrice",
+        ended: false
+    }]
+}];
+
+const completion = await chat.generateResponse(history, {functions});
+console.log(completion.functionCalls); // generated arguments for getFruitPrice
+```
+
+To continue from the middle of an argument, supply a **literal JSON text prefix** in `paramsText`:
+
+```typescript
+import {type ChatModelFunctionCall} from "node-llama-cpp";
+
+const prefill: ChatModelFunctionCall = {
+    type: "functionCall",
+    name: "getFruitPrice",
+    paramsText: "{\"name\":\"app",
+    ended: false
+};
+```
+
+The model generates only the remaining argument text, constrained by the function's JSON schema.
+`paramsText` can be syntactically incomplete JSON. The library validates that the prefix can be continued by the
+argument grammar. An invalid prefix is rejected rather than being silently replaced.
+Even if `paramsText` already contains a complete JSON value, `ended: false` means that the model still
+needs to finish the argument grammar.
+
+To submit a complete call without generating any arguments, use `ended: true` and a parsed `params` value:
+
+```typescript
+import {type ChatModelFunctionCall} from "node-llama-cpp";
+
+const ready: ChatModelFunctionCall = {
+    type: "functionCall",
+    name: "getFruitPrice",
+    params: {name: "apple"},
+    ended: true
+};
+```
+
+The parameters are validated against the function schema, and `generateResponse()` returns the function call immediately
+without sampling further model tokens. `LlamaChat` reports calls but does not execute function handlers itself.
+A call with `ended: true` is **not** the same as a historical completed call: historical calls have a `result`
+property and do not have `ended`. Those historical calls are never re-executed just because they are present in the history.
+
+### Using prefills with LlamaChatSession
+
+To run your function handler and continue the conversation, set the session history first, then use
+`continueResponseWithMeta()` rather than `promptWithMeta()`, which would append a new user message:
+
+```typescript
+import {type LlamaChatSession, defineChatSessionFunction, type ChatHistoryItem} from "node-llama-cpp";
+
+declare const session: LlamaChatSession;
+
+const functions = {
+    getFruitPrice: defineChatSessionFunction({
+        description: "Get the price of a fruit",
+        params: {
+            type: "object",
+            properties: {
+                name: {
+                    type: "string"
+                }
+            }
+        },
+        handler(params) {
+            return params.name;
+        }
+    })
+};
+const history: ChatHistoryItem[] = [{
+    type: "user",
+    text: "Check the price of an apple."
+}, {
+    type: "model",
+    response: [{
+        type: "functionCall",
+        name: "getFruitPrice",
+        ended: false,
+        paramsText: "{\"name\":\"app"
+    }]
+}];
+
+session.setChatHistory(history);
+
+const answer = await session.continueResponseWithMeta({functions});
+console.log(answer.responseText);
+```
+
+`continueResponse()` returns just the response text. Both methods use the existing function-handler execution
+and history-recording behavior. An interrupted argument generation preserves a resumable unfinished call in
+`lastEvaluation.cleanHistory` (or the session's chat history), which can be passed back for continuation.
+
+A pending call must be the **last response item of the last model message**; it cannot be placed inside past history.
+Only functions provided to that generation call can be prefilled. Actual inference requires a model and chat wrapper
+whose function-call formatting matches the model's capabilities.
+
 ## Function Parameters
 All the parameters passed to a function are considered required by the schema.
 This is intentional because many models struggle to use optional parameters effectively.

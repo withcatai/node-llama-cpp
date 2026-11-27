@@ -235,10 +235,12 @@ export class Gemma4ChatWrapper extends ChatWrapper {
                 else
                     void (response.segmentType satisfies never);
             } else if (response.type === "functionCall") {
-                if (response.startsNewChunk)
+                if (response.startsNewChunk || response.ended !== undefined)
                     addPendingFunctions();
 
                 pendingFunctionCalls.push(response);
+                if (response.ended !== undefined)
+                    addPendingFunctions();
             } else
                 void (response satisfies never);
         }

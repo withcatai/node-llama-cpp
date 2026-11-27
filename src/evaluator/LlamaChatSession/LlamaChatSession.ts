@@ -18,6 +18,7 @@ import {wrapAbortSignal} from "../../utils/wrapAbortSignal.js";
 import {safeEventCallback} from "../../utils/safeEventCallback.js";
 import {GgufArchitectureType} from "../../gguf/types/GgufMetadataTypes.js";
 import {DecisionAnswers, DecisionQuestions} from "../LlamaDecisionContext/types.js";
+import {addResolvedFunctionCallBeforePrefill, getFunctionCallPrefill} from "../../utils/getFunctionCallPrefill.js";
 import {
     LLamaChatPromptCompletionEngineOptions, LlamaChatSessionPromptCompletionEngine
 } from "./utils/LlamaChatSessionPromptCompletionEngine.js";
@@ -700,7 +701,32 @@ export class LlamaChatSession {
      * @param prompt
      * @param [options]
      */
-    public async promptWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string, {
+    public promptWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(
+        prompt: string, options: LLamaChatPromptOptions<Functions> = {}
+    ) {
+        return this._promptWithMeta<Functions>(prompt, options);
+    }
+
+    /**
+     * Continue the last assistant response without appending a user turn.
+     * This also resumes an unfinished function call, or dispatches a call with `ended: true`.
+     * Use `setChatHistory()` to supply the desired assistant prefill first.
+     */
+    public async continueResponse<const Functions extends ChatSessionModelFunctions | undefined = undefined>(
+        options: LLamaChatPromptOptions<Functions> = {}
+    ) {
+        const {responseText} = await this.continueResponseWithMeta<Functions>(options);
+        return responseText;
+    }
+
+    /** Continue the last assistant response and return its response, history, and stop metadata. */
+    public continueResponseWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(
+        options: LLamaChatPromptOptions<Functions> = {}
+    ) {
+        return this._promptWithMeta<Functions>(undefined, options);
+    }
+
+    private async _promptWithMeta<const Functions extends ChatSessionModelFunctions | undefined = undefined>(prompt: string | undefined, {
         functions,
         documentFunctionParams,
         maxParallelFunctionCalls,
@@ -745,24 +771,38 @@ export class LlamaChatSession {
             let lastEvaluation = this._canUseContextWindowForCompletion
                 ? this._lastEvaluation
                 : undefined;
-            let newChatHistory = appendUserMessageToChatHistory(this._chatHistory, prompt);
+            let newChatHistory = prompt == null
+                ? this._chatHistory.slice()
+                : appendUserMessageToChatHistory(this._chatHistory, prompt);
             let newContextWindowChatHistory = lastEvaluation?.contextWindow == null
                 ? undefined
-                : appendUserMessageToChatHistory(lastEvaluation?.contextWindow, prompt);
+                : prompt == null
+                    ? lastEvaluation.contextWindow.slice()
+                    : appendUserMessageToChatHistory(lastEvaluation.contextWindow, prompt);
             let previousFunctionCalls: number = 0;
+
+            if (prompt == null && newChatHistory.at(-1)?.type !== "model")
+                throw new Error("Cannot continue a response unless the chat history ends with a model message");
+            if (prompt == null && responsePrefix != null)
+                throw new Error("responsePrefix cannot be used when continuing an existing response");
+
+            // The session must not silently resume a historical, already executed function call.
+            if (prompt == null)
+                getFunctionCallPrefill(newChatHistory);
 
             const resolvedResponsePrefix = (responsePrefix != null && responsePrefix !== "")
                 ? responsePrefix
                 : undefined;
 
-            newChatHistory.push({
-                type: "model",
-                response: resolvedResponsePrefix != null
-                    ? [resolvedResponsePrefix]
-                    : []
-            });
+            if (prompt != null)
+                newChatHistory.push({
+                    type: "model",
+                    response: resolvedResponsePrefix != null
+                        ? [resolvedResponsePrefix]
+                        : []
+                });
 
-            if (newContextWindowChatHistory != null)
+            if (prompt != null && newContextWindowChatHistory != null)
                 newContextWindowChatHistory.push({
                     type: "model",
                     response: resolvedResponsePrefix != null
@@ -1435,7 +1475,7 @@ function addFunctionCallToChatHistory({
     if (startsNewChunk)
         functionCall.startsNewChunk = true;
 
-    modelResponse.push(functionCall);
+    addResolvedFunctionCallBeforePrefill(modelResponse, functionCall);
 
     return newChatHistory;
 }

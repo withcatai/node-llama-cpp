@@ -314,15 +314,21 @@ export class HarmonyChatWrapper extends ChatWrapper {
     public override generateFunctionCall(name: string, params: any): LlamaText {
         const emptyCallParamsPlaceholder = this.settings.functions.call.emptyCallParamsPlaceholder;
         return LlamaText([
-            new SpecialTokensText("<|start|>assistant<|channel|>commentary to="),
-            "functions.", name,
-            this.settings.functions.call.paramsPrefix,
-            params === undefined
+            this.generateFunctionCallPrefix(name, params === undefined
                 ? (emptyCallParamsPlaceholder === undefined || emptyCallParamsPlaceholder === "")
                     ? ""
                     : jsonDumps(emptyCallParamsPlaceholder)
-                : jsonDumps(params),
+                : jsonDumps(params)),
             this.settings.functions.call.suffix
+        ]);
+    }
+
+    public override generateFunctionCallPrefix(name: string, paramsText: string = ""): LlamaText {
+        return LlamaText([
+            new SpecialTokensText("<|start|>assistant<|channel|>commentary to="),
+            "functions.", name,
+            this.settings.functions.call.paramsPrefix,
+            paramsText
         ]);
     }
 
@@ -510,14 +516,20 @@ export class HarmonyChatWrapper extends ChatWrapper {
                 } else
                     void (response.segmentType satisfies never);
             } else if (response.type === "functionCall") {
-                res.push(
-                    LlamaText([
-                        (response.rawCall != null && useRawValues)
-                            ? LlamaText.fromJSON(response.rawCall)
-                            : this.generateFunctionCall(response.name, response.params),
-                        this.generateFunctionCallResult(response.name, response.params, response.result)
-                    ])
-                );
+                if (response.ended !== undefined) {
+                    res.push(response.ended
+                        ? this.generateFunctionCall(response.name, response.params)
+                        : this.generateFunctionCallPrefix(response.name, response.paramsText));
+                    canEnableTriggers = false;
+                } else
+                    res.push(
+                        LlamaText([
+                            (response.rawCall != null && useRawValues)
+                                ? LlamaText.fromJSON(response.rawCall)
+                                : this.generateFunctionCall(response.name, response.params),
+                            this.generateFunctionCallResult(response.name, response.params, response.result)
+                        ])
+                    );
             } else
                 void (response satisfies never);
         }

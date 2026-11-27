@@ -4,6 +4,7 @@ import {
     ChatWrapperGenerateContextStateOptions, ChatWrapperGeneratedContextState, ChatWrapperSettings, isChatModelResponseFunctionCall,
     isChatModelResponseSegment
 } from "../types.js";
+import {getFunctionCallPrefill, withoutFunctionCallPrefill} from "../utils/getFunctionCallPrefill.js";
 import {LlamaText, SpecialToken, SpecialTokensText} from "../utils/LlamaText.js";
 import {ChatModelFunctionsDocumentationGenerator} from "./utils/ChatModelFunctionsDocumentationGenerator.js";
 import {jsonDumps} from "./utils/jsonDumps.js";
@@ -126,6 +127,17 @@ export class FunctionaryChatWrapper extends ChatWrapper {
     public override generateContextState({
         chatHistory, availableFunctions, documentFunctionParams
     }: ChatWrapperGenerateContextStateOptions): ChatWrapperGeneratedContextState {
+        const prefill = getFunctionCallPrefill(chatHistory);
+        if (prefill != null) {
+            const state = this.generateContextState({
+                chatHistory: withoutFunctionCallPrefill(chatHistory), availableFunctions, documentFunctionParams
+            });
+            return {
+                ...state,
+                contextText: LlamaText([state.contextText, this.generateFunctionCallsAndResults([prefill])])
+            };
+        }
+
         if (this.variation === "v3")
             return this._generateContextStateV3({chatHistory, availableFunctions, documentFunctionParams});
         else if (this.variation === "v2.llama3")
